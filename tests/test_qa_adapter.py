@@ -277,6 +277,73 @@ class TestLeakageDetection:
         codes = {f.code for f in report.findings}
         assert "F2" in codes
 
+    def _leaky_inputs(self, tmp_path: Path):
+        task_toml = _write_task(
+            tmp_path,
+            ground_truth={
+                "tiers": ["deterministic"],
+                "required_files": [{"path": "very/specific/path.py", "repo": "r"}],
+            },
+            instruction=(
+                "Investigate the bug; the file in question is at "
+                "very/specific/path.py and breaks under load."
+            ),
+        )
+        return load_task_inputs(task_toml)
+
+    def test_f2_waiver_downgrades_to_info(self, tmp_path: Path):
+        # A matching [[qa.waivers]] entry downgrades the F2 from warning to
+        # info and attaches the rationale, so it no longer counts as a warning.
+        from dataclasses import replace
+
+        inputs = self._leaky_inputs(tmp_path)
+        waived = replace(
+            inputs,
+            task_toml={
+                **inputs.task_toml,
+                "qa": {
+                    "waivers": [
+                        {
+                            "code": "F2",
+                            "token": "very/specific/path.py",
+                            "decision": "waive",
+                            "rationale": "given investigation entry point",
+                        }
+                    ]
+                },
+            },
+        )
+        report = run_qa_checks(waived)
+        f2 = next(f for f in report.findings if f.code == "F2")
+        assert f2.severity == "info"
+        assert "waived" in f2.message
+        assert "given investigation entry point" in f2.message
+
+    def test_f2_waiver_for_other_token_still_warns(self, tmp_path: Path):
+        # A waiver that names a different token must not suppress the real F2.
+        from dataclasses import replace
+
+        inputs = self._leaky_inputs(tmp_path)
+        waived = replace(
+            inputs,
+            task_toml={
+                **inputs.task_toml,
+                "qa": {
+                    "waivers": [
+                        {
+                            "code": "F2",
+                            "token": "some/other/file.py",
+                            "decision": "waive",
+                            "rationale": "unrelated",
+                        }
+                    ]
+                },
+            },
+        )
+        report = run_qa_checks(waived)
+        f2 = next(f for f in report.findings if f.code == "F2")
+        assert f2.severity == "warning"
+
 
 class TestSchemaValidatorIntegration:
     def test_warn_only_default_does_not_fail_on_qa_errors(self, tmp_path: Path):

@@ -112,3 +112,14 @@ source = "deterministic"
 path = "bitnami/consul/Chart.yaml"
 repo = "charts"
 confidence = 0.70
+
+[qa]
+
+[[qa.waivers]]
+code = "F2"
+token = "bitnami/consul/values.yaml"
+decision = "waive"
+rationale = "Config file named as the bounded search scope for the drift investigation (the prompt walks values.yaml through statefulset.yaml and consul-headless-service.yaml). The discriminative answer is the specific port-mapping drift (serflan-udp should bind containerPorts.serfLAN not serfWAN) and expected-vs-actual values, not which files."
+approved_by = "stephanie.jarmak (dec-uon CLOSED)"
+bead = "EnterpriseBench-1is"
+date = "2026-06-04"

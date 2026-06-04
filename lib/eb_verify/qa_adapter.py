@@ -390,22 +390,74 @@ def run_qa_checks(
         # Downgrade the lib's F2 errors to warnings: many EB task families
         # legitimately name the file under investigation in the prompt.
         # Surface the finding so authors can decide, but don't fail strict
-        # mode on this alone.
+        # mode on this alone. Tokens an author has explicitly triaged via a
+        # [[qa.waivers]] block are downgraded further, to info, with the
+        # recorded rationale attached — the finding stays visible as an audit
+        # trail but no longer counts as a warning.
+        waivers = _f2_waivers(inputs.task_toml)
         for raw_finding in check_aux_file_leakage(tokens, aux_files):
-            if raw_finding.code == "F2":
-                findings.append(
-                    Finding(
-                        severity="warning",
-                        code=raw_finding.code,
-                        message=raw_finding.message,
-                        location=raw_finding.location,
-                        suggested_fix=raw_finding.suggested_fix,
-                    )
-                )
-            else:
+            if raw_finding.code != "F2":
                 findings.append(raw_finding)
+                continue
+            waiver = _match_waiver(raw_finding.message, waivers)
+            if waiver is None:
+                severity, message = "warning", raw_finding.message
+            else:
+                severity = "info"
+                message = (
+                    f"{raw_finding.message} "
+                    f"[{waiver['decision']}d: {waiver['rationale']}]"
+                )
+            findings.append(
+                Finding(
+                    severity=severity,
+                    code=raw_finding.code,
+                    message=message,
+                    location=raw_finding.location,
+                    suggested_fix=raw_finding.suggested_fix,
+                )
+            )
 
     return QaReport(task_id=task_id, findings=findings)
+
+
+def _f2_waivers(task_toml: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Map waived F2 token -> waiver record from ``[[qa.waivers]]``.
+
+    Only ``code == "F2"`` waivers with an ``accept``/``waive`` decision are
+    returned, keyed by the oracle ``token`` they suppress.
+    """
+    qa = task_toml.get("qa") or {}
+    out: dict[str, dict[str, str]] = {}
+    for entry in qa.get("waivers", []) or []:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("code") != "F2":
+            continue
+        token = entry.get("token")
+        decision = entry.get("decision")
+        if not isinstance(token, str) or decision not in ("accept", "waive"):
+            continue
+        out[token] = {
+            "decision": str(decision),
+            "rationale": str(entry.get("rationale", "")),
+        }
+    return out
+
+
+def _match_waiver(
+    message: str, waivers: dict[str, dict[str, str]]
+) -> dict[str, str] | None:
+    """Return the waiver whose token the F2 ``message`` reports, if any.
+
+    The lib emits ``Oracle token <token!r> appears in aux file: ...``; the
+    token is matched by its ``repr`` so partial-path collisions can't match
+    the wrong waiver.
+    """
+    for token, waiver in waivers.items():
+        if f"token {token!r} " in message:
+            return waiver
+    return None
 
 
 def _strip_prefix(path: str, prefix: str) -> str:
