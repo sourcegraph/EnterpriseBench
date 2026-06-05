@@ -17,13 +17,19 @@ if [[ ! -f "$GT_FILE" ]]; then
     exit 1
 fi
 
-# bash+jq+grep (no python3 in container). Semantics identical to the prior python3:
+# bash+jq+grep (no python3 in container).
 # related_refs = gt.related_references else (gt.ground_truth // gt).sufficient_files[].path;
-# agent_refs extracted from answer.related_issues//references//related//docs (dict items use
-# .reference//.path//.url//.title, key-present-wins); a gt ref counts as matched when, for some
-# agent ref, the fraction of gt's significant tokens (split on / and ., lowercased, stopwords
-# removed) that also appear in the agent ref's significant tokens is >= 0.5. score =
-# round(found/len(related_refs), 2), passed at >= 0.3.
+# agent_refs = EVERY string scalar at any nesting depth in answer.json plus every object
+# key (the whole structure flattened). A gt ref counts as matched when, for some agent ref,
+# the fraction of gt's significant tokens (split on / and ., lowercased, stopwords removed)
+# that also appear in the agent ref's significant tokens is >= 0.5.
+# score = round(found/len(related_refs), 2), passed at >= 0.3.
+#
+# Why flatten the whole answer: instruction.md never names a specific top-level key, so
+# agents put correct gold paths nested under root_cause / code_mapping / free-form prose.
+# The earlier version read only the 4 top-level keys (related_issues/references/related/
+# docs), so a correctly-identified-but-nested path scored 0.0. Flattening matches the ref
+# wherever it lives. Threshold/weight are unchanged — only the search surface is widened.
 
 # related_refs (newline-delimited). Fallback to sufficient_files[].path when empty/absent.
 related_refs=$(jq -r '
@@ -38,29 +44,17 @@ if [[ -z "$related_refs" ]]; then
 fi
 total=$(printf '%s\n' "$related_refs" | grep -c . || true)
 
-# agent_refs raw value (first present key among related_issues/references/related/docs).
-# agent_n = number of refs python would collect; refs themselves emitted one per line.
-AGENT_PICK='(if has("related_issues") then .related_issues
-   elif has("references") then .references
-   elif has("related") then .related
-   elif has("docs") then .docs else [] end)'
-agent_n=$(jq -r "$AGENT_PICK"' as $raw
-  | if ($raw|type)=="array" then ([ $raw[] | select(type=="object" or type=="string") ] | length)
-    elif ($raw|type)=="string" then 1 else 0 end' "$ANSWER_FILE")
+# agent_refs: flatten the entire answer.json to every string scalar (any depth) plus
+# every object key, deduped. agent_n guards the "no references at all" case.
+FLATTEN='[ (.. | strings), (paths | .[] | select(type=="string")) ] | unique'
+agent_n=$(jq -r "$FLATTEN | length" "$ANSWER_FILE")
 
 if [[ "$agent_n" -eq 0 ]]; then
     echo '{"score": 0.0, "passed": false, "detail": "Agent provided no related references"}'
     exit 0
 fi
 
-agent_refs=$(jq -r "$AGENT_PICK"' as $raw
-  | if ($raw|type)=="array" then
-      $raw[] | if type=="object" then
-                 (if has("reference") then .reference elif has("path") then .path
-                  elif has("url") then .url elif has("title") then .title else "" end)
-               elif type=="string" then . else empty end
-    elif ($raw|type)=="string" then $raw
-    else empty end' "$ANSWER_FILE")
+agent_refs=$(jq -r "$FLATTEN | .[]" "$ANSWER_FILE")
 
 # Count gt refs matched by any agent ref via significant-token overlap >= 0.5.
 # Tokenization: lowercase, replace "/" and "." with spaces, split on whitespace, drop

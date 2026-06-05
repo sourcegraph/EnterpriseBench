@@ -342,6 +342,65 @@ class TestCSBLineage:
         )
 
 
+class TestRelatedIssuesNestedRef:
+    """Regression (p6ux.10): related_issues must find gold refs wherever the agent
+    puts them, not only under the 4 top-level keys.
+
+    instruction.md never names a specific output key, so agents routinely nest the
+    correct paths under root_cause / code_mapping / free-form prose. The verifier now
+    flattens the entire answer.json before token-overlap matching. These replay checks
+    use a real support-map task (grafana) and assert the nested ref is found.
+    """
+
+    GRAFANA_DIR = TASK_BASE / "support-mapping-dual-grafana-001"
+
+    def _gold_refs(self) -> list[str]:
+        gt = _load_ground_truth(self.GRAFANA_DIR)
+        refs = gt.get("related_references", [])
+        assert refs, "grafana ground_truth has no related_references to replay"
+        return refs
+
+    def test_nested_refs_are_found(self, tmp_path: Path) -> None:
+        """Gold paths nested under root_cause/code_mapping (NOT a top-level
+        related_issues/references/related/docs key) score full credit."""
+        refs = self._gold_refs()
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        # Deliberately avoid every top-level key the old verifier read.
+        nested_answer = {
+            "summary": "Mapped the Grafana panel timeout to the Prometheus engine.",
+            "root_cause": {
+                "explanation": f"The proxy forwards to {refs[0]} which enforces limits.",
+                "engine": {"file": refs[-1]},
+            },
+            "code_mapping": {f"component_{i}": ref for i, ref in enumerate(refs)},
+        }
+        _create_answer(workspace, nested_answer)
+
+        result = _run_verifier(
+            self.GRAFANA_DIR, "checks/check_related_issues.sh", workspace
+        )
+        assert result["score"] >= 0.85, (
+            f"nested refs not found: {result}. Flatten regression — the verifier "
+            f"must search the whole answer.json, not only top-level keys."
+        )
+        assert result["passed"] is True
+
+    def test_no_refs_anywhere_scores_zero(self, tmp_path: Path) -> None:
+        """An answer that mentions none of the gold paths still scores 0 — flattening
+        widens the search surface without turning unrelated prose into matches."""
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        _create_answer(
+            workspace,
+            {"root_cause": {"explanation": "Unrelated note about CI flakiness."}},
+        )
+        result = _run_verifier(
+            self.GRAFANA_DIR, "checks/check_related_issues.sh", workspace
+        )
+        assert result["score"] == 0.0, f"false positive on unrelated prose: {result}"
+
+
 class TestCheckpointWeighting:
     """Verify 4-checkpoint weighting (0.60/0.15/0.15/0.10) produces correct aggregation"""
 
