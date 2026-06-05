@@ -6,43 +6,36 @@
   "repo_rev": "v2.32.3",
   "required_files": [
     {
-      "path": "src/requests/utils.py",
+      "path": "src/requests/sessions.py",
       "repo": "requests",
-      "confidence": 0.9,
+      "confidence": 0.95,
       "source": "deterministic",
-      "rationale": "Contains rewind_body and header-stripping logic for proxy connections"
-    },
-    {
-      "path": "src/requests/models.py",
-      "repo": "requests",
-      "confidence": 0.9,
-      "source": "deterministic",
-      "rationale": "PreparedRequest.prepare method and header handling during request preparation"
+      "rationale": "SessionRedirectMixin.rebuild_proxies (lines 302-329) deletes the Proxy-Authorization header on redirect (`del headers['Proxy-Authorization']`, lines 318-319) and only re-adds it from the new proxy URL credentials — this is where a manually set Proxy-Authorization header is stripped."
     }
   ],
   "sufficient_files": [
     {
       "path": "src/requests/adapters.py",
       "repo": "requests",
-      "confidence": 0.7,
-      "rationale": "HTTPAdapter.send() where proxy connection is established"
+      "confidence": 0.6,
+      "rationale": "HTTPAdapter.send() establishes the proxy connection that consumes the Proxy-Authorization header."
     },
     {
-      "path": "src/requests/sessions.py",
+      "path": "src/requests/models.py",
       "repo": "requests",
-      "confidence": 0.65,
-      "rationale": "Session.request() flow that passes headers through preparation"
+      "confidence": 0.5,
+      "rationale": "PreparedRequest.prepare builds the initial request headers before redirect handling rebuilds them."
     }
   ],
   "error_chain": [
-    "User sets Proxy-Authorization in headers dict",
-    "Session.request() creates PreparedRequest",
-    "During redirect or proxy negotiation, headers are rebuilt",
-    "Proxy-Authorization is stripped from non-proxy destinations in utils.py"
+    "User sets Proxy-Authorization in the headers dict",
+    "Session.request() creates a PreparedRequest and follows redirects via resolve_redirects",
+    "On each redirect SessionRedirectMixin.rebuild_proxies is called",
+    "rebuild_proxies deletes Proxy-Authorization (sessions.py:318-319) and only re-adds it from the proxy URL credentials, so a manually set header is lost"
   ],
   "trigger_conditions": [
     "Proxy-Authorization header is manually set",
-    "Request goes through HTTPS proxy (CONNECT tunnel)",
-    "Header stripping logic in utils treats it as sensitive header to remove on redirect"
+    "Request goes through an HTTPS proxy (CONNECT tunnel) and/or follows a redirect",
+    "rebuild_proxies in sessions.py removes the header because the credentials are not derived from the proxy URL"
   ]
 }

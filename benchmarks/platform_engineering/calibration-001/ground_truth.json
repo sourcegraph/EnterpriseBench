@@ -6,8 +6,8 @@
     {
       "key": "SECRET_KEY",
       "file": "src/flask/config.py",
-      "expected": "from_envvar overrides from_object",
-      "actual": "If from_envvar file does not set SECRET_KEY, from_object value persists",
+      "expected": "from_object",
+      "actual": "If the from_envvar config file does not set SECRET_KEY, the value loaded earlier by from_object persists instead of being overridden",
       "override_chain": [
         "default_config -> from_object -> from_envvar -> direct"
       ]
@@ -15,8 +15,8 @@
     {
       "key": "SESSION_COOKIE_SECURE",
       "file": "src/flask/config.py",
-      "expected": "from_envvar overrides default",
-      "actual": "Boolean config in env file may be loaded as string, not overriding correctly",
+      "expected": "from_envvar",
+      "actual": "A boolean config loaded by from_envvar from an env file arrives as a string, so it does not override the default correctly",
       "override_chain": [
         "default_config -> from_object -> from_envvar"
       ]
