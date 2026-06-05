@@ -17,6 +17,19 @@ from typing import Dict, List
 from eb_verify.plugins import ValidationResult
 
 
+def _strip_markup(token: str) -> str:
+    """Strip markdown emphasis/backticks and trailing list punctuation from a token.
+
+    Agents write the ordering as "**grpc-go**", "`cobra`", or "etcd," — markdown
+    emphasis (`*`, `_`), inline-code backticks, and trailing list punctuation
+    (`,.;:-`) wrap the real repo name and otherwise survive basename-normalization,
+    blocking the name match. Strip leading emphasis/backtick chars and trailing
+    emphasis/backtick/punctuation chars. Internal hyphens (grpc-go) are preserved;
+    only trailing ones are removed. Mirrors the sed pass in check_topo_order.sh.
+    """
+    return token.strip().lstrip("*_`").rstrip("*_`,.;:-")
+
+
 def _basename(name: str) -> str:
     """Reduce an org/repo slug to its workspace basename.
 
@@ -80,7 +93,9 @@ def validate_topological_order(
         _basename(node): [_basename(dep) for dep in deps]
         for node, deps in dependency_graph.items()
     }
-    proposed = [_basename(repo) for repo in proposed_order]
+    proposed = [
+        b for repo in proposed_order if (b := _basename(_strip_markup(repo)))
+    ]
 
     if _has_cycle(graph):
         return {"score": 0.0, "detail": "Dependency graph contains a cycle"}

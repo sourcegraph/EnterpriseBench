@@ -42,8 +42,12 @@ if [[ ! -s "$PROPOSED_FILE" ]]; then
   exit 0
 fi
 
-# proposed[] = non-blank stripped lines (matches python [r.strip() for r in f if r.strip()])
-mapfile -t proposed < <(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$PROPOSED_FILE" | grep -v '^$' || true)
+# proposed[] = non-blank stripped lines (matches python [r.strip() for r in f if r.strip()]).
+# Also strip markdown emphasis/backticks and trailing list punctuation: agents write
+# the ordering as "**grpc-go**", "`cobra`", or "etcd," — the wrappers otherwise survive
+# basename-normalization and block the name match. Mirrors _strip_markup() in
+# lib/eb_verify/plugins/topological_order.py. Internal hyphens (grpc-go) are preserved.
+mapfile -t proposed < <(sed -E 's/^[[:space:]]*//; s/[[:space:]]*$//; s/^[*_`]+//; s/[*_`,.;:-]+$//' "$PROPOSED_FILE" | grep -v '^$' || true)
 rm -f "$PROPOSED_FILE"
 
 # Basename-normalize proposed repo tokens to match the normalized graph above.

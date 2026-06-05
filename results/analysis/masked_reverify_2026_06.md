@@ -6,7 +6,9 @@
 **Method:** `python3 scripts/analysis/reverify_masked.py [--json]` (reproducible; no container, no agent re-run)
 **Source list:** `results/analysis/remediation_diagnosis.md` §A + `results/analysis/aggregate_mcp_clean.py` (`masked`)
 
-> **GATE RESOLUTION (mol-focus-review zy8lr, 2026-06-05):** Independently reproduced (`reverify_masked.py --json` → 16/37; 0 active tasks fell back to stored, so the shortfall is not a reconstruction artifact). AC1/AC3/AC4/AC5 met. **AC2's ≥30 target was NOT met (16/37) and was accepted as an empirically-refuted prediction, not a work defect** — the diagnosis conflated "fixed verifier accepts a correct answer" with "the recorded agent answer is correct." Project-lead decision: **close + escalate** the 16/37 figure into p6ux.28's suite-lock signal (a retry is futile — deterministic re-score; residuals are genuine agent misses + filed bug 9nb + 8 archived-out-of-scope). Follow-up `EnterpriseBench-9nb` (topo_order markdown-strip) would lift active 14→18 / total →~18, still < 30.
+> **GATE RESOLUTION (mol-focus-review zy8lr, 2026-06-05):** Independently reproduced (`reverify_masked.py --json` → 16/37; 0 active tasks fell back to stored, so the shortfall is not a reconstruction artifact). AC1/AC3/AC4/AC5 met. **AC2's ≥30 target was NOT met and was accepted as an empirically-refuted prediction, not a work defect** — the diagnosis conflated "fixed verifier accepts a correct answer" with "the recorded agent answer is correct." Project-lead decision: **close + escalate** into p6ux.28's suite-lock signal (a retry is futile — deterministic re-score; residuals are genuine agent misses + 8 archived-out-of-scope).
+>
+> **UPDATE (EnterpriseBench-9nb landed, 2026-06-05):** the topo_order markdown-strip fix is now committed (`check_topo_order.sh` ×11 + `lib/eb_verify/plugins/topological_order.py` `_strip_markup()` + bold/backtick tests). Re-score → **20/37 (18 active + 2 archived)**; the 4 affected tasks (refactor-orch-007/002-hybrid/004-baseline, refactor-orchestration-tri-spring-001-hybrid) now unmask. AC2's ≥30 remains unmet (20/37); the 5 genuine-miss topo tasks (001/003/005/006/008) correctly stay masked — the fix is matching-logic only and does not loosen topological correctness.
 
 ---
 
@@ -14,15 +16,15 @@
 
 **The verifier/gold fixes work — but they unmask far fewer *recorded runs* than the diagnosis predicted (~30), because the residual 0.0s are now governed by genuine agent-answer quality, archived-by-design tasks, and one residual verifier bug, not by masking.**
 
-- **16 of 37** masked tasks now score **> 0.0 on ≥ 1 mode** for a previously-masked checkpoint (**14 of 27 active**, **2 of 10 archived**).
+- **20 of 37** masked tasks now score **> 0.0 on ≥ 1 mode** for a previously-masked checkpoint (**18 of 27 active**, **2 of 10 archived**). *(Updated 2026-06-05 after EnterpriseBench-9nb landed: +4 active topo_order tasks, was 16/37.)*
 - The diagnosis predicted ~30. The gap is **not** a failure of the fixes: re-scoring proves the fixes lift masking across **8 checkpoint types** (topo_order, related_issues, source_files, symbols, expected_values, drift_points, severity, error_source) — the checkpoints now *can* score > 0 and separate modes on a correct answer. The residual 0.0s are real signal:
   - **5 active** = genuine agent miss (wrong granularity / wrong symbols / no match) — legitimate benchmark signal, **not** masking.
-  - **4 active** = **NEW verifier bug** (topo_order does not strip markdown emphasis from proposed repo tokens) — agents wrote a substantively-correct ordering as `1. **grpc-go**`; filed as **EnterpriseBench-9nb**, *not* fixed inline (per bead scope).
   - **2 active** = singleton genuine/format misses (impact_classification, feature_flags).
   - **8 archived** = out of the active suite; the fixes were intentionally applied to active copies only (retired verifiers left in `_archived/`). Excluded from the active-suite target.
+  - *(Resolved)* the 4 active topo_order tasks blocked by the markdown-emphasis bug **EnterpriseBench-9nb** now unmask: the verifier strips `*`/`` ` ``/`_` and trailing punctuation from proposed tokens before basename match.
 - **Masking is lifted.** No active masked checkpoint remains "structurally unsatisfiable": every checkpoint type re-scored > 0 on at least one real agent answer. The benchmark's mode-separating signal is restored where the agent produced a correct answer.
 
-> **Acceptance-criterion note:** the bead's literal target ("≥ 30 of 37 score > 0 on ≥ 1 mode") is **NOT met (16/37)**. This is an empirical finding, not a defect in the re-verification: the diagnosis conflated *"the fixed verifier would accept a correct answer"* with *"the recorded agent answer is correct."* Re-scoring the actual answers separates the two. This number feeds p6ux.28 (final MCP-vs-baseline aggregate) and the suite-lock decision; flagged for project-lead.
+> **Acceptance-criterion note:** the bead's literal target ("≥ 30 of 37 score > 0 on ≥ 1 mode") is **NOT met (20/37, was 16/37 before 9nb)**. This is an empirical finding, not a defect in the re-verification: the diagnosis conflated *"the fixed verifier would accept a correct answer"* with *"the recorded agent answer is correct."* Re-scoring the actual answers separates the two. This number feeds p6ux.28 (final MCP-vs-baseline aggregate) and the suite-lock decision; flagged for project-lead.
 
 ---
 
@@ -40,11 +42,11 @@ Reproduce: `python3 scripts/analysis/reverify_masked.py` (table) · `--json` (ma
 
 ---
 
-## (1) Active suite — 27 tasks (14 unmasked)
+## (1) Active suite — 27 tasks (18 unmasked)
 
 BEFORE is `0.0` (uniform) for every row. AFTER = max re-scored score across available modes for the masked checkpoint.
 
-### Unmasked (14) — fix confirmed
+### Unmasked (18) — fix confirmed
 
 | Task | Masked cp | AFTER (best mode) | Fix that lifted it |
 |---|---|---|---|
@@ -62,17 +64,17 @@ BEFORE is `0.0` (uniform) for every row. AFTER = max re-scored score across avai
 | config-drift-scdf-rabbitmq-002 | expected_values, drift_points | **1.00** (all modes) | s58f EACCES fix + re-run |
 | cal-sup-flask-errhandler-006 | severity | **1.00** (baseline) | p6ux.19 + baseline backfill emitted severity key |
 | cal-err-requests-proxy-003 | error_source | **1.00** (mcp/hybrid) | p6ux.19 gold → sessions.py |
+| refactor-orch-007 | topo_order | **1.00** (all modes) | **9nb** markdown-strip (`**grpc-go**` → `grpc-go`) |
+| refactor-orch-002 | topo_order | **1.00** (hybrid) | **9nb** markdown-strip |
+| refactor-orch-004 | topo_order | **1.00** (baseline) | **9nb** markdown-strip |
+| refactor-orchestration-tri-spring-001 | topo_order | **1.00** (hybrid) | **9nb** markdown-strip |
 
 Note: `cal-drift-click-envvar-002` unmasks via `drift_points` (1.00); its `expected_values` checkpoint stays 0.0 (agent text never restates the verbatim gold sentences — a known calibration-verbatim residual, not a verifier bug).
 
-### Still 0.0 (13) — with reason class
+### Still 0.0 (9) — with reason class
 
 | Task | Masked cp | Reason class | Evidence |
 |---|---|---|---|
-| refactor-orch-002 | topo_order | **NEW verifier bug → EnterpriseBench-9nb** | hybrid proposed `[**cobra**, **kubernetes**]` == graph nodes, correct order; rejected only by `**` wrappers |
-| refactor-orch-004 | topo_order | **NEW verifier bug → EnterpriseBench-9nb** | baseline proposed `[**protobuf-go**, **grpc-go**, **etcd**]`, full correct set under markdown-strip |
-| refactor-orch-007 | topo_order | **NEW verifier bug → EnterpriseBench-9nb** | all 3 modes proposed `[**grpc-go**, **etcd**, **kubernetes**]`, correct order |
-| refactor-orchestration-tri-spring-001 | topo_order | **NEW verifier bug → EnterpriseBench-9nb** | hybrid proposed `[**spring-framework**, **spring-kafka**, **spring-boot**]`, correct set |
 | refactor-orch-001 | topo_order | genuine agent miss (granularity) | listed etcd *submodules* in a markdown **table**, not the `[etcd, kubernetes]` repo list the instruction asks for |
 | refactor-orch-003 | topo_order | genuine agent miss | no graph repo recognized even after markdown-strip |
 | refactor-orch-005 | topo_order | genuine agent miss (granularity) | babel monorepo packages (`core`, `preset-env`…) never listed by basename |
@@ -83,7 +85,7 @@ Note: `cal-drift-click-envvar-002` unmasks via `drift_points` (1.00); its `expec
 | monorepo-boundary-rustc-attr-009 | impact_classification | genuine agent miss | "Expected major classification not found" across all modes |
 | dead-code-001 | feature_flags | genuine/format miss (singleton) | mcp_only wrote `answer.json` only (check reads `dead_code_report.json`); hybrid `flags_found=0/1` |
 
-**Markdown-bug impact:** fixing EnterpriseBench-9nb would lift active topo_order unmask from **2/11 → 6/11** and total active unmask from **14 → 18 of 27**. The remaining 5 topo tasks (001/003/005/006/008) are genuine granularity misses unaffected by it.
+**Markdown-bug impact (RESOLVED — EnterpriseBench-9nb landed):** the fix lifted active topo_order unmask from **2/11 → 6/11** and total active unmask from **14 → 18 of 27** (confirmed by re-score). The remaining 5 topo tasks (001/003/005/006/008) are genuine granularity misses unaffected by it.
 
 ---
 
@@ -121,9 +123,9 @@ All 37 are accounted for above; none dropped.
 
 ---
 
-## (4) New verifier bug filed
+## (4) New verifier bug — filed and FIXED
 
-- **EnterpriseBench-9nb** — `check_topo_order.sh` / `topological_order.py` do not strip markdown emphasis (`**`, `` ` ``) or trailing punctuation from proposed repo tokens, so a correct `1. **grpc-go**` ordering scores 0.0. Matching-logic-only fix; would unmask 4 active topo tasks. **Not fixed inline** (re-verify leg is read-only on verifiers, per bead scope).
+- **EnterpriseBench-9nb** — `check_topo_order.sh` / `topological_order.py` did not strip markdown emphasis (`**`, `` ` ``, `_`) or trailing punctuation from proposed repo tokens, so a correct `1. **grpc-go**` ordering scored 0.0. **FIXED 2026-06-05** (separate follow-up bead, per the re-verify leg's read-only scope): added `_strip_markup()` to the plugin + the mirror sed pass to all 11 `check_topo_order.sh` (md5-identical) + bold/backtick unit tests; re-score confirms +4 active topo tasks unmask (16/37 → 20/37). Matching-logic only — the 5 genuine-miss topo tasks correctly stay masked.
 
 No other new verifier bugs surfaced: every other still-0 active checkpoint re-scored correctly given a correct answer (verified on the unmasked peers of the same checkpoint type), so the remaining 0.0s are genuine agent misses, not verifier defects.
 
@@ -133,6 +135,6 @@ No other new verifier bugs surfaced: every other still-0 active checkpoint re-sc
 
 | Bucket | Count | Unmasked | Notes |
 |---|---:|---:|---|
-| Active | 27 | **14** | +4 more once EnterpriseBench-9nb lands (→18) |
+| Active | 27 | **18** | includes +4 from EnterpriseBench-9nb (markdown-strip), now landed |
 | Archived | 10 | **2** | out of active-suite target; fixes not applied to archived copies |
-| **Total** | **37** | **16** | diagnosis predicted ~30; gap = agent-answer quality + 1 residual bug + archived-by-design |
+| **Total** | **37** | **20** | diagnosis predicted ~30; gap = agent-answer quality + archived-by-design (AC2 ≥30 unmet — escalated) |

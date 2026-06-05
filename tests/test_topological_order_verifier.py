@@ -17,6 +17,7 @@ import pytest
 
 from eb_verify.plugins.topological_order import (
     TopologicalOrderValidator,
+    _strip_markup,
     validate_topological_order,
 )
 
@@ -232,6 +233,59 @@ class TestSlugBasenameEquivalence:
             dependency_graph=self.SLUG_GRAPH,
         )
         assert result["score"] == 1.0
+
+
+class TestMarkdownEmphasisStripping:
+    """Agents write the numbered ordering with markdown emphasis (`**grpc-go**`),
+    inline-code backticks (`` `cobra` ``), or trailing list punctuation (`etcd,`).
+    These wrappers must be stripped before the basename match, or a substantively
+    correct ordering scores 0.0 (EnterpriseBench-9nb)."""
+
+    SLUG_GRAPH = {
+        "etcd-io/etcd": [],
+        "kubernetes/kubernetes": ["etcd-io/etcd"],
+    }
+
+    @pytest.mark.parametrize(
+        ("token", "expected"),
+        [
+            ("**grpc-go**", "grpc-go"),
+            ("`cobra`", "cobra"),
+            ("__etcd__", "etcd"),
+            ("etcd,", "etcd"),
+            ("kubernetes.", "kubernetes"),
+            ("**spf13/cobra**", "spf13/cobra"),
+            ("spring-boot", "spring-boot"),  # internal hyphen preserved
+            ("  `etcd` ", "etcd"),
+            ("grpc-go", "grpc-go"),  # bare token untouched
+        ],
+    )
+    def test_strip_markup_cases(self, token: str, expected: str) -> None:
+        assert _strip_markup(token) == expected
+
+    def test_bold_proposal_scores_full_credit(self) -> None:
+        """A correct ordering wrapped in **bold** must score 1.0, not 0.0."""
+        result = validate_topological_order(
+            proposed_order=["**etcd**", "**kubernetes**"],
+            dependency_graph=self.SLUG_GRAPH,
+        )
+        assert result["score"] == 1.0
+
+    def test_backtick_proposal_scores_full_credit(self) -> None:
+        """A correct ordering wrapped in `code` ticks must score 1.0."""
+        result = validate_topological_order(
+            proposed_order=["`etcd`", "`kubernetes`"],
+            dependency_graph=self.SLUG_GRAPH,
+        )
+        assert result["score"] == 1.0
+
+    def test_markup_does_not_loosen_correctness(self) -> None:
+        """Stripping markup must not rescue a topologically wrong ordering."""
+        result = validate_topological_order(
+            proposed_order=["**kubernetes**", "**etcd**"],
+            dependency_graph=self.SLUG_GRAPH,
+        )
+        assert result["score"] == 0.0
 
 
 class TestTopologicalOrderValidatorPlugin:
