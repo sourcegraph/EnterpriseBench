@@ -19,10 +19,11 @@ fi
 
 # Normalize an array to unique (file,symbol) pairs serialized as compact JSON
 # (so null values and string values stay distinct, like python tuples). Python used
-# direct indexing e["file"]/e["symbol"], so an element missing either key raised
-# KeyError and aborted the whole script with no output — `error` reproduces that exit.
-NORM='map(if (has("file") and has("symbol")) then ([.file, .symbol] | @json)
-          else error("KeyError") end) | unique | .[]'
+# Agents key the file on either "file" or the MCP "path"; accept whichever is present.
+# Entries missing both a file/path and a symbol are skipped, not aborted — the earlier
+# `error("KeyError")` scored a mostly-correct report 0.0 on a single malformed entry.
+NORM='map(if ((has("file") or has("path")) and has("symbol")) then ([(.file // .path), .symbol] | @json)
+          else empty end) | unique | .[]'
 
 claimed=$(jq -r "$NORM" "$REPORT")
 dead=$(jq -r '(.dead_code // []) | '"$NORM" "$GT_DIR")

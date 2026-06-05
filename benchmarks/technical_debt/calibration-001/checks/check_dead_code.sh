@@ -19,8 +19,9 @@ if [[ ! -f "$GT" ]]; then
 fi
 
 # Normalize an array to unique sep-joined "filesymbol" pairs (python normalize()):
-#   dict -> (.file//"", .symbol//"") ; string -> ("", str) ; else dropped.
-NORM='map(if type=="object" then ((.file // "") + "" + (.symbol // ""))
+#   dict -> (.file//.path//"", .symbol//"") ; string -> ("", str) ; else dropped.
+# Agents key the file on either "file" or the MCP "path"; accept whichever is present.
+NORM='map(if type=="object" then ((.file // .path // "") + "" + (.symbol // ""))
           elif type=="string" then ("" + .)
           else empty end) | unique | .[]'
 

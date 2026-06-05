@@ -32,12 +32,18 @@ agent_text=$(jq -c '
   else "" end
 ' "$ANSWER_FILE" | sed 's/,/, /g; s/:/: /g' | tr '[:upper:]' '[:lower:]')
 
+# Split the gold compound on '-' and count it matched when ANY token appears in the
+# agent text. The old check required the whole hyphenated keyword ("type-cast") as a
+# contiguous substring, which prose that says "type cast" never satisfies.
 matched=0
 while IFS= read -r kw; do
   kw_lc=$(printf '%s' "$kw" | tr '[:upper:]' '[:lower:]')
-  if grep -qF -- "$kw_lc" <<<"$agent_text"; then
-    matched=$((matched + 1))
-  fi
+  while IFS= read -r tok; do
+    [[ -z "$tok" ]] && continue
+    if grep -qF -- "$tok" <<<"$agent_text"; then
+      matched=$((matched + 1)); break
+    fi
+  done < <(printf '%s\n' "$kw_lc" | tr '-' '\n')
 done < <(jq -r '.ownership_keywords[]' "$GT_FILE")
 
 # score = round(matched / n_kw, 2); whole-number results need explicit .0 form

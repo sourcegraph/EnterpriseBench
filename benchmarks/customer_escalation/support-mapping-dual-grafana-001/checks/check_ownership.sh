@@ -58,16 +58,20 @@ if [[ -z "${ownership_text//[[:space:]]/}" ]]; then
     exit 0
 fi
 
-# keyword_present: kw.lower().replace('-','_') in search_text.replace('-','_')
-search_norm=$(printf '%s' "$search_text" | tr '-' '_')
+# keyword_present: split the gold compound on '-' and count it matched when ANY token
+# appears in the (already-lowercased) search text. The old check required the whole
+# de-hyphenated keyword ("alert_scheduling") contiguous in the normalized prose, which
+# prose that says "alert scheduling" never satisfies.
 matched=0
 matched_kw=()
 while IFS= read -r kw; do
-  kw_norm=$(printf '%s' "$kw" | tr '[:upper:]' '[:lower:]' | tr '-' '_')
-  if grep -qF -- "$kw_norm" <<<"$search_norm"; then
-    matched=$((matched + 1))
-    matched_kw+=("$kw")
-  fi
+  kw_lc=$(printf '%s' "$kw" | tr '[:upper:]' '[:lower:]')
+  while IFS= read -r tok; do
+    [[ -z "$tok" ]] && continue
+    if grep -qF -- "$tok" <<<"$search_text"; then
+      matched=$((matched + 1)); matched_kw+=("$kw"); break
+    fi
+  done < <(printf '%s\n' "$kw_lc" | tr '-' '\n')
 done < <(jq -r '.ownership_keywords[]' "$GT_FILE")
 
 # score = round(min(1.0, matched/4.0), 2)

@@ -73,17 +73,19 @@ if [[ -z "${ownership_text//[[:space:]]/}" ]]; then
     exit 0
 fi
 
-# matched: kw.lower().replace('-',' ') in ownership_text
-#       OR kw.lower().replace('-','')  in ownership_text.replace(' ','')
-ownership_nospace=$(printf '%s' "$ownership_text" | tr -d ' ')
+# matched: split the gold compound on '-' and count the keyword as matched when ANY of
+# its tokens appears in the ownership prose. The old check required the contiguous
+# de-hyphenated compound ("type legalization"/"typelegalization") as a substring, which
+# natural prose never emits — a correct "type legalization pass" still scored 0.0.
 matched=0
 while IFS= read -r kw; do
   kw_lc=$(printf '%s' "$kw" | tr '[:upper:]' '[:lower:]')
-  form1=$(printf '%s' "$kw_lc" | tr '-' ' ')
-  form2=$(printf '%s' "$kw_lc" | tr -d '-')
-  if grep -qF -- "$form1" <<<"$ownership_text" || grep -qF -- "$form2" <<<"$ownership_nospace"; then
-    matched=$((matched + 1))
-  fi
+  while IFS= read -r tok; do
+    [[ -z "$tok" ]] && continue
+    if grep -qF -- "$tok" <<<"$ownership_text"; then
+      matched=$((matched + 1)); break
+    fi
+  done < <(printf '%s\n' "$kw_lc" | tr '-' '\n')
 done < "$kw_file"
 rm -f "$kw_file"
 

@@ -401,6 +401,50 @@ class TestRelatedIssuesNestedRef:
         assert result["score"] == 0.0, f"false positive on unrelated prose: {result}"
 
 
+class TestOwnershipTokenMatch:
+    """Regression (p6ux.13): hyphenated gold ownership compounds must match natural
+    prose by per-token overlap, not by requiring the contiguous de-hyphenated form.
+
+    A gold keyword like "type-legalization" never appears verbatim in prose; the agent
+    writes "type legalization pass". The verifier now splits the gold compound on "-"
+    and counts the keyword matched when ANY token appears — while single-word keywords
+    and unrelated answers still behave correctly.
+    """
+
+    # support-mapping-002 has hyphenated keywords: type-legalization, code-generation,
+    # value-types (plus SelectionDAG, expansion).
+    DIR = TASK_BASE / "support-mapping-002"
+
+    def test_spaced_prose_matches_hyphenated_keywords(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        _create_answer(
+            workspace,
+            {
+                "ownership": {
+                    "subsystem": "LLVM SelectionDAG type legalization and code generation",
+                    "description": "Bug is in the type legalization pass during value "
+                    "types expansion.",
+                }
+            },
+        )
+        result = _run_verifier(self.DIR, "checks/check_ownership.sh", workspace)
+        assert result["score"] >= 0.85, (
+            f"spaced prose did not match hyphenated keywords: {result}"
+        )
+
+    def test_unrelated_prose_scores_zero(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        _create_answer(
+            workspace,
+            {"ownership": {"subsystem": "authentication middleware",
+                           "description": "OAuth token refresh handler"}},
+        )
+        result = _run_verifier(self.DIR, "checks/check_ownership.sh", workspace)
+        assert result["score"] == 0.0, f"false positive on unrelated prose: {result}"
+
+
 class TestCheckpointWeighting:
     """Verify 4-checkpoint weighting (0.60/0.15/0.15/0.10) produces correct aggregation"""
 

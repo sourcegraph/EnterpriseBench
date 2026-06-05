@@ -489,3 +489,43 @@ class TestProportionalScoring:
         assert large_score > small_score, (
             f"8/12 ({large_score:.3f}) should beat 4/12 ({small_score:.3f})"
         )
+
+
+# -- regression (p6ux.13): agent reports keyed on MCP "path" ------------------
+
+class TestPathKeyedReport:
+    """Agents key the dead symbol's file on either "file" or the MCP "path".
+
+    The verifier normalized only on "file", so a report using "path"
+    (e.g. {"path": "src/...", "symbol": "x"}) produced no (file,symbol) pairs and
+    scored 0.0 — even when every symbol was correct. After the fix the file is read
+    from "file" or "path", so a path-keyed report matches a file-keyed one exactly.
+    """
+
+    def test_path_keyed_matches_file_keyed(self, tmp_path: Path) -> None:
+        gt = _load_gt("001")
+
+        file_keyed = [
+            {"file": it["file"], "symbol": it["symbol"]} for it in gt["dead_code"]
+        ]
+        path_keyed = [
+            {"path": it["file"], "symbol": it["symbol"]} for it in gt["dead_code"]
+        ]
+
+        ws_file = tmp_path / "ws_file"
+        _write_report(ws_file, "react", file_keyed)
+        file_score = float(
+            _run_verifier("001", "check_dead_code", ws_file).get("score", 0)
+        )
+
+        ws_path = tmp_path / "ws_path"
+        _write_report(ws_path, "react", path_keyed)
+        path_score = float(
+            _run_verifier("001", "check_dead_code", ws_path).get("score", 0)
+        )
+
+        assert path_score == file_score, (
+            f"path-keyed report scored {path_score} but file-keyed scored "
+            f"{file_score}; the verifier must accept the MCP 'path' key."
+        )
+        assert path_score >= 0.85, f"path-keyed all-correct report scored {path_score}"
