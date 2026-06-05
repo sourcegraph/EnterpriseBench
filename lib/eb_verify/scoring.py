@@ -12,6 +12,10 @@ EnterpriseBench and CSB. It carries:
 * ``diagnostics`` (dict):
     - ``task_time_seconds``: optional float, plumbed from the harness.
     - ``token_cost_usd``: optional float, plumbed from the harness.
+    - ``input_tokens`` / ``output_tokens``: optional ints, plumbed from the
+      harness. Raw token counts (summed across the multi-turn conversation),
+      mirroring codeprobe so cost-Pareto plots that aren't dollar-locked can
+      compare models with different per-token pricing.
     - ``ir_metrics``: always ``None`` for EB (information-retrieval style
       metrics aren't measured here).
     - ``artifact_results``: dict keyed by artifact type, with ``valid`` and
@@ -53,6 +57,8 @@ class ScoreDiagnostics:
 
     task_time_seconds: float | None = None
     token_cost_usd: float | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
     ir_metrics: dict[str, Any] | None = None
     artifact_results: dict[str, dict[str, Any]] = field(default_factory=dict)
 
@@ -119,6 +125,8 @@ class VerificationResult:
         *,
         task_time_seconds: float | None = None,
         token_cost_usd: float | None = None,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
     ) -> ScoreResult:
         """Project this VerificationResult into the unified ScoreResult.
 
@@ -129,6 +137,9 @@ class VerificationResult:
                 consolidates the surface.
             token_cost_usd: Optional per-task token cost in USD, also
                 plumbed from the harness.
+            input_tokens: Optional raw input-token count (summed across the
+                conversation), plumbed from the harness for cost-Pareto plots.
+            output_tokens: Optional raw output-token count, likewise plumbed.
         """
         sub_scores = {
             cr.name: max(0.0, min(1.0, cr.score)) for cr in self.checkpoint_results
@@ -148,6 +159,8 @@ class VerificationResult:
             diagnostics=ScoreDiagnostics(
                 task_time_seconds=task_time_seconds,
                 token_cost_usd=token_cost_usd,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
                 ir_metrics=None,
                 artifact_results=artifact_results,
             ),
@@ -178,6 +191,8 @@ def write_score_result(
     *,
     task_time_seconds: float | None = None,
     token_cost_usd: float | None = None,
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
 ) -> Path:
     """Write the unified ScoreResult JSON next to ``reward.txt``.
 
@@ -190,6 +205,8 @@ def write_score_result(
     score = result.to_score_result(
         task_time_seconds=task_time_seconds,
         token_cost_usd=token_cost_usd,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
     )
     output_path.write_text(json.dumps(score.to_dict(), indent=2) + "\n")
     return output_path

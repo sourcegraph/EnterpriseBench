@@ -287,6 +287,8 @@ class CheckpointRunner:
         score_result_path: str | Path | None = "score_result.json",
         task_time_seconds: float | None = None,
         token_cost_usd: float | None = None,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
     ) -> VerificationResult:
         """Run full verification: health check, checkpoints, artifacts, scoring.
 
@@ -305,6 +307,10 @@ class CheckpointRunner:
                 the harness; flows into ``diagnostics.task_time_seconds``.
             token_cost_usd: Optional per-task token cost in USD plumbed in
                 from the harness; flows into ``diagnostics.token_cost_usd``.
+            input_tokens: Optional raw input-token count plumbed in from the
+                harness; flows into ``diagnostics.input_tokens``.
+            output_tokens: Optional raw output-token count plumbed in from the
+                harness; flows into ``diagnostics.output_tokens``.
         """
         # Health check (non-fatal in prototype — repos may not be cloned)
         healthy = self.sandbox_health_check()
@@ -379,6 +385,8 @@ class CheckpointRunner:
                 sr_path,
                 task_time_seconds=task_time_seconds,
                 token_cost_usd=token_cost_usd,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
             )
             print(f"[runner] Wrote {written} — unified ScoreResult")
 

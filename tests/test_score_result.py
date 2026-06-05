@@ -58,9 +58,16 @@ class TestToScoreResult:
         assert sr.sub_scores == {"hi": 1.0, "lo": 0.0}
 
     def test_diagnostics_carries_harness_inputs(self):
-        sr = _vr().to_score_result(task_time_seconds=12.5, token_cost_usd=0.0042)
+        sr = _vr().to_score_result(
+            task_time_seconds=12.5,
+            token_cost_usd=0.0042,
+            input_tokens=1289,
+            output_tokens=35128,
+        )
         assert sr.diagnostics.task_time_seconds == 12.5
         assert sr.diagnostics.token_cost_usd == pytest.approx(0.0042)
+        assert sr.diagnostics.input_tokens == 1289
+        assert sr.diagnostics.output_tokens == 35128
 
     def test_diagnostics_ir_metrics_is_none_for_eb(self):
         sr = _vr().to_score_result()
@@ -97,6 +104,8 @@ class TestToDictWireFormat:
         assert set(wire["diagnostics"].keys()) == {
             "task_time_seconds",
             "token_cost_usd",
+            "input_tokens",
+            "output_tokens",
             "ir_metrics",
             "artifact_results",
         }
@@ -131,7 +140,16 @@ class TestWriteScoreResult:
         data = json.loads(out.read_text())
         assert data["diagnostics"]["task_time_seconds"] is None
         assert data["diagnostics"]["token_cost_usd"] is None
+        assert data["diagnostics"]["input_tokens"] is None
+        assert data["diagnostics"]["output_tokens"] is None
         assert data["diagnostics"]["ir_metrics"] is None
+
+    def test_raw_token_counts_are_emitted(self, tmp_path: Path):
+        out = tmp_path / "score_result.json"
+        write_score_result(_vr(), out, input_tokens=1289, output_tokens=35128)
+        data = json.loads(out.read_text())
+        assert data["diagnostics"]["input_tokens"] == 1289
+        assert data["diagnostics"]["output_tokens"] == 35128
 
 
 class TestScoreDiagnosticsDefaults:
@@ -139,6 +157,8 @@ class TestScoreDiagnosticsDefaults:
         d = ScoreDiagnostics()
         assert d.task_time_seconds is None
         assert d.token_cost_usd is None
+        assert d.input_tokens is None
+        assert d.output_tokens is None
         assert d.ir_metrics is None
         assert d.artifact_results == {}
 
