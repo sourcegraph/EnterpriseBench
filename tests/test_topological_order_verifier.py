@@ -190,6 +190,50 @@ class TestValidateTopologicalOrder:
         assert 0.15 <= result["score"] <= 0.70
 
 
+class TestSlugBasenameEquivalence:
+    """Repos are keyed by org/repo slug in ground truth but named by workspace
+    basename in agent output. Basename-normalization must make the two forms
+    compare equal without loosening topological correctness."""
+
+    # Ground-truth-style graph keyed by slugs (etcd before kubernetes).
+    SLUG_GRAPH = {
+        "etcd-io/etcd": [],
+        "kubernetes/kubernetes": ["etcd-io/etcd"],
+    }
+
+    def test_basename_proposal_matches_slug_graph(self) -> None:
+        """Agent ordering by basename scores full credit against a slug graph."""
+        result = validate_topological_order(
+            proposed_order=["etcd", "kubernetes"],
+            dependency_graph=self.SLUG_GRAPH,
+        )
+        assert result["score"] == 1.0
+
+    def test_slug_proposal_still_matches_slug_graph(self) -> None:
+        """Agent ordering by slug remains backward-compatible."""
+        result = validate_topological_order(
+            proposed_order=["etcd-io/etcd", "kubernetes/kubernetes"],
+            dependency_graph=self.SLUG_GRAPH,
+        )
+        assert result["score"] == 1.0
+
+    def test_basename_reversed_still_fails(self) -> None:
+        """Normalization must not loosen the correctness check — reversed fails."""
+        result = validate_topological_order(
+            proposed_order=["kubernetes", "etcd"],
+            dependency_graph=self.SLUG_GRAPH,
+        )
+        assert result["score"] == 0.0
+
+    def test_mixed_forms_match(self) -> None:
+        """A mix of slug and basename in the proposal both resolve."""
+        result = validate_topological_order(
+            proposed_order=["etcd-io/etcd", "kubernetes"],
+            dependency_graph=self.SLUG_GRAPH,
+        )
+        assert result["score"] == 1.0
+
+
 class TestTopologicalOrderValidatorPlugin:
     """Tests for the plugin interface wrapper."""
 

@@ -20,6 +20,18 @@ if [[ ! -f "$GT" ]]; then
   exit 0
 fi
 
+# Basename-normalize the ground_truth dependency_graph: ground_truth keys repos
+# by slug ("spf13/cobra") while agents name them by workspace basename ("cobra").
+# Strip everything up to and including the last "/" on both keys and dep values
+# so name-matching is form-agnostic; topological correctness is unaffected.
+NORM_GT=$(mktemp)
+trap 'rm -f "$NORM_GT"' EXIT
+jq '.dependency_graph |= (
+  to_entries
+  | map({key: (.key | sub("^.*/"; "")), value: (.value | map(sub("^.*/"; "")))})
+  | from_entries
+)' "$GT" > "$NORM_GT"
+
 # Extract ordered repo list from agent's plan (numbered list items)
 PROPOSED_FILE=$(mktemp)
 grep -oE '^\s*[0-9]+\.\s+\S+' "$ANSWER" | sed 's/^[[:space:]]*[0-9]*\.\s*//' | head -20 > "$PROPOSED_FILE" || true
@@ -33,6 +45,11 @@ fi
 # proposed[] = non-blank stripped lines (matches python [r.strip() for r in f if r.strip()])
 mapfile -t proposed < <(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' "$PROPOSED_FILE" | grep -v '^$' || true)
 rm -f "$PROPOSED_FILE"
+
+# Basename-normalize proposed repo tokens to match the normalized graph above.
+if [[ ${#proposed[@]} -gt 0 ]]; then
+  proposed=("${proposed[@]##*/}")
+fi
 
 # Format a number the way python json.dumps prints a float: whole numbers keep a
 # trailing ".0" (jq emits bare integers; python emits 1.0 / 0.0).
@@ -78,7 +95,7 @@ has_cycle=$(jq -r '
           .indeg[$dep] -= 1
           | if .indeg[$dep] == 0 then .queue += [$dep] else . end))
   | (.visited < $n)
-' "$GT")
+' "$NORM_GT")
 
 if [[ "$has_cycle" == "true" ]]; then
   emit "0.0" "false" "Dependency graph contains a cycle"
@@ -86,7 +103,7 @@ if [[ "$has_cycle" == "true" ]]; then
 fi
 
 # graph_nodes
-mapfile -t graph_nodes < <(jq -r '.dependency_graph | keys[]' "$GT")
+mapfile -t graph_nodes < <(jq -r '.dependency_graph | keys[]' "$NORM_GT")
 n_graph=${#graph_nodes[@]}
 
 # is_node helper via associative array
@@ -128,7 +145,7 @@ while IFS=$'\t' read -r node dep; do
       satisfied_constraints=$((satisfied_constraints + 1))
     fi
   fi
-done < <(jq -r '.dependency_graph | to_entries[] | .key as $k | .value[] | [$k, .] | @tsv' "$GT")
+done < <(jq -r '.dependency_graph | to_entries[] | .key as $k | .value[] | [$k, .] | @tsv' "$NORM_GT")
 
 if [[ $total_constraints -eq 0 ]]; then
   # coverage = n_known / n_graph (n_graph > 0 here since known_proposed nonempty)

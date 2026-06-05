@@ -17,6 +17,16 @@ from typing import Dict, List
 from eb_verify.plugins import ValidationResult
 
 
+def _basename(name: str) -> str:
+    """Reduce an org/repo slug to its workspace basename.
+
+    Ground truth keys repos by slug ("spf13/cobra") while agent output names
+    them by workspace basename ("cobra", from /workspace/cobra/). Strip
+    everything up to and including the last "/" so the two forms compare equal.
+    """
+    return name.rsplit("/", 1)[-1]
+
+
 def _has_cycle(graph: Dict[str, List[str]]) -> bool:
     """Detect cycles in a dependency graph using Kahn's algorithm."""
     # Build adjacency: dep -> dependents (forward edges)
@@ -63,13 +73,22 @@ def validate_topological_order(
     if not proposed_order:
         return {"score": 0.0, "detail": "Empty proposal"}
 
-    if _has_cycle(dependency_graph):
+    # Basename-normalize both sides so slug ("spf13/cobra") and workspace
+    # basename ("cobra") match. Topological correctness is unaffected — only the
+    # name-matching is made form-agnostic.
+    graph = {
+        _basename(node): [_basename(dep) for dep in deps]
+        for node, deps in dependency_graph.items()
+    }
+    proposed = [_basename(repo) for repo in proposed_order]
+
+    if _has_cycle(graph):
         return {"score": 0.0, "detail": "Dependency graph contains a cycle"}
 
-    graph_nodes = set(dependency_graph.keys())
+    graph_nodes = set(graph.keys())
 
     # Filter proposed order to only nodes in the graph
-    known_proposed = [r for r in proposed_order if r in graph_nodes]
+    known_proposed = [r for r in proposed if r in graph_nodes]
 
     if not known_proposed:
         return {"score": 0.0, "detail": "No recognized repos in proposal"}
@@ -82,7 +101,7 @@ def validate_topological_order(
     total_constraints = 0
     satisfied_constraints = 0
 
-    for node, deps in dependency_graph.items():
+    for node, deps in graph.items():
         for dep in deps:
             if dep not in graph_nodes:
                 continue
