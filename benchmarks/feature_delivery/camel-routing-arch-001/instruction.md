@@ -21,29 +21,23 @@ Trace how Apache Camel routes a message from endpoint reception through the EIP 
 
 ## Expected Output
 
-Write your analysis to `/logs/agent/solution.md` with the following structure:
+Write your analysis as JSON to `/workspace/agent_output/answer.json` with the
+following structure:
 
-```
-## Files Examined
-- path/to/file1.ext — role in architecture
-- path/to/file2.ext — role in architecture
-...
-
-## Dependency Chain
-1. Entry point: path/to/entry.ext
-2. Calls: path/to/next.ext (via function/method name)
-3. Delegates to: path/to/impl.ext
-...
-
-## Analysis
-[Detailed architectural analysis including:
-- Design patterns identified
-- Component responsibilities
-- Data flow description
-- Interface contracts between components]
-
-## Summary
-[Concise 2-3 sentence summary answering the task question]
+```json
+{
+  "files": [
+    {"path": "path/to/file1.ext", "role": "role in architecture"},
+    {"path": "path/to/file2.ext", "role": "role in architecture"}
+  ],
+  "dependency_chain": [
+    "Entry point: path/to/entry.ext",
+    "Calls: path/to/next.ext (via function/method name)",
+    "Delegates to: path/to/impl.ext"
+  ],
+  "analysis": "Detailed architectural analysis covering the design patterns identified (e.g. the EIP Pipeline), each component's responsibilities, the Component->Endpoint->Consumer->Processor->Producer data flow, and the interface contracts between components.",
+  "summary": "Concise 2-3 sentence summary answering the task question."
+}
 ```
 
 ## Evaluation Criteria
