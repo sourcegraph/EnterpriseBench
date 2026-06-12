@@ -1,5 +1,5 @@
-[
- {
+{
+ "eb_paired": {
   "bench": "EB",
   "n_pairs": 10,
   "mean_reward_A": 0.468,
@@ -21,48 +21,462 @@
   "mean_search_calls_A": 22.3,
   "mean_search_calls_B": 8.4
  },
- {
-  "bench": "CSB",
-  "n_pairs": 10,
-  "mean_reward_A": 0.629,
-  "mean_reward_B": 0.503,
-  "delta_A_minus_B": 0.125,
-  "A_win/tie/B_win": "8/1/1",
-  "total_cost_A": 6.71,
-  "total_cost_B": 10.46,
-  "total_time_A_s": 1402,
-  "total_time_B_s": 1238,
-  "cost_per_quality_point_A": 1.07,
-  "cost_per_quality_point_B": 2.08,
-  "gt_seen_recall_A": 0.915,
-  "gt_seen_recall_B": 0.897,
-  "gt_read_recall_A": 0.433,
-  "gt_read_recall_B": 0.496,
-  "mean_tool_calls_A": 27.9,
-  "mean_tool_calls_B": 9.9,
-  "mean_search_calls_A": 13.5,
-  "mean_search_calls_B": 0.0
- },
- {
-  "bench": "ALL",
-  "n_pairs": 20,
-  "mean_reward_A": 0.548,
-  "mean_reward_B": 0.626,
-  "delta_A_minus_B": -0.077,
-  "A_win/tie/B_win": "9/4/7",
-  "total_cost_A": 20.05,
-  "total_cost_B": 36.98,
-  "total_time_A_s": 6027,
-  "total_time_B_s": 4616,
-  "cost_per_quality_point_A": 1.83,
-  "cost_per_quality_point_B": 2.96,
-  "gt_seen_recall_A": 0.859,
-  "gt_seen_recall_B": 0.816,
-  "gt_read_recall_A": 0.48,
-  "gt_read_recall_B": 0.397,
-  "mean_tool_calls_A": 37.55,
-  "mean_tool_calls_B": 13.65,
-  "mean_search_calls_A": 17.9,
-  "mean_search_calls_B": 4.2
+ "csb_3arm": {
+  "complete_tasks": [
+   "ccx-agentic-223",
+   "ccx-config-trace-010",
+   "ccx-crossorg-217",
+   "ccx-crossorg-288",
+   "ccx-incident-145",
+   "ccx-migration-274",
+   "ccx-migration-289",
+   "ccx-vuln-remed-014",
+   "ccx-vuln-remed-126",
+   "ccx-vuln-remed-135"
+  ],
+  "arms": {
+   "armA": {
+    "model": "claude-sonnet-4-6",
+    "config": "mcp-remote-direct",
+    "n_tasks": 10,
+    "trials": 30,
+    "mean_reward": 0.689,
+    "mean_cost_usd": 0.744,
+    "mean_cost_usd_recomputed": 0.744,
+    "cost_per_quality_point": 1.08,
+    "cost_per_quality_point_recomputed": 1.08,
+    "mean_wall_clock_s": 166.377,
+    "mean_tool_calls": 29.2,
+    "mean_search_calls": 13.0,
+    "gt_read_recall": 0.522,
+    "gt_seen_recall": 0.912
+   },
+   "armB": {
+    "model": "claude-fable-5",
+    "config": "baseline-local-direct",
+    "n_tasks": 10,
+    "trials": 30,
+    "mean_reward": 0.511,
+    "mean_cost_usd": 1.034,
+    "mean_cost_usd_recomputed": 1.034,
+    "cost_per_quality_point": 2.02,
+    "cost_per_quality_point_recomputed": 2.02,
+    "mean_wall_clock_s": 116.63,
+    "mean_tool_calls": 10.067,
+    "mean_search_calls": 0.0,
+    "gt_read_recall": 0.481,
+    "gt_seen_recall": 0.884
+   },
+   "armC": {
+    "model": "claude-sonnet-4-6",
+    "config": "baseline-local-direct",
+    "n_tasks": 10,
+    "trials": 30,
+    "mean_reward": 0.545,
+    "mean_cost_usd": 0.693,
+    "mean_cost_usd_recomputed": 0.711,
+    "cost_per_quality_point": 1.27,
+    "cost_per_quality_point_recomputed": 1.3,
+    "mean_wall_clock_s": 202.51,
+    "mean_tool_calls": 47.633,
+    "mean_search_calls": 0.0,
+    "gt_read_recall": 0.584,
+    "gt_seen_recall": 0.895
+   }
+  },
+  "mcp_effect_A_minus_C": {
+   "mean_delta": 0.144,
+   "win/tie/loss": "6/2/2"
+  },
+  "model_effect_C_minus_B": {
+   "mean_delta": 0.034,
+   "win/tie/loss": "5/2/3"
+  },
+  "deployment_A_minus_B": {
+   "mean_delta": 0.178,
+   "win/tie/loss": "7/2/1"
+  },
+  "per_task": {
+   "ccx-agentic-223": {
+    "armA": {
+     "n": 3,
+     "reward": 0.6254,
+     "reward_sd": 0.1324,
+     "cost_usd": 0.5565,
+     "cost_usd_recomputed": 0.5565,
+     "wall_clock_s": 128.1,
+     "tool_calls": 29.0,
+     "search_calls": 11.6667,
+     "gt_read_recall": 0.574,
+     "gt_seen_recall": 1.0
+    },
+    "armB": {
+     "n": 3,
+     "reward": 0.537,
+     "reward_sd": 0.1157,
+     "cost_usd": 0.9872,
+     "cost_usd_recomputed": 0.9872,
+     "wall_clock_s": 114.4333,
+     "tool_calls": 8.6667,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.4073,
+     "gt_seen_recall": 1.0
+    },
+    "armC": {
+     "n": 3,
+     "reward": 0.4747,
+     "reward_sd": 0.1666,
+     "cost_usd": 0.4592,
+     "cost_usd_recomputed": 0.4591,
+     "wall_clock_s": 133.9333,
+     "tool_calls": 35.0,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.4627,
+     "gt_seen_recall": 1.0
+    }
+   },
+   "ccx-config-trace-010": {
+    "armA": {
+     "n": 3,
+     "reward": 1.0,
+     "reward_sd": 0.0,
+     "cost_usd": 0.1769,
+     "cost_usd_recomputed": 0.1769,
+     "wall_clock_s": 34.9333,
+     "tool_calls": 5.3333,
+     "search_calls": 1.3333,
+     "gt_read_recall": 0.1667,
+     "gt_seen_recall": 1.0
+    },
+    "armB": {
+     "n": 3,
+     "reward": 1.0,
+     "reward_sd": 0.0,
+     "cost_usd": 0.4639,
+     "cost_usd_recomputed": 0.464,
+     "wall_clock_s": 38.9333,
+     "tool_calls": 3.6667,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.5,
+     "gt_seen_recall": 1.0
+    },
+    "armC": {
+     "n": 3,
+     "reward": 1.0,
+     "reward_sd": 0.0,
+     "cost_usd": 0.0871,
+     "cost_usd_recomputed": 0.0871,
+     "wall_clock_s": 21.4,
+     "tool_calls": 6.0,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.5,
+     "gt_seen_recall": 1.0
+    }
+   },
+   "ccx-crossorg-217": {
+    "armA": {
+     "n": 3,
+     "reward": 0.6953,
+     "reward_sd": 0.0469,
+     "cost_usd": 0.4608,
+     "cost_usd_recomputed": 0.4608,
+     "wall_clock_s": 111.3,
+     "tool_calls": 14.0,
+     "search_calls": 1.3333,
+     "gt_read_recall": 0.4073,
+     "gt_seen_recall": 1.0
+    },
+    "armB": {
+     "n": 3,
+     "reward": 0.1043,
+     "reward_sd": 0.0118,
+     "cost_usd": 1.0692,
+     "cost_usd_recomputed": 1.0691,
+     "wall_clock_s": 88.8333,
+     "tool_calls": 8.3333,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.278,
+     "gt_seen_recall": 0.7037
+    },
+    "armC": {
+     "n": 3,
+     "reward": 0.471,
+     "reward_sd": 0.3348,
+     "cost_usd": 0.3751,
+     "cost_usd_recomputed": 0.3751,
+     "wall_clock_s": 88.4667,
+     "tool_calls": 16.6667,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.3517,
+     "gt_seen_recall": 1.0
+    }
+   },
+   "ccx-crossorg-288": {
+    "armA": {
+     "n": 3,
+     "reward": 0.7345,
+     "reward_sd": 0.0937,
+     "cost_usd": 1.3234,
+     "cost_usd_recomputed": 1.3234,
+     "wall_clock_s": 306.3333,
+     "tool_calls": 47.3333,
+     "search_calls": 14.0,
+     "gt_read_recall": 0.55,
+     "gt_seen_recall": 0.95
+    },
+    "armB": {
+     "n": 3,
+     "reward": 0.8325,
+     "reward_sd": 0.0256,
+     "cost_usd": 1.4456,
+     "cost_usd_recomputed": 1.4456,
+     "wall_clock_s": 164.5333,
+     "tool_calls": 10.0,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.2333,
+     "gt_seen_recall": 1.0
+    },
+    "armC": {
+     "n": 3,
+     "reward": 0.708,
+     "reward_sd": 0.0737,
+     "cost_usd": 0.9327,
+     "cost_usd_recomputed": 0.9451,
+     "wall_clock_s": 271.5333,
+     "tool_calls": 57.6667,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.5167,
+     "gt_seen_recall": 0.9667
+    }
+   },
+   "ccx-incident-145": {
+    "armA": {
+     "n": 3,
+     "reward": 0.1717,
+     "reward_sd": 0.0087,
+     "cost_usd": 0.55,
+     "cost_usd_recomputed": 0.55,
+     "wall_clock_s": 92.7333,
+     "tool_calls": 15.6667,
+     "search_calls": 5.6667,
+     "gt_read_recall": 0.444,
+     "gt_seen_recall": 0.667
+    },
+    "armB": {
+     "n": 3,
+     "reward": 0.1717,
+     "reward_sd": 0.0087,
+     "cost_usd": 1.1897,
+     "cost_usd_recomputed": 1.1897,
+     "wall_clock_s": 127.5,
+     "tool_calls": 12.6667,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.407,
+     "gt_seen_recall": 0.704
+    },
+    "armC": {
+     "n": 3,
+     "reward": 0.1768,
+     "reward_sd": 0.0087,
+     "cost_usd": 0.4378,
+     "cost_usd_recomputed": 0.4641,
+     "wall_clock_s": 143.7667,
+     "tool_calls": 39.3333,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.4813,
+     "gt_seen_recall": 0.63
+    }
+   },
+   "ccx-migration-274": {
+    "armA": {
+     "n": 3,
+     "reward": 1.0,
+     "reward_sd": 0.0,
+     "cost_usd": 0.9426,
+     "cost_usd_recomputed": 0.9426,
+     "wall_clock_s": 203.8,
+     "tool_calls": 42.0,
+     "search_calls": 14.6667,
+     "gt_read_recall": 1.0,
+     "gt_seen_recall": 1.0
+    },
+    "armB": {
+     "n": 3,
+     "reward": 0.9276,
+     "reward_sd": 0.0627,
+     "cost_usd": 1.0944,
+     "cost_usd_recomputed": 1.0944,
+     "wall_clock_s": 128.2333,
+     "tool_calls": 10.6667,
+     "search_calls": 0.0,
+     "gt_read_recall": 1.0,
+     "gt_seen_recall": 1.0
+    },
+    "armC": {
+     "n": 3,
+     "reward": 1.0,
+     "reward_sd": 0.0,
+     "cost_usd": 0.5549,
+     "cost_usd_recomputed": 0.5549,
+     "wall_clock_s": 147.7667,
+     "tool_calls": 33.0,
+     "search_calls": 0.0,
+     "gt_read_recall": 1.0,
+     "gt_seen_recall": 1.0
+    }
+   },
+   "ccx-migration-289": {
+    "armA": {
+     "n": 3,
+     "reward": 0.681,
+     "reward_sd": 0.0669,
+     "cost_usd": 0.8478,
+     "cost_usd_recomputed": 0.8478,
+     "wall_clock_s": 202.1333,
+     "tool_calls": 36.3333,
+     "search_calls": 16.3333,
+     "gt_read_recall": 0.5713,
+     "gt_seen_recall": 1.0
+    },
+    "armB": {
+     "n": 3,
+     "reward": 0.5736,
+     "reward_sd": 0.0383,
+     "cost_usd": 1.3223,
+     "cost_usd_recomputed": 1.3223,
+     "wall_clock_s": 163.1,
+     "tool_calls": 11.3333,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.524,
+     "gt_seen_recall": 0.9527
+    },
+    "armC": {
+     "n": 3,
+     "reward": 0.6389,
+     "reward_sd": 0.0225,
+     "cost_usd": 0.7183,
+     "cost_usd_recomputed": 0.7183,
+     "wall_clock_s": 215.1667,
+     "tool_calls": 54.3333,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.857,
+     "gt_seen_recall": 0.9527
+    }
+   },
+   "ccx-vuln-remed-014": {
+    "armA": {
+     "n": 3,
+     "reward": 0.6111,
+     "reward_sd": 0.0962,
+     "cost_usd": 1.0153,
+     "cost_usd_recomputed": 1.0153,
+     "wall_clock_s": 214.1667,
+     "tool_calls": 27.0,
+     "search_calls": 11.0,
+     "gt_read_recall": 0.667,
+     "gt_seen_recall": 0.778
+    },
+    "armB": {
+     "n": 3,
+     "reward": 0.0,
+     "reward_sd": 0.0,
+     "cost_usd": 0.9631,
+     "cost_usd_recomputed": 0.9631,
+     "wall_clock_s": 124.1667,
+     "tool_calls": 13.3333,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.0,
+     "gt_seen_recall": 0.778
+    },
+    "armC": {
+     "n": 3,
+     "reward": 0.0,
+     "reward_sd": 0.0,
+     "cost_usd": 2.4936,
+     "cost_usd_recomputed": 2.6208,
+     "wall_clock_s": 691.8333,
+     "tool_calls": 153.6667,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.333,
+     "gt_seen_recall": 0.667
+    }
+   },
+   "ccx-vuln-remed-126": {
+    "armA": {
+     "n": 3,
+     "reward": 0.7593,
+     "reward_sd": 0.1197,
+     "cost_usd": 1.3371,
+     "cost_usd_recomputed": 1.3371,
+     "wall_clock_s": 306.0333,
+     "tool_calls": 67.3333,
+     "search_calls": 49.0,
+     "gt_read_recall": 0.778,
+     "gt_seen_recall": 0.963
+    },
+    "armB": {
+     "n": 3,
+     "reward": 0.7348,
+     "reward_sd": 0.0364,
+     "cost_usd": 0.842,
+     "cost_usd_recomputed": 0.842,
+     "wall_clock_s": 100.8,
+     "tool_calls": 11.0,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.852,
+     "gt_seen_recall": 0.852
+    },
+    "armC": {
+     "n": 3,
+     "reward": 0.7771,
+     "reward_sd": 0.0655,
+     "cost_usd": 0.3397,
+     "cost_usd_recomputed": 0.3397,
+     "wall_clock_s": 154.6333,
+     "tool_calls": 31.0,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.704,
+     "gt_seen_recall": 0.889
+    }
+   },
+   "ccx-vuln-remed-135": {
+    "armA": {
+     "n": 3,
+     "reward": 0.611,
+     "reward_sd": 0.0238,
+     "cost_usd": 0.2341,
+     "cost_usd_recomputed": 0.2341,
+     "wall_clock_s": 64.2333,
+     "tool_calls": 8.0,
+     "search_calls": 5.0,
+     "gt_read_recall": 0.0607,
+     "gt_seen_recall": 0.7573
+    },
+    "armB": {
+     "n": 3,
+     "reward": 0.2312,
+     "reward_sd": 0.034,
+     "cost_usd": 0.9638,
+     "cost_usd_recomputed": 0.9638,
+     "wall_clock_s": 115.7667,
+     "tool_calls": 11.0,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.6057,
+     "gt_seen_recall": 0.8483
+    },
+    "armC": {
+     "n": 3,
+     "reward": 0.2039,
+     "reward_sd": 0.0329,
+     "cost_usd": 0.536,
+     "cost_usd_recomputed": 0.5429,
+     "wall_clock_s": 156.6,
+     "tool_calls": 49.6667,
+     "search_calls": 0.0,
+     "gt_read_recall": 0.636,
+     "gt_seen_recall": 0.8483
+    }
+   }
+  }
  }
-]
+}

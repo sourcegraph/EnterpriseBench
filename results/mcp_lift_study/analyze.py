@@ -1,14 +1,27 @@
 #!/usr/bin/env python3
-"""MCP-lift study (EnterpriseBench-323) — aggregate results + IR metrics.
+"""MCP-lift study (EnterpriseBench-323 + dse deepening) — aggregates + IR metrics.
 
-Conditions:
-  condA = claude-sonnet-4-6 + Sourcegraph MCP (EB mcp_only / CSB mcp-remote-direct)
-  condB = claude-fable-5, no MCP            (EB baseline / CSB baseline-local-direct)
+EB conditions (n=1, unchanged from the phase-2 report):
+  condA = claude-sonnet-4-6 + Sourcegraph MCP (mcp_only)
+  condB = claude-fable-5, no MCP              (baseline)
+
+CSB arms (EnterpriseBench-dse, n=3 per cell):
+  armA = claude-sonnet-4-6 + SG-MCP   (run dir *_sonnet_*,   mcp-remote-direct)
+  armB = claude-fable-5 baseline      (run dir *_claudefa_*, baseline-local-direct)
+  armC = claude-sonnet-4-6 baseline   (run dir *_sonnet_*,   baseline-local-direct)
+A−C isolates the MCP effect at fixed model; C−B the model effect at fixed tooling.
 
 Reads:
   EB:  results/mcp_lift_study/eb/<task>/<cond>/{results.json,agent_trace.jsonl}
   CSB: ~/projects/CodeScaleBench/runs/mcp_lift_study/<bm>_<model>_<ts>/<config>/
          <task>_<hash>/<job>/<trial>/{result.json,task_metrics.json,agent/*.txt}
+       (every valid trial is a row; `_quarantine*` dirs are skipped)
+
+Costs are reported two ways per run: Claude-Code-logged `cost_usd`, and
+`cost_usd_recomputed` from logged token counts at the authoritative per-MTok
+prices below (platform.claude.com/docs/en/about-claude/pricing, 2026-06-12).
+Cache writes are priced at the 1h-ephemeral rate — Claude Code uses 1h cache
+(`ephemeral_1h_input_tokens` in run stdout); task_metrics does not split 5m/1h.
 
 Emits results/mcp_lift_study/study_results.json and prints markdown tables.
 """
@@ -17,6 +30,7 @@ from __future__ import annotations
 
 import json
 import re
+import statistics
 from pathlib import Path
 
 EB_ROOT = Path(__file__).resolve().parents[2]
@@ -48,6 +62,51 @@ CSB_TASK_DIRS = {
     "ccx-agentic-223": "benchmarks/csb_org_org/ccx-agentic-223",
     "ccx-incident-145": "benchmarks/csb_org_incident/ccx-incident-145",
 }
+
+# (model_tag_in_run_dir, harbor config) per CSB arm — see module docstring.
+CSB_ARMS = {
+    "armA": ("sonnet", "mcp-remote-direct"),
+    "armB": ("claudefa", "baseline-local-direct"),
+    "armC": ("sonnet", "baseline-local-direct"),
+}
+ARM_MODEL = {"armA": "claude-sonnet-4-6", "armB": "claude-fable-5",
+             "armC": "claude-sonnet-4-6"}
+# $/MTok: (input, output, cache_write_1h, cache_read)
+PRICES = {
+    "claude-sonnet-4-6": (3.0, 15.0, 6.0, 0.30),
+    "claude-fable-5": (10.0, 50.0, 20.0, 1.0),
+    "claude-haiku-4-5-20251001": (1.0, 5.0, 2.0, 0.10),  # EB-side auxiliary usage
+}
+# Per-model usage block in Claude Code's final stdout result line.
+MODEL_USAGE_RE = re.compile(
+    r'"(claude-[a-z0-9.-]+)":\{"inputTokens":(\d+),"outputTokens":(\d+),'
+    r'"cacheReadInputTokens":(\d+),"cacheCreationInputTokens":(\d+)')
+
+
+def recompute_cost_from_stdout(stdout_log: Path) -> float | None:
+    """EB-side recompute: sum every model in the modelUsage block at its price.
+
+    EB results.json carries only total input/output tokens (no cache split),
+    so the recompute reads the per-model usage from the agent's stdout tail.
+    """
+    if not stdout_log.is_file():
+        return None
+    tail = stdout_log.read_text(errors="replace")[-8000:]
+    total = None
+    for model, inp, out, c_read, c_write in MODEL_USAGE_RE.findall(tail):
+        c = recompute_cost(model, int(inp), int(out), int(c_write), int(c_read))
+        if c is not None:
+            total = (total or 0.0) + c
+    return round(total, 4) if total is not None else None
+
+
+def recompute_cost(model: str, inp, out, cache_write, cache_read) -> float | None:
+    if model not in PRICES or out is None:
+        return None
+    p_in, p_out, p_cw, p_cr = PRICES[model]
+    return round(((inp or 0) * p_in + (out or 0) * p_out + (cache_write or 0) * p_cw
+                  + (cache_read or 0) * p_cr) / 1e6, 4)
+
 
 SEARCH_TOOLS = re.compile(r"(grep|glob|search|sg_keyword|sg_nls|sg_list)", re.I)
 READ_TOOLS = re.compile(r"(^read$|sg_read_file|read_file)", re.I)
@@ -199,6 +258,7 @@ def eb_rows() -> list[dict]:
                 "input_tokens": tu.get("total_input_tokens"),
                 "output_tokens": tu.get("total_output_tokens"),
                 "cost_usd": tu.get("cost_usd"),
+                "cost_usd_recomputed": recompute_cost_from_stdout(rdir / "agent_stdout.log"),
                 "mcp_tool_calls": tu.get("mcp_tool_calls"),
             }
             row.update(trace_ir(rdir / "agent_trace.jsonl", gt))
@@ -207,44 +267,79 @@ def eb_rows() -> list[dict]:
 
 
 def csb_rows() -> list[dict]:
+    """One row per valid CSB trial, across all three arms.
+
+    A trial is valid iff reward is non-null, the agent produced output
+    tokens, and its return code is 0 (infra-error triage; invalid trials
+    are emitted with status=INVALID so exclusions stay visible).
+    """
     rows = []
     base = CSB_ROOT / "runs" / "mcp_lift_study"
-    # cond mapping by config dir name
     for task, tdir in CSB_TASK_DIRS.items():
         gt = gt_files(CSB_ROOT / tdir)
-        for cond, cfg in (("condA", "mcp-remote-direct"), ("condB", "baseline-local-direct")):
-            tm = trial_dir = None
-            for p in sorted(base.glob(f"*/{cfg}/{task}_*/**/task_metrics.json"),
-                            key=lambda p: p.stat().st_mtime, reverse=True):
-                cand = json.loads(p.read_text())
-                if cand.get("reward") is not None:
-                    tm, trial_dir = cand, p.parent
-                    break
-            if tm is None:
-                rows.append({"bench": "CSB", "task": task, "cond": cond, "status": "MISSING"})
+        for arm, (model_tag, cfg) in CSB_ARMS.items():
+            trials = []
+            for p in sorted(base.glob(f"*_{model_tag}_*/{cfg}/{task}_*/**/task_metrics.json"),
+                            key=lambda p: p.stat().st_mtime):
+                if "_quarantine" in str(p):
+                    continue
+                tm = json.loads(p.read_text())
+                if tm.get("reward") is None:
+                    continue  # launch casualty: agent never produced a scored run
+                trials.append((p.parent, tm))
+            if not trials:
+                rows.append({"bench": "CSB", "task": task, "cond": arm, "status": "MISSING"})
                 continue
-            row = {
-                "bench": "CSB",
-                "task": task,
-                "cond": cond,
-                "status": tm.get("status"),
-                "reward": tm.get("reward"),
-                "max_score": 1.0,
-                "norm_reward": tm.get("reward"),
-                "wall_clock_s": round(tm.get("agent_execution_seconds") or tm.get("wall_clock_seconds") or 0, 1),
-                "input_tokens": tm.get("input_tokens"),
-                "output_tokens": tm.get("output_tokens"),
-                "cache_read_tokens": tm.get("cache_read_tokens"),
-                "cost_usd": tm.get("cost_usd"),
-                "mcp_tool_calls": tm.get("tool_calls_mcp"),
-                "tool_calls": tm.get("tool_calls_total"),
-                "search_calls": (tm.get("search_calls_keyword") or 0) + (tm.get("search_calls_nls") or 0),
-            }
-            trace = trial_dir / "agent" / "claude-code.txt"
-            ir = trace_ir(trace, gt)
-            for k, v in ir.items():
-                row.setdefault(k, v)
-            rows.append(row)
+            for i, (trial_dir, tm) in enumerate(trials, 1):
+                model = ARM_MODEL[arm]
+                # Arm purity: the driver model plus haiku auxiliary/subagent
+                # usage is the expected shape; any other model contaminates
+                # the arm (observed: opus-4-8 in two fable-arm trials).
+                usage = {}
+                trace = trial_dir / "agent" / "claude-code.txt"
+                if trace.is_file():
+                    usage = {m: int(o) for m, _, o, *_ in
+                             MODEL_USAGE_RE.findall(trace.read_text(errors="replace")[-4000:])}
+                alien = sorted(m for m, o in usage.items()
+                               if not m.startswith(model) and "haiku" not in m and o > 0)
+                invalid = (not tm.get("output_tokens")
+                           or (tm.get("agent_return_code") not in (0, None)))
+                row = {
+                    "bench": "CSB",
+                    "task": task,
+                    "cond": arm,
+                    "trial": i,
+                    "trial_dir": str(trial_dir.relative_to(base)),
+                    "model": model,
+                    "models_used": usage or None,
+                    "status": ("INVALID" if invalid
+                               else "MODEL_MIXED" if alien else tm.get("status")),
+                    "alien_models": alien or None,
+                    "agent_return_code": tm.get("agent_return_code"),
+                    "reward": tm.get("reward"),
+                    "max_score": 1.0,
+                    "norm_reward": tm.get("reward"),
+                    "wall_clock_s": round(tm.get("agent_execution_seconds") or tm.get("wall_clock_seconds") or 0, 1),
+                    "input_tokens": tm.get("input_tokens"),
+                    "output_tokens": tm.get("output_tokens"),
+                    "cache_creation_tokens": tm.get("cache_creation_tokens"),
+                    "cache_read_tokens": tm.get("cache_read_tokens"),
+                    "cost_usd": tm.get("cost_usd"),
+                    # Prefer the transcript's per-model usage: task_metrics token
+                    # fields cover the driver model only, so a token-field
+                    # recompute misses haiku subagent cost in baseline arms.
+                    "cost_usd_recomputed": (
+                        recompute_cost_from_stdout(trace)
+                        or recompute_cost(
+                            model, tm.get("input_tokens"), tm.get("output_tokens"),
+                            tm.get("cache_creation_tokens"), tm.get("cache_read_tokens"))),
+                    "mcp_tool_calls": tm.get("tool_calls_mcp"),
+                    "tool_calls": tm.get("tool_calls_total"),
+                    "search_calls": (tm.get("search_calls_keyword") or 0) + (tm.get("search_calls_nls") or 0),
+                }
+                for k, v in trace_ir(trace, gt).items():
+                    row.setdefault(k, v)
+                rows.append(row)
     return rows
 
 
@@ -312,19 +407,98 @@ def aggregate(rows: list[dict], bench: str | None = None) -> dict | None:
     }
 
 
+def csb_valid(r: dict) -> bool:
+    return (r.get("norm_reward") is not None
+            and r.get("status") not in ("INVALID", "MODEL_MIXED"))
+
+
+def csb_task_means(rows: list[dict]) -> dict:
+    """(task, arm) -> per-cell mean over valid trials."""
+    cells: dict = {}
+    for r in rows:
+        if r["bench"] == "CSB" and r.get("cond") in CSB_ARMS and csb_valid(r):
+            cells.setdefault((r["task"], r["cond"]), []).append(r)
+    out = {}
+    for (task, arm), trials in cells.items():
+        def m(key):
+            vals = [t.get(key) for t in trials if t.get(key) is not None]
+            return round(sum(vals) / len(vals), 4) if vals else None
+        rewards = [t["norm_reward"] for t in trials if t.get("norm_reward") is not None]
+        out[(task, arm)] = {
+            "n": len(trials),
+            "reward": m("norm_reward"),
+            "reward_sd": round(statistics.stdev(rewards), 4) if len(rewards) > 1 else None,
+            "cost_usd": m("cost_usd"),
+            "cost_usd_recomputed": m("cost_usd_recomputed"),
+            "wall_clock_s": m("wall_clock_s"),
+            "tool_calls": m("tool_calls"),
+            "search_calls": m("search_calls"),
+            "gt_read_recall": m("gt_read_recall"),
+            "gt_seen_recall": m("gt_seen_recall"),
+        }
+    return out
+
+
+def csb_3arm(rows: list[dict]) -> dict:
+    """Per-arm aggregates over tasks with all 3 arms present, plus deltas."""
+    cells = csb_task_means(rows)
+    tasks = sorted({t for t, _ in cells})
+    complete = [t for t in tasks if all((t, a) in cells for a in CSB_ARMS)]
+
+    def arm_agg(arm):
+        rs = [cells[(t, arm)] for t in complete]
+        def m(key):
+            vals = [r[key] for r in rs if r[key] is not None]
+            return round(sum(vals) / len(vals), 3) if vals else None
+        q, c, cr = m("reward"), m("cost_usd"), m("cost_usd_recomputed")
+        return {
+            "model": ARM_MODEL[arm], "config": CSB_ARMS[arm][1],
+            "n_tasks": len(rs), "trials": sum(r["n"] for r in rs),
+            "mean_reward": q, "mean_cost_usd": c, "mean_cost_usd_recomputed": cr,
+            "cost_per_quality_point": round(c / q, 2) if q and c else None,
+            "cost_per_quality_point_recomputed": round(cr / q, 2) if q and cr else None,
+            "mean_wall_clock_s": m("wall_clock_s"),
+            "mean_tool_calls": m("tool_calls"), "mean_search_calls": m("search_calls"),
+            "gt_read_recall": m("gt_read_recall"), "gt_seen_recall": m("gt_seen_recall"),
+        }
+
+    def pairwise(a1, a2):
+        d = [cells[(t, a1)]["reward"] - cells[(t, a2)]["reward"] for t in complete]
+        wins = sum(1 for x in d if x > 1e-9)
+        losses = sum(1 for x in d if x < -1e-9)
+        return {
+            "mean_delta": round(sum(d) / len(d), 3) if d else None,
+            "win/tie/loss": f"{wins}/{len(d) - wins - losses}/{losses}",
+        }
+
+    return {
+        "complete_tasks": complete,
+        "arms": {a: arm_agg(a) for a in CSB_ARMS},
+        "mcp_effect_A_minus_C": pairwise("armA", "armC"),
+        "model_effect_C_minus_B": pairwise("armC", "armB"),
+        "deployment_A_minus_B": pairwise("armA", "armB"),
+        "per_task": {t: {a: cells[(t, a)] for a in CSB_ARMS if (t, a) in cells}
+                     for t in tasks},
+    }
+
+
 def main():
     rows = eb_rows() + csb_rows()
     out = STUDY / "study_results.json"
     out.write_text(json.dumps(rows, indent=1))
     print(f"wrote {out} ({len(rows)} rows)\n")
-    cols = ["bench", "task", "cond", "status", "norm_reward", "wall_clock_s",
-            "input_tokens", "output_tokens", "cost_usd", "tool_calls",
-            "search_calls", "mcp_tool_calls", "gt_seen_recall", "gt_read_recall"]
+    cols = ["bench", "task", "cond", "trial", "status", "norm_reward", "wall_clock_s",
+            "input_tokens", "output_tokens", "cost_usd", "cost_usd_recomputed",
+            "tool_calls", "search_calls", "mcp_tool_calls", "gt_seen_recall",
+            "gt_read_recall"]
     print(fmt_table(rows, cols))
-    aggs = [a for a in (aggregate(rows, b) for b in ("EB", "CSB", None)) if a]
+    aggs = {"eb_paired": aggregate(rows, "EB"), "csb_3arm": csb_3arm(rows)}
     (STUDY / "study_aggregates.json").write_text(json.dumps(aggs, indent=1))
     print()
-    print(fmt_table(aggs, list(aggs[0].keys())))
+    arm_rows = [{"arm": a, **v} for a, v in aggs["csb_3arm"]["arms"].items()]
+    print(fmt_table(arm_rows, list(arm_rows[0].keys())))
+    for k in ("mcp_effect_A_minus_C", "model_effect_C_minus_B", "deployment_A_minus_B"):
+        print(k, aggs["csb_3arm"][k])
 
 
 if __name__ == "__main__":

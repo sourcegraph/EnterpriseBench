@@ -89,7 +89,7 @@ All 20×2 final runs are VALID with `num_turns > 0`. Quarantined and re-run befo
 The CSB harness had drifted since its April campaign; local-state-only fixes (no CSB repo changes committed):
 
 1. `benchmarks/tasks -> .` symlink restored (harness expects `benchmarks/tasks/<suite>/<task>`).
-2. harbor pinned to **0.1.45** in `~/projects/CodeScaleBench/.venv` (system harbor 0.3.0 rejects CSB's `task.toml` schema: requires `task.name`).
+2. harbor pinned to **0.1.45** in `~/projects/CodeScaleBench/.venv` (system harbor 0.3.0 rejects CSB's `task.toml` schema: requires `task.name`). **The venv must be on PATH at launch** (`export PATH="$HOME/projects/CodeScaleBench/.venv/bin:$PATH"`) — `harbor` otherwise resolves to the user-site 0.3.0 and every job crashes with a TaskGroup ExceptionGroup (re-learned the hard way in the dse follow-on; that launch is quarantined in `runs/mcp_lift_study/_quarantine_badharbor_172020/`).
 3. `PYTHONUSERBASE=/home/ds/.local` and `DOCKER_CONFIG=/home/ds/.docker` exported at launch — per-account `HOME` switching otherwise breaks Python user-site imports and the docker compose CLI plugin.
 4. `scripts/evaluation/extract_task_metrics.py` run with `PYTHONPATH=$PWD/scripts:$PWD` (its self-inserted sys.path points at `scripts/evaluation`, but `csb_metrics` lives in `scripts/`).
 
@@ -99,3 +99,60 @@ The CSB harness had drifted since its April campaign; local-state-only fixes (no
 2. **Where the work is discovery across org/cross-repo surfaces (CSB org suites), Sonnet+MCP also wins on raw quality** (8/1/1, +0.125) — cheaper *and* better there.
 3. **Where the work needs deep local-context reading and long artifact production (EB suite), the frontier model with a local checkout still wins on quality** (6/1, +0.28) — if quality is the only objective on such tasks, pay for the frontier model.
 4. MCP measurably changes retrieval *behavior* (4× the search calls, 2.7× the tool calls) but not retrieval *outcomes* (ground-truth coverage is similar across conditions) — and retrieval volume does not convert 1:1 into task reward.
+
+---
+
+# Addendum — CSB 3-arm deepening at n=3 (EnterpriseBench-dse)
+
+**Date:** 2026-06-12 (same day, follow-on) · **Scope:** CSB only — the 10 CSB tasks above. EB numbers in the main report are unchanged (still n=1).
+**What changed:** +2 reps on Arm A (Sonnet 4.6 + SG-MCP) and Arm B (Fable 5 baseline) → n=3; **new Arm C (Sonnet 4.6 baseline, no MCP)** at n=3. 90 valid trials total (70 new). This kills the n=1 caveat for CSB and de-confounds model from tooling: **A−C isolates the MCP effect at fixed model; C−B isolates the model effect at fixed tooling.**
+**Reproduce:** `python3 results/mcp_lift_study/analyze.py` (now multi-trial + 3-arm aware; per-trial rows in `study_results.json`, aggregates in `study_aggregates.json` under `csb_3arm`).
+
+## Headline (10 tasks × 3 arms × n=3)
+
+| arm | model | tooling | mean reward | mean $/task (logged) | mean $/task (recomputed) | $/quality-pt | mean time |
+|---|---|---|---|---|---|---|---|
+| **A** | sonnet-4-6 | SG-MCP (no local source) | **0.689** | $0.74 | $0.74 | **$1.08** | 166s |
+| **B** | fable-5 | baseline (local checkout) | 0.511 | $1.03 | $1.03 | $2.02 | 117s |
+| **C** | sonnet-4-6 | baseline (local checkout) | 0.545 | $0.69 | $0.71 | $1.27 | 203s |
+
+- **MCP effect (A−C, same model): +0.144 mean reward, 6 wins / 2 ties / 2 losses.** On these discovery-heavy CSB org tasks, Sourcegraph MCP lifts Sonnet's quality by ~14 points of normalized reward at essentially equal dollar cost and *less* wall-clock than baseline-sonnet. The n=1 finding survives replication and is now attributable to tooling, not model choice.
+- **Model effect (C−B, same tooling): +0.034, 5/2/3 — parity.** Fable-baseline does not outperform Sonnet-baseline on these tasks; the frontier model buys nothing here while costing 1.5× more per task ($1.03 vs $0.69).
+- **Deployment comparison (A−B): +0.178, 7/2/1** — strengthened vs the n=1 snapshot (+0.125, 8/1/1) and now at half the cost per quality point ($1.08 vs $2.02).
+
+## Per-task (mean reward per cell, n=3 each)
+
+| task | A | C | B | A−C (MCP) | C−B (model) | A $ | C $ | B $ |
+|---|---|---|---|---|---|---|---|---|
+| ccx-agentic-223 | 0.625 | 0.475 | 0.537 | +0.151 | −0.062 | 0.56 | 0.46 | 0.99 |
+| ccx-config-trace-010 | 1.000 | 1.000 | 1.000 | +0.000 | +0.000 | 0.18 | 0.09 | 0.46 |
+| ccx-crossorg-217 | 0.695 | 0.471 | 0.104 | +0.224 | +0.367 | 0.46 | 0.38 | 1.07 |
+| ccx-crossorg-288 | 0.735 | 0.708 | 0.833 | +0.027 | −0.125 | 1.32 | 0.93 | 1.45 |
+| ccx-incident-145 | 0.172 | 0.177 | 0.172 | −0.005 | +0.005 | 0.55 | 0.44 | 1.19 |
+| ccx-migration-274 | 1.000 | 1.000 | 0.928 | +0.000 | +0.072 | 0.94 | 0.55 | 1.09 |
+| ccx-migration-289 | 0.681 | 0.639 | 0.574 | +0.042 | +0.065 | 0.85 | 0.72 | 1.32 |
+| ccx-vuln-remed-014 | 0.611 | 0.000 | 0.000 | **+0.611** | +0.000 | 1.02 | 2.49 | 0.96 |
+| ccx-vuln-remed-126 | 0.759 | 0.777 | 0.735 | −0.018 | +0.042 | 1.34 | 0.34 | 0.84 |
+| ccx-vuln-remed-135 | 0.611 | 0.204 | 0.231 | **+0.407** | −0.027 | 0.23 | 0.54 | 0.96 |
+
+The MCP lift concentrates where the n=1 report predicted: vulnerability usage-site discovery (vuln-remed-014: both baselines dead at 0.0 across all 6 trials while MCP scores 0.611±; vuln-remed-135: +0.407) and cross-org discovery (crossorg-217: +0.224). Tasks both baselines already solve (config-trace-010, migration-274) tie at 1.0 — no headroom.
+
+## Cost accounting — logged vs recomputed (the dual-accounting addendum)
+
+Per-run cost is reported two ways: **logged** (Claude Code's `cost_usd`) and **recomputed** from per-model token counts at authoritative per-MTok prices (platform.claude.com pricing, 2026-06-12: sonnet-4-6 $3 in / $15 out / $6 cache-write-1h / $0.30 cache-read; fable-5 $10 / $50 / $20 / $1; haiku-4-5 $1 / $5 / $2 / $0.10).
+
+- Recomputation from the transcript's per-model `modelUsage` reproduces logged cost **exactly** for pure single-model runs (arms A and B: $0.744 vs $0.744, $1.034 vs $1.034) — Claude Code's `cost_usd` is list-price-accurate, not subscription-discounted.
+- **Caveat found while reconciling:** `task_metrics.json` token fields cover the **driver model only**. Baseline sonnet runs delegate substantially to haiku subagents (same pattern as the locked-set audit), so a token-field-only recompute understates arm C cost by up to 45% per run. `analyze.py` therefore recomputes from the transcript's full per-model usage; the residual arm-C gap (logged $0.693 vs recomputed $0.711, 2.6%) traces to 429-retry remnants. **Any token-based cost analysis on these runs must use per-model usage, not the task_metrics totals.**
+
+## Run validity (triage applied before counting)
+
+All 90 counted trials: reward non-null, output tokens > 0, `agent_return_code == 0`, arm-pure models. Excluded and visible in `study_results.json`:
+
+- **14 INVALID trials** — 429 five-hour session-limit casualties (instant death, 0 output tokens; concentrated on whichever account a fast task landed on) and 2 full-length runs that exited non-zero. Every casualty was re-run to quota.
+- **1 MODEL_MIXED trial** (new triage class): a Fable-arm trial with 2.3k tokens of **claude-opus-4-8** usage — the transcript shows an explicit `model_refusal_fallback` event (`original_model: claude-fable-5 → fallback_model: claude-opus-4-8`), i.e. Claude Code silently swaps models on refusal (a second trial showed the same pattern but was already INVALID). Arm purity is now machine-checked: a trial counts only if its transcript shows the arm's driver model plus at most haiku auxiliary usage.
+
+## Bottom line (supersedes the CSB bullet of the main report)
+
+1. **MCP lift on discovery-heavy CSB tasks is real and model-independent: +0.14 mean reward at fixed model (6/2/2), replicated at n=3.** It is tooling, not model: the same Sonnet without MCP drops to baseline-Fable's level.
+2. **The frontier model without retrieval is not a substitute** — Fable-baseline ties Sonnet-baseline on quality (C−B +0.03) at 1.5× the cost, and loses to Sonnet+MCP on 7 of 10 tasks at 2× the cost per quality point.
+3. The initial published study can quote the CSB table without the n=1 caveat; per-cell SDs are in `study_aggregates.json` per-task block.
