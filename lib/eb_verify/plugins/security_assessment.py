@@ -1,5 +1,5 @@
 """
-security_assessment validator — CVE mapping, prioritization fields (stub).
+security_assessment validator — CVE mapping, prioritization fields.
 """
 
 from __future__ import annotations

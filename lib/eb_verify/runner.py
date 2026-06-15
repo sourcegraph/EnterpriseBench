@@ -32,6 +32,13 @@ from eb_verify.plugins import get_validator
 
 logger = logging.getLogger(__name__)
 
+# A checkpoint's ``passed`` flag is a coarse PASS/FAIL summary for human-readable
+# output; the weighted ``score`` is the real measurement. A checkpoint counts as
+# passed only when it earns at least this fraction of credit — a sliver of
+# partial credit (e.g. 0.01) is not a pass. Mirrors the 0.5 default in
+# scripts that score file-path matches (eb_verify.plugins.file_extraction).
+PASS_THRESHOLD = 0.5
+
 
 def _load_expected_solution(task_dir: Path) -> dict[str, Any]:
     """Load expected_solution.json if it exists, else return empty dict."""
@@ -219,11 +226,11 @@ class CheckpointRunner:
                         f"is not numeric: {raw_score!r}"
                     ) from exc
                 detail = data.get("detail", "")
-                passed = score > 0.0
+                passed = score >= PASS_THRESHOLD
             else:
                 # No score JSON object: legitimate exit-code verifier.
-                passed = result.returncode == 0
-                score = 1.0 if passed else 0.0
+                score = 1.0 if result.returncode == 0 else 0.0
+                passed = score >= PASS_THRESHOLD
                 detail = stdout or result.stderr.strip()
 
             return CheckpointResult(
@@ -383,7 +390,7 @@ class CheckpointRunner:
             result = CheckpointResult(
                 name=cp.name,
                 weight=cp.weight,
-                passed=final_score > 0.0,
+                passed=final_score >= PASS_THRESHOLD,
                 score=final_score,
                 detail="; ".join(detail_parts),
             )

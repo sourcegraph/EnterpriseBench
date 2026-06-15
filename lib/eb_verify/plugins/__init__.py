@@ -16,6 +16,11 @@ from typing import Dict, Optional, Protocol
 class ValidationResult:
     valid: bool
     detail: str = ""
+    # True when the artifact could not be checked at all (e.g. the parser
+    # library is unavailable) — distinct from a confirmed-valid result. Callers
+    # should surface this as a warning rather than silently treating the
+    # artifact as valid.
+    indeterminate: bool = False
 
 
 class ArtifactValidator(Protocol):

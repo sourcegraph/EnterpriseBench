@@ -1,5 +1,5 @@
 """
-runbook validator — markdown with required sections (stub with basic validation).
+runbook validator — markdown with required sections.
 """
 
 from __future__ import annotations

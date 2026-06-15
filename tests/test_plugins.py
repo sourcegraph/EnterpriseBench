@@ -183,6 +183,53 @@ class TestConfigValidator:
         # Either outcome is valid — we just assert no exception is raised
         assert isinstance(result.valid, bool)
 
+    def test_root_scan_covers_all_extensions(self, tmp_path):
+        # EnterpriseBench-0fx (e): the workspace-root scan must cover yml/json/
+        # toml/hcl, not just *.yaml. An invalid .json at the root must be caught.
+        workspace = tmp_path / "ws"
+        workspace.mkdir()
+        (workspace / "config.json").write_text("{bad json:::}")
+        result = ConfigValidator().validate(workspace)
+        assert result.valid is False
+        assert "config.json" in result.detail
+
+    def test_missing_yaml_parser_is_indeterminate_not_valid(self, tmp_path):
+        # EnterpriseBench-0fx (a): when PyYAML is unavailable the file is not
+        # silently passed as valid — it is flagged indeterminate.
+        import builtins
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "yaml":
+                raise ImportError("no yaml")
+            return real_import(name, *args, **kwargs)
+
+        f = tmp_path / "c.yaml"
+        f.write_text("a: 1\n")
+        from unittest.mock import patch
+        with patch("builtins.__import__", side_effect=fake_import):
+            result = ConfigValidator()._validate_file(f, tmp_path)
+        assert result.indeterminate is True
+        assert result.valid is True  # cannot prove invalid, but flagged
+
+    def test_indeterminate_surfaced_in_validate(self, tmp_path):
+        import builtins
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "yaml":
+                raise ImportError("no yaml")
+            return real_import(name, *args, **kwargs)
+
+        workspace = tmp_path / "ws"
+        workspace.mkdir()
+        (workspace / "c.yaml").write_text("a: 1\n")
+        from unittest.mock import patch
+        with patch("builtins.__import__", side_effect=fake_import):
+            result = ConfigValidator().validate(workspace)
+        assert result.indeterminate is True
+        assert "INDETERMINATE" in result.detail
+
 
 # ---------------------------------------------------------------------------
 # AnswerValidator
@@ -599,6 +646,13 @@ class TestAnswerOracleMatching:
     def test_file_path_match_none(self):
         text = "The issue is somewhere in the codebase."
         files = ["src/server/handler.go"]
+        assert file_path_match_score(text, files) == 0.0
+
+    def test_file_path_basename_not_matched_inside_token(self):
+        # EnterpriseBench-0fx (c): an unanchored substring must NOT score a hit —
+        # basename "id.py" should not be credited for "valid.python".
+        text = "The error is in valid.python somewhere."
+        files = ["src/id.py"]
         assert file_path_match_score(text, files) == 0.0
 
     def test_file_path_match_empty(self):

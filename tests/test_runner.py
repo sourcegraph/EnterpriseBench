@@ -175,7 +175,7 @@ class TestRunCheckpointJsonOutput:
         runner = CheckpointRunner(task=task, task_dir=task_dir, workspace=workspace)
         result = runner.run_checkpoint(cp)
 
-        assert result.passed is True  # score > 0
+        assert result.passed is True  # score >= PASS_THRESHOLD (0.5)
         assert result.score == pytest.approx(0.6)
 
 
@@ -219,6 +219,41 @@ class TestRunCheckpointExitCodeFallback:
 
         assert result.passed is False
         assert result.score == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# run_checkpoint — passed threshold (EnterpriseBench-0fx)
+# ---------------------------------------------------------------------------
+
+class TestRunCheckpointPassThreshold:
+    """passed must require real credit, not a 0.01 sliver of partial credit."""
+
+    def _run_json(self, tmp_path, score):
+        task_dir = tmp_path / "task"
+        task_dir.mkdir()
+        workspace = tmp_path / "ws"
+        workspace.mkdir()
+        write_bash_script(
+            task_dir / "checks" / "v.sh",
+            f'#!/bin/bash\necho \'{{"score": {score}}}\'\n',
+        )
+        task = make_task()
+        cp = make_checkpoint(verifier="checks/v.sh")
+        runner = CheckpointRunner(task=task, task_dir=task_dir, workspace=workspace)
+        return runner.run_checkpoint(cp)
+
+    def test_sliver_partial_credit_is_not_passed(self, tmp_path):
+        result = self._run_json(tmp_path, 0.01)
+        assert result.score == pytest.approx(0.01)  # score is preserved
+        assert result.passed is False  # but it is not a pass
+
+    def test_below_threshold_not_passed(self, tmp_path):
+        result = self._run_json(tmp_path, 0.49)
+        assert result.passed is False
+
+    def test_at_threshold_passes(self, tmp_path):
+        result = self._run_json(tmp_path, 0.5)
+        assert result.passed is True
 
 
 # ---------------------------------------------------------------------------

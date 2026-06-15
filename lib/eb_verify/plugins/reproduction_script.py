@@ -1,5 +1,5 @@
 """
-reproduction_script validator — file exists and is executable (stub).
+reproduction_script validator — file exists and is executable.
 """
 
 from __future__ import annotations

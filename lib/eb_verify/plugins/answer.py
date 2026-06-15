@@ -54,15 +54,23 @@ def symbol_match_score(answer_text: str, symbols: list[str]) -> float:
     return hits / len(symbols)
 
 
+def _referenced(needle: str, haystack: str) -> bool:
+    """Whether *needle* appears in *haystack* as a whole token (word-boundary
+    anchored). Anchoring kills unanchored-substring inflation — e.g. the
+    basename ``id.py`` must not be credited for appearing inside ``valid.python``
+    — in the same spirit as the suffix policy in file_extraction.py."""
+    return re.search(r"\b" + re.escape(needle) + r"\b", haystack) is not None
+
+
 def file_path_match_score(answer_text: str, expected_files: list[str]) -> float:
     """Return fraction of expected file paths referenced in answer."""
     if not expected_files:
         return 1.0
     hits = 0
     for fp in expected_files:
-        # Match full path or just the basename
+        # Match the full path or just the basename, anchored on word boundaries.
         basename = fp.rsplit("/", 1)[-1] if "/" in fp else fp
-        if fp in answer_text or basename in answer_text:
+        if _referenced(fp, answer_text) or _referenced(basename, answer_text):
             hits += 1
     return hits / len(expected_files)
 
