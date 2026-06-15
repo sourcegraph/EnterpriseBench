@@ -28,3 +28,29 @@ jobs:
           find benchmarks -name "*.sh" -not -path "*/_archived/*" | while read f; do
             bash -n "$f" || exit 1
           done
+
+  soundness:
+    # Mutation-tests every checkpoint verifier (empty / garbage / gold sweep).
+    # A FALSE POSITIVE — a verifier scoring > 0 with no agent output at all —
+    # is the hard soundness failure that makes the benchmark untrustworthy, so
+    # it blocks. The --strict sweep additionally surfaces garbage-credit and
+    # gold-zero *risk* warnings; those run informationally (continue-on-error)
+    # so they are visible in the log and tracked toward the threats-to-validity
+    # triage without turning this into a permanently-red required check.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          pip install pytest jsonschema tomli
+          pip install -e lib/
+      - name: Verifier soundness gate (false positives block)
+        run: python3 scripts/validation/verifier_mutation_test.py benchmarks/ --json
+      - name: Verifier risk sweep (strict, informational)
+        continue-on-error: true
+        run: python3 scripts/validation/verifier_mutation_test.py benchmarks/ --json --strict
