@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Check that agent triages the issue.
 set -euo pipefail
-WORKSPACE="${1:-.}"
+WORKSPACE="${WORKSPACE:-/workspace}"
 ACTIONS="$WORKSPACE/actions.jsonl"
 
 if [ ! -f "$ACTIONS" ]; then

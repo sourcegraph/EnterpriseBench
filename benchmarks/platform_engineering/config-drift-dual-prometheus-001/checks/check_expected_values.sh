@@ -1,41 +1,32 @@
 #!/usr/bin/env bash
-# Checkpoint 2: Verify agent determined correct expected values per drift point
-# Reimplemented in bash+jq+grep (no python3 in container); scoring (FOUND/TOTAL,
-# awk %.2f, pass at FOUND>=1) identical to the previous python implementation.
-# (Realistic reports carry string key/file/expected; a non-string value would
-# make python's .lower()/+ raise — an unreproduced corner, not present in data.)
+# Checkpoint: agent determined the correct expected values per drift point.
+# Criteria from expected_solution.json :: expected_values.
 set -euo pipefail
 
-export REPORT="${WORKSPACE:-/workspace}/charts/DRIFT_REPORT.json"
+REPORT="${WORKSPACE:-/workspace}/DRIFT_REPORT.json"
 if [[ ! -f "$REPORT" ]]; then
   printf '{"score": 0.0, "passed": false, "reason": "DRIFT_REPORT.json not found"}\n'
   exit 0
 fi
 
-export FOUND=0
-export TOTAL=2
+BLOB=$(jq -r '[.. | strings] | join(" ")' "$REPORT" 2>/dev/null || true)
+FOUND=0
+TOTAL=3
 
-# Per drift point: "<lower(key+file)>\t<lower(expected)>".
-mapfile -t rows < <(jq -r '
-  .drift_points // [] | .[] |
-  (((.key // "") + (.file // "")) | ascii_downcase) + "\t" + ((.expected // "") | ascii_downcase)
-' "$REPORT")
-
-match_pair() { # needle present in both key-side and expected-side of some point
-  local needle="$1" row k e
-  for row in "${rows[@]}"; do
-    k="${row%%$'\t'*}"; e="${row#*$'\t'}"
-    if [[ "$k" == *"$needle"* && "$e" == *"$needle"* ]]; then return 0; fi
-  done
-  return 1
-}
-
-# serflan-udp should use containerPorts.serfLAN
-if match_pair serflan; then FOUND=$((FOUND + 1)); fi
-# serfwan-udp should use containerPorts.serfWAN
-if match_pair serfwan; then FOUND=$((FOUND + 1)); fi
+# min-block-duration == max-block-duration (== 2h) as the canonical compaction fix.
+if printf '%s' "$BLOB" | grep -qiE 'block-duration|block_duration' && printf '%s' "$BLOB" | grep -qE '2h'; then
+  FOUND=$((FOUND + 1))
+fi
+# external_labels (cluster/replica) required for Thanos deduplication.
+if printf '%s' "$BLOB" | grep -qiE 'external.?label' && printf '%s' "$BLOB" | grep -qiE 'cluster|replica'; then
+  FOUND=$((FOUND + 1))
+fi
+# Override chain: prometheus.yml/flags -> tsdb/db.go -> sidecar -> shipper.go.
+if jq -e '.drift_points | any((.override_chain // []) | length > 0)' "$REPORT" >/dev/null 2>&1 \
+   || printf '%s' "$BLOB" | grep -qiE 'override chain|prometheus\.yml|shipper\.go|sidecar'; then
+  FOUND=$((FOUND + 1))
+fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
-if [ "$FOUND" -ge 1 ]; then PASSED=true; else PASSED=false; fi
-
-printf '{"score": %s, "passed": %s, "reason": "Correct expected values for %d/%d drift points"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"
+if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi
+printf '{"score": %s, "passed": %s, "reason": "Correct expected values: %d/%d criteria"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"

@@ -4,7 +4,8 @@
 # Env: WORKSPACE, TASK_DIR, TASK_ID
 set -euo pipefail
 
-REPORT="${WORKSPACE}/react/dead_code_report.json"
+REPORT="${WORKSPACE}/dead_code_report.json"
+GT_DIR="${TASK_DIR}/ground_truth.json"
 
 if [[ ! -f "$REPORT" ]]; then
     echo '{"score": 0.0, "detail": "No dead_code_report.json found"}'
@@ -21,6 +22,19 @@ fi
 falsy=$(jq -r 'if (.==null or .==false or .==0 or .=="" or .==[] or .=={}) then "yes" else "no" end' "$REPORT")
 if [[ "$falsy" == "yes" ]]; then
     echo '{"score": 0.0, "detail": "Empty report"}'
+    exit 0
+fi
+
+# Gate: evidence credit requires at least one correctly-identified dead-code
+# (file,symbol) pair. Evidence about wrong/fabricated dead code earns nothing —
+# this stops a filler report banking the evidence floor on garbage claims.
+NORM='map(if ((has("file") or has("path")) and has("symbol")) then ([(.file // .path), .symbol] | @json) else empty end) | unique | .[]'
+claimed=$(jq -r "$NORM" "$REPORT" 2>/dev/null || true)
+dead=$(jq -r '(.dead_code // []) | '"$NORM" "$GT_DIR" 2>/dev/null || true)
+export LC_ALL=C
+tp_count=$(comm -12 <(sort <<<"$claimed") <(sort <<<"$dead") | grep -c . || true)
+if [[ "$tp_count" -eq 0 ]]; then
+    echo '{"score": 0.0, "detail": "No correctly-identified dead-code pair — evidence credit requires >=1 true positive"}'
     exit 0
 fi
 

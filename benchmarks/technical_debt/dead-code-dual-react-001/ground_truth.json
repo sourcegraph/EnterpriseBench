@@ -41,11 +41,23 @@
   ],
   "dead_code": [
     {
-      "description": "Cross-repo dead code reference",
-      "repos_involved": [
-        "react",
-        "create-react-app"
-      ]
+      "file": "packages/react/src/ReactSharedInternals.js",
+      "symbol": "__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED",
+      "kind": "deprecated_api",
+      "evidence": "Several keys carried inside the __SECRET_INTERNALS object are no longer functional after the React 18 JSX-transform changes; create-react-app webpack config still aliases the deprecated entrypoint."
+    },
+    {
+      "file": "packages/react-dom/src/client/ReactDOM.js",
+      "symbol": "render",
+      "kind": "deprecated_api",
+      "evidence": "Legacy ReactDOM.render is deprecated in React 18 (replaced by createRoot) and warns at runtime; create-react-app templates that still call it are vestigial."
+    }
+  ],
+  "live_code": [
+    {
+      "file": "packages/react-dom/src/client/ReactDOMRoot.js",
+      "symbol": "createRoot",
+      "evidence": "createRoot is the live React 18 client entrypoint that replaced ReactDOM.render — must NOT be reported as dead."
     }
   ]
 }

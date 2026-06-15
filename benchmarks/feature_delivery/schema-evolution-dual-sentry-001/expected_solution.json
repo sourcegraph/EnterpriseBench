@@ -1,0 +1,41 @@
+{
+  "task_id": "schema-evolution-dual-sentry-001",
+  "checkpoints": {
+    "schema_change": {
+      "expected_solution": "At Sentry 23.11.0 the Python side defines event types, project configuration, and data categories via Django models in `src/sentry/models/project.py` (and friends like `src/sentry/event_manager.py`), while Relay 23.11.0 defines the matching Rust schema in `relay-event-schema/src/protocol/event.rs` (Event/EventType structs and enums) and `relay-server/src/envelope.rs` (envelope/item types). Drift accumulates whenever Sentry's Django side adds a new `EventType` enum value, a new project-config field, or a new validation rule but the corresponding `pub enum`/`pub struct` in `relay-event-schema/src/protocol/event.rs` is not updated, causing Relay to reject events that the main Sentry app would have accepted. The schema change boundary is therefore `src/sentry/models/project.py` ↔ `relay-event-schema/src/protocol/event.rs`.",
+      "evaluation_criteria": [
+        "Must reference src/sentry/models/project.py as the Sentry-side schema definition",
+        "Must reference relay-event-schema/src/protocol/event.rs as the Relay-side schema definition",
+        "Must explain the drift mode: a Python enum or field exists with no Rust counterpart",
+        "Should mention that Relay rejects events whose schema does not match its compiled-in protocol"
+      ]
+    },
+    "direct_refs": {
+      "expected_solution": "Direct references — the code paths that consume the schema on each side: (1) `src/sentry/models/project.py` declares Project and project-config fields used by Django admin and ingest endpoints; (2) `src/sentry/event_manager.py` runs Python-side validation/normalization on events as they arrive from SDKs and is the chief downstream of model definitions; (3) `relay-event-schema/src/protocol/event.rs` declares the canonical Rust `Event`, `EventType`, and `Annotated<Value>` shapes used by Relay's normalization pipeline; (4) `relay-server/src/envelope.rs` consumes the protocol module to validate envelope item types when Relay receives a payload from an SDK, returning 400/422 on mismatch.",
+      "evaluation_criteria": [
+        "Must cite src/sentry/models/project.py and src/sentry/event_manager.py on the Sentry side",
+        "Must cite relay-event-schema/src/protocol/event.rs as the Rust schema source-of-truth",
+        "Must cite relay-server/src/envelope.rs as the envelope-validation consumer",
+        "Should explain that envelope.rs is where Relay rejects schema-mismatched events with 400/422"
+      ]
+    },
+    "indirect_refs": {
+      "expected_solution": "Indirect references: (1) `src/sentry/event_manager.py` and any normalization helpers it imports — they encode validation rules whose error messages Relay also tries to mimic, so any Python-side rule that has no Rust counterpart causes asymmetric error responses depending on whether ingest goes through Relay or directly to Sentry; (2) `relay-event-schema/src/protocol/event.rs` is consumed by every Relay normalizer (`relay-general/src/store/`-style modules, not in scope here but transitively affected); (3) project-options/quotas defined on `src/sentry/models/project.py` flow through Sentry's data-categories module and are forwarded to Relay via project-config endpoints; an unsynced enum value on either side breaks event categorization. The cross-repo handshake is the project-config payload — Sentry serializes from Python objects, Relay deserializes into the Rust struct.",
+      "evaluation_criteria": [
+        "Must explain that src/sentry/event_manager.py validation rules need to mirror Rust-side rules",
+        "Must explain that relay-event-schema/src/protocol/event.rs is consumed by every Relay normalizer",
+        "Must mention the project-config payload as the cross-repo handshake",
+        "Should describe how unsynced enum values cause asymmetric error responses"
+      ]
+    },
+    "test_impact": {
+      "expected_solution": "Test coverage required: (1) Sentry-side — schema fixture tests under `src/sentry/event_manager.py` (and adjacent tests/) that pin the JSON output of normalized events; (2) Relay-side — protocol round-trip tests in `relay-event-schema/src/protocol/event.rs` and envelope tests covering `relay-server/src/envelope.rs` that exercise every `EventType`/category enum value; (3) cross-repo: integration fixtures (e.g., `tests/integration/` on the Sentry side and `tests/integration/` on the Relay side) that run Sentry's event normalizer and Relay's normalizer against the same SDK-format input and assert byte-equal output. Whenever a new `EventType` is added on either side, both fixture corpora must be updated atomically.",
+      "evaluation_criteria": [
+        "Must cite both src/sentry/event_manager.py and relay-event-schema/src/protocol/event.rs as test target areas",
+        "Must mention round-trip / fixture tests covering relay-server/src/envelope.rs",
+        "Must describe a cross-repo integration test that runs both normalizers on the same input",
+        "Should require atomic update of both repos' fixture corpora when an EventType is added"
+      ]
+    }
+  }
+}

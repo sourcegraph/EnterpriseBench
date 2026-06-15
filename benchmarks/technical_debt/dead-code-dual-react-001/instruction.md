@@ -19,11 +19,13 @@ Your task:
 4. Identify any create-react-app shims or polyfills that exist solely to bridge
    deprecated React APIs.
 
-Write your findings to /workspace/dead_code_report.json as:
+Write your findings to /workspace/dead_code_report.json as a JSON array where each
+entry uses `file` (the dead/deprecated React module path) and `symbol` (the dead
+export name) as the primary keys:
 [
   {
-    "react_module": "path/to/react/module.js",
-    "react_symbol": "exportName",
+    "file": "path/to/react/module.js",
+    "symbol": "exportName",
     "cra_references": ["path/to/cra/file.js"],
     "kind": "deprecated_api|dead_export|vestigial_shim",
     "confidence": "high|medium|low",

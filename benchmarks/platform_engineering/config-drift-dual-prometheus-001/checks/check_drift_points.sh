@@ -1,45 +1,30 @@
 #!/usr/bin/env bash
-# Checkpoint 1: Verify agent identified drift points (set precision/recall)
-# Reimplemented in bash+jq+grep (no python3 in container); scoring semantics
-# (FOUND/TOTAL with awk %.2f, pass at FOUND>=2) are identical to the previous
-# python implementation.
+# Checkpoint: agent identified the Prometheus-vs-Thanos drift points.
+# Criteria from expected_solution.json :: drift_points.
 set -euo pipefail
 
-export REPORT="${WORKSPACE:-/workspace}/charts/DRIFT_REPORT.json"
+REPORT="${WORKSPACE:-/workspace}/DRIFT_REPORT.json"
 if [[ ! -f "$REPORT" ]]; then
   printf '{"score": 0.0, "passed": false, "reason": "DRIFT_REPORT.json not found"}\n'
   exit 0
 fi
 
-# Expected drift points: serflan-udp and serfwan-udp port mismatches
-export FOUND=0
-export TOTAL=2
+BLOB=$(jq -r '[.. | strings] | join(" ")' "$REPORT" 2>/dev/null || true)
+FOUND=0
+TOTAL=4
 
-# Check if agent identified the serflan-udp port drift. For each drift point,
-# f = file + key; matches when lowercased f contains 'serflan'/'serf_lan' or
-# raw f contains 'serfLAN' (last clause is case-sensitive — preserved).
-if jq -e '
-  (.drift_points // []) | any(
-    ((.file // "") + (.key // "")) as $f
-    | ($f | ascii_downcase | contains("serflan"))
-      or ($f | ascii_downcase | contains("serf_lan"))
-      or ($f | contains("serfLAN"))
-  )' "$REPORT" >/dev/null 2>&1; then
+# Prometheus TSDB defaults source.
+if printf '%s' "$BLOB" | grep -qE 'tsdb/db\.go'; then FOUND=$((FOUND + 1)); fi
+# Thanos sidecar validation / shipper upload sources.
+if printf '%s' "$BLOB" | grep -qE 'cmd/thanos/sidecar\.go|sidecar\.go|pkg/shipper/shipper\.go|shipper\.go'; then FOUND=$((FOUND + 1)); fi
+# At least three drift points with concrete config keys.
+if jq -e '(.drift_points | length) >= 3' "$REPORT" >/dev/null 2>&1 \
+   && printf '%s' "$BLOB" | grep -qiE 'block-duration|min-block|max-block|retention|wal|external.?label'; then
   FOUND=$((FOUND + 1))
 fi
-
-# Check if agent identified the serfwan-udp port drift.
-if jq -e '
-  (.drift_points // []) | any(
-    ((.file // "") + (.key // "")) as $f
-    | ($f | ascii_downcase | contains("serfwan"))
-      or ($f | ascii_downcase | contains("serf_wan"))
-      or ($f | contains("serfWAN"))
-  )' "$REPORT" >/dev/null 2>&1; then
-  FOUND=$((FOUND + 1))
-fi
+# Failure mode for each drift explained.
+if printf '%s' "$BLOB" | grep -qiE 'compaction|block not found|missing.?block|upload|dedup|refus'; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi
-
-printf '{"score": %s, "passed": %s, "reason": "Found %d/%d drift points"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"
+printf '{"score": %s, "passed": %s, "reason": "Found %d/%d drift-point criteria"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"

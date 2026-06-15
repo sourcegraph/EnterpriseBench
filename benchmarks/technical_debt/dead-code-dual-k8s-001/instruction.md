@@ -19,13 +19,16 @@ Your task:
 4. For each dead code path, document the removed API, the client-go files affected,
    and whether removal would be safe.
 
-Write your findings to /workspace/dead_code_report.json as:
+Write your findings to /workspace/dead_code_report.json as a JSON array where each
+entry uses `file` (the dead client-go file path) and `symbol` (the dead typed-client,
+informer, lister, or fake-client symbol) as the primary keys:
 [
   {
+    "file": "path/in/client-go",
+    "symbol": "DeadSymbolName",
     "api_group": "apigroup/version",
     "status": "removed|deprecated",
     "k8s_evidence_file": "path/in/kubernetes/repo",
-    "client_go_files": ["path/in/client-go"],
     "kind": "typed_client|informer|lister|fake_client|expansion",
     "confidence": "high|medium|low",
     "evidence": "explanation of why this is dead code",

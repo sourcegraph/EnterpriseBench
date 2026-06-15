@@ -1,0 +1,29 @@
+{
+  "task_id": "dead-code-dual-react-001",
+  "checkpoints": {
+    "dead_code": {
+      "expected_solution": "facebook/react@v18.2.0 has narrowed its non-public surface around the new JSX transform and Server Components. The most prominent dead-or-deprecated anchor is packages/react/src/ReactSharedInternals.js — its __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED export is a stable name but several keys carried inside the object are no longer functional after the transform changes; supplemental anchors include packages/react-dom/src/client/ReactDOM.js (legacy ReactDOM.render is deprecated in 18 and warns at runtime). create-react-app@v5.0.1 still references the older surface in packages/react-scripts/config/webpack.config.js (resolve aliases pointing at deprecated entrypoints) and packages/react-scripts/scripts/build.js (build-time references that no longer load anything). An ideal answer cross-references each react module to its consumer in create-react-app and classifies the link as deprecated_api, dead_export, or vestigial_shim. Each entry must be a JSON object with `react_module`, `react_symbol`, `cra_references`, and `kind`.",
+      "evaluation_criteria": [
+        "Answer must be a non-empty JSON array of objects with `file` and `symbol` fields (the verifier extracts these into a (file, symbol) set) — using the canonical react module path for `file` and the export name for `symbol`",
+        "Must include the GT required-file anchors: packages/react/src/ReactSharedInternals.js (react side) and packages/react-scripts/config/webpack.config.js (CRA side)",
+        "Each entry must carry a `kind` from {deprecated_api, dead_export, vestigial_shim} and indicate whether the cross-repo reference is load_bearing (true/false) — an ideal answer classifies CRA references as vestigial whenever removal of the React export does not break a CRA build"
+      ]
+    },
+    "evidence": {
+      "expected_solution": "Each entry must explain in one sentence why the React export is dead/deprecated AND why the create-react-app reference no longer requires it. Strong evidence cites quality keywords like 'deprecated', 'no longer', 'removed', 'no callers', or 'unreachable'. Example evidence for a vestigial CRA shim: 'packages/react-scripts/config/webpack.config.js still aliases this export but the import is dead — webpack tree-shakes it, no runtime path reaches the alias.' At minimum 60% of items should hit a quality keyword for the verifier's bonus.",
+      "evaluation_criteria": [
+        "Every entry must populate a non-empty `evidence` field (the verifier scores 0.6× evidence_ratio + 0.4× quality_ratio)",
+        "Evidence text should hit at least one quality keyword: 'deprecated', 'no longer', 'removed', 'no callers', 'no references', or 'unreachable' — these are explicitly listed in the verifier",
+        "Evidence must establish both ends of the cross-repo link — what is dead in facebook/react@v18.2.0 AND what in create-react-app@v5.0.1 still references it (e.g., webpack alias, polyfill import, build-script require)"
+      ]
+    },
+    "feature_flags": {
+      "expected_solution": "create-react-app does not gate on React feature flags directly — the dead code is driven by React's lifecycle shifts (JSX transform default, Server Components rollout) rather than named flags. Ground truth registers a generic cross-repo dead-code reference rather than naming flags, so the answer should explicitly state 'no live feature flags gate the dead code; cleanup is lifecycle-driven' and use evidence text containing 'deprecated' or 'no longer' so the keyword grep across evidence+symbol+file fields succeeds.",
+      "evaluation_criteria": [
+        "Answer should explicitly note the absence of named feature flags and attribute the dead code to lifecycle/deprecation rather than configuration gating",
+        "Evidence text across the report must contain at least one of 'deprecated', 'no longer', 'removed' so the verifier's keyword grep over evidence+symbol+file resolves",
+        "The cross-repo connection must be visible in each entry — the answer should pair a react anchor (e.g., packages/react/src/ReactSharedInternals.js) with the create-react-app file (e.g., packages/react-scripts/config/webpack.config.js) that still references it"
+      ]
+    }
+  }
+}

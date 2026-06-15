@@ -1,0 +1,30 @@
+{
+  "task_id": "config-drift-dual-argocd-001",
+  "checkpoints": {
+    "config_valid": {
+      "expected_solution": "Valid drift report covers two repos: argo-cd v2.9.0 and argo-helm argo-cd-5.51.0. The report should be a JSON array of drift_points where each entry names a config_key, the ArgoCD default with its source file (Go source under cmd/argocd-application-controller/commands/argocd_application_controller.go or controller/appcontroller.go), the helm_override with its values.yaml path under charts/argo-cd/values.yaml, and an impact statement. The report must be valid JSON and reference both repos by name.",
+      "evaluation_criteria": [
+        "Must produce valid JSON parsable by json.loads with a top-level drift_points array",
+        "Must reference both argo-cd (Go source) and argo-helm (charts/argo-cd/values.yaml) in the drift_points entries",
+        "Each drift_point must contain config_key, argocd_default, argocd_source_file, helm_override, helm_source_path, and impact fields"
+      ]
+    },
+    "drift_points": {
+      "expected_solution": "Drift points between argo-cd v2.9.0 controller defaults and argo-helm argo-cd-5.51.0 chart values. (1) Application controller --status-processors / --operation-processors: Go defaults for these flags live in cmd/argocd-application-controller/commands/argocd_application_controller.go (defaults are 20 status processors and 10 operation processors); the Helm chart at charts/argo-cd/values.yaml under controller.args sets these to lower values, capping concurrency below the controller's tested defaults. (2) controller.appResyncPeriod: the controller defaults to 180s in argocd_application_controller.go but argo-helm's values.yaml sets a different default (commonly 0 or a higher value), changing the resync cadence. (3) Resource tracking method: util/settings/settings.go enforces application.resourceTrackingMethod default of 'label'; the helm chart's argocd-cm configmap may override to 'annotation' or 'annotation+label', changing how ArgoCD attaches tracking metadata. (4) Sync timeout/retry: controller/appcontroller.go uses an internal default for sync operation timeout that the helm chart's controller.args may shorten, causing premature timeout under load. Each drift produces a behavior change at runtime even though no application config has changed.",
+      "evaluation_criteria": [
+        "Must identify cmd/argocd-application-controller/commands/argocd_application_controller.go as a source of controller defaults",
+        "Must identify charts/argo-cd/values.yaml as the helm chart's override location",
+        "Must call out at least two specific drift points with concrete config keys (e.g., status-processors, appResyncPeriod, resourceTrackingMethod, sync timeout)",
+        "Must reference controller/appcontroller.go or util/settings/settings.go as additional source files where relevant"
+      ]
+    },
+    "expected_values": {
+      "expected_solution": "Expected values are the controller's own Go defaults: --status-processors=20 and --operation-processors=10 (defined in cmd/argocd-application-controller/commands/argocd_application_controller.go), appResyncPeriod=180s (same file, set via flag default), application.resourceTrackingMethod='label' (default in util/settings/settings.go), and the controller's internal sync operation timeout (defined in controller/appcontroller.go). The Helm chart at charts/argo-cd/values.yaml should either match these defaults or document each deliberate divergence in comments. The override chain is: Go flag default in argocd_application_controller.go -> deployment env/args generated from charts/argo-cd/values.yaml -> running controller pod -> reconcile loop. To eliminate phantom timeouts, align the helm values with the controller's tested defaults or explicitly raise concurrency parameters to match application count.",
+      "evaluation_criteria": [
+        "Must specify the Go-side defaults (status-processors=20, operation-processors=10, appResyncPeriod=180s) with their source file argocd_application_controller.go",
+        "Must specify that resourceTrackingMethod='label' is the default in util/settings/settings.go",
+        "Must explain the override chain: Go default -> helm-rendered deployment args -> running controller -> reconcile loop"
+      ]
+    }
+  }
+}

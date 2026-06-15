@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Check that agent proposes or implements a remediation.
 set -euo pipefail
-WORKSPACE="${1:-.}"
+WORKSPACE="${WORKSPACE:-/workspace}"
 ACTIONS="$WORKSPACE/actions.jsonl"
 
 if [ ! -f "$ACTIONS" ]; then

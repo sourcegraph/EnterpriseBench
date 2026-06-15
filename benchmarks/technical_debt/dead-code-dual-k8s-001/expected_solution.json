@@ -1,0 +1,29 @@
+{
+  "task_id": "dead-code-dual-k8s-001",
+  "checkpoints": {
+    "dead_code": {
+      "expected_solution": "At kubernetes@v1.28.0, the flowcontrol.apiserver.k8s.io/v1beta2 API group is deprecated and slated for removal — staging/src/k8s.io/api/flowcontrol/v1beta2/types.go declares the types, and pkg/registry/flowcontrol/rest/storage_flowcontrol.go shows how registration is being shifted toward v1beta3 / v1 successors. client-go@v0.28.0 still ships generated typed clients, informers, listers, and fake clients for v1beta2 — kubernetes/typed/flowcontrol/v1beta2/flowcontrol_client.go is the typed-client anchor and informers/flowcontrol/v1beta2/interface.go is the informer anchor. An ideal answer enumerates each generated artifact under client-go for the deprecated group, classifies it as 'partially dead' (because the group still exists under newer versions), and notes that v1beta2 will be served by aggregation-style compatibility until removal. Any reply must contain a non-empty array of objects with `file` and `symbol` fields so the dead_code verifier can compute precision/recall — the headline pair to flag is (kubernetes/typed/flowcontrol/v1beta2/flowcontrol_client.go, FlowcontrolV1beta2Client).",
+      "evaluation_criteria": [
+        "Answer must be a non-empty JSON array (not an object) where every entry carries `file` and `symbol` fields — the verifier extracts (file, symbol) tuples for precision/recall scoring",
+        "Must reference at least the typed client at kubernetes/typed/flowcontrol/v1beta2/flowcontrol_client.go and the informer at informers/flowcontrol/v1beta2/interface.go (the GT required-file anchors in client-go)",
+        "Must classify each entry's status as 'removed' or 'deprecated' and identify the API server registration source in staging/src/k8s.io/api/flowcontrol/v1beta2/types.go that proves the API surface is going away"
+      ]
+    },
+    "evidence": {
+      "expected_solution": "Each entry's evidence string must explain why the artifact is dead in concrete terms — e.g., 'flowcontrol.apiserver.k8s.io/v1beta2 deprecated in 1.26 and removed in 1.29; v1beta2 typed client in kubernetes/typed/flowcontrol/v1beta2/flowcontrol_client.go has no live consumers when the cluster is upgraded'. The verifier rewards quality keywords like 'deprecated', 'removed', 'no callers', 'unreachable', and 'no longer'; vague labels like 'old' score lower. At minimum 60% of entries should hit a quality keyword.",
+      "evaluation_criteria": [
+        "Every entry must populate a non-empty `evidence` field (the verifier scores 0.6× evidence_ratio + 0.4× quality_ratio)",
+        "Evidence text should hit quality keywords such as 'deprecated', 'removed', 'no callers', 'unreachable', or 'no longer' — used by the verifier's keyword-quality bonus",
+        "Evidence for v1beta2 dead code must cite both sides of the cross-repo trace: the API server deprecation in staging/src/k8s.io/api/flowcontrol/v1beta2/types.go and the consumer in kubernetes/typed/flowcontrol/v1beta2/flowcontrol_client.go"
+      ]
+    },
+    "feature_flags": {
+      "expected_solution": "kubernetes/v1.28.0's API lifecycle is gated by feature gates; the relevant ones for flowcontrol/v1beta2 are APIPriorityAndFairness (the broader feature) and the version-specific deprecation hooks. Ground truth lists a generic 'cross-repo dead code reference' rather than enumerating named flags, so this checkpoint passes when the agent at minimum acknowledges that no live feature gates protect v1beta2 endpoints — it is purely a deprecation/removal lifecycle issue. If the agent reports zero feature flags, the file/symbol/evidence text should still mention 'deprecated' and 'no longer' so the keyword grep in check_feature_flags.sh succeeds.",
+      "evaluation_criteria": [
+        "Answer must mention the cross-repo dependency context (kubernetes ↔ client-go) and the lifecycle status of flowcontrol.apiserver.k8s.io/v1beta2 — even if no named feature flag exists",
+        "Either populate a feature_flags-style block, OR ensure evidence text contains 'deprecated'/'removed'/'no longer' so that the verifier's keyword grep across evidence+symbol+file fields can resolve the lifecycle gate",
+        "Evidence must reference at least one anchor in each repo: staging/src/k8s.io/api/flowcontrol/v1beta2/types.go (API server side) and kubernetes/typed/flowcontrol/v1beta2/flowcontrol_client.go (client side)"
+      ]
+    }
+  }
+}

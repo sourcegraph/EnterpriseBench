@@ -1,0 +1,41 @@
+{
+  "task_id": "schema-evolution-dual-django-001",
+  "checkpoints": {
+    "schema_change": {
+      "expected_solution": "Django 5.0 introduces internal field-API changes that affect Wagtail 5.2's Page hierarchy and StreamField. The two most relevant primitives are: (1) the model `Field` base class and `Field.contribute_to_class` machinery in `django/db/models/fields/__init__.py`, which Wagtail subclasses extend (StreamField, RichTextField, etc.), and (2) the new `GeneratedField` and accompanying changes in `django/db/models/options.py` (model `Meta` handling — field collection, ordering, and DB-level expression resolution). When the consuming app (Wagtail v5.2) inherits these contracts, internal contracts that Wagtail relied on (private/semi-private hooks like `contribute_to_class`, `_meta.get_field`, model state copying) shift, breaking Wagtail's `Page` model hierarchy and StreamField introspection at migration check and admin serialization time.",
+      "evaluation_criteria": [
+        "Must identify django/db/models/fields/__init__.py as the primary Django change site (Field.contribute_to_class)",
+        "Must reference django/db/models/options.py for Meta handling and GeneratedField support",
+        "Must explain the contract is between Django Field internals and Wagtail's subclass extensions",
+        "Should mention GeneratedField as the specifically new construct in Django 5.0"
+      ]
+    },
+    "direct_refs": {
+      "expected_solution": "Wagtail's direct dependents on the changed Django field internals: (1) `wagtail/models/__init__.py` — declares the `Page` model hierarchy (`Page`, `Orderable`, `RevisionMixin`) which override `Meta` and call `contribute_to_class` on dynamic fields; subclasses inherit the modified contract; (2) `wagtail/fields.py` — `StreamField` is a custom Field subclass that customises `contribute_to_class` for block schema serialization, intercepting deconstruction for migrations and the model-state-copy semantics that change in Django 5.0. The boundary is therefore `django/db/models/fields/__init__.py` ↔ `wagtail/models/__init__.py`/`wagtail/fields.py`.",
+      "evaluation_criteria": [
+        "Must cite wagtail/models/__init__.py as the Page hierarchy module that depends on Django field internals",
+        "Must cite wagtail/fields.py as the StreamField subclass that overrides contribute_to_class",
+        "Must explain that the breakage flows through subclassing of Django's Field/Meta machinery",
+        "Should reference back to django/db/models/fields/__init__.py and django/db/models/options.py as the upstream surface"
+      ]
+    },
+    "indirect_refs": {
+      "expected_solution": "Indirect references: any model that subclasses `wagtail.models.Page` (custom page types in user projects) inherits the changed model `Meta` machinery, so `_meta.get_field` and migration introspection silently see different state than they did under Django 4.2. The Wagtail admin serializer relies on field-instance identity and `_meta.private_fields` to render edit forms; when Django 5.0 changes how generated fields land in `_meta`, the admin raises FieldError. Migrations created against Django 4.2's deconstruction format still load, but Wagtail's `StreamField.deconstruct` (in `wagtail/fields.py`) returns slightly different output under Django 5.0's model-state copy semantics, so `makemigrations --check` reports spurious diffs. The cross-repo coordination point is: any time Django changes the private contract of `Field.contribute_to_class` or Meta-options ordering, Wagtail must follow within a release.",
+      "evaluation_criteria": [
+        "Must explain that user-defined Page subclasses inherit the changed Meta machinery and silently misbehave",
+        "Must explain how Wagtail admin's reliance on _meta.private_fields and field identity surfaces FieldError",
+        "Must mention StreamField.deconstruct producing different migration output under the new Django",
+        "Should describe the cross-repo coordination requirement: Wagtail must follow Django's private-API changes per release"
+      ]
+    },
+    "test_impact": {
+      "expected_solution": "Test impact: (1) Django's own field tests under `django/db/models/fields/__init__.py` (and accompanying test modules in the Django test suite) cover `Field.contribute_to_class` and `GeneratedField` behavior; any Wagtail-side workaround must avoid relying on shapes those tests explicitly assert. (2) Wagtail-side tests for `wagtail/models/__init__.py` and `wagtail/fields.py` should add cases for: Page subclass migration generation under Django 5.0, StreamField deconstruction stability across Django versions, and admin form rendering with `GeneratedField` columns present. Cross-repo migration coordination requires running both repos' migration test suites against the matrix (Django 4.2 + Wagtail 5.2 ↔ Django 5.0 + Wagtail 5.2 ↔ Django 5.0 + a Wagtail 5.2.x patch) and confirming that no spurious migration is produced.",
+      "evaluation_criteria": [
+        "Must cite both django/db/models/fields/__init__.py and wagtail/models/__init__.py as test target areas",
+        "Must mention adding test cases for Page subclass migration generation under Django 5.0",
+        "Must mention StreamField deconstruction stability tests in wagtail/fields.py",
+        "Should describe a test matrix across Django 4.2 / Django 5.0 + Wagtail 5.2"
+      ]
+    }
+  }
+}

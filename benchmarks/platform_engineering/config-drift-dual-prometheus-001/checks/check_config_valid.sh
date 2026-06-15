@@ -1,54 +1,34 @@
 #!/usr/bin/env bash
-# Checkpoint 3: Validate corrected configuration if provided
-# No-helm fallback uses bash + jq + grep (no python3 in container). Port-consistency
-# check is identical to the previous python: flag a line as inconsistent when it
-# contains 'serflan' (case-insensitive) AND literal 'serfWAN', or contains 'serfwan'
-# (case-insensitive) AND literal 'serfLAN' but not literal 'serfWAN'.
+# Checkpoint: drift report is well-formed and references both repos.
+# Criteria from expected_solution.json :: config_valid.
 set -euo pipefail
 
-export WORKSPACE="${WORKSPACE:-/workspace}"
-export CHART_DIR="$WORKSPACE/charts/bitnami/consul"
-export REPORT="$WORKSPACE/charts/DRIFT_REPORT.json"
-
+REPORT="${WORKSPACE:-/workspace}/DRIFT_REPORT.json"
 if [[ ! -f "$REPORT" ]]; then
   printf '{"score": 0.0, "passed": false, "reason": "DRIFT_REPORT.json not found"}\n'
   exit 0
 fi
 
-# Check if corrected config files were provided
-export CORRECTED_SERVICE="$CHART_DIR/templates/consul-headless-service.yaml"
-if [[ ! -f "$CORRECTED_SERVICE" ]]; then
-  # No corrected config is optional — give partial credit for the report alone
-  printf '{"score": 1.0, "passed": true, "reason": "Corrected config not provided (optional checkpoint — skipped)"}\n'
+if ! jq -e '(.drift_points | type) == "array" and (.drift_points | length) > 0' "$REPORT" >/dev/null 2>&1; then
+  printf '{"score": 0.0, "passed": false, "reason": "Not valid JSON with a non-empty drift_points array"}\n'
   exit 0
 fi
 
-# If helm is available, try to template the corrected chart
-if command -v helm &>/dev/null; then
-  if helm template test-consul "$CHART_DIR" --dry-run 2>/dev/null | grep -q 'kind:'; then
-    printf '{"score": 1.0, "passed": true, "reason": "Corrected chart templates successfully"}\n'
-  else
-    printf '{"score": 0.25, "passed": false, "reason": "Corrected chart fails helm template"}\n'
-  fi
-else
-  # No helm available — check that the corrected file has consistent port references
-  check_consul_ports() {
-    local service_file="$CHART_DIR/templates/consul-headless-service.yaml"
-    local line line_lc
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      line_lc=$(printf '%s' "$line" | tr '[:upper:]' '[:lower:]')
-      if printf '%s' "$line_lc" | grep -qF -- 'serflan' && printf '%s' "$line" | grep -qF -- 'serfWAN'; then
-        return 1
-      fi
-      if printf '%s' "$line_lc" | grep -qF -- 'serfwan' && printf '%s' "$line" | grep -qF -- 'serfLAN' && ! printf '%s' "$line" | grep -qF -- 'serfWAN'; then
-        return 1
-      fi
-    done < "$service_file"
-    return 0
-  }
-  if check_consul_ports 2>/dev/null; then
-    printf '{"score": 1.0, "passed": true, "reason": "Corrected config has consistent port references"}\n'
-  else
-    printf '{"score": 0.25, "passed": false, "reason": "Corrected config still has inconsistent port references"}\n'
-  fi
+FOUND=1   # valid JSON + non-empty drift_points array
+TOTAL=3
+
+BLOB=$(jq -r '[.. | strings] | join(" ")' "$REPORT" 2>/dev/null || true)
+# References both repos: a Prometheus TSDB source AND a Thanos sidecar/shipper source.
+if printf '%s' "$BLOB" | grep -qiE 'tsdb/db\.go|prometheus' && printf '%s' "$BLOB" | grep -qiE 'sidecar\.go|shipper\.go|thanos'; then
+  FOUND=$((FOUND + 1))
 fi
+# Each drift_point carries the required fields.
+if jq -e '.drift_points | all(
+    has("config_key") and has("prometheus_default") and has("prometheus_source_file")
+    and has("thanos_expectation") and has("thanos_source_file") and has("failure_mode"))' "$REPORT" >/dev/null 2>&1; then
+  FOUND=$((FOUND + 1))
+fi
+
+SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
+if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi
+printf '{"score": %s, "passed": %s, "reason": "Report validity: %d/%d criteria"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"

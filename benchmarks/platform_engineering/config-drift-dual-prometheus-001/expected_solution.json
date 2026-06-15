@@ -1,0 +1,30 @@
+{
+  "task_id": "config-drift-dual-prometheus-001",
+  "checkpoints": {
+    "config_valid": {
+      "expected_solution": "Valid drift report covers Prometheus v2.48.0 and Thanos v0.32.5. Each drift_points entry must include config_key, prometheus_default (with prometheus_source_file), thanos_expectation (with thanos_source_file), failure_mode, and override_chain. Required source files: tsdb/db.go (Prometheus TSDB defaults) and cmd/thanos/sidecar.go (Thanos sidecar validation). The report must be valid JSON.",
+      "evaluation_criteria": [
+        "Must produce valid JSON with a top-level drift_points array",
+        "Must reference both Prometheus (tsdb/db.go) and Thanos (cmd/thanos/sidecar.go) in the drift_points entries",
+        "Each entry must contain config_key, prometheus_default, prometheus_source_file, thanos_expectation, thanos_source_file, failure_mode fields"
+      ]
+    },
+    "drift_points": {
+      "expected_solution": "Drift points between Prometheus v2.48.0 and Thanos v0.32.5 sidecar. (1) min-block-duration / max-block-duration: tsdb/db.go defines DefaultOptions with MinBlockDuration=2h and MaxBlockDuration based on retention; Thanos sidecar in cmd/thanos/sidecar.go and pkg/shipper/shipper.go expects --storage.tsdb.min-block-duration to equal --storage.tsdb.max-block-duration so blocks are not compacted before upload. If Prometheus is started with default compaction enabled, the sidecar logs warnings about local compaction conflicting with the upload pipeline. (2) Retention policy: tsdb/db.go honors --storage.tsdb.retention.time and --storage.tsdb.retention.size; Thanos expects retention to be 'long enough to upload + buffer' (typically >= 6h) — a short retention deletes blocks before sidecar can upload them, causing 'block not found' errors in pkg/shipper/shipper.go. (3) WAL settings: Prometheus's --storage.tsdb.wal-compression default differs across versions; cmd/thanos/sidecar.go's reload mechanism reads the WAL state via the Prometheus HTTP API and may misinterpret compressed WAL segments. (4) External labels: Prometheus's external_labels (set in prometheus.yml's global block, parsed in cmd/prometheus/main.go) MUST include cluster/replica labels required by Thanos's pkg/shipper/shipper.go for global query deduplication; missing labels cause sidecar to refuse uploads.",
+      "evaluation_criteria": [
+        "Must identify tsdb/db.go as the Prometheus TSDB defaults source",
+        "Must identify cmd/thanos/sidecar.go and pkg/shipper/shipper.go as the Thanos validation/upload sources",
+        "Must call out at least three specific drift points (block-duration, retention, WAL compression, external_labels)",
+        "Must explain the failure mode for each drift (compaction conflict, missing-block errors, upload refusal)"
+      ]
+    },
+    "expected_values": {
+      "expected_solution": "Expected values: (1) --storage.tsdb.min-block-duration must equal --storage.tsdb.max-block-duration (typically 2h) to disable Prometheus's local compaction so the sidecar can upload immutable 2h blocks — this is the documented Thanos requirement enforced in cmd/thanos/sidecar.go. (2) --storage.tsdb.retention.time should be >= 6h so the sidecar in pkg/shipper/shipper.go has time to upload before deletion. (3) external_labels in prometheus.yml must include at minimum a 'cluster' and 'replica' label so Thanos can deduplicate replicated blocks at query time; cmd/prometheus/main.go parses these from prometheus.yml. (4) WAL compression should match between Prometheus and the sidecar's reload expectations — typically leave at the Prometheus default and ensure the sidecar uses the matching --reloader.* config. The override chain is prometheus.yml + flags -> tsdb/db.go (TSDB options) -> sidecar via HTTP API + filesystem -> cmd/thanos/sidecar.go validation -> pkg/shipper/shipper.go upload pipeline.",
+      "evaluation_criteria": [
+        "Must specify min-block-duration=max-block-duration=2h as the canonical fix for compaction drift",
+        "Must specify external_labels (cluster/replica) as required for Thanos deduplication",
+        "Must trace the override chain: prometheus.yml/flags -> tsdb/db.go -> sidecar -> shipper.go"
+      ]
+    }
+  }
+}
