@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
+from eb_verify.errors import VerifierInfraError
 from eb_verify.plugins import ValidationResult
 
 
@@ -15,77 +16,90 @@ from eb_verify.plugins import ValidationResult
 DEFAULT_MAX_DIFF_LINES = 10_000
 DEFAULT_MIN_DIFF_LINES = 1
 
+# Per-invocation timeout for read-only git commands (trust-boundary cap).
+GIT_TIMEOUT_SECONDS = 30
+
+
+def _run_git(args: list[str], repo_path: Path) -> str:
+    """Run a read-only git command and return its stdout.
+
+    Raises ``VerifierInfraError`` on any infrastructure failure — git binary
+    missing, the path not being a git repo, a corrupt repo, permission errors,
+    or a timeout. This is the critical distinction: a *clean* working tree makes
+    git exit 0 with empty stdout, whereas a *broken* environment makes git exit
+    non-zero. Swallowing the latter into an empty diff would let a verification
+    env that cannot run silently score as valid-with-no-changes.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", *args],
+            capture_output=True, text=True, cwd=str(repo_path),
+            timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except FileNotFoundError as exc:  # git binary not on PATH
+        raise VerifierInfraError(f"git executable not found: {exc}") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise VerifierInfraError(
+            f"git {' '.join(args)} timed out after {GIT_TIMEOUT_SECONDS}s "
+            f"in {repo_path}"
+        ) from exc
+    if proc.returncode != 0:
+        raise VerifierInfraError(
+            f"git {' '.join(args)} failed in {repo_path} "
+            f"(exit {proc.returncode}): {proc.stderr.strip()}"
+        )
+    return proc.stdout
+
 
 def _get_diff_stat(repo_path: Path) -> Optional[str]:
-    """Return combined diff --stat output for a repo, or None on error."""
-    try:
-        unstaged = subprocess.run(
-            ["git", "diff", "--stat", "HEAD"],
-            capture_output=True, text=True, cwd=str(repo_path), timeout=30,
-        )
-        staged = subprocess.run(
-            ["git", "diff", "--cached", "--stat"],
-            capture_output=True, text=True, cwd=str(repo_path), timeout=30,
-        )
-        combined = (unstaged.stdout.strip() + "\n" + staged.stdout.strip()).strip()
-        return combined if combined else None
-    except (subprocess.TimeoutExpired, Exception):
-        return None
+    """Return combined diff --stat output for a repo, or None when the tree is
+    clean. Raises ``VerifierInfraError`` if git itself fails (see ``_run_git``)."""
+    unstaged = _run_git(["diff", "--stat", "HEAD"], repo_path)
+    staged = _run_git(["diff", "--cached", "--stat"], repo_path)
+    combined = (unstaged.strip() + "\n" + staged.strip()).strip()
+    return combined if combined else None
 
 
 def _get_diff_lines(repo_path: Path) -> int:
-    """Return total number of diff lines (staged + unstaged)."""
-    try:
-        unstaged = subprocess.run(
-            ["git", "diff", "HEAD"],
-            capture_output=True, text=True, cwd=str(repo_path), timeout=30,
-        )
-        staged = subprocess.run(
-            ["git", "diff", "--cached"],
-            capture_output=True, text=True, cwd=str(repo_path), timeout=30,
-        )
-        total = len(unstaged.stdout.splitlines()) + len(staged.stdout.splitlines())
-        return total
-    except (subprocess.TimeoutExpired, Exception):
-        return 0
+    """Return total number of diff lines (staged + unstaged). Raises
+    ``VerifierInfraError`` if git itself fails (see ``_run_git``)."""
+    unstaged = _run_git(["diff", "HEAD"], repo_path)
+    staged = _run_git(["diff", "--cached"], repo_path)
+    return len(unstaged.splitlines()) + len(staged.splitlines())
 
 
 def check_patch_applies(repo_path: Path) -> tuple[bool, str]:
-    """Use git stash + git stash pop to verify the working tree diff can round-trip.
+    """Verify the repo's working-tree/staged diff applies cleanly via
+    ``git apply --check``. Returns (applies_cleanly, detail).
 
-    For staged changes, use git apply --check on a generated patch.
-    Returns (applies_cleanly, detail).
+    A non-zero ``git apply --check`` exit is a *real* result (the patch does not
+    apply) and is returned as such. Failures that prevent the check from running
+    at all — git missing or timing out — raise ``VerifierInfraError`` instead of
+    being mislabelled as a patch that does not apply.
     """
+    diff_text = _run_git(["diff", "HEAD"], repo_path)
+    if not diff_text.strip():
+        diff_text = _run_git(["diff", "--cached"], repo_path)
+    if not diff_text.strip():
+        return True, "no diff to check"
+
     try:
-        # Generate the diff and verify it can apply via --check
-        diff_result = subprocess.run(
-            ["git", "diff", "HEAD"],
-            capture_output=True, text=True, cwd=str(repo_path), timeout=30,
-        )
-        diff_text = diff_result.stdout
-        if not diff_text.strip():
-            # Try staged only
-            diff_result = subprocess.run(
-                ["git", "diff", "--cached"],
-                capture_output=True, text=True, cwd=str(repo_path), timeout=30,
-            )
-            diff_text = diff_result.stdout
-
-        if not diff_text.strip():
-            return True, "no diff to check"
-
         apply_result = subprocess.run(
             ["git", "apply", "--check", "--allow-empty"],
             input=diff_text,
-            capture_output=True, text=True, cwd=str(repo_path), timeout=30,
+            capture_output=True, text=True, cwd=str(repo_path),
+            timeout=GIT_TIMEOUT_SECONDS,
         )
-        if apply_result.returncode == 0:
-            return True, "patch applies cleanly"
-        return False, f"patch does not apply: {apply_result.stderr.strip()}"
-    except subprocess.TimeoutExpired:
-        return False, "git apply --check timed out"
-    except Exception as e:
-        return False, f"error checking patch: {e}"
+    except FileNotFoundError as exc:
+        raise VerifierInfraError(f"git executable not found: {exc}") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise VerifierInfraError(
+            f"git apply --check timed out after {GIT_TIMEOUT_SECONDS}s "
+            f"in {repo_path}"
+        ) from exc
+    if apply_result.returncode == 0:
+        return True, "patch applies cleanly"
+    return False, f"patch does not apply: {apply_result.stderr.strip()}"
 
 
 def check_diff_size(

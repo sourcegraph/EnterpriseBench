@@ -812,6 +812,88 @@ class TestCodePatchHardening:
 
 
 # ---------------------------------------------------------------------------
+# CodePatch infra-failure vs real no-diff (EnterpriseBench-vp7)
+# ---------------------------------------------------------------------------
+
+class TestCodePatchInfraFailure:
+    """A broken git environment (missing binary, corrupt repo) must raise
+    VerifierInfraError, NOT be coerced into a clean no-diff that scores the
+    workspace as valid-with-no-changes."""
+
+    @staticmethod
+    def _git(repo, *args):
+        import subprocess
+        subprocess.run(["git", *args], cwd=str(repo), capture_output=True)
+
+    def _make_repo_with_change(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        self._git(repo, "init")
+        self._git(repo, "config", "user.email", "t@t.com")
+        self._git(repo, "config", "user.name", "T")
+        (repo / "file.txt").write_text("hello\n")
+        self._git(repo, "add", ".")
+        self._git(repo, "commit", "-m", "init")
+        (repo / "file.txt").write_text("hello world\n")
+        return repo
+
+    def test_clean_tree_returns_none_not_error(self, tmp_path):
+        from eb_verify.plugins.code_patch import _get_diff_stat
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        self._git(repo, "init")
+        self._git(repo, "config", "user.email", "t@t.com")
+        self._git(repo, "config", "user.name", "T")
+        (repo / "file.txt").write_text("hello\n")
+        self._git(repo, "add", ".")
+        self._git(repo, "commit", "-m", "init")
+        # A genuinely clean tree is a real result, not an infra error.
+        assert _get_diff_stat(repo) is None
+
+    def test_non_git_dir_raises_infra_error(self, tmp_path):
+        from eb_verify.errors import VerifierInfraError
+        from eb_verify.plugins.code_patch import _get_diff_stat
+        not_a_repo = tmp_path / "plain"
+        not_a_repo.mkdir()
+        with pytest.raises(VerifierInfraError):
+            _get_diff_stat(not_a_repo)
+
+    def test_get_diff_lines_non_git_raises(self, tmp_path):
+        from eb_verify.errors import VerifierInfraError
+        from eb_verify.plugins.code_patch import _get_diff_lines
+        not_a_repo = tmp_path / "plain"
+        not_a_repo.mkdir()
+        with pytest.raises(VerifierInfraError):
+            _get_diff_lines(not_a_repo)
+
+    def test_missing_git_binary_raises_infra_error(self, tmp_path):
+        import subprocess
+        from unittest.mock import patch
+        from eb_verify.errors import VerifierInfraError
+        from eb_verify.plugins.code_patch import _get_diff_stat
+        repo = self._make_repo_with_change(tmp_path)
+        with patch(
+            "eb_verify.plugins.code_patch.subprocess.run",
+            side_effect=FileNotFoundError("git"),
+        ):
+            with pytest.raises(VerifierInfraError):
+                _get_diff_stat(repo)
+
+    def test_validator_propagates_infra_error(self, tmp_path):
+        from eb_verify.errors import VerifierInfraError
+        # A workspace child that looks like a repo (.git present) but is corrupt
+        # must surface as an infra error, not "No code changes detected".
+        workspace = tmp_path / "ws"
+        workspace.mkdir()
+        broken = workspace / "broken_repo"
+        broken.mkdir()
+        (broken / ".git").mkdir()  # looks like a repo; git operations will fail
+        v = CodePatchValidator()
+        with pytest.raises(VerifierInfraError):
+            v.validate(workspace)
+
+
+# ---------------------------------------------------------------------------
 # Incident Report Semantic Checks (new)
 # ---------------------------------------------------------------------------
 

@@ -222,6 +222,73 @@ class TestRunCheckpointExitCodeFallback:
 
 
 # ---------------------------------------------------------------------------
+# run_checkpoint — infra-failure vs real score (EnterpriseBench-vp7)
+# ---------------------------------------------------------------------------
+
+class TestRunCheckpointInfraFailure:
+    """A verifier that crashes mid-output (malformed/partial JSON) or emits a
+    non-numeric score while exiting 0 must raise VerifierInfraError, NOT fall
+    through to the exit-code branch and silently score a full 1.0 PASS."""
+
+    def _run(self, tmp_path, script_body, verifier="checks/v.sh"):
+        task_dir = tmp_path / "task"
+        task_dir.mkdir()
+        workspace = tmp_path / "ws"
+        workspace.mkdir()
+        write_bash_script(task_dir / verifier, script_body)
+        task = make_task()
+        cp = make_checkpoint(verifier=verifier)
+        runner = CheckpointRunner(task=task, task_dir=task_dir, workspace=workspace)
+        return runner, cp
+
+    def test_malformed_json_exit_0_raises(self, tmp_path):
+        from eb_verify.errors import VerifierInfraError
+
+        # Looks like an attempted JSON emission but is truncated, exits 0.
+        runner, cp = self._run(
+            tmp_path, '#!/bin/bash\necho \'{"score": 1.0, "detail\'\nexit 0\n'
+        )
+        with pytest.raises(VerifierInfraError):
+            runner.run_checkpoint(cp)
+
+    def test_non_numeric_score_exit_0_raises(self, tmp_path):
+        from eb_verify.errors import VerifierInfraError
+
+        runner, cp = self._run(
+            tmp_path, '#!/bin/bash\necho \'{"score": "oops"}\'\nexit 0\n'
+        )
+        with pytest.raises(VerifierInfraError):
+            runner.run_checkpoint(cp)
+
+    def test_partial_json_array_exit_0_raises(self, tmp_path):
+        from eb_verify.errors import VerifierInfraError
+
+        runner, cp = self._run(
+            tmp_path, '#!/bin/bash\necho \'[{"score": 1.0\'\nexit 0\n'
+        )
+        with pytest.raises(VerifierInfraError):
+            runner.run_checkpoint(cp)
+
+    def test_plain_text_exit_0_still_passes(self, tmp_path):
+        # Regression guard: a legitimate plain-text exit-code verifier must NOT
+        # be mistaken for malformed JSON.
+        runner, cp = self._run(
+            tmp_path, '#!/bin/bash\necho "all checks ok"\nexit 0\n'
+        )
+        result = runner.run_checkpoint(cp)
+        assert result.passed is True
+        assert result.score == pytest.approx(1.0)
+
+    def test_plain_text_exit_1_still_fails(self, tmp_path):
+        runner, cp = self._run(
+            tmp_path, '#!/bin/bash\necho "missing thing"\nexit 1\n'
+        )
+        result = runner.run_checkpoint(cp)
+        assert result.passed is False
+        assert result.score == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
 # run_checkpoint — timeout
 # ---------------------------------------------------------------------------
 

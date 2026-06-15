@@ -19,6 +19,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Optional
 
+from eb_verify.errors import VerifierInfraError
 from eb_verify.task_parser import TaskDefinition, Checkpoint
 from eb_verify.scoring import (
     CheckpointResult,
@@ -182,15 +183,45 @@ class CheckpointRunner:
                 env=env,
             )
 
-            # Convention: verifier prints JSON to stdout with {"score": 0.0-1.0, "detail": "..."}
-            # If no JSON, use exit code: 0=pass (1.0), nonzero=fail (0.0)
+            # Convention: a verifier prints JSON to stdout with
+            # {"score": 0.0-1.0, "detail": "..."}. Verifiers that do not follow
+            # the JSON convention signal pass/fail purely via exit code
+            # (0 = pass / 1.0, nonzero = fail / 0.0).
+            #
+            # The danger this guards against: a verifier that *meant* to emit the
+            # score JSON but crashed mid-output (truncated/malformed JSON) or
+            # emitted a non-numeric score, while still exiting 0, must NOT fall
+            # through to the exit-code branch — that would silently award a full
+            # PASS for a broken verifier. Such output is an infra failure.
             stdout = result.stdout.strip()
-            try:
-                data = json.loads(stdout)
-                score = max(0.0, min(1.0, float(data.get("score", 0.0))))
+            data = None
+            if stdout:
+                try:
+                    data = json.loads(stdout)
+                except json.JSONDecodeError as exc:
+                    # Output that looks like an attempted JSON emission but does
+                    # not parse means the verifier crashed mid-output.
+                    if stdout[:1] in ("{", "["):
+                        raise VerifierInfraError(
+                            f"checkpoint {checkpoint.name!r}: verifier emitted "
+                            f"malformed JSON (exit {result.returncode}): "
+                            f"{stdout[:200]!r}"
+                        ) from exc
+                    # Otherwise it is a plain-text exit-code verifier.
+
+            if isinstance(data, dict):
+                raw_score = data.get("score", 0.0)
+                try:
+                    score = max(0.0, min(1.0, float(raw_score)))
+                except (TypeError, ValueError) as exc:
+                    raise VerifierInfraError(
+                        f"checkpoint {checkpoint.name!r}: verifier JSON 'score' "
+                        f"is not numeric: {raw_score!r}"
+                    ) from exc
                 detail = data.get("detail", "")
                 passed = score > 0.0
-            except (json.JSONDecodeError, ValueError):
+            else:
+                # No score JSON object: legitimate exit-code verifier.
                 passed = result.returncode == 0
                 score = 1.0 if passed else 0.0
                 detail = stdout or result.stderr.strip()
@@ -202,6 +233,9 @@ class CheckpointRunner:
                 score=score,
                 detail=detail,
             )
+        except VerifierInfraError:
+            # Infra failures must propagate — never coerce to a score.
+            raise
         except subprocess.TimeoutExpired:
             return CheckpointResult(
                 name=checkpoint.name,

@@ -44,6 +44,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lib"))
 
+from eb_verify.errors import VerifierInfraError  # noqa: E402
 from eb_verify.runner import CheckpointRunner  # noqa: E402
 from eb_verify.task_parser import TaskDefinition, parse_task  # noqa: E402
 
@@ -248,7 +249,13 @@ def run_variant(
             _write_outputs(workspace, rel_paths, text, answer_obj)
         runner = CheckpointRunner(det_task, task_dir=task_dir, workspace=workspace)
         for cp in det_task.checkpoints:
-            scores[cp.name] = runner.run_checkpoint(cp).score
+            try:
+                scores[cp.name] = runner.run_checkpoint(cp).score
+            except VerifierInfraError:
+                # A verifier that cannot run in the synthetic sweep workspace
+                # yields no trustworthy score; record 0.0 (conservative — never
+                # a false positive) rather than aborting the whole sweep.
+                scores[cp.name] = 0.0
     return scores
 
 
