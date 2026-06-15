@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Check that agent communicates findings.
 set -euo pipefail
-WORKSPACE="${1:-.}"
+WORKSPACE="${WORKSPACE:-${1:-.}}"
 ACTIONS="$WORKSPACE/actions.jsonl"
 
 if [ ! -f "$ACTIONS" ]; then

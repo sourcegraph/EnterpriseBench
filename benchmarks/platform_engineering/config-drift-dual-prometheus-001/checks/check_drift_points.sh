@@ -1,46 +1,30 @@
 #!/usr/bin/env bash
-# Checkpoint 1: Verify agent identified drift points (set precision/recall)
+# check_drift_points.sh — verify agent identified drift points between Prometheus TSDB/storage
+# defaults and the Thanos sidecar's expectations.
 set -euo pipefail
 
-export REPORT="${WORKSPACE:-/workspace}/charts/DRIFT_REPORT.json"
+export REPORT="${WORKSPACE:-/workspace}/DRIFT_REPORT.json"
 if [[ ! -f "$REPORT" ]]; then
-  printf '{"score": 0.0, "passed": false, "reason": "DRIFT_REPORT.json not found"}\n'
+  printf '{"score": 0.0, "passed": false, "detail": "DRIFT_REPORT.json not found"}\n'
   exit 0
 fi
 
-# Expected drift points: serflan-udp and serfwan-udp port mismatches
-export FOUND=0
-export TOTAL=2
-
-# Check if agent identified the serflan-udp port drift (serfLAN value used where serfWAN should be, or vice versa)
-if python3 -c "
+python3 -c "
 import json, os
-report = json.load(open(os.environ['REPORT']))
+try:
+    report = json.load(open(os.environ['REPORT']))
+except json.JSONDecodeError:
+    print(json.dumps({'score': 0.0, 'passed': False, 'detail': 'Invalid JSON in DRIFT_REPORT.json'})); raise SystemExit
 points = report.get('drift_points', [])
-for p in points:
-    f = p.get('file', '') + p.get('key', '')
-    if 'serflan' in f.lower() or 'serf_lan' in f.lower() or 'serfLAN' in f:
-        exit(0)
-exit(1)
-" 2>/dev/null; then
-  FOUND=$((FOUND + 1))
-fi
-
-# Check if agent identified the serfwan-udp port drift
-if python3 -c "
-import json, os
-report = json.load(open(os.environ['REPORT']))
-points = report.get('drift_points', [])
-for p in points:
-    f = p.get('file', '') + p.get('key', '')
-    if 'serfwan' in f.lower() or 'serf_wan' in f.lower() or 'serfWAN' in f:
-        exit(0)
-exit(1)
-" 2>/dev/null; then
-  FOUND=$((FOUND + 1))
-fi
-
-SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
-if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi
-
-printf '{"score": %s, "passed": %s, "reason": "Found %d/%d drift points"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"
+def blob(p): return json.dumps(p).lower()
+has_prom = any(any(t in blob(p) for t in ['prometheus','prometheus_default','prometheus_source_file','tsdb','tsdb/db.go','cmd/prometheus']) for p in points)
+has_thanos = any(any(t in blob(p) for t in ['thanos','thanos_expectation','thanos_source_file','sidecar','shipper']) for p in points)
+concepts = ['block','min-block','max-block','retention','wal','external label','duration','storage','upload']
+matched = sum(1 for c in concepts if any(c in blob(p) for p in points))
+repos_score = (0.5 if has_prom else 0.0) + (0.5 if has_thanos else 0.0)
+concept_score = min(1.0, matched / 3.0)
+score = round(repos_score * 0.6 + concept_score * 0.4, 2)
+passed = bool(has_prom and has_thanos and matched >= 2)
+detail = f'prometheus_ref={has_prom}, thanos_ref={has_thanos}, concepts={matched}/{len(concepts)}, points={len(points)}'
+print(json.dumps({'score': score, 'passed': passed, 'detail': detail}))
+"
