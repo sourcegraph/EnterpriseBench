@@ -26,7 +26,7 @@ fi
 # json.dumps(answer).lower() — python default separators ", " / ": " (with spaces).
 answer_text=$(jq -c . "$ANSWER_FILE" | sed 's/,/, /g; s/:/: /g' | tr '[:upper:]' '[:lower:]')
 
-# gt_files: required_files + sufficient_files, repo == fastapi, lowercased path + basename.
+# gt_files: required_files + sufficient_files, repo == protobuf, lowercased path + basename.
 mapfile -t gt_files < <(jq -r '
   ((.required_files // []) + (.sufficient_files // []))
   | .[] | select(.repo == "protobuf") | .path' "$GT_FILE")

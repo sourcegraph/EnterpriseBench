@@ -45,6 +45,14 @@ verify-tasks: ## Run preflight schema validation for every task
 verify-crnt: ## Validate Cross-Repo Necessity Test for multi-repo tasks
 	$(PYTHON) scripts/validation/crnt_validator.py
 
+.PHONY: verify-verifiers
+verify-verifiers: ## Mutation-test checkpoint verifiers (FP/FN sweep)
+	$(PYTHON) scripts/validation/verifier_mutation_test.py benchmarks/
+
+.PHONY: verify-contamination
+verify-contamination: ## Scan multi-repo verifiers for cross-task copy-paste (foreign-path blocks)
+	$(PYTHON) scripts/validation/verifier_contamination_scan.py benchmarks/ --strict
+
 .PHONY: verify-expected-solutions
 verify-expected-solutions: ## Validate expected_solution.json files
 	$(PYTHON) scripts/validation/validate_expected_solutions.py

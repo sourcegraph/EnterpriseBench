@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # check_ownership.sh — verify agent identified correct code owners or subsystem
 # Reads agent output from $WORKSPACE/agent_output/answer.json
-# Checks for implementation-specific ownership terms from the Envoy codebase
+# Checks the agent output against the ownership keywords in this task's ground_truth.json
 # bash+jq+grep reimplementation (no python3 in container). Output JSON is
 # byte-identical to the previous python implementation.
 set -euo pipefail

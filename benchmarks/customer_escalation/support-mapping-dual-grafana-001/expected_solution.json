@@ -1,0 +1,39 @@
+{
+  "task_id": "support-mapping-dual-grafana-001",
+  "checkpoints": {
+    "code_paths": {
+      "expected_solution": "Core code paths: (1) pkg/api/dashboard.go. (2) promql/engine.go.",
+      "evaluation_criteria": [
+        "Must identify pkg/api/dashboard.go as part of the core code path",
+        "Must identify promql/engine.go as part of the core code path",
+        "Must reference specific functions, types, or methods from the cited files",
+        "Must explain how pkg/api/dashboard.go interacts with promql/engine.go"
+      ]
+    },
+    "ownership": {
+      "expected_solution": "Ownership: the code lives under pkg/api/dashboard.go, promql/engine.go. Subsystem keywords: grafana, prometheus, promql, query, engine, dashboard.",
+      "evaluation_criteria": [
+        "Must identify the owning subsystem (e.g. directory 'pkg/api/dashboard.go')",
+        "Must reference the secondary subsystem 'promql/engine.go'",
+        "Must reference at least one of the ownership keywords: grafana, prometheus, promql"
+      ]
+    },
+    "related_issues": {
+      "expected_solution": "Related files and references: (1) public/app/plugins/datasource/prometheus/datasource.ts. (2) web/api/v1/api.go. Reference: pkg/services/datasources/datasources.go. Reference: promql/parser/parse.go.",
+      "evaluation_criteria": [
+        "Must reference public/app/plugins/datasource/prometheus/datasource.ts as a related file",
+        "Must reference web/api/v1/api.go as a related file",
+        "Must reference pkg/services/datasources/datasources.go as a related file",
+        "Related files should extend beyond the strict required_files set"
+      ]
+    },
+    "severity": {
+      "expected_solution": "Severity: HIGH. The reported symptom affects production stability or correctness for many users; should be fixed in the next release. In this case: Map Grafana dashboard 'execution exceeded' query timeout to Prometheus query engine code.",
+      "evaluation_criteria": [
+        "Must assess severity as HIGH",
+        "Must justify the severity rating with reference to user impact or blast radius",
+        "Must align severity with the type of failure (e.g. crash vs incorrect-result vs degraded behavior)"
+      ]
+    }
+  }
+}

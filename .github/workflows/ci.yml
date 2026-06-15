@@ -54,3 +54,10 @@ jobs:
       - name: Verifier risk sweep (strict, informational)
         continue-on-error: true
         run: python3 scripts/validation/verifier_mutation_test.py benchmarks/ --json --strict
+      - name: Verifier contamination scan (foreign-path blocks)
+        # High-precision foreign-path detector: a multi-repo verifier referencing a
+        # repo dir outside its task's declared [[repos]] is copy-pasted-from-wrong-task
+        # contamination (the y50/awa defect class). --strict exits nonzero on any such
+        # hit so it cannot regress. Foreign-token hits print informationally (they have
+        # benign comment/domain matches) and do not affect the exit code.
+        run: python3 scripts/validation/verifier_contamination_scan.py benchmarks/ --strict
