@@ -27,6 +27,7 @@ sys.path.insert(
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "infra"))
 
 from run_task import (
+    RUN_STATUS_INVALID,
     SOURCEGRAPH_MCP_ENDPOINT,
     _DEFAULT_MCP_URL,
     _configure_mcp,
@@ -264,6 +265,156 @@ class TestMcpSkipsBaseline:
         with patch("run_task._docker_exec", mock_exec):
             _configure_mcp("test-container", "baseline")
         mock_exec.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Hard-fail on MCP pre-flight failure (bead EnterpriseBench-c7wb)
+# ---------------------------------------------------------------------------
+
+
+class TestMcpPreflightHardFail:
+    """A failed MCP pre-flight (401 / unreachable) on an MCP arm must hard-fail.
+
+    Regression for bead EnterpriseBench-c7wb: run_task.py used to log
+    "agent will run but MCP may not work" and proceed, recording a degraded
+    no-MCP run as if it were a real MCP measurement. The MCP arm must instead
+    be routed to the infra-error re-run channel, and the agent must never run.
+    The baseline arm (no MCP) must stay completely unaffected.
+    """
+
+    @staticmethod
+    def _fake_task_data() -> dict:
+        return {
+            "task": {
+                "id": "test-mcp-preflight-001",
+                "suite": "test",
+                "task_type": "test",
+                "difficulty": "easy",
+                "session_type": "single",
+            },
+            "repos": [],
+        }
+
+    def _run_with_failed_preflight(self, mode: str):
+        """Drive run_task() through a simulated 401/unreachable MCP endpoint.
+
+        `_verify_mcp_endpoint` is stubbed to return False (the real
+        `_configure_mcp` runs and returns False on that pre-flight failure).
+        Returns (result, run_agent_mock) so callers can assert the run was
+        classified as an infra error AND that the agent never executed.
+        """
+        agent_mock = MagicMock(return_value=(0, 10.0))
+
+        config = TaskRunConfig(
+            task_toml=Path("/fake/task.toml"),
+            agent_command="claude -p",
+            timeout=300,
+            mode=mode,
+        )
+
+        with patch("run_task._parse_task", return_value=self._fake_task_data()), patch(
+            "run_task._generate_dockerfile", return_value=Path("/fake/Dockerfile")
+        ), patch("run_task._docker_build"), patch(
+            "run_task._docker_create_container", return_value="fake-container-id"
+        ), patch("run_task._docker_start"), patch("run_task._setup_container"), patch(
+            "run_task._run_health_check", return_value=True
+        ), patch(
+            # Simulate a 401 / unreachable endpoint: HTTP pre-flight fails.
+            "run_task._verify_mcp_endpoint",
+            return_value=False,
+        ), patch(
+            "run_task._docker_cp"
+        ), patch(
+            "run_task._docker_exec",
+            return_value=MagicMock(returncode=0, stdout="", stderr=""),
+        ), patch(
+            "run_task._mcp_exec",
+            return_value=MagicMock(returncode=0, stdout="", stderr=""),
+        ), patch(
+            "run_task._run_agent", side_effect=agent_mock
+        ), patch(
+            "run_task._run_scoring", return_value={"task_score": 0.0}
+        ), patch("run_task._save_results"), patch(
+            "run_task._extract_tool_usage", return_value={}
+        ), patch(
+            "run_task._copy_agent_trace", return_value=False
+        ), patch(
+            "run_task._check_disk_space", return_value=True
+        ), patch("run_task._docker_stop_rm"), patch(
+            "run_task.time.sleep"
+        ), patch.dict(
+            os.environ, {"SOURCEGRAPH_ACCESS_TOKEN": "sgp_expired_token"}
+        ):
+            result = run_task(config)
+
+        return result, agent_mock
+
+    def test_mcp_only_preflight_failure_is_infra_error(self) -> None:
+        result, _ = self._run_with_failed_preflight("mcp_only")
+        assert result.phase == "mcp_infra_error"
+        assert result.failure_class == "infra_mcp_preflight"
+
+    def test_mcp_only_preflight_failure_is_not_a_scored_success(self) -> None:
+        """The degraded run must NOT be recorded as a real scored run."""
+        result, _ = self._run_with_failed_preflight("mcp_only")
+        assert result.success is False
+        assert result.status == RUN_STATUS_INVALID
+
+    def test_mcp_only_preflight_failure_does_not_run_agent(self) -> None:
+        """Hard-fail must short-circuit BEFORE the agent runs (no degraded run)."""
+        _, agent_mock = self._run_with_failed_preflight("mcp_only")
+        agent_mock.assert_not_called()
+
+    def test_hybrid_preflight_failure_is_infra_error(self) -> None:
+        """The hybrid arm is also MCP-bearing and must hard-fail identically."""
+        result, agent_mock = self._run_with_failed_preflight("hybrid")
+        assert result.phase == "mcp_infra_error"
+        assert result.success is False
+        agent_mock.assert_not_called()
+
+    def test_baseline_arm_unaffected_by_mcp_preflight(self) -> None:
+        """Baseline has no MCP: it must run the agent and never see a pre-flight."""
+        agent_mock = MagicMock(return_value=(0, 10.0))
+        verify_mock = MagicMock(return_value=False)
+
+        config = TaskRunConfig(
+            task_toml=Path("/fake/task.toml"),
+            agent_command="claude -p",
+            timeout=300,
+            mode="baseline",
+        )
+
+        with patch("run_task._parse_task", return_value=self._fake_task_data()), patch(
+            "run_task._generate_dockerfile", return_value=Path("/fake/Dockerfile")
+        ), patch("run_task._docker_build"), patch(
+            "run_task._docker_create_container", return_value="fake-container-id"
+        ), patch("run_task._docker_start"), patch("run_task._setup_container"), patch(
+            "run_task._run_health_check", return_value=True
+        ), patch(
+            "run_task._verify_mcp_endpoint", side_effect=verify_mock
+        ), patch(
+            "run_task._chown_to_agent"
+        ), patch(
+            "run_task._assert_agent_readable", return_value=(True, "")
+        ), patch(
+            "run_task._run_agent", side_effect=agent_mock
+        ), patch(
+            "run_task._run_scoring", return_value={"task_score": 1.0}
+        ), patch("run_task._save_results"), patch(
+            "run_task._extract_tool_usage", return_value={"num_turns": 5}
+        ), patch(
+            "run_task._scan_mcp_config_error", return_value=False
+        ), patch(
+            "run_task._copy_agent_trace", return_value=False
+        ), patch(
+            "run_task._check_disk_space", return_value=True
+        ), patch("run_task._docker_stop_rm"):
+            result = run_task(config)
+
+        verify_mock.assert_not_called()  # baseline never reaches MCP pre-flight
+        agent_mock.assert_called_once()  # baseline runs normally
+        assert result.phase == "complete"
+        assert result.success is True
 
 
 # ---------------------------------------------------------------------------

@@ -1136,13 +1136,22 @@ def _configure_mcp(container_id: str, mode: str) -> Optional[bool]:
 
     logger.info("Configuring Sourcegraph MCP endpoint (mode=%s)", mode)
 
-    # Step 1: Verify endpoint is reachable and auth works via HTTP
+    # Step 1: Verify endpoint is reachable and auth works via HTTP.
+    # A failure here (unreachable host, or a rejected/expired token returning
+    # 401) means the MCP arm cannot run validly. Hard-fail the pre-flight and
+    # return False instead of writing config and running a degraded no-MCP
+    # agent whose result would masquerade as a real MCP measurement
+    # (bead EnterpriseBench-c7wb). The caller routes a False return to the
+    # infra-error re-run channel.
     if sg_token:
         if not _verify_mcp_endpoint(container_id, sg_token):
             logger.error(
-                "MCP endpoint unreachable or auth rejected — "
-                "agent will run but MCP may not work"
+                "MCP endpoint unreachable or auth rejected (mode=%s) — "
+                "failing MCP pre-flight; run will be routed to the infra-error "
+                "re-run channel, never scored as a degraded run",
+                mode,
             )
+            return False
 
     # Step 2: Write MCP config files (using docker cp to avoid shell escaping)
     mcp_config_json = json.dumps(
@@ -1247,8 +1256,9 @@ def _configure_mcp(container_id: str, mode: str) -> Optional[bool]:
             time.sleep(backoff)
     else:
         logger.error(
-            "MCP pre-flight FAILED after %d attempts — "
-            "agent will run but MCP may show needs-auth",
+            "MCP pre-flight FAILED after %d attempts — handshake never "
+            "succeeded; caller will route this run to the infra-error re-run "
+            "channel (not a scored degraded run)",
             max_retries,
         )
 
@@ -1544,6 +1554,33 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         if config.mode in ("mcp_only", "hybrid"):
             mcp_handshake_ok = _configure_mcp(container_id, config.mode)
             result.mcp_handshake_ok = mcp_handshake_ok
+
+            # MCP pre-flight is a HARD gate for the MCP arms. If the endpoint
+            # never handshaked (unreachable / expired or rejected token), the
+            # agent would run with no working MCP and the result would be
+            # silently recorded as an MCP measurement — corrupting the MCP arm
+            # of any affected comparison. Route it to the infra-error re-run
+            # channel instead of proceeding degraded (bead EnterpriseBench-c7wb).
+            # This branch only runs for mcp_only/hybrid; the baseline arm has no
+            # MCP and is unaffected.
+            if not mcp_handshake_ok:
+                logger.error(
+                    "MCP pre-flight FAILED for mode=%s — routing to infra-error "
+                    "re-run channel (not a scored degraded run)",
+                    config.mode,
+                )
+                result.phase = "mcp_infra_error"
+                result.status = RUN_STATUS_INVALID
+                result.success = False
+                result.failure_class = "infra_mcp_preflight"
+                result.error = (
+                    "MCP pre-flight failed: endpoint unreachable or token "
+                    f"rejected/expired (mode={config.mode}). The MCP arm cannot "
+                    "run validly; recorded as infra error for re-run."
+                )
+                result.timing = timings
+                _save_results(result, task_data, output_dir, config)
+                return result
 
         # --- Dry run stops here ---
         if config.dry_run:
