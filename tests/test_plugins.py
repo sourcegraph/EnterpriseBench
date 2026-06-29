@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from eb_verify.errors import VerifierInfraError
 from eb_verify.plugins import (
     ValidationResult,
     get_validator,
@@ -641,10 +642,34 @@ class TestAnswerOracleMatching:
         assert "file_path" in dims
         assert "fuzzy" in dims
 
-    def test_oracle_score_no_ground_truth(self):
-        score, dims = oracle_score("anything", {})
-        assert score == 1.0
-        assert dims == {}
+    def test_oracle_score_empty_ground_truth_raises(self):
+        # An empty ground_truth reaching oracle scoring has no recognized key;
+        # awarding 1.0 here is silent full-credit on a misconfigured task.
+        with pytest.raises(VerifierInfraError) as exc:
+            oracle_score("anything", {})
+        assert exc.value.reason == "ground_truth_no_recognized_key"
+
+    def test_oracle_score_unrecognized_key_raises(self):
+        # Schema drift / typo ("keyword" instead of "keywords") used to score
+        # 1.0 because no dimension matched — F4 silent full-credit path.
+        with pytest.raises(VerifierInfraError) as exc:
+            oracle_score("anything", {"keyword": ["deadlock"], "files": ["a.go"]})
+        assert exc.value.reason == "ground_truth_no_recognized_key"
+        # The offending keys surface in the message for the operator.
+        assert "keyword" in str(exc.value)
+
+    def test_infra_error_tag_shape_is_single_source(self):
+        # The raised exception and the orchestration dict-tag share one shape.
+        from eb_verify.errors import infra_error_tag
+
+        tag = infra_error_tag("judge_init_failed", "boom", stage="llm_judge")
+        assert tag == {
+            "reason": "judge_init_failed",
+            "stage": "llm_judge",
+            "detail": "boom",
+        }
+        # Extra keys (e.g. candidates) merge in.
+        assert infra_error_tag("r", "d", candidates=["a"])["candidates"] == ["a"]
 
     def test_oracle_score_keywords_only(self):
         text = "The issue is a deadlock."

@@ -10,7 +10,13 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Optional
 
+from eb_verify.errors import VerifierInfraError
 from eb_verify.plugins import ValidationResult, safe_read
+
+# Oracle keys answer ground_truth may declare. A non-empty ground_truth that
+# matches none of these is a misconfiguration (typo / schema drift), not an
+# answer that happens to satisfy zero constraints — see oracle_score.
+_RECOGNIZED_ORACLE_KEYS = ("keywords", "symbols", "expected_files", "expected_answer")
 
 
 def _normalize(text: str) -> str:
@@ -118,7 +124,17 @@ def oracle_score(
         weights["fuzzy"] = thresholds.get("fuzzy_weight", 0.2)
 
     if not scores:
-        return 1.0, {}
+        # ground_truth was supplied for oracle scoring but contained no
+        # recognized key. Awarding 1.0 here records full credit on a
+        # misconfigured task (a misspelled "keyword", schema drift, an empty
+        # dict). Refuse to score rather than silently pass.
+        raise VerifierInfraError(
+            "ground_truth_no_recognized_key",
+            "oracle ground_truth has no recognized key "
+            f"(expected one of {list(_RECOGNIZED_ORACLE_KEYS)}; "
+            f"got {sorted(ground_truth.keys())})",
+            stage="oracle_score",
+        )
 
     total_weight = sum(weights.values())
     if total_weight == 0:

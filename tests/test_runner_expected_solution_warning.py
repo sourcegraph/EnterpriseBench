@@ -5,7 +5,11 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from unittest.mock import patch
 
+import pytest
+
+from eb_verify.errors import VerifierInfraError
 from eb_verify.runner import CheckpointRunner
 from eb_verify.task_parser import (
     ArtifactSpec,
@@ -124,3 +128,38 @@ def test_no_warning_when_expected_solution_absent(tmp_path: Path, caplog) -> Non
     CheckpointRunner(task=task, task_dir=task_dir, workspace=workspace)
     msgs = [r.getMessage() for r in caplog.records]
     assert not any("missing checkpoint" in m for m in msgs)
+
+
+def test_judge_init_failure_raises_infra_error(tmp_path: Path) -> None:
+    """F4.3: llm_curator + expected_solution but the Tier-2 judge fails to
+    construct must raise VerifierInfraError, not silently degrade to judge=None
+    (which would pass every checkpoint at its un-capped grep score)."""
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    (workspace / "repo1").mkdir()
+
+    (task_dir / "expected_solution.json").write_text(
+        json.dumps(
+            {
+                "task_id": "warn-test-001",
+                "checkpoints": {
+                    "root_cause": {
+                        "expected_solution": "x",
+                        "evaluation_criteria": ["a"],
+                    }
+                },
+            }
+        )
+    )
+
+    task = _make_task(
+        [Checkpoint(name="root_cause", weight=1.0, verifier="x", timeout_seconds=60)]
+    )
+
+    with patch("eb_verify.judge.LLMJudge", side_effect=RuntimeError("no API key")):
+        with pytest.raises(VerifierInfraError) as exc:
+            CheckpointRunner(task=task, task_dir=task_dir, workspace=workspace)
+
+    assert exc.value.reason == "judge_init_failed"

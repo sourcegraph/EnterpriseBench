@@ -754,6 +754,9 @@ def _apply_llm_judge(
     measurement), the scores dict is tagged with a ``verifier_infra_error`` so
     the caller routes the run to the re-run channel.
     """
+    sys.path.insert(0, str(REPO_ROOT / "lib"))
+    from eb_verify.errors import infra_error_tag
+
     expected_path = task_dir / "expected_solution.json"
     if not expected_path.exists():
         logger.info("No expected_solution.json, skipping LLM judge")
@@ -762,7 +765,22 @@ def _apply_llm_judge(
     try:
         expected = json.loads(expected_path.read_text())
     except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("Failed to load expected_solution.json: %s", exc)
+        # Corrupt curated ground truth must not silently degrade to "no cap".
+        logger.warning(
+            "Failed to load expected_solution.json (%s) — routing to "
+            "verifier_infra_error",
+            exc,
+        )
+        scores["verifier_infra_error"] = infra_error_tag(
+            "corrupt_expected_solution",
+            (
+                "expected_solution.json could not be parsed "
+                f"({type(exc).__name__}: {exc}); the Tier-2 cap could not be "
+                "applied, so the deterministic grep scores are un-capped and "
+                "must not be recorded as the final measurement"
+            ),
+            stage="llm_judge",
+        )
         return scores
 
     checkpoints_gt = expected.get("checkpoints", {})
@@ -781,25 +799,23 @@ def _apply_llm_judge(
             break
 
     if not agent_output:
-        # llm_curator + expected_solution present but no agent artifact found:
-        # the Tier-2 cap cannot be applied. Do NOT pass through un-capped grep
-        # scores as a real measurement — route to the re-run channel instead.
+        # expected_solution present but no agent artifact: cap cannot be applied.
         logger.warning(
             "LLM judge: no agent output found for llm_curator task with "
             "expected_solution (candidates: %s) — routing to verifier_infra_error",
             ", ".join(candidates),
         )
-        scores["verifier_infra_error"] = {
-            "reason": "no_agent_output",
-            "stage": "llm_judge",
-            "detail": (
+        scores["verifier_infra_error"] = infra_error_tag(
+            "no_agent_output",
+            (
                 "llm_curator task declares expected_solution but no agent "
                 "artifact was found in the container; Tier-2 cap could not be "
                 "applied, so the deterministic grep scores are un-capped and "
                 "must not be recorded as the final measurement"
             ),
-            "candidates": candidates,
-        }
+            stage="llm_judge",
+            candidates=candidates,
+        )
         return scores
 
     try:
@@ -808,7 +824,23 @@ def _apply_llm_judge(
 
         judge = LLMJudge(model="cc:haiku")
     except Exception as exc:
-        logger.warning("Failed to init LLM judge: %s", exc)
+        # Judge required to cap grep here; construction failure must not pass
+        # un-capped grep through as a real score.
+        logger.warning(
+            "Failed to init LLM judge (%s) — routing to verifier_infra_error",
+            exc,
+        )
+        scores["verifier_infra_error"] = infra_error_tag(
+            "judge_init_failed",
+            (
+                "llm_curator task declares expected_solution and an agent "
+                f"artifact was found, but the Tier-2 judge could not be "
+                f"constructed ({type(exc).__name__}: {exc}); the deterministic "
+                "grep scores are un-capped and must not be recorded as the "
+                "final measurement"
+            ),
+            stage="llm_judge",
+        )
         return scores
 
     task_desc = task_data.get("task", {}).get("description", "")

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from eb_verify.task_parser import TaskDefinition, Checkpoint
+from eb_verify.errors import VerifierInfraError
 from eb_verify.scoring import (
     CheckpointResult,
     VerificationResult,
@@ -101,7 +102,19 @@ class CheckpointRunner:
                         "LLM judge enabled (model=%s)", judge_model or "cc:haiku"
                     )
                 except Exception as exc:
-                    logger.warning("Failed to init LLM judge: %s", exc)
+                    # llm_curator + expected_solution present means the Tier-2
+                    # judge is required to cap Tier-1 grep. Swallowing this to
+                    # judge=None would let every checkpoint pass at its un-capped
+                    # grep score with no operator-visible signal — a silent
+                    # Tier-2 bypass. Fail loud instead.
+                    raise VerifierInfraError(
+                        "judge_init_failed",
+                        f"llm_curator task {task.id!r} declares an "
+                        f"expected_solution but the Tier-2 LLM judge could not "
+                        f"be constructed ({type(exc).__name__}: {exc}); refusing "
+                        f"to score with un-capped Tier-1 grep results",
+                        stage="judge_init",
+                    ) from exc
 
     def _warn_unmapped_checkpoints(self) -> None:
         """Log a WARNING for any task.toml checkpoint absent from expected_solution.

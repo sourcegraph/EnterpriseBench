@@ -200,5 +200,60 @@ class TestArtifactFoundAtDerivedPathAppliesCap:
         assert cp["score"] == 0.5  # min(grep, judge)
 
 
+# --------------------------------------------------------------------------
+# EnterpriseBench-zafm (audit-2026-06-29 finding F4) — two more silent
+# Tier-2-bypass paths in _apply_llm_judge must route to verifier_infra_error
+# instead of returning the un-capped grep scores.
+# --------------------------------------------------------------------------
+
+
+def _scores_one_cp() -> dict:
+    return {
+        "task_score": 1.0,
+        "checkpoints": [{"name": "cp1", "score": 1.0, "weight": 1.0, "passed": True}],
+    }
+
+
+class TestCorruptExpectedSolutionRoutesToInfraError:
+    def test_malformed_json_tags_infra_error(self, tmp_path: Path) -> None:
+        # Corrupt curated ground truth used to be swallowed (warning + return
+        # scores), recording the un-capped grep score as the real measurement.
+        (tmp_path / "instruction.md").write_text(
+            "Write to `/workspace/agent_output/answer.json`."
+        )
+        (tmp_path / "expected_solution.json").write_text('{"checkpoints": {oops')
+
+        out = _apply_llm_judge(_scores_one_cp(), tmp_path, "cid", {"task": {}})
+
+        assert "verifier_infra_error" in out
+        assert out["verifier_infra_error"]["reason"] == "corrupt_expected_solution"
+        # No cap was applied — the grep score was not promoted to a judged final.
+        assert "judge_score" not in out["checkpoints"][0]
+
+
+class TestJudgeInitFailureRoutesToInfraError:
+    def test_judge_construction_failure_tags_infra_error(
+        self, tmp_path: Path
+    ) -> None:
+        # llm_curator + expected_solution + agent output present, but the judge
+        # fails to construct: the Tier-2 cap cannot be applied, so un-capped
+        # grep must NOT be recorded — route to re-run instead.
+        task_dir = _write_task(
+            tmp_path,
+            "Write findings to `/workspace/agent_output/answer.json`.",
+            {"cp1": {"expected_solution": "x", "evaluation_criteria": []}},
+        )
+        side = _docker_exec_for({ANSWER_ARTIFACT_PATH: "agent report body"})
+
+        with patch.object(run_task, "_docker_exec", side_effect=side), patch(
+            "eb_verify.judge.LLMJudge", side_effect=RuntimeError("no API key")
+        ):
+            out = _apply_llm_judge(_scores_one_cp(), task_dir, "cid", {"task": {}})
+
+        assert "verifier_infra_error" in out
+        assert out["verifier_infra_error"]["reason"] == "judge_init_failed"
+        assert "judge_score" not in out["checkpoints"][0]
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
