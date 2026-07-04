@@ -1,0 +1,258 @@
+{
+  "audit": "docker-cp package-dir bug silent-zero audit",
+  "bug_fix_commit": "16280cf",
+  "bug_introduced": "2026-03-29..2026-04-01 (7dff937/ae43078: /workspace/.eb_verify copy)",
+  "fingerprint": "check script invoking eb_verify via `python3 -m` or `from eb_verify... import` under PYTHONPATH=/workspace/.eb_verify; broken layout raises ModuleNotFoundError -> check exits 1 -> test_runner records silent 0.0, verifier_infra_error=null",
+  "file_extraction_scope": {
+    "tasks": [
+      "err-provenance-tri-httpx-proxy-001",
+      "support-mapping-dual-httpx-httpcore-001"
+    ],
+    "affected_published_runs": 0,
+    "note": "Both tasks were added in commit 5a796c4, AFTER all result batches (incl. June rescores aq8e 405a78c / uu17 257e2d7). They appear in zero result files. The only file_extraction run to hit the bug was the ad-hoc solve-verification of err-provenance-tri-httpx-proxy-001 that surfaced it (rep1 error_source=0.0 -> rescored 1.0 at discovery, per 16280cf). Nothing to re-score."
+  },
+  "broader_blast_radius_topological_order": {
+    "affected_runs": [
+      {
+        "file": "results/rescore_aq8e/refactor-orch-004/baseline/results.json",
+        "task_id": "refactor-orch-004",
+        "checkpoint": "topo_order",
+        "mode": "baseline",
+        "score": 0.0,
+        "exit_code": 1,
+        "classification": "docker_cp_silent_zero"
+      },
+      {
+        "file": "results/rescore_aq8e/refactor-orch-007/baseline/results.json",
+        "task_id": "refactor-orch-007",
+        "checkpoint": "topo_order",
+        "mode": "baseline",
+        "score": 0.0,
+        "exit_code": 1,
+        "classification": "docker_cp_silent_zero"
+      },
+      {
+        "file": "results/rescore_uu17/refactor-orch-001/mcp_only/results.json",
+        "task_id": "refactor-orch-001",
+        "checkpoint": "topo_order",
+        "mode": "mcp_only",
+        "score": 0.0,
+        "exit_code": 1,
+        "classification": "docker_cp_silent_zero"
+      },
+      {
+        "file": "results/rescore_uu17/refactor-orch-007/mcp_only/results.json",
+        "task_id": "refactor-orch-007",
+        "checkpoint": "topo_order",
+        "mode": "mcp_only",
+        "score": 0.0,
+        "exit_code": 1,
+        "classification": "docker_cp_silent_zero"
+      },
+      {
+        "file": "results/rescore_uu17/refactor-orch-008/mcp_only/results.json",
+        "task_id": "refactor-orch-008",
+        "checkpoint": "topo_order",
+        "mode": "mcp_only",
+        "score": 0.0,
+        "exit_code": 1,
+        "classification": "docker_cp_silent_zero"
+      }
+    ],
+    "count": 5,
+    "artifacts_preserved": false,
+    "offline_rescore_possible": false,
+    "note": "The topo_order checkpoint (check_topo_order.sh, imports eb_verify via sys.path fallback to PYTHONPATH=/workspace/.eb_verify) was hit by the SAME bug. 5 instances show score=0.0 & exit_code=1 (ModuleNotFoundError). These live in the June rescore batches that feed headline_recompute.json. The 7 other topo_order zeros have exit_code=0 (guard fired before import: no REFACTOR_PLAN.md / no numbered ordering) = genuine agent misses. Agent REFACTOR_PLAN.md artifacts were NOT preserved in the rescore dirs, so these 5 cannot be re-scored offline; they require a post-fix docker re-run."
+  },
+  "all_import_dependent_instances": [
+    {
+      "file": "results/mcp_batch/cal-err-flask-blueprint-001_hybrid/results.json",
+      "task_id": "cal-err-flask-blueprint-001",
+      "checkpoint": "error_source",
+      "mode": "hybrid",
+      "score": 0.0,
+      "exit_code": 0,
+      "classification": "genuine_guard_zero"
+    },
+    {
+      "file": "results/mcp_batch/cal-err-flask-blueprint-001_hybrid/verifier/output.json",
+      "task_id": "verifier",
+      "checkpoint": "error_source",
+      "mode": "hybrid",
+      "score": 0.0,
+      "exit_code": 0,
+      "classification": "genuine_guard_zero"
+    },
+    {
+      "file": "results/mcp_batch/cal-err-flask-blueprint-001_mcp_only/results.json",
+      "task_id": "cal-err-flask-blueprint-001",
+      "checkpoint": "error_source",
+      "mode": "unknown",
+      "score": 0.5,
+      "exit_code": 0,
+      "classification": "graded_normal"
+    },
+    {
+      "file": "results/mcp_batch/cal-err-flask-blueprint-001_mcp_only/verifier/output.json",
+      "task_id": "verifier",
+      "checkpoint": "error_source",
+      "mode": "unknown",
+      "score": 0.5,
+      "exit_code": 0,
+      "classification": "graded_normal"
+    },
+    {
+      "file": "results/rescore_aq8e/error-trace-k8s-nftables-sync-001/baseline/results.json",
+      "task_id": "error-trace-k8s-nftables-sync-001",
+      "checkpoint": "error_source",
+      "mode": "baseline",
+      "score": 1.0,
+      "exit_code": 0,
+      "classification": "graded_normal"
+    },
+    {
+      "file": "results/rescore_aq8e/refactor-orch-001/baseline/results.json",
+      "task_id": "refactor-orch-001",
+      "checkpoint": "topo_order",
+      "mode": "baseline",
+      "score": 0.0,
+      "exit_code": 0,
+      "classification": "genuine_guard_zero"
+    },
+    {
+      "file": "results/rescore_aq8e/refactor-orch-002/baseline/results.json",
+      "task_id": "refactor-orch-002",
+      "checkpoint": "topo_order",
+      "mode": "baseline",
+      "score": 0.0,
+      "exit_code": 0,
+      "classification": "genuine_guard_zero"
+    },
+    {
+      "file": "results/rescore_aq8e/refactor-orch-003/baseline/results.json",
+      "task_id": "refactor-orch-003",
+      "checkpoint": "topo_order",
+      "mode": "baseline",
+      "score": 0.0,
+      "exit_code": 0,
+      "classification": "genuine_guard_zero"
+    },
+    {
+      "file": "results/rescore_aq8e/refactor-orch-004/baseline/results.json",
+      "task_id": "refactor-orch-004",
+      "checkpoint": "topo_order",
+      "mode": "baseline",
+      "score": 0.0,
+      "exit_code": 1,
+      "classification": "docker_cp_silent_zero"
+    },
+    {
+      "file": "results/rescore_aq8e/refactor-orch-007/baseline/results.json",
+      "task_id": "refactor-orch-007",
+      "checkpoint": "topo_order",
+      "mode": "baseline",
+      "score": 0.0,
+      "exit_code": 1,
+      "classification": "docker_cp_silent_zero"
+    },
+    {
+      "file": "results/rescore_aq8e/refactor-orch-008/baseline/results.json",
+      "task_id": "refactor-orch-008",
+      "checkpoint": "topo_order",
+      "mode": "baseline",
+      "score": 0.0,
+      "exit_code": 0,
+      "classification": "genuine_guard_zero"
+    },
+    {
+      "file": "results/rescore_uu17/error-trace-k8s-nftables-sync-001/mcp_only/results.json",
+      "task_id": "error-trace-k8s-nftables-sync-001",
+      "checkpoint": "error_source",
+      "mode": "mcp_only",
+      "score": 1.0,
+      "exit_code": 0,
+      "classification": "graded_normal"
+    },
+    {
+      "file": "results/rescore_uu17/refactor-orch-001/mcp_only/results.json",
+      "task_id": "refactor-orch-001",
+      "checkpoint": "topo_order",
+      "mode": "mcp_only",
+      "score": 0.0,
+      "exit_code": 1,
+      "classification": "docker_cp_silent_zero"
+    },
+    {
+      "file": "results/rescore_uu17/refactor-orch-002/mcp_only/results.json",
+      "task_id": "refactor-orch-002",
+      "checkpoint": "topo_order",
+      "mode": "mcp_only",
+      "score": 0.0,
+      "exit_code": 0,
+      "classification": "genuine_guard_zero"
+    },
+    {
+      "file": "results/rescore_uu17/refactor-orch-003/mcp_only/results.json",
+      "task_id": "refactor-orch-003",
+      "checkpoint": "topo_order",
+      "mode": "mcp_only",
+      "score": 0.0,
+      "exit_code": 0,
+      "classification": "genuine_guard_zero"
+    },
+    {
+      "file": "results/rescore_uu17/refactor-orch-004/mcp_only/results.json",
+      "task_id": "refactor-orch-004",
+      "checkpoint": "topo_order",
+      "mode": "mcp_only",
+      "score": 0.0,
+      "exit_code": 0,
+      "classification": "genuine_guard_zero"
+    },
+    {
+      "file": "results/rescore_uu17/refactor-orch-007/mcp_only/results.json",
+      "task_id": "refactor-orch-007",
+      "checkpoint": "topo_order",
+      "mode": "mcp_only",
+      "score": 0.0,
+      "exit_code": 1,
+      "classification": "docker_cp_silent_zero"
+    },
+    {
+      "file": "results/rescore_uu17/refactor-orch-008/mcp_only/results.json",
+      "task_id": "refactor-orch-008",
+      "checkpoint": "topo_order",
+      "mode": "mcp_only",
+      "score": 0.0,
+      "exit_code": 1,
+      "classification": "docker_cp_silent_zero"
+    },
+    {
+      "file": "results/runs/cal-err-click-flagval-002/results.json",
+      "task_id": "cal-err-click-flagval-002",
+      "checkpoint": "error_source",
+      "mode": "unknown",
+      "score": 1.0,
+      "exit_code": 0,
+      "classification": "graded_normal"
+    },
+    {
+      "file": "results/runs/cal-err-flask-blueprint-001/results.json",
+      "task_id": "cal-err-flask-blueprint-001",
+      "checkpoint": "error_source",
+      "mode": "unknown",
+      "score": 0.0,
+      "exit_code": 0,
+      "classification": "genuine_guard_zero"
+    },
+    {
+      "file": "results/runs/cal-err-requests-proxy-003/results.json",
+      "task_id": "cal-err-requests-proxy-003",
+      "checkpoint": "error_source",
+      "mode": "unknown",
+      "score": 0.0,
+      "exit_code": 0,
+      "classification": "genuine_guard_zero"
+    }
+  ]
+}
