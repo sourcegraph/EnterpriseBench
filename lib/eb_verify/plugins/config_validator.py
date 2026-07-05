@@ -13,13 +13,15 @@ from eb_verify.plugins import ValidationResult, safe_read
 class ConfigValidator:
     artifact_type = "config"
 
-    # Common config file patterns to look for in workspace
+    # Common config file patterns to look for in workspace.
+    # .hcl is intentionally excluded: _validate_file has no parser for it,
+    # so counting it here would report files as "validated" with no syntax
+    # check ever run.
     CONFIG_GLOBS = [
         "**/*.yaml",
         "**/*.yml",
         "**/*.json",
         "**/*.toml",
-        "**/*.hcl",
     ]
 
     def validate(self, workspace: Path) -> ValidationResult:
