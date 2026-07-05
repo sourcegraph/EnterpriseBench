@@ -25,6 +25,9 @@ from create_sg_mirrors import parse_toml, find_task_files, ORG
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "sandbox"))
 from dockerfile_generator import mirror_name_for_repo
 
+sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
+from validation import validate_repo_entry
+
 
 # ═══════════════════════════════════════════════════════════════
 #  MCP INSTRUCTION GENERATION
@@ -85,6 +88,7 @@ def generate_instruction_mcp(task_data: dict) -> str:
         if not url or not rev:
             continue
 
+        validate_repo_entry(repo)
         mirror = mirror_name_for_repo(url, rev)
         full_mirror = f"{ORG}/{mirror}"
 
@@ -101,6 +105,7 @@ def generate_instruction_mcp(task_data: dict) -> str:
             url = repo.get("url", "")
             rev = repo.get("rev", "")
             if url and rev:
+                validate_repo_entry(repo)
                 mirror = mirror_name_for_repo(url, rev)
                 all_filters.append(f"github.com/{ORG}/{mirror}")
 
