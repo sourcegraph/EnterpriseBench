@@ -267,7 +267,8 @@ def coverage(
     resolved embedder's own ``default_threshold`` so it can't be paired with
     the wrong embedder's calibration.
     """
-    embedder = embedder or TfidfCharNgramEmbedder()
+    if embedder is None:
+        embedder = TfidfCharNgramEmbedder()
     if threshold is None:
         threshold = embedder.default_threshold
     _validate_threshold(threshold)

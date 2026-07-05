@@ -96,7 +96,7 @@ PARAPHRASE_PAIRS = [
     LabeledPair(
         "Blueprint.register_blueprint and the register method that handles URL prefix merging for nested blueprints",
         "the register method, invoked via Blueprint.register_blueprint, is what merges the URL prefix for nested blueprints",
-        True, "paraphrase", "calibration-001"),
+        True, "paraphrase", "customer_escalation/calibration-001"),
     LabeledPair(
         "PostStartHook fails, readyz check fails",
         "the failure of the PostStartHook causes the readyz check to fail as well",
@@ -168,7 +168,7 @@ NEAR_MISS_PAIRS = [
 
 ALL_PAIRS: list[LabeledPair] = PARAPHRASE_PAIRS + NEAR_MISS_PAIRS
 
-EMBEDDER_FACTORIES = {
+EMBEDDER_FACTORIES: dict[str, type[Embedder]] = {
     "tfidf": TfidfCharNgramEmbedder,
     "sentence-transformer": SentenceTransformerEmbedder,
 }
@@ -198,10 +198,13 @@ def sweep(
     """Sweep thresholds; return (rows, best_row) with precision/recall/F1.
 
     Pass a precomputed ``sims`` (from ``pair_similarities``) to skip
-    re-embedding the pair set when the caller already has it.
+    re-embedding the pair set when the caller already has it. ``embedder``
+    is only used to compute ``sims`` when it isn't supplied directly.
     """
     if thresholds is None:
         thresholds = [round(0.05 * i, 2) for i in range(1, 20)]  # 0.05..0.95
+    if sims is not None and embedder is not None:
+        raise ValueError("pass either embedder or sims, not both")
     if sims is None:
         sims = pair_similarities(embedder=embedder)
     rows = []

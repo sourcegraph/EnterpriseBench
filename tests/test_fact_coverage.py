@@ -174,6 +174,18 @@ def test_default_embedder_rows_are_l2_normalized():
     assert np.allclose(norms, 1.0)
 
 
+def test_coverage_resolves_threshold_from_embedder_default():
+    # No threshold arg: must resolve to the passed embedder's own
+    # default_threshold, not the other embedder's calibration.
+    result = coverage(GT, CAND_EXACT, embedder=TfidfCharNgramEmbedder())
+    assert result.threshold == TfidfCharNgramEmbedder.default_threshold
+
+
+def test_precision_resolves_threshold_from_embedder_default():
+    result = precision(CAND_EXACT, GT, embedder=TfidfCharNgramEmbedder())
+    assert result.threshold == TfidfCharNgramEmbedder.default_threshold
+
+
 def test_coverage_result_type():
     result = coverage(GT, CAND_EXACT, threshold=0.9)
     assert isinstance(result, CoverageResult)
@@ -200,7 +212,11 @@ def test_sentence_transformer_embedder_missing_dependency_raises_clear_error(mon
 
 @pytest.fixture(scope="session")
 def real_embedder() -> SentenceTransformerEmbedder:
-    """Loads the pinned model once; @pytest.mark.network tests share it."""
+    """Loads the pinned model once, shared by the tests below that take it as
+    a parameter. Tests that build their embedder via EMBEDDER_FACTORIES
+    (the calibration/adversarial parametrizations) load their own instance
+    instead, to stay symmetric with the "tfidf" parametrization.
+    """
     return SentenceTransformerEmbedder()
 
 
@@ -229,6 +245,14 @@ def test_sentence_transformer_embedder_empty_texts(real_embedder):
 # ---------------------------------------------------------------------------
 # Calibration regression — locks in the experiment result
 # ---------------------------------------------------------------------------
+
+def test_sweep_rejects_embedder_and_sims_together():
+    from eb_verify.fact_coverage_calibration import pair_similarities, sweep
+
+    sims = pair_similarities(embedder=TfidfCharNgramEmbedder())
+    with pytest.raises(ValueError, match="embedder.*sims"):
+        sweep(embedder=TfidfCharNgramEmbedder(), sims=sims)
+
 
 @pytest.mark.parametrize(
     "embedder_name",
