@@ -79,6 +79,7 @@ def generate_instruction_mcp(task_data: dict) -> str:
     ]
 
     # List each mirror with its filter syntax
+    mirrors = []
     for repo in repos:
         url = repo.get("url", "")
         rev = repo.get("rev", "")
@@ -90,6 +91,7 @@ def generate_instruction_mcp(task_data: dict) -> str:
 
         validate_repo_entry(repo)
         mirror = mirror_name_for_repo(url, rev)
+        mirrors.append(mirror)
         full_mirror = f"{ORG}/{mirror}"
 
         lines.append(f"### {path} ({role})")
@@ -100,14 +102,7 @@ def generate_instruction_mcp(task_data: dict) -> str:
 
     # Multi-repo search example
     if len(repos) > 1:
-        all_filters = []
-        for repo in repos:
-            url = repo.get("url", "")
-            rev = repo.get("rev", "")
-            if url and rev:
-                validate_repo_entry(repo)
-                mirror = mirror_name_for_repo(url, rev)
-                all_filters.append(f"github.com/{ORG}/{mirror}")
+        all_filters = [f"github.com/{ORG}/{mirror}" for mirror in mirrors]
 
         lines.append("### Searching Across All Repos")
         lines.append("")

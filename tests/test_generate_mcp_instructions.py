@@ -62,7 +62,8 @@ def test_generate_instruction_mcp_rejects_path_traversal_rev() -> None:
 
 
 def test_generate_instruction_mcp_rejects_path_traversal_in_multi_repo_pass() -> None:
-    """Two repos so the second (multi-repo OR-pattern) loop is exercised too."""
+    """A multi-repo task (>1 repos, triggers the OR-pattern section) still
+    validates every repo entry, not just the first."""
     repos = [
         {
             "url": "https://github.com/psf/requests",
