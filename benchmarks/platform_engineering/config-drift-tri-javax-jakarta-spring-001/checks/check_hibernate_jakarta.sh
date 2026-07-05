@@ -11,10 +11,11 @@ if [[ ! -f "$REPORT" ]]; then
 fi
 
 FOUND=0
-TOTAL=2
+TOTAL=3
 
-grep -qiE 'jakarta\.persistence|javax\.persistence' "$REPORT" && FOUND=$((FOUND + 1))
+grep -qiE 'jakarta\.persistence' "$REPORT" && FOUND=$((FOUND + 1))
 grep -qiE 'Entity|Session' "$REPORT" && FOUND=$((FOUND + 1))
+grep -qiE 'Configuration\.java|hibernate-core' "$REPORT" && FOUND=$((FOUND + 1))
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 PASSED=$([ "$FOUND" -ge "$TOTAL" ] && echo true || echo false)

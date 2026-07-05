@@ -11,10 +11,11 @@ if [[ ! -f "$REPORT" ]]; then
 fi
 
 FOUND=0
-TOTAL=2
+TOTAL=3
 
-grep -qiE 'jakarta\.|javax\.' "$REPORT" && FOUND=$((FOUND + 1))
-grep -qiE 'Spring ?Boot|SpringApplication|spring-boot' "$REPORT" && FOUND=$((FOUND + 1))
+grep -qiE 'jakarta\.servlet' "$REPORT" && FOUND=$((FOUND + 1))
+grep -qiE 'Spring ?Boot|spring-boot' "$REPORT" && FOUND=$((FOUND + 1))
+grep -qiE 'ServletWebServerApplicationContext' "$REPORT" && FOUND=$((FOUND + 1))
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 PASSED=$([ "$FOUND" -ge "$TOTAL" ] && echo true || echo false)

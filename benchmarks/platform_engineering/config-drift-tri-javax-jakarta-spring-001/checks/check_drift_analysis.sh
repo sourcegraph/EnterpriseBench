@@ -11,10 +11,16 @@ if [[ ! -f "$REPORT" ]]; then
 fi
 
 FOUND=0
-TOTAL=2
+TOTAL=3
 
-grep -qiE 'ClassNotFoundException|NoClassDefFound|drift|conflict' "$REPORT" && FOUND=$((FOUND + 1))
+grep -qiE 'ClassNotFoundException|NoClassDefFoundError|LinkageError' "$REPORT" && FOUND=$((FOUND + 1))
 grep -qiE 'javax.*jakarta|mixed' "$REPORT" && FOUND=$((FOUND + 1))
+
+ANCHORS=0
+grep -qiE 'ServletWebServerApplicationContext' "$REPORT" && ANCHORS=$((ANCHORS + 1))
+grep -qiE 'Configuration\.java|hibernate-core' "$REPORT" && ANCHORS=$((ANCHORS + 1))
+grep -qiE 'Tomcat\.java|catalina' "$REPORT" && ANCHORS=$((ANCHORS + 1))
+[ "$ANCHORS" -ge 2 ] && FOUND=$((FOUND + 1))
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 PASSED=$([ "$FOUND" -ge "$TOTAL" ] && echo true || echo false)
