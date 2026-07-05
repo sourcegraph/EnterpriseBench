@@ -31,25 +31,24 @@ def _require_dict(parsed: object, text: str) -> dict:
     return parsed
 
 
+def _try_parse_json(candidate: str) -> dict | None:
+    """Parse candidate as JSON, returning None (not raising) on malformed JSON."""
+    try:
+        parsed = json.loads(candidate)
+    except json.JSONDecodeError:
+        return None
+    return _require_dict(parsed, candidate)
+
+
 def _parse_json(raw: str) -> dict:
     """Extract and parse JSON from the model's text response."""
     text = raw.strip()
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError:
-        pass
-    else:
-        return _require_dict(parsed, text)
+    if (parsed := _try_parse_json(text)) is not None:
+        return parsed
 
     m = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
-    if m:
-        fenced = m.group(1).strip()
-        try:
-            parsed = json.loads(fenced)
-        except json.JSONDecodeError:
-            pass
-        else:
-            return _require_dict(parsed, fenced)
+    if m and (parsed := _try_parse_json(m.group(1).strip())) is not None:
+        return parsed
 
     raise JudgeBackendError(
         f"Failed to parse JSON from response: {text[:200]}...",
