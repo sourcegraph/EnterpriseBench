@@ -365,6 +365,25 @@ class TestClaudeCodeBackend:
             with pytest.raises(JudgeBackendError, match="parse claude CLI output"):
                 backend._raw_call("sys", "user")
 
+    @patch("eb_verify.judge.backends.shutil.which", return_value="/usr/bin/claude")
+    def test_raw_call_non_dict_envelope_raises(self, _which):
+        backend = ClaudeCodeBackend(model="haiku")
+        completed = subprocess.CompletedProcess([], 0, stdout="true", stderr="")
+        with patch("eb_verify.judge.backends.subprocess.run", return_value=completed):
+            with pytest.raises(JudgeBackendError, match="Malformed claude CLI envelope"):
+                backend._raw_call("sys", "user")
+
+    @patch("eb_verify.judge.backends.shutil.which", return_value="/usr/bin/claude")
+    def test_call_does_not_retry_on_non_dict_envelope(self, _which):
+        backend = ClaudeCodeBackend(model="haiku")
+        completed = subprocess.CompletedProcess([], 0, stdout="[1, 2, 3]", stderr="")
+        with patch(
+            "eb_verify.judge.backends.subprocess.run", return_value=completed
+        ) as mock_run:
+            with pytest.raises(JudgeBackendError, match="Malformed claude CLI envelope"):
+                backend.call("sys", "user")
+        mock_run.assert_called_once()  # no status_code => not retryable
+
     @patch("eb_verify.judge.backends.time.sleep")
     @patch("eb_verify.judge.backends.shutil.which", return_value="/usr/bin/claude")
     def test_call_retries_on_429_then_succeeds(self, _which, sleep):
