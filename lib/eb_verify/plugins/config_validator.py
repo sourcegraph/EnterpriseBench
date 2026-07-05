@@ -40,8 +40,16 @@ class ConfigValidator:
         for out_dir in output_dirs:
             if not out_dir.is_dir():
                 continue
+            # Workspace root may have full OSS repos cloned as direct
+            # children (see docs/TASK_AUTHORING_GUIDE.md), so only scan
+            # its top level; output/ and artifacts/ are agent-produced
+            # and safe to scan recursively.
+            is_workspace_root = out_dir == workspace
             for pattern in self.CONFIG_GLOBS:
-                for config_file in out_dir.glob(pattern):
+                glob_pattern = (
+                    pattern.removeprefix("**/") if is_workspace_root else pattern
+                )
+                for config_file in out_dir.glob(glob_pattern):
                     # Skip deeply nested vendor/node_modules
                     parts = config_file.parts
                     if any(p in ("vendor", "node_modules", ".git") for p in parts):
@@ -50,9 +58,6 @@ class ConfigValidator:
                     if not result.valid:
                         errors.append(f"{config_file.name}: {result.detail}")
                     validated += 1
-                # Only check top-level for workspace root to avoid scanning entire repos
-                if out_dir == workspace:
-                    break
 
         if errors:
             return ValidationResult(
