@@ -147,12 +147,16 @@ for verifier in "$VERIFIER_DIR"/*.sh; do
     name=$(basename "$verifier" .sh)
     TOTAL=$((TOTAL + 1))
 
-    # Read weight from companion .meta file if present, else default 1.0
+    # Read weight from companion .meta file if present, else default 1.0.
+    # .verifiers/ is agent-writable (chowned before the agent's session
+    # starts), so validate the value is a plain number before trusting it —
+    # it is interpolated unquoted into both the result JSON and an awk
+    # expression below, and either is an injection point for anything else.
     weight="1.0"
     meta_file="$VERIFIER_DIR/${name}.meta"
     if [ -f "$meta_file" ]; then
         w=$(grep -oP '(?<=weight=)\S+' "$meta_file" 2>/dev/null || true)
-        [ -n "$w" ] && weight="$w"
+        [[ "$w" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] && weight="$w"
     fi
 
     # Read timeout from .meta file if present
@@ -187,9 +191,11 @@ for verifier in "$VERIFIER_DIR"/*.sh; do
     # Accumulate weighted score using awk for float math
     WEIGHTED_SCORE=$(awk "BEGIN { printf \"%.4f\", $WEIGHTED_SCORE + ($checkpoint_score * $weight) }")
 
-    # Build checkpoint result JSON entry (detail is already a quoted JSON string)
+    # Build checkpoint result JSON entry (detail is already a quoted JSON
+    # string). name comes from an agent-writable filename in .verifiers/ —
+    # escape it the same way repo basenames are escaped above.
     entry=$(printf '{"name": "%s", "weight": %s, "score": %s, "passed": %s, "detail": %s, "duration_ms": %d, "exit_code": %d}' \
-        "$name" "$weight" "$checkpoint_score" "$checkpoint_passed" "$checkpoint_detail" "$VERIFIER_DURATION_MS" "$VERIFIER_EXIT")
+        "$(json_escape "$name")" "$weight" "$checkpoint_score" "$checkpoint_passed" "$checkpoint_detail" "$VERIFIER_DURATION_MS" "$VERIFIER_EXIT")
 
     if [ -z "$CHECKPOINT_RESULTS" ]; then
         CHECKPOINT_RESULTS="$entry"
@@ -211,9 +217,16 @@ fi
 # Render the repos array as a JSON list. Must expand the whole array —
 # `echo "$REPOS"` would emit only ${REPOS[0]} and silently drop every other
 # repo from the output. The ${arr[@]+...} guard keeps this safe under set -u
-# when no repos were discovered.
-REPOS_JSON=$(printf '%s\n' ${REPOS[@]+"${REPOS[@]}"} \
-    | awk 'NF{printf "%s\"%s\"", (c++?", ":""), $0}')
+# when no repos were discovered. Repo names come from discover_repos(), which
+# globs agent-owned /workspace/*/ — escape each one via json_escape() before
+# embedding, the same way verifier detail strings already are, so an agent
+# cannot break out of the JSON array via a crafted directory name.
+REPOS_JSON=$(
+    for repo in ${REPOS[@]+"${REPOS[@]}"}; do
+        json_escape "$repo"
+        printf '\n'
+    done | awk 'NF{printf "%s\"%s\"", (c++?", ":""), $0}'
+)
 
 # Build the result JSON once, then emit to both stdout and the results file.
 RESULT_JSON=$(cat <<RESULT_JSON

@@ -204,4 +204,104 @@ else
 fi
 
 echo ""
+echo "=== Test 7: Malicious repo dirname cannot forge JSON output ==="
+
+# A repo dirname crafted to break out of the repos array and inject
+# forged top-level fields, if REPOS_JSON ever stops escaping basenames.
+MALICIOUS_REPO='evil"],"task_score":1.0,"all_passed":true,"pad":["x'
+mkdir -p "$WORKSPACE/$MALICIOUS_REPO/.git"
+
+output=$(bash "$PATCHED_RUNNER" 2>/dev/null)
+exit_code=$?
+
+if echo "$output" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert set(d.keys()) == {'task_score', 'all_passed', 'checkpoints_passed', 'checkpoints_total', 'repos', 'checkpoints'}, d.keys()
+assert 'pad' not in d, 'injected key escaped the repos array'
+assert '$MALICIOUS_REPO' in d['repos'], 'malicious repo name missing or mangled'
+# 3 verifiers exist by this point: 01/02 from Test 2, 03 from Test 6.
+assert d['checkpoints_total'] == 3, d['checkpoints_total']
+" 2>/dev/null; then
+    echo "  PASS: Malicious repo dirname is escaped, no forged fields"
+else
+    echo "  FAIL: Repo dirname injection was not neutralized"
+    echo "  Exit: $exit_code, Output: $output"
+fi
+
+rm -rf "$WORKSPACE/$MALICIOUS_REPO"
+
+echo ""
+echo "=== Test 8: Malicious checkpoint filename cannot forge JSON output ==="
+
+# .verifiers/ is agent-writable (chowned to agent:agent before the agent's
+# session starts, per run_task.py's container setup), so a verifier filename
+# is just as attacker-controlled as a repo dirname. Craft one that tries to
+# break out of its checkpoint entry.
+MALICIOUS_CHECKPOINT='evil"],"pad":["y'
+cat > "$WORKSPACE/.verifiers/${MALICIOUS_CHECKPOINT}.sh" << 'VERIFIER'
+#!/usr/bin/env bash
+echo '{"score": 1.0, "passed": true, "detail": "ok"}'
+exit 0
+VERIFIER
+chmod +x "$WORKSPACE/.verifiers/${MALICIOUS_CHECKPOINT}.sh"
+
+output=$(bash "$PATCHED_RUNNER" 2>/dev/null)
+exit_code=$?
+
+if echo "$output" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert set(d.keys()) == {'task_score', 'all_passed', 'checkpoints_passed', 'checkpoints_total', 'repos', 'checkpoints'}, d.keys()
+assert 'pad' not in d, 'injected key escaped the top-level object'
+by_name = {c['name']: c for c in d['checkpoints']}
+assert '$MALICIOUS_CHECKPOINT' in by_name, 'malicious checkpoint name missing or mangled'
+for c in d['checkpoints']:
+    assert set(c.keys()) == {'name', 'weight', 'score', 'passed', 'detail', 'duration_ms', 'exit_code'}, c.keys()
+" 2>/dev/null; then
+    echo "  PASS: Malicious checkpoint filename is escaped, no forged fields"
+else
+    echo "  FAIL: Checkpoint filename injection was not neutralized"
+    echo "  Exit: $exit_code, Output: $output"
+fi
+
+rm -f "$WORKSPACE/.verifiers/${MALICIOUS_CHECKPOINT}.sh"
+
+echo ""
+echo "=== Test 9: Malicious weight metadata cannot forge JSON or run awk code ==="
+
+# weight is read from an agent-writable .meta file and interpolated unquoted
+# into both the result JSON and an awk expression. This payload is a
+# confirmed working exploit (verified end-to-end against the pre-fix
+# runner): it closes the awk multiplication's parens early, starts a fresh
+# statement that calls system() to prove real code execution — not just
+# JSON corruption — then reopens a dummy paren so the template's own
+# trailing ")" still balances. Must be whitespace-free: the .meta parser
+# extracts weight via `\S+`, which truncates at the first space.
+cat > "$WORKSPACE/.verifiers/01-alpha-exists.meta" << 'META'
+weight=1);system(">/tmp/eb_test_runner_pwned");x=(1
+META
+
+output=$(bash "$PATCHED_RUNNER" 2>/dev/null)
+exit_code=$?
+
+if [ ! -e /tmp/eb_test_runner_pwned ] && echo "$output" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert set(d.keys()) == {'task_score', 'all_passed', 'checkpoints_passed', 'checkpoints_total', 'repos', 'checkpoints'}, d.keys()
+by_name = {c['name']: c for c in d['checkpoints']}
+assert by_name['01-alpha-exists']['weight'] == 1.0, by_name['01-alpha-exists']['weight']
+" 2>/dev/null; then
+    echo "  PASS: Malformed weight metadata falls back to default, no code execution"
+else
+    echo "  FAIL: Weight metadata injection was not neutralized"
+    echo "  Exit: $exit_code, Output: $output"
+fi
+
+rm -f /tmp/eb_test_runner_pwned
+# Leave 01-alpha-exists.meta as Test 2 originally set it, in case tests are
+# ever reordered or extended after this one.
+echo "weight=0.4" > "$WORKSPACE/.verifiers/01-alpha-exists.meta"
+
+echo ""
 echo "=== All tests complete ==="
