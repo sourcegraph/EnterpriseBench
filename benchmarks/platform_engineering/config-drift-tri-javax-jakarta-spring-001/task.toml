@@ -1,0 +1,122 @@
+# Config Drift: javax -> jakarta namespace migration across Spring Boot 3, Hibernate 6, and Tomcat 10
+
+difficulty_stratum = "tri_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "jakarta-ee-migration"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "config-drift-tri-javax-jakarta-spring-001"
+suite = "platform_engineering"
+task_type = "config_drift"
+difficulty = "expert"
+estimated_duration_minutes = 45
+session_type = "single"
+description = "Detect javax->jakarta namespace drift across Spring Boot 3, Hibernate 6, and Tomcat 10"
+prompt = """
+The Jakarta EE migration renamed the platform namespace from `javax.*` to
+`jakarta.*` across the entire Java ecosystem. Spring Boot 3.0 adopted jakarta,
+which forces every dependency on the classpath to migrate in lockstep. When one
+component is still on `javax.*` while another expects `jakarta.*`, the JVM throws
+ClassNotFoundException / NoClassDefFoundError / LinkageError at boot or first
+request.
+
+Your task:
+1. Find where Spring Boot 3.0 switched from javax to jakarta imports.
+2. Find where Hibernate 6 made the jakarta.persistence migration.
+3. Find where Tomcat 10 adopted the jakarta.servlet namespace.
+4. Identify configuration drift where one component uses javax while another
+   expects jakarta, and explain the resulting failure mode.
+
+All three repos are cloned under `/workspace/`. Focus on import/dependency
+declarations first, then trace into implementation. Check version constraints in
+the dependency manifests (pom.xml / build.gradle).
+
+Write your analysis to /workspace/analysis/IMPACT_REPORT.md. The report should
+include, for each repository: the relevant file paths, the specific code symbols
+or types involved, the nature of the change (rename, removal, signature change,
+behavioral), and migration recommendations. Conclude with the cross-component
+alignment requirement.
+"""
+
+[[repos]]
+url = "https://github.com/spring-projects/spring-boot"
+rev = "v3.0.0"
+path = "spring-boot"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/hibernate/hibernate-orm"
+rev = "6.0.0"
+path = "hibernate-orm"
+role = "consumer"
+
+[[repos]]
+url = "https://github.com/apache/tomcat"
+rev = "10.1.0"
+path = "tomcat"
+role = "consumer"
+
+[metadata]
+languages = ["java"]
+total_loc = 2_500_000
+dependency_depth = 3
+frameworks = ["spring-boot", "hibernate", "tomcat", "jakarta-ee"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "spring_jakarta"
+weight = 0.25
+verifier = "checks/check_spring_jakarta.sh"
+description = "Agent identifies where Spring Boot 3.0 mandates the jakarta.* namespace"
+timeout_seconds = 60
+
+[[checkpoints]]
+name = "hibernate_jakarta"
+weight = 0.25
+verifier = "checks/check_hibernate_jakarta.sh"
+description = "Agent identifies the Hibernate 6 jakarta.persistence migration"
+timeout_seconds = 60
+
+[[checkpoints]]
+name = "tomcat_jakarta"
+weight = 0.20
+verifier = "checks/check_tomcat_jakarta.sh"
+description = "Agent identifies the Tomcat 10 jakarta.servlet adoption"
+timeout_seconds = 60
+
+[[checkpoints]]
+name = "drift_analysis"
+weight = 0.30
+verifier = "checks/check_drift_analysis.sh"
+description = "Agent documents cross-component drift scenarios and their failure modes"
+timeout_seconds = 60
+
+[artifacts]
+required = ["answer"]
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Tracing a namespace rename across three large Java codebases (spring-boot, hibernate-orm, tomcat) requires locating servlet/persistence imports and dependency declarations in each repo and correlating them — cross-repo symbol search is far cheaper than manual grep across 2.5M LOC."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/SpringApplication.java"
+repo = "spring-boot"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "hibernate-core/src/main/java/org/hibernate/cfg/Configuration.java"
+repo = "hibernate-orm"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "java/org/apache/catalina/startup/Tomcat.java"
+repo = "tomcat"
+confidence = 0.85
+source = "deterministic"
