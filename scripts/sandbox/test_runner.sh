@@ -174,7 +174,7 @@ for verifier in "$VERIFIER_DIR"/*.sh; do
     # Extract the canonical "detail" string (verifier_output.schema.json) as a
     # JSON string token, including escapes, so it can be embedded verbatim.
     # Preserved per-checkpoint in output.json for debugging; empty when absent.
-    checkpoint_detail=$(printf '%s' "$VERIFIER_JSON" | grep -oP '"detail"\s*:\s*\K"(\\.|[^"\\])*"' | head -1)
+    checkpoint_detail=$(printf '%s' "$VERIFIER_JSON" | grep -oPm1 '"detail"\s*:\s*\K"(\\.|[^"\\])*"')
     [ -n "$checkpoint_detail" ] || checkpoint_detail='""'
 
     if [ "$checkpoint_passed" = "true" ]; then

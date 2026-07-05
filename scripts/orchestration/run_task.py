@@ -395,6 +395,24 @@ def _build_instruction_text(
     return instruction_text + output_appendix
 
 
+def _write_content_to_container(
+    container_id: str, content: str, dest_path: str, suffix: str = ""
+) -> None:
+    """Write `content` to a local tempfile and docker-cp it into the container.
+
+    Shared by every "write a small file into the container" call site
+    (instruction.md, per-checkpoint .meta) so they can't drift out of sync on
+    the write/copy/cleanup sequence.
+    """
+    with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
+        f.write(content)
+        tmp_path = f.name
+    try:
+        _docker_cp(tmp_path, f"{container_id}:{dest_path}")
+    finally:
+        os.unlink(tmp_path)
+
+
 def _checkpoint_verifier_name(verifier_path: str | Path) -> str:
     """Basename of a checkpoint verifier path with the ``check_`` prefix stripped.
 
@@ -445,15 +463,9 @@ def _setup_container(
     # Copy instruction.md with output format appendix and optional MCP preamble
     combined = _build_instruction_text(task_dir, mode, repos=task_data.get("repos", []))
     if combined is not None:
-        import tempfile
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
-            f.write(combined)
-            tmp_path = f.name
-        try:
-            _docker_cp(tmp_path, f"{container_id}:/workspace/instruction.md")
-        finally:
-            os.unlink(tmp_path)
+        _write_content_to_container(
+            container_id, combined, "/workspace/instruction.md", suffix=".md"
+        )
         logger.info(
             "Copied instruction.md (mode=%s) with output appendix into container",
             mode,
@@ -473,7 +485,8 @@ def _setup_container(
 
     checks_dir = task_dir / "checks"
     if checks_dir.is_dir():
-        for check_script in sorted(checks_dir.glob("*.sh")):
+        check_scripts = sorted(checks_dir.glob("*.sh"))
+        for check_script in check_scripts:
             # Rename to just <name>.sh for test_runner.sh compatibility
             name = _checkpoint_verifier_name(check_script)
             dest = f"{container_id}:/workspace/.verifiers/{name}.sh"
@@ -484,21 +497,15 @@ def _setup_container(
             meta = checkpoint_meta.get(name)
             if meta is not None:
                 weight, timeout = meta
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".meta", delete=False
-                ) as f:
-                    f.write(f"weight={weight}\ntimeout={timeout}\n")
-                    meta_tmp_path = f.name
-                try:
-                    _docker_cp(
-                        meta_tmp_path,
-                        f"{container_id}:/workspace/.verifiers/{name}.meta",
-                    )
-                finally:
-                    os.unlink(meta_tmp_path)
+                _write_content_to_container(
+                    container_id,
+                    f"weight={weight}\ntimeout={timeout}\n",
+                    f"/workspace/.verifiers/{name}.meta",
+                    suffix=".meta",
+                )
         logger.info(
             "Copied %d check scripts into .verifiers/ (%d with weight metadata)",
-            len(list(checks_dir.glob("*.sh"))),
+            len(check_scripts),
             len(checkpoint_meta),
         )
     else:
