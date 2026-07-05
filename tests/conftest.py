@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,17 @@ def pytest_configure(config):
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 REPO_ROOT = Path(__file__).parent.parent
+LIB_DIR = REPO_ROOT / "lib"
+
+# Put this worktree's lib/ ahead of any globally installed eb_verify. A stale
+# editable install (pip install -e lib run from a different clone) hardcodes
+# an absolute path in its finder and silently shadows the local package,
+# breaking collection for whichever test module happens to import eb_verify
+# before another module's ad hoc sys.path.insert takes effect. Setting this
+# here, in conftest, runs before any test module in this directory is
+# collected, independent of file ordering or the global install's state.
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
 
 
 @pytest.fixture
