@@ -16,8 +16,6 @@ Your task:
 4. Identify any configuration drift where one component uses javax
    while another expects jakarta, causing ClassNotFoundException
 
-Write your analysis to /workspace/analysis/IMPACT_REPORT.md
-
 ## Expected Output
 
 Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.
