@@ -371,16 +371,19 @@ def _build_instruction_text(
         "\n\n---\n\n## Output Requirements\n\n"
         "Write your findings as a JSON file to `/workspace/agent_output/answer.json`.\n"
         "Create the directory first: `mkdir -p /workspace/agent_output`\n\n"
+        "All file paths MUST be absolute and anchored at `/workspace/<repo>/...` "
+        "(the repo roots are the directories under `/workspace`). "
+        "Repo-relative paths will not match the oracle and score 0.\n\n"
         "Include all relevant fields for this task type. Example structure:\n"
         "```json\n"
         "{\n"
-        '  "source_files": [{"path": "relative/path/to/file"}],\n'
+        '  "source_files": [{"path": "/workspace/<repo>/path/to/file"}],\n'
         '  "error_chain": ["Step 1", "Step 2"],\n'
         '  "trigger_conditions": ["Condition 1"],\n'
-        '  "code_paths": [{"path": "relative/path"}],\n'
+        '  "code_paths": [{"path": "/workspace/<repo>/path/to/file"}],\n'
         '  "ownership": "subsystem description",\n'
         '  "severity": {"level": "high", "rationale": "..."},\n'
-        '  "related_issues": ["path/to/related/file.go", "description of related component"]\n'
+        '  "related_issues": ["/workspace/<repo>/path/to/related/file.go", "description of related component"]\n'
         "}\n```\n"
         "Include only the fields relevant to this task. "
         "Your answer is evaluated against a closed-world oracle — completeness matters.\n"
@@ -390,6 +393,29 @@ def _build_instruction_text(
         preamble = "\n\n".join(preamble_parts)
         return preamble + "\n\n---\n\n" + instruction_text + output_appendix
     return instruction_text + output_appendix
+
+
+def _verifier_meta_by_name(checkpoints: list[dict]) -> dict[str, tuple[float, int]]:
+    """Map .verifiers/<name> -> (weight, timeout) from task toml checkpoints.
+
+    The key is derived the same way _setup_container names the copied verifier:
+    the basename of the checkpoint's ``verifier`` path with the ``check_``
+    prefix stripped (e.g. ``checks/check_api_migration.sh`` -> ``api_migration``).
+    Weights come straight from the toml (schema guarantees they sum to 1.0);
+    timeout falls back to test_runner.sh's 120s default when unspecified.
+    """
+    meta: dict[str, tuple[float, int]] = {}
+    for cp in checkpoints:
+        verifier = cp.get("verifier")
+        if not verifier:
+            continue
+        name = Path(verifier).stem
+        if name.startswith("check_"):
+            name = name[len("check_") :]
+        weight = float(cp.get("weight", 1.0))
+        timeout = int(cp.get("timeout_seconds", 120))
+        meta[name] = (weight, timeout)
+    return meta
 
 
 def _setup_container(
@@ -427,6 +453,13 @@ def _setup_container(
     # Create .verifiers directory and copy check scripts
     _docker_exec(container_id, ["mkdir", "-p", "/workspace/.verifiers"])
 
+    # Map checkpoint verifier name -> (weight, timeout) from the task toml so
+    # test_runner.sh can read real weights from .verifiers/<name>.meta. Keyed by
+    # the same name the .sh file is copied under (verifier basename, "check_"
+    # prefix stripped). Without this, every checkpoint defaults to weight 1.0
+    # and task_score becomes a 0-N sum instead of the toml-weighted 0-1.
+    checkpoint_meta = _verifier_meta_by_name(task_data.get("checkpoints", []))
+
     checks_dir = task_dir / "checks"
     if checks_dir.is_dir():
         for check_script in sorted(checks_dir.glob("*.sh")):
@@ -440,9 +473,25 @@ def _setup_container(
             _docker_exec(
                 container_id, ["chmod", "+x", f"/workspace/.verifiers/{name}.sh"]
             )
+            meta = checkpoint_meta.get(name)
+            if meta is not None:
+                # weight/timeout are validated numeric (float/int) in
+                # _verifier_meta_by_name, so inlining them into the printf
+                # format carries no shell-injection risk.
+                weight, timeout = meta
+                _docker_exec(
+                    container_id,
+                    [
+                        "bash",
+                        "-c",
+                        f"printf 'weight={weight}\\ntimeout={timeout}\\n' "
+                        f"> /workspace/.verifiers/{name}.meta",
+                    ],
+                )
         logger.info(
-            "Copied %d check scripts into .verifiers/",
+            "Copied %d check scripts into .verifiers/ (%d with weight metadata)",
             len(list(checks_dir.glob("*.sh"))),
+            len(checkpoint_meta),
         )
     else:
         logger.warning("No checks/ directory found in %s", task_dir)

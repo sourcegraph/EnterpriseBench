@@ -171,6 +171,12 @@ for verifier in "$VERIFIER_DIR"/*.sh; do
     # Extract passed from verifier JSON
     checkpoint_passed=$(printf '%s' "$VERIFIER_JSON" | grep -oP '"passed"\s*:\s*\K(true|false)' || echo "false")
 
+    # Extract the canonical "detail" string (verifier_output.schema.json) as a
+    # JSON string token, including escapes, so it can be embedded verbatim.
+    # Preserved per-checkpoint in output.json for debugging; empty when absent.
+    checkpoint_detail=$(printf '%s' "$VERIFIER_JSON" | grep -oP '"detail"\s*:\s*\K"(\\.|[^"\\])*"' | head -1)
+    [ -n "$checkpoint_detail" ] || checkpoint_detail='""'
+
     if [ "$checkpoint_passed" = "true" ]; then
         PASSED=$((PASSED + 1))
         echo "  PASS (score=$checkpoint_score)" >&2
@@ -181,9 +187,9 @@ for verifier in "$VERIFIER_DIR"/*.sh; do
     # Accumulate weighted score using awk for float math
     WEIGHTED_SCORE=$(awk "BEGIN { printf \"%.4f\", $WEIGHTED_SCORE + ($checkpoint_score * $weight) }")
 
-    # Build checkpoint result JSON entry
-    entry=$(printf '{"name": "%s", "weight": %s, "score": %s, "passed": %s, "duration_ms": %d, "exit_code": %d}' \
-        "$name" "$weight" "$checkpoint_score" "$checkpoint_passed" "$VERIFIER_DURATION_MS" "$VERIFIER_EXIT")
+    # Build checkpoint result JSON entry (detail is already a quoted JSON string)
+    entry=$(printf '{"name": "%s", "weight": %s, "score": %s, "passed": %s, "detail": %s, "duration_ms": %d, "exit_code": %d}' \
+        "$name" "$weight" "$checkpoint_score" "$checkpoint_passed" "$checkpoint_detail" "$VERIFIER_DURATION_MS" "$VERIFIER_EXIT")
 
     if [ -z "$CHECKPOINT_RESULTS" ]; then
         CHECKPOINT_RESULTS="$entry"
@@ -202,28 +208,27 @@ if [ "$PASSED" -eq "$TOTAL" ] && [ "$TOTAL" -gt 0 ]; then
     EXIT_CODE=0
 fi
 
-# Emit structured JSON to stdout
-cat <<RESULT_JSON
-{
-  "task_score": $WEIGHTED_SCORE,
-  "all_passed": $ALL_PASSED,
-  "checkpoints_passed": $PASSED,
-  "checkpoints_total": $TOTAL,
-  "repos": [$(echo "$REPOS" | awk '{printf "%s\"%s\"", (NR>1?", ":""), $0}')],
-  "checkpoints": [$CHECKPOINT_RESULTS]
-}
-RESULT_JSON
+# Render the repos array as a JSON list. Must expand the whole array —
+# `echo "$REPOS"` would emit only ${REPOS[0]} and silently drop every other
+# repo from the output. The ${arr[@]+...} guard keeps this safe under set -u
+# when no repos were discovered.
+REPOS_JSON=$(printf '%s\n' ${REPOS[@]+"${REPOS[@]}"} \
+    | awk 'NF{printf "%s\"%s\"", (c++?", ":""), $0}')
 
-# Also save results to file for downstream consumption
-cat <<RESULT_JSON > "$RESULTS_FILE"
+# Build the result JSON once, then emit to both stdout and the results file.
+RESULT_JSON=$(cat <<RESULT_JSON
 {
   "task_score": $WEIGHTED_SCORE,
   "all_passed": $ALL_PASSED,
   "checkpoints_passed": $PASSED,
   "checkpoints_total": $TOTAL,
-  "repos": [$(echo "$REPOS" | awk '{printf "%s\"%s\"", (NR>1?", ":""), $0}')],
+  "repos": [$REPOS_JSON],
   "checkpoints": [$CHECKPOINT_RESULTS]
 }
 RESULT_JSON
+)
+
+printf '%s\n' "$RESULT_JSON"
+printf '%s\n' "$RESULT_JSON" > "$RESULTS_FILE"
 
 exit $EXIT_CODE

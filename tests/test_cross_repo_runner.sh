@@ -106,6 +106,20 @@ else
     echo "  FAIL: Weighted score incorrect"
 fi
 
+# Validate per-checkpoint detail strings are preserved in output.json
+if echo "$output" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+by_name = {c['name']: c for c in d['checkpoints']}
+assert 'detail' in by_name['01-alpha-exists'], 'detail field missing'
+assert by_name['01-alpha-exists']['detail'] == 'repo-alpha verified', by_name['01-alpha-exists']['detail']
+assert by_name['02-cross-repo-link']['detail'] == 'go.mod not found in repo-beta', by_name['02-cross-repo-link']['detail']
+" 2>/dev/null; then
+    echo "  PASS: Per-checkpoint detail strings preserved"
+else
+    echo "  FAIL: Per-checkpoint detail strings missing or wrong"
+fi
+
 # Validate repos listed
 if echo "$output" | python3 -c "import sys, json; d=json.load(sys.stdin); assert 'repo-alpha' in d['repos']; assert 'repo-beta' in d['repos']" 2>/dev/null; then
     echo "  PASS: Both repos listed in output"

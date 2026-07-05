@@ -225,3 +225,111 @@ class TestSetupContainerPassesMode:
 
             _setup_container("fake-container", task_dir, {})
             mock_build.assert_called_once_with(task_dir, "baseline", repos=[])
+
+
+# ---------------------------------------------------------------------------
+# Output appendix anchors answer paths to /workspace (Fix 3)
+# ---------------------------------------------------------------------------
+
+
+class TestOutputAppendixPathAnchoring:
+    """The output appendix must instruct agents to write /workspace-absolute
+    paths; repo-relative example paths let agents emit paths that miss the
+    oracle's /workspace-anchored expected_files."""
+
+    def test_appendix_example_paths_are_workspace_absolute(
+        self, task_dir: Path
+    ) -> None:
+        result = _build_instruction_text(task_dir, "baseline")
+        assert result is not None
+        # Every example "path" value in the JSON skeleton is anchored at /workspace.
+        assert '"path": "/workspace/' in result
+        # No bare repo-relative example path remains.
+        assert '"path": "relative/' not in result
+        assert '"relative/path/to/file"' not in result
+
+    def test_appendix_states_paths_must_be_absolute(self, task_dir: Path) -> None:
+        result = _build_instruction_text(task_dir, "baseline")
+        assert result is not None
+        lowered = result.lower()
+        assert "/workspace/" in lowered
+        assert "absolute" in lowered
+
+
+# ---------------------------------------------------------------------------
+# _setup_container writes per-checkpoint .verifiers/<name>.meta (Fix 1)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def task_dir_with_checks(task_dir: Path) -> Path:
+    """Task directory with a checks/ dir holding two check scripts."""
+    checks = task_dir / "checks"
+    checks.mkdir()
+    (checks / "check_api_migration.sh").write_text("#!/usr/bin/env bash\nexit 0\n")
+    (checks / "check_tests.sh").write_text("#!/usr/bin/env bash\nexit 0\n")
+    return task_dir
+
+
+def _meta_writes(exec_calls: list) -> dict[str, str]:
+    """Extract {meta_filename: command_string} for every .meta-writing exec call."""
+    writes: dict[str, str] = {}
+    for call in exec_calls:
+        args = call.args[1] if len(call.args) > 1 else call.args[0]
+        cmd = " ".join(args) if isinstance(args, list) else str(args)
+        if ".verifiers/" in cmd and ".meta" in cmd:
+            for token in cmd.split():
+                if token.endswith(".meta"):
+                    writes[token.rsplit("/", 1)[-1]] = cmd
+    return writes
+
+
+class TestSetupContainerWritesVerifierMeta:
+    """_setup_container must emit .verifiers/<name>.meta with the toml weight
+    and timeout so test_runner.sh applies real weights instead of defaulting
+    every checkpoint to 1.0 (which turns task_score into a 0-N sum)."""
+
+    def test_meta_written_with_toml_weight_and_timeout(
+        self, task_dir_with_checks: Path
+    ) -> None:
+        task_data = {
+            "repos": [],
+            "checkpoints": [
+                {
+                    "name": "update_apis",
+                    "weight": 0.65,
+                    "verifier": "checks/check_api_migration.sh",
+                    "timeout_seconds": 90,
+                },
+                {
+                    "name": "tests_pass",
+                    "weight": 0.35,
+                    "verifier": "checks/check_tests.sh",
+                },
+            ],
+        }
+        with patch("run_task._docker_exec") as mock_exec, patch("run_task._docker_cp"):
+            from run_task import _setup_container
+
+            _setup_container("fake-container", task_dir_with_checks, task_data)
+
+        writes = _meta_writes(mock_exec.call_args_list)
+        # Meta filename matches the .verifiers/<name>.sh naming (check_ stripped).
+        assert "api_migration.meta" in writes
+        assert "tests.meta" in writes
+        assert "weight=0.65" in writes["api_migration.meta"]
+        assert "timeout=90" in writes["api_migration.meta"]
+        # Missing timeout_seconds falls back to the runner default (120).
+        assert "weight=0.35" in writes["tests.meta"]
+        assert "timeout=120" in writes["tests.meta"]
+
+    def test_no_meta_written_without_checkpoints(
+        self, task_dir_with_checks: Path
+    ) -> None:
+        with patch("run_task._docker_exec") as mock_exec, patch("run_task._docker_cp"):
+            from run_task import _setup_container
+
+            _setup_container("fake-container", task_dir_with_checks, {"repos": []})
+
+        # No checkpoint metadata → no .meta files (runner falls back to 1.0).
+        assert _meta_writes(mock_exec.call_args_list) == {}
