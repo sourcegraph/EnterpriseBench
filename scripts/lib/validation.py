@@ -14,8 +14,8 @@ def validate_repo_entry(repo: dict) -> None:
     rev = repo.get("rev", "")
     path = repo.get("path", "")
 
-    if not re.match(r'^https?://[a-zA-Z0-9._/-]+$', url):
-        raise ValueError(f"Invalid repo URL (rejected due to unsafe characters): {url!r}")
+    if not re.match(r'^https?://[a-zA-Z0-9._/-]+$', url) or '..' in url:
+        raise ValueError(f"Invalid repo URL (rejected due to unsafe characters or path traversal): {url!r}")
 
     if not re.match(r'^[a-zA-Z0-9._/-]+$', rev) or '..' in rev:
         raise ValueError(f"Invalid repo rev (rejected due to unsafe characters or path traversal): {rev!r}")
