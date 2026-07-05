@@ -114,7 +114,6 @@ class LLMPolarityChecker:
     """
 
     def __init__(self, model: str = "claude-haiku-4-5-20251001", temperature: float = 0.0):
-        self.model = model
         self._backend = create_backend(model=model, temperature=temperature)
 
     def check(self, gt_statement: str, candidate_statement: str) -> PolarityVerdict:
