@@ -23,8 +23,6 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
-
 from eb_verify.task_parser import parse_task, TaskDefinition
 from eb_verify.runner import CheckpointRunner
 from eb_verify.scoring import VerificationResult

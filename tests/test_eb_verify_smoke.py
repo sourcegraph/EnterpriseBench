@@ -14,11 +14,6 @@ from pathlib import Path
 
 import pytest
 
-# Ensure lib/ is importable
-import sys
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
-
 from eb_verify.task_parser import parse_task, TaskDefinition, Checkpoint
 from eb_verify.runner import CheckpointRunner
 from eb_verify.scoring import (

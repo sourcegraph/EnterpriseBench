@@ -3,13 +3,7 @@ a stale global editable install, regardless of test collection order."""
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
-
-
-def test_repo_lib_on_syspath() -> None:
-    repo_root = Path(__file__).parent.parent
-    assert str(repo_root / "lib") in sys.path
 
 
 def test_eb_verify_resolves_to_local_lib() -> None:

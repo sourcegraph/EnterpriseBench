@@ -25,9 +25,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Ensure lib/ is importable (mirrors tests/test_eb_verify_smoke.py).
-sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
-
 from eb_verify.judge import CheckpointJudgeInput, CheckpointJudgeResult, LLMJudge
 from eb_verify.judge.backends import (
     AnthropicBackend,
