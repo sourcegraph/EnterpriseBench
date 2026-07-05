@@ -22,6 +22,12 @@ class ConfigValidator:
         "**/*.hcl",
     ]
 
+    # Same extensions, non-recursive: workspace root may have full OSS repos
+    # cloned as direct children (see docs/TASK_AUTHORING_GUIDE.md), so that
+    # tier only scans its top level; output/ and artifacts/ are
+    # agent-produced and safe to scan recursively via CONFIG_GLOBS.
+    TOP_LEVEL_GLOBS = [pattern.removeprefix("**/") for pattern in CONFIG_GLOBS]
+
     def validate(self, workspace: Path) -> ValidationResult:
         """
         Find config files that appear to be agent-produced artifacts and validate syntax.
@@ -40,16 +46,10 @@ class ConfigValidator:
         for out_dir in output_dirs:
             if not out_dir.is_dir():
                 continue
-            # Workspace root may have full OSS repos cloned as direct
-            # children (see docs/TASK_AUTHORING_GUIDE.md), so only scan
-            # its top level; output/ and artifacts/ are agent-produced
-            # and safe to scan recursively.
             is_workspace_root = out_dir == workspace
-            for pattern in self.CONFIG_GLOBS:
-                glob_pattern = (
-                    pattern.removeprefix("**/") if is_workspace_root else pattern
-                )
-                for config_file in out_dir.glob(glob_pattern):
+            patterns = self.TOP_LEVEL_GLOBS if is_workspace_root else self.CONFIG_GLOBS
+            for pattern in patterns:
+                for config_file in out_dir.glob(pattern):
                     # Skip deeply nested vendor/node_modules
                     parts = config_file.parts
                     if any(p in ("vendor", "node_modules", ".git") for p in parts):
