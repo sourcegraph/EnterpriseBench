@@ -12,76 +12,41 @@ sys.path.insert(0, str(REPO_ROOT / "scripts" / "infra"))
 
 from generate_mcp_instructions import generate_instruction_mcp  # noqa: E402
 
-VALID_TASK_DATA = {
-    "task": {"id": "test-task-001", "description": "Example task"},
-    "metadata": {},
-    "repos": [
-        {
-            "url": "https://github.com/psf/requests",
-            "rev": "abc12345",
-            "path": "requests",
-            "role": "primary",
-        }
-    ],
-}
+def _repo(url: str = "https://github.com/psf/requests", rev: str = "abc12345", path: str = "requests", role: str = "primary") -> dict:
+    return {"url": url, "rev": rev, "path": path, "role": role}
 
 
-def _task_with_repo(repo: dict) -> dict:
+def _task_with_repos(repos: list[dict], task_id: str = "test-task") -> dict:
     return {
-        "task": {"id": "test-task-002", "description": "Example task"},
+        "task": {"id": task_id, "description": "Example task"},
         "metadata": {},
-        "repos": [repo],
+        "repos": repos,
     }
 
 
 def test_generate_instruction_mcp_valid_repo() -> None:
-    content = generate_instruction_mcp(VALID_TASK_DATA)
+    content = generate_instruction_mcp(_task_with_repos([_repo()]))
     assert "requests" in content
 
 
 def test_generate_instruction_mcp_rejects_path_traversal_url() -> None:
-    repo = {
-        "url": "https://github.com/org/../../etc/passwd",
-        "rev": "abc12345",
-        "path": "repo",
-        "role": "primary",
-    }
+    repo = _repo(url="https://github.com/org/../../etc/passwd")
     with pytest.raises(ValueError, match="Invalid repo URL"):
-        generate_instruction_mcp(_task_with_repo(repo))
+        generate_instruction_mcp(_task_with_repos([repo]))
 
 
 def test_generate_instruction_mcp_rejects_path_traversal_rev() -> None:
-    repo = {
-        "url": "https://github.com/org/repo",
-        "rev": "../../etc/passwd",
-        "path": "repo",
-        "role": "primary",
-    }
+    repo = _repo(rev="../../etc/passwd")
     with pytest.raises(ValueError, match="Invalid repo rev"):
-        generate_instruction_mcp(_task_with_repo(repo))
+        generate_instruction_mcp(_task_with_repos([repo]))
 
 
 def test_generate_instruction_mcp_rejects_path_traversal_in_multi_repo_pass() -> None:
     """A multi-repo task (>1 repos, triggers the OR-pattern section) still
     validates every repo entry, not just the first."""
     repos = [
-        {
-            "url": "https://github.com/psf/requests",
-            "rev": "abc12345",
-            "path": "requests",
-            "role": "primary",
-        },
-        {
-            "url": "https://github.com/org/../../etc/passwd",
-            "rev": "abc12345",
-            "path": "repo2",
-            "role": "secondary",
-        },
+        _repo(),
+        _repo(url="https://github.com/org/../../etc/passwd", path="repo2", role="secondary"),
     ]
-    task_data = {
-        "task": {"id": "test-task-003", "description": "Multi-repo task"},
-        "metadata": {},
-        "repos": repos,
-    }
     with pytest.raises(ValueError, match="Invalid repo URL"):
-        generate_instruction_mcp(task_data)
+        generate_instruction_mcp(_task_with_repos(repos))
