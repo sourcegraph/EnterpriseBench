@@ -271,21 +271,25 @@ def task_dir_with_checks(task_dir: Path) -> Path:
     return task_dir
 
 
-def _meta_writes(exec_calls: list) -> dict[str, str]:
-    """Extract {meta_filename: command_string} for every .meta-writing exec call."""
+def _docker_cp_meta_capture():
+    """A _docker_cp side_effect that captures .meta content by filename.
+
+    .meta files are written via a tempfile + _docker_cp (same pattern as
+    instruction.md), and the tempfile is unlinked immediately after the cp
+    call returns — so content must be read from the source path here, during
+    the call, rather than from call_args_list afterward.
+    """
     writes: dict[str, str] = {}
-    for call in exec_calls:
-        args = call.args[1] if len(call.args) > 1 else call.args[0]
-        cmd = " ".join(args) if isinstance(args, list) else str(args)
-        if ".verifiers/" in cmd and ".meta" in cmd:
-            for token in cmd.split():
-                if token.endswith(".meta"):
-                    writes[token.rsplit("/", 1)[-1]] = cmd
-    return writes
+
+    def _cp(src: str, dest: str) -> None:
+        if dest.endswith(".meta"):
+            writes[dest.rsplit("/", 1)[-1]] = Path(src).read_text()
+
+    return _cp, writes
 
 
 class TestSetupContainerWritesVerifierMeta:
-    """_setup_container must emit .verifiers/<name>.meta with the toml weight
+    """_setup_container must write .verifiers/<name>.meta with the toml weight
     and timeout so test_runner.sh applies real weights instead of defaulting
     every checkpoint to 1.0 (which turns task_score into a 0-N sum)."""
 
@@ -308,12 +312,14 @@ class TestSetupContainerWritesVerifierMeta:
                 },
             ],
         }
-        with patch("run_task._docker_exec") as mock_exec, patch("run_task._docker_cp"):
+        cp_side_effect, writes = _docker_cp_meta_capture()
+        with patch("run_task._docker_exec"), patch(
+            "run_task._docker_cp", side_effect=cp_side_effect
+        ):
             from run_task import _setup_container
 
             _setup_container("fake-container", task_dir_with_checks, task_data)
 
-        writes = _meta_writes(mock_exec.call_args_list)
         # Meta filename matches the .verifiers/<name>.sh naming (check_ stripped).
         assert "api_migration.meta" in writes
         assert "tests.meta" in writes
@@ -326,10 +332,13 @@ class TestSetupContainerWritesVerifierMeta:
     def test_no_meta_written_without_checkpoints(
         self, task_dir_with_checks: Path
     ) -> None:
-        with patch("run_task._docker_exec") as mock_exec, patch("run_task._docker_cp"):
+        cp_side_effect, writes = _docker_cp_meta_capture()
+        with patch("run_task._docker_exec"), patch(
+            "run_task._docker_cp", side_effect=cp_side_effect
+        ):
             from run_task import _setup_container
 
             _setup_container("fake-container", task_dir_with_checks, {"repos": []})
 
         # No checkpoint metadata → no .meta files (runner falls back to 1.0).
-        assert _meta_writes(mock_exec.call_args_list) == {}
+        assert writes == {}

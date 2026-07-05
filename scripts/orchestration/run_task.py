@@ -395,23 +395,34 @@ def _build_instruction_text(
     return instruction_text + output_appendix
 
 
+def _checkpoint_verifier_name(verifier_path: str | Path) -> str:
+    """Basename of a checkpoint verifier path with the ``check_`` prefix stripped.
+
+    e.g. ``checks/check_api_migration.sh`` -> ``api_migration``. Shared by
+    _verifier_meta_by_name and _setup_container's check-script copy loop so
+    both always derive the same .verifiers/<name> key from a verifier path.
+    """
+    name = Path(verifier_path).stem
+    if name.startswith("check_"):
+        name = name[len("check_") :]
+    return name
+
+
 def _verifier_meta_by_name(checkpoints: list[dict]) -> dict[str, tuple[float, int]]:
     """Map .verifiers/<name> -> (weight, timeout) from task toml checkpoints.
 
-    The key is derived the same way _setup_container names the copied verifier:
-    the basename of the checkpoint's ``verifier`` path with the ``check_``
-    prefix stripped (e.g. ``checks/check_api_migration.sh`` -> ``api_migration``).
-    Weights come straight from the toml (schema guarantees they sum to 1.0);
-    timeout falls back to test_runner.sh's 120s default when unspecified.
+    The key is derived the same way _setup_container names the copied verifier
+    (see _checkpoint_verifier_name). Weights come straight from the toml
+    (schema bounds each to [0, 1]; a separate offline audit enforces they sum
+    to 1.0); timeout falls back to test_runner.sh's 120s default when
+    unspecified.
     """
     meta: dict[str, tuple[float, int]] = {}
     for cp in checkpoints:
         verifier = cp.get("verifier")
         if not verifier:
             continue
-        name = Path(verifier).stem
-        if name.startswith("check_"):
-            name = name[len("check_") :]
+        name = _checkpoint_verifier_name(verifier)
         weight = float(cp.get("weight", 1.0))
         timeout = int(cp.get("timeout_seconds", 120))
         meta[name] = (weight, timeout)
@@ -463,11 +474,8 @@ def _setup_container(
     checks_dir = task_dir / "checks"
     if checks_dir.is_dir():
         for check_script in sorted(checks_dir.glob("*.sh")):
-            # Strip the "check_" prefix and ".sh" suffix to get checkpoint name,
-            # then rename to just <name>.sh for test_runner.sh compatibility
-            name = check_script.stem
-            if name.startswith("check_"):
-                name = name[len("check_") :]
+            # Rename to just <name>.sh for test_runner.sh compatibility
+            name = _checkpoint_verifier_name(check_script)
             dest = f"{container_id}:/workspace/.verifiers/{name}.sh"
             _docker_cp(str(check_script), dest)
             _docker_exec(
@@ -475,19 +483,19 @@ def _setup_container(
             )
             meta = checkpoint_meta.get(name)
             if meta is not None:
-                # weight/timeout are validated numeric (float/int) in
-                # _verifier_meta_by_name, so inlining them into the printf
-                # format carries no shell-injection risk.
                 weight, timeout = meta
-                _docker_exec(
-                    container_id,
-                    [
-                        "bash",
-                        "-c",
-                        f"printf 'weight={weight}\\ntimeout={timeout}\\n' "
-                        f"> /workspace/.verifiers/{name}.meta",
-                    ],
-                )
+                with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".meta", delete=False
+                ) as f:
+                    f.write(f"weight={weight}\ntimeout={timeout}\n")
+                    meta_tmp_path = f.name
+                try:
+                    _docker_cp(
+                        meta_tmp_path,
+                        f"{container_id}:/workspace/.verifiers/{name}.meta",
+                    )
+                finally:
+                    os.unlink(meta_tmp_path)
         logger.info(
             "Copied %d check scripts into .verifiers/ (%d with weight metadata)",
             len(list(checks_dir.glob("*.sh"))),
