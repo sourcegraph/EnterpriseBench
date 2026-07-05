@@ -119,7 +119,15 @@ class Fact:
 
 
 class Embedder(Protocol):
-    """Embeds texts into L2-normalized row vectors, shape (n, d)."""
+    """Embeds texts into L2-normalized row vectors, shape (n, d).
+
+    ``default_threshold`` is the embedder's own calibrated match threshold
+    (see fact_coverage_calibration.py) — ``coverage``/``precision`` use it
+    when no explicit ``threshold`` is passed, so the pairing can't drift out
+    of sync when a caller swaps embedders.
+    """
+
+    default_threshold: float
 
     def embed(self, texts: list[str]) -> np.ndarray: ...
 
@@ -131,6 +139,8 @@ class TfidfCharNgramEmbedder:
     GT and candidate statements must be embedded in a single call to share a
     vector space (``coverage`` does this).
     """
+
+    default_threshold: float = DEFAULT_THRESHOLD
 
     def __init__(self, ngram_range: tuple[int, int] = (3, 5)) -> None:
         self.ngram_range = ngram_range
@@ -164,6 +174,7 @@ class SentenceTransformerEmbedder:
     # Pinned Hugging Face repo revision (commit SHA), not a mutable tag —
     # see module docstring for why this module refuses to float on "main".
     DEFAULT_MODEL_REVISION = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+    default_threshold: float = SENTENCE_TRANSFORMER_THRESHOLD
 
     def __init__(
         self,
@@ -245,15 +256,20 @@ def coverage(
     gt_facts: Sequence[Fact],
     candidate_facts: Sequence[Fact],
     embedder: Embedder | None = None,
-    threshold: float = DEFAULT_THRESHOLD,
+    threshold: float | None = None,
 ) -> CoverageResult:
     """Recall of GT facts by the candidate set.
 
     A GT fact is *recovered* if its max cosine similarity against the
     candidate statements is >= ``threshold``. Empty GT is vacuous success
     (recall 1.0); empty candidate with non-empty GT is total miss (0.0, with
-    per-fact provenance recording no match).
+    per-fact provenance recording no match). ``threshold`` defaults to the
+    resolved embedder's own ``default_threshold`` so it can't be paired with
+    the wrong embedder's calibration.
     """
+    embedder = embedder or TfidfCharNgramEmbedder()
+    if threshold is None:
+        threshold = embedder.default_threshold
     _validate_threshold(threshold)
     _validate_facts(gt_facts, "gt_facts")
     _validate_facts(candidate_facts, "candidate_facts")
@@ -267,7 +283,7 @@ def coverage(
         )
         return CoverageResult(recall=0.0, threshold=threshold, matches=miss_matches)
 
-    emb = (embedder or TfidfCharNgramEmbedder()).embed(
+    emb = embedder.embed(
         [f.statement for f in gt_facts] + [f.statement for f in candidate_facts]
     )
     n_gt = len(gt_facts)
@@ -298,7 +314,7 @@ def precision(
     candidate_facts: Sequence[Fact],
     gt_facts: Sequence[Fact],
     embedder: Embedder | None = None,
-    threshold: float = DEFAULT_THRESHOLD,
+    threshold: float | None = None,
 ) -> CoverageResult:
     """Fraction of candidate facts grounded in GT (coverage in reverse).
 

@@ -198,50 +198,49 @@ def test_sentence_transformer_embedder_missing_dependency_raises_clear_error(mon
         SentenceTransformerEmbedder()
 
 
+@pytest.fixture(scope="session")
+def real_embedder() -> SentenceTransformerEmbedder:
+    """Loads the pinned model once; @pytest.mark.network tests share it."""
+    return SentenceTransformerEmbedder()
+
+
 @pytest.mark.network
-def test_sentence_transformer_embedder_rows_are_l2_normalized():
+def test_sentence_transformer_embedder_rows_are_l2_normalized(real_embedder):
     import numpy as np
 
-    emb = SentenceTransformerEmbedder().embed([f.statement for f in GT])
+    emb = real_embedder.embed([f.statement for f in GT])
     norms = np.linalg.norm(emb, axis=1)
     assert np.allclose(norms, 1.0, atol=1e-5)
 
 
 @pytest.mark.network
-def test_sentence_transformer_embedder_determinism_two_runs_identical():
-    embedder = SentenceTransformerEmbedder()
+def test_sentence_transformer_embedder_determinism_two_runs_identical(real_embedder):
     texts = [f.statement for f in GT]
-    a = embedder.embed(texts)
-    b = embedder.embed(texts)
+    a = real_embedder.embed(texts)
+    b = real_embedder.embed(texts)
     assert (a == b).all()
 
 
 @pytest.mark.network
-def test_sentence_transformer_embedder_empty_texts():
-    assert SentenceTransformerEmbedder().embed([]).shape == (0, 0)
+def test_sentence_transformer_embedder_empty_texts(real_embedder):
+    assert real_embedder.embed([]).shape == (0, 0)
 
 
 # ---------------------------------------------------------------------------
 # Calibration regression — locks in the experiment result
 # ---------------------------------------------------------------------------
 
-def test_calibration_best_f1_and_default_threshold():
-    from eb_verify.fact_coverage import DEFAULT_THRESHOLD
-    from eb_verify.fact_coverage_calibration import sweep
+@pytest.mark.parametrize(
+    "embedder_name",
+    ["tfidf", pytest.param("sentence-transformer", marks=pytest.mark.network)],
+)
+def test_calibration_best_f1_and_threshold(embedder_name):
+    from eb_verify.fact_coverage_calibration import EMBEDDER_FACTORIES, sweep
 
-    _, best = sweep()
-    assert best["f1"] >= 0.75, f"TF-IDF default fell below viability bar: {best}"
-    assert best["threshold"] == DEFAULT_THRESHOLD
-
-
-@pytest.mark.network
-def test_calibration_sentence_transformer_best_f1_and_threshold():
-    from eb_verify.fact_coverage import SENTENCE_TRANSFORMER_THRESHOLD
-    from eb_verify.fact_coverage_calibration import sweep
-
-    _, best = sweep(embedder=SentenceTransformerEmbedder())
-    assert best["f1"] >= 0.75, f"sentence-transformer fell below viability bar: {best}"
-    assert best["threshold"] == SENTENCE_TRANSFORMER_THRESHOLD
+    embedder = EMBEDDER_FACTORIES[embedder_name]()
+    _, best = sweep(embedder=embedder)
+    assert best["f1"] >= 0.75, f"{embedder_name} fell below viability bar: {best}"
+    assert best["threshold"] == embedder.default_threshold
 
 
 @pytest.mark.parametrize(
@@ -267,9 +266,9 @@ def test_adversarial_order_negation_pairs_are_not_solved_by_either_embedder(
     )
 
     embedder = EMBEDDER_FACTORIES[embedder_name]()
-    _, best = sweep(embedder=embedder)
-    threshold = best["threshold"]
     sims = pair_similarities(embedder=embedder)
+    _, best = sweep(sims=sims)
+    threshold = best["threshold"]
     adversarial = [
         (p, s) for p, s in sims if p.kind in ("negation", "wrong-relation")
     ]

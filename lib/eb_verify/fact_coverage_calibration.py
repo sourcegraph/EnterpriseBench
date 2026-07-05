@@ -28,7 +28,11 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from eb_verify.fact_coverage import Embedder, TfidfCharNgramEmbedder
+from eb_verify.fact_coverage import (
+    Embedder,
+    SentenceTransformerEmbedder,
+    TfidfCharNgramEmbedder,
+)
 
 
 @dataclass(frozen=True)
@@ -164,18 +168,9 @@ NEAR_MISS_PAIRS = [
 
 ALL_PAIRS: list[LabeledPair] = PARAPHRASE_PAIRS + NEAR_MISS_PAIRS
 
-EMBEDDER_CHOICES = {"tfidf": TfidfCharNgramEmbedder}
-
-
-def _sentence_transformer_embedder() -> Embedder:
-    from eb_verify.fact_coverage import SentenceTransformerEmbedder
-
-    return SentenceTransformerEmbedder()
-
-
 EMBEDDER_FACTORIES = {
     "tfidf": TfidfCharNgramEmbedder,
-    "sentence-transformer": _sentence_transformer_embedder,
+    "sentence-transformer": SentenceTransformerEmbedder,
 }
 
 
@@ -196,12 +191,19 @@ def pair_similarities(
 
 
 def sweep(
-    thresholds: list[float] | None = None, embedder: Embedder | None = None
+    thresholds: list[float] | None = None,
+    embedder: Embedder | None = None,
+    sims: list[tuple[LabeledPair, float]] | None = None,
 ) -> tuple[list[dict], dict]:
-    """Sweep thresholds; return (rows, best_row) with precision/recall/F1."""
+    """Sweep thresholds; return (rows, best_row) with precision/recall/F1.
+
+    Pass a precomputed ``sims`` (from ``pair_similarities``) to skip
+    re-embedding the pair set when the caller already has it.
+    """
     if thresholds is None:
         thresholds = [round(0.05 * i, 2) for i in range(1, 20)]  # 0.05..0.95
-    sims = pair_similarities(embedder=embedder)
+    if sims is None:
+        sims = pair_similarities(embedder=embedder)
     rows = []
     for t in thresholds:
         tp = sum(1 for p, s in sims if p.should_match and s >= t)
@@ -229,7 +231,7 @@ def _run(embedder_name: str) -> None:
         label = "MATCH " if p.should_match else "nomatch"
         print(f"  {s:.3f}  {label}  [{p.kind}]  {p.a[:52]!r} vs {p.b[:52]!r}")
 
-    rows, best = sweep(embedder=embedder)
+    rows, best = sweep(sims=sims)
     print("\nthreshold sweep:")
     print(f"  {'thr':>5} {'tp':>3} {'fp':>3} {'fn':>3} {'prec':>6} {'rec':>6} {'f1':>6}")
     for r in rows:
