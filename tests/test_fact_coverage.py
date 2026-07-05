@@ -7,6 +7,7 @@ import pytest
 from eb_verify.fact_coverage import (
     CoverageResult,
     Fact,
+    SentenceTransformerEmbedder,
     TfidfCharNgramEmbedder,
     coverage,
     precision,
@@ -186,6 +187,41 @@ def test_empty_candidate_matches_are_a_tuple():
 
 
 # ---------------------------------------------------------------------------
+# SentenceTransformerEmbedder — real embedding backend
+# ---------------------------------------------------------------------------
+
+def test_sentence_transformer_embedder_missing_dependency_raises_clear_error(monkeypatch):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "sentence_transformers", None)
+    with pytest.raises(ImportError, match=r"eb-verify\[embeddings\]"):
+        SentenceTransformerEmbedder()
+
+
+@pytest.mark.network
+def test_sentence_transformer_embedder_rows_are_l2_normalized():
+    import numpy as np
+
+    emb = SentenceTransformerEmbedder().embed([f.statement for f in GT])
+    norms = np.linalg.norm(emb, axis=1)
+    assert np.allclose(norms, 1.0, atol=1e-5)
+
+
+@pytest.mark.network
+def test_sentence_transformer_embedder_determinism_two_runs_identical():
+    embedder = SentenceTransformerEmbedder()
+    texts = [f.statement for f in GT]
+    a = embedder.embed(texts)
+    b = embedder.embed(texts)
+    assert (a == b).all()
+
+
+@pytest.mark.network
+def test_sentence_transformer_embedder_empty_texts():
+    assert SentenceTransformerEmbedder().embed([]).shape == (0, 0)
+
+
+# ---------------------------------------------------------------------------
 # Calibration regression — locks in the experiment result
 # ---------------------------------------------------------------------------
 
@@ -196,3 +232,50 @@ def test_calibration_best_f1_and_default_threshold():
     _, best = sweep()
     assert best["f1"] >= 0.75, f"TF-IDF default fell below viability bar: {best}"
     assert best["threshold"] == DEFAULT_THRESHOLD
+
+
+@pytest.mark.network
+def test_calibration_sentence_transformer_best_f1_and_threshold():
+    from eb_verify.fact_coverage import SENTENCE_TRANSFORMER_THRESHOLD
+    from eb_verify.fact_coverage_calibration import sweep
+
+    _, best = sweep(embedder=SentenceTransformerEmbedder())
+    assert best["f1"] >= 0.75, f"sentence-transformer fell below viability bar: {best}"
+    assert best["threshold"] == SENTENCE_TRANSFORMER_THRESHOLD
+
+
+@pytest.mark.parametrize(
+    "embedder_name",
+    ["tfidf", pytest.param("sentence-transformer", marks=pytest.mark.network)],
+)
+def test_adversarial_order_negation_pairs_are_not_solved_by_either_embedder(
+    embedder_name,
+):
+    """Regression lock for the module docstring's deployment-boundary claim.
+
+    Neither embedder correctly rejects direction-reversed or negated
+    statement pairs at its own calibrated best-F1 threshold — swapping in a
+    real embedding model does not, by itself, close the adversarial gap. If
+    this test starts failing (i.e. an embedder starts getting these right),
+    that is a real result and the module docstring's "Deployment boundary"
+    section must be revisited, not just the assertion below.
+    """
+    from eb_verify.fact_coverage_calibration import (
+        EMBEDDER_FACTORIES,
+        pair_similarities,
+        sweep,
+    )
+
+    embedder = EMBEDDER_FACTORIES[embedder_name]()
+    _, best = sweep(embedder=embedder)
+    threshold = best["threshold"]
+    sims = pair_similarities(embedder=embedder)
+    adversarial = [
+        (p, s) for p, s in sims if p.kind in ("negation", "wrong-relation")
+    ]
+    correctly_rejected = sum(1 for p, s in adversarial if s < threshold)
+    assert correctly_rejected == 0, (
+        f"{embedder_name} now correctly rejects {correctly_rejected}/"
+        f"{len(adversarial)} adversarial pairs — update the docstring instead "
+        f"of this assertion if that's a genuine improvement"
+    )

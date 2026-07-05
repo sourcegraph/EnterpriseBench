@@ -11,23 +11,46 @@ fraction of candidate facts grounded in GT (the ungrounded-assertion rate is
 
 The default embedder is a deterministic TF-IDF over character 3-5-grams
 (sklearn), fit per call on the union of GT + candidate statements. No network,
-no persisted state. A real embedding model can be plugged in later via the
-``Embedder`` Protocol.
+no persisted state. A real embedding model is available via
+``SentenceTransformerEmbedder`` (a pinned sentence-transformers model,
+implementing the same ``Embedder`` Protocol) for callers that need it.
 
-Deployment boundary (do not wire into adversarial scoring)
------------------------------------------------------------
-The TF-IDF default is suitable ONLY for cooperative partial-credit recall
-(honest agent output, missed-fact detection). Independent verification on
-held-out adversarial pairs showed it cannot be trusted where an agent could
-game the score: bag-of-ngrams is word-order-blind, so a direction-reversed
-relation ("scheduler restarts the worker" vs "worker restarts the scheduler")
-scores similarity 1.000; a negated statement scores ~0.956; and a genuine
-paraphrase with divergent surface forms can miss at ~0.30 (below the 0.40
-operating threshold). Before this module scores anything agents are graded
-on, plug a real embedding model in via ``Embedder`` and re-run the
-calibration sweep in ``fact_coverage_calibration`` (ideally regrown from
-actual task GT facts); a directional/negation post-check on matched pairs is
-the cheap alternative mitigation.
+Deployment boundary (do not wire EITHER embedder into adversarial scoring)
+---------------------------------------------------------------------------
+Both embedders are suitable ONLY for cooperative partial-credit recall
+(honest agent output, missed-fact detection) — swapping TF-IDF for a real
+sentence-embedding model does **not** close the adversarial gap. Calibrated
+on ``fact_coverage_calibration``'s pair set (28 pairs grounded in real task
+``ground_truth.json`` statements, including hand-crafted negation/
+wrong-relation probes derived from them — see that module for provenance):
+both embedders clear the same overall F1 = 0.800 at their respective best
+threshold (TF-IDF: 0.40; ``SentenceTransformerEmbedder``: see
+``SENTENCE_TRANSFORMER_THRESHOLD``), and both get every paraphrase and every
+"different-symbol"/"different-repo" negative right — but **0 of 7**
+order/negation adversarial pairs (direction-reversed relations, negated
+statements) are correctly rejected by either embedder at that threshold: a
+direction-reversed relation ("scheduler restarts the worker" vs "worker
+restarts the scheduler") scores 1.000 under TF-IDF and 0.987 under the real
+embedder; a negated statement scores ~0.95-0.97 under both. This is a known
+property of general-purpose sentence encoders (trained for semantic/
+paraphrase similarity, not for polarity or argument order), not a defect
+specific to either implementation here — a bigger or newer embedding model
+would not be expected to fix it on its own. Consequently: **the directional/
+negation post-check is not an optional add-on — it is required before this
+module scores anything an adversarial agent could game.** It is not yet
+implemented (delegate it to a model per ZFC; do not hand-roll regex/keyword
+negation detection). Until then, only use either embedder for cooperative
+recall against honest agent output.
+
+Hermeticity note on ``SentenceTransformerEmbedder``: it loads a pinned
+model+revision from the local Hugging Face cache. To run without network
+access (sandboxed verification), pre-fetch the pinned revision at image-build
+time (``scripts/infra/prefetch_embedding_model.py``) and set ``HF_HUB_OFFLINE=1``
+in the runtime environment. No such pre-fetch step exists yet in any task
+sandbox image today, nor does any per-task sandbox image install this
+module's Python dependencies at all (they are ``docker cp``'d as raw source,
+relying on whatever the base image's ``python3`` already has) — wiring
+either up is separate infra work, not done by this module.
 
 Mapping onto lib/eb_verify/scoring.py checkpoints
 -------------------------------------------------
@@ -71,10 +94,16 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 # Calibrated on the labeled pair set in fact_coverage_calibration.py:
-# best F1 = 0.828 at threshold 0.40 for the TF-IDF char 3-5-gram default
-# embedder (perfect recall of paraphrase pairs; 5/12 near-miss false
-# positives, dominated by order-blind cases — see calibration module).
+# best F1 = 0.800 at threshold 0.40 for the TF-IDF char 3-5-gram default
+# embedder (perfect recall of paraphrase + easy-negative pairs; all 7
+# order/negation adversarial pairs are false positives — see module
+# docstring "Deployment boundary" and the calibration module for detail).
 DEFAULT_THRESHOLD = 0.40
+
+# Calibrated the same way for SentenceTransformerEmbedder: best F1 = 0.800
+# at threshold 0.75 (same adversarial blind spot as DEFAULT_THRESHOLD above —
+# see module docstring).
+SENTENCE_TRANSFORMER_THRESHOLD = 0.75
 
 
 @dataclass(frozen=True)
@@ -117,6 +146,53 @@ class TfidfCharNgramEmbedder:
         )
         matrix = vectorizer.fit_transform(texts)
         return np.asarray(matrix.todense())
+
+
+class SentenceTransformerEmbedder:
+    """Real embedding backend: a pinned sentence-transformers model.
+
+    Deterministic across runs for a fixed (model_name, revision, device) —
+    the model is pinned by revision so scores don't drift under a dependency
+    or model-repo upgrade. Imports ``sentence_transformers`` lazily so that
+    merely importing this module (or using ``TfidfCharNgramEmbedder``) never
+    requires the ``sentence-transformers``/``torch`` extra to be installed.
+
+    Install with the ``embeddings`` extra: ``pip install 'eb-verify[embeddings]'``.
+    """
+
+    DEFAULT_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+    # Pinned Hugging Face repo revision (commit SHA), not a mutable tag —
+    # see module docstring for why this module refuses to float on "main".
+    DEFAULT_MODEL_REVISION = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL_NAME,
+        revision: str = DEFAULT_MODEL_REVISION,
+        *,
+        device: str = "cpu",
+    ) -> None:
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as e:
+            raise ImportError(
+                "SentenceTransformerEmbedder requires the 'sentence-transformers' "
+                "package. Install with: pip install 'eb-verify[embeddings]'"
+            ) from e
+        self.model_name = model_name
+        self.revision = revision
+        self._model = SentenceTransformer(model_name, revision=revision, device=device)
+
+    def embed(self, texts: list[str]) -> np.ndarray:
+        if not texts:
+            return np.zeros((0, 0))
+        emb = self._model.encode(
+            texts,
+            convert_to_numpy=True,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+        )
+        return np.asarray(emb)
 
 
 @dataclass(frozen=True)
