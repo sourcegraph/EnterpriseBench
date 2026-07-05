@@ -72,6 +72,22 @@ class TestParseJson:
         with pytest.raises(JudgeBackendError, match="Failed to parse JSON"):
             _parse_json("```json\nnot valid {{{ json\n```")
 
+    def test_empty_dict_does_not_raise(self):
+        assert _parse_json("{}") == {}
+
+    @pytest.mark.parametrize(
+        "raw",
+        ["true", "[1, 2, 3]", "42", '"a string"', "null"],
+    )
+    def test_bare_non_dict_json_raises(self, raw):
+        with pytest.raises(JudgeBackendError, match="Expected JSON object"):
+            _parse_json(raw)
+
+    def test_fenced_non_dict_json_raises(self):
+        raw = "```json\n[1, 2, 3]\n```"
+        with pytest.raises(JudgeBackendError, match="Expected JSON object"):
+            _parse_json(raw)
+
 
 # ---------------------------------------------------------------------------
 # normalize_score
@@ -209,6 +225,13 @@ class TestAnthropicBackend:
             with pytest.raises(JudgeBackendError, match="bad request"):
                 backend.call("sys", "user")
         mock_raw.assert_called_once()  # 4xx must NOT be retried
+
+    def test_call_does_not_retry_on_non_dict_response(self):
+        backend = AnthropicBackend(model="claude-haiku-4-5-20251001")
+        with patch.object(backend, "_raw_call", return_value="true") as mock_raw:
+            with pytest.raises(JudgeBackendError, match="Expected JSON object"):
+                backend.call("sys", "user")
+        mock_raw.assert_called_once()  # no status_code on this error => not retryable
 
     @patch("eb_verify.judge.backends.time.sleep")
     def test_call_exhausts_retries_and_raises(self, _sleep):
@@ -392,6 +415,18 @@ class TestClaudeCodeBackend:
             with pytest.raises(JudgeBackendError, match="CLI failed"):
                 backend.call("sys", "user")
         mock_raw.assert_called_once()  # no status_code => not retryable
+
+    @patch("eb_verify.judge.backends.shutil.which", return_value="/usr/bin/claude")
+    def test_call_does_not_retry_on_non_dict_response(self, _which):
+        backend = ClaudeCodeBackend(model="haiku")
+        envelope = '{"is_error": false, "result": "true"}'
+        completed = subprocess.CompletedProcess([], 0, stdout=envelope, stderr="")
+        with patch(
+            "eb_verify.judge.backends.subprocess.run", return_value=completed
+        ) as mock_run:
+            with pytest.raises(JudgeBackendError, match="Expected JSON object"):
+                backend.call("sys", "user")
+        mock_run.assert_called_once()  # no status_code on this error => not retryable
 
     @patch("eb_verify.judge.backends.time.sleep")
     @patch("eb_verify.judge.backends.shutil.which", return_value="/usr/bin/claude")
