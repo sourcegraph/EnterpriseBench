@@ -159,11 +159,13 @@ for verifier in "$VERIFIER_DIR"/*.sh; do
         [[ "$w" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] && weight="$w"
     fi
 
-    # Read timeout from .meta file if present
+    # Read timeout from .meta file if present. Same agent-writable source and
+    # same injection risk as weight above (interpolated into a JSON string
+    # below on the timeout path) — validate it's a plain integer before trusting it.
     checkpoint_timeout=120
     if [ -f "$meta_file" ]; then
         t=$(grep -oP '(?<=timeout=)\S+' "$meta_file" 2>/dev/null || true)
-        [ -n "$t" ] && checkpoint_timeout="$t"
+        [[ "$t" =~ ^[0-9]+$ ]] && checkpoint_timeout="$t"
     fi
 
     echo "--- Checkpoint: $name (weight=$weight, timeout=${checkpoint_timeout}s) ---" >&2
@@ -221,12 +223,15 @@ fi
 # globs agent-owned /workspace/*/ — escape each one via json_escape() before
 # embedding, the same way verifier detail strings already are, so an agent
 # cannot break out of the JSON array via a crafted directory name.
-REPOS_JSON=$(
-    for repo in ${REPOS[@]+"${REPOS[@]}"}; do
-        json_escape "$repo"
-        printf '\n'
-    done | awk 'NF{printf "%s\"%s\"", (c++?", ":""), $0}'
-)
+REPOS_JSON=""
+for repo in ${REPOS[@]+"${REPOS[@]}"}; do
+    entry="\"$(json_escape "$repo")\""
+    if [ -z "$REPOS_JSON" ]; then
+        REPOS_JSON="$entry"
+    else
+        REPOS_JSON="$REPOS_JSON, $entry"
+    fi
+done
 
 # Build the result JSON once, then emit to both stdout and the results file.
 RESULT_JSON=$(cat <<RESULT_JSON

@@ -199,7 +199,7 @@ class TestMcpEnvVars:
         ), patch(
             "run_task._docker_start"
         ), patch(
-            "run_task._setup_container", return_value=({}, set())
+            "run_task._setup_container", return_value=({}, set(), {})
         ), patch(
             "run_task._run_health_check", return_value=True
         ), patch(
@@ -328,7 +328,7 @@ class TestMcpPreflightHardFail:
             )
             stack.enter_context(patch("run_task._docker_start"))
             stack.enter_context(
-                patch("run_task._setup_container", return_value=({}, set()))
+                patch("run_task._setup_container", return_value=({}, set(), {}))
             )
             stack.enter_context(patch("run_task._run_health_check", return_value=True))
             # Simulate a 401 / unreachable endpoint: HTTP pre-flight fails.
@@ -403,7 +403,7 @@ class TestMcpPreflightHardFail:
         ), patch("run_task._docker_build"), patch(
             "run_task._docker_create_container", return_value="fake-container-id"
         ), patch("run_task._docker_start"), patch(
-            "run_task._setup_container", return_value=({}, set())
+            "run_task._setup_container", return_value=({}, set(), {})
         ), patch(
             "run_task._run_health_check", return_value=True
         ), patch(

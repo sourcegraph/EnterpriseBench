@@ -34,6 +34,7 @@ from run_task import (
     _container_file_checksums,
     _copy_grading_files,
     _grading_file_manifest,
+    _install_claude_cli,
     _kill_agent_processes,
     _refresh_and_verify_grading_files,
     _run_scoring,
@@ -218,7 +219,7 @@ def test_refresh_flags_tampered_verifier_and_restores_it(fake_container, task_di
     original_content = fake_container.files[verifier_path]
     fake_container.files[verifier_path] = "#!/usr/bin/env bash\necho '{\"score\":1.0,\"passed\":true}'  # hacked\n"
 
-    tampered = _refresh_and_verify_grading_files("cid", task_dir, task_data, expected_checksums)
+    tampered = _refresh_and_verify_grading_files("cid", task_dir, checkpoint_meta, expected_checksums)
 
     tampered_paths = [t["path"] for t in tampered]
     assert verifier_path in tampered_paths
@@ -231,7 +232,7 @@ def test_refresh_reports_no_tamper_when_clean(fake_container, task_dir, task_dat
     grading_paths = _copy_grading_files("cid", task_dir, checkpoint_meta)
     expected_checksums = _container_file_checksums("cid", grading_paths)
 
-    tampered = _refresh_and_verify_grading_files("cid", task_dir, task_data, expected_checksums)
+    tampered = _refresh_and_verify_grading_files("cid", task_dir, checkpoint_meta, expected_checksums)
 
     assert tampered == []
 
@@ -353,13 +354,34 @@ def test_copy_grading_files_never_chowns_to_agent(fake_container, task_dir, task
     assert all("root:root" in script for script in chown_scripts)
 
 
+def test_install_claude_cli_does_not_reopen_grading_paths(fake_container, task_dir, task_data):
+    """_install_claude_cli always runs after _setup_container in the real
+    pipeline; its agent-user provisioning step must not chown .task/.verifiers
+    back to agent:agent, or it would silently undo the lockdown
+    _copy_grading_files just applied (EnterpriseBench-7jpm)."""
+    checkpoint_meta, _ = _grading_file_manifest(task_dir, task_data)
+    _copy_grading_files("cid", task_dir, checkpoint_meta)
+    fake_container.exec_calls.clear()
+
+    _install_claude_cli("cid")
+
+    agent_chown_scripts = [
+        cmd[2]
+        for cmd, _user in fake_container.exec_calls
+        if cmd[:2] == ["bash", "-c"] and "chown" in cmd[2] and "agent:agent" in cmd[2]
+    ]
+    assert agent_chown_scripts, "expected an agent:agent chown call"
+    assert all("/workspace/.task" not in script for script in agent_chown_scripts)
+    assert all("/workspace/.verifiers" not in script for script in agent_chown_scripts)
+
+
 def test_refresh_kills_agent_processes_as_root(fake_container, task_dir, task_data):
     checkpoint_meta, _ = _grading_file_manifest(task_dir, task_data)
     grading_paths = _copy_grading_files("cid", task_dir, checkpoint_meta)
     expected_checksums = _container_file_checksums("cid", grading_paths)
     fake_container.exec_calls.clear()
 
-    _refresh_and_verify_grading_files("cid", task_dir, task_data, expected_checksums)
+    _refresh_and_verify_grading_files("cid", task_dir, checkpoint_meta, expected_checksums)
 
     pkill_calls = [
         (cmd, user) for cmd, user in fake_container.exec_calls if cmd[:1] == ["pkill"]

@@ -521,7 +521,6 @@ def _copy_grading_files(
             name = _checkpoint_verifier_name(check_script)
             sh_path = f"/workspace/.verifiers/{name}.sh"
             _docker_cp(str(check_script), f"{container_id}:{sh_path}")
-            _docker_exec(container_id, ["chmod", "+x", sh_path])
             written.append(sh_path)
             meta = checkpoint_meta.get(name)
             if meta is not None:
@@ -534,6 +533,10 @@ def _copy_grading_files(
                     suffix=".meta",
                 )
                 written.append(meta_path)
+        if check_scripts:
+            _docker_exec(
+                container_id, ["bash", "-c", "chmod +x /workspace/.verifiers/*.sh"]
+            )
         logger.info(
             "Copied %d check scripts into .verifiers/ (%d with weight metadata)",
             len(check_scripts),
@@ -653,7 +656,7 @@ def _container_file_checksums(container_id: str, paths: list[str]) -> dict[str, 
 def _refresh_and_verify_grading_files(
     container_id: str,
     task_dir: Path,
-    task_data: dict,
+    checkpoint_meta: dict[str, tuple[float, int]],
     expected_checksums: dict[str, str],
 ) -> list[dict[str, str]]:
     """Kill lingering agent processes, detect tampering, then discard it.
@@ -668,11 +671,14 @@ def _refresh_and_verify_grading_files(
     host — scoring must never trust in-container grading state, tampered or
     not (EnterpriseBench-7jpm AC1+AC2).
 
+    checkpoint_meta is the same manifest _setup_container computed and used
+    for the initial copy — passed in rather than recomputed here so the two
+    copies of the same task can't drift apart.
+
     Returns a list of {"path", "expected", "found"} entries for every
     grading file that was missing or modified since setup; empty if clean.
     """
     _kill_agent_processes(container_id)
-    checkpoint_meta, _ = _grading_file_manifest(task_dir, task_data)
     paths = list(expected_checksums)
     found_checksums = _container_file_checksums(container_id, paths)
 
@@ -700,7 +706,7 @@ def _setup_container(
     task_dir: Path,
     task_data: dict,
     mode: str = "baseline",
-) -> tuple[dict[str, str], set[str]]:
+) -> tuple[dict[str, str], set[str], dict[str, tuple[float, int]]]:
     """Copy task files into the running container.
 
     - instruction.md -> /workspace/instruction.md
@@ -709,11 +715,12 @@ def _setup_container(
     - eb_verify library -> /workspace/.eb_verify/ (if needed by check scripts)
     - ground_truth.json -> /workspace/.task/ground_truth.json
 
-    Returns (grading_checksums, canonical_checkpoint_names): a sha256 of
-    every grading file computed immediately after copying, while the
-    container is still pre-agent-session and therefore trusted — the anchor
-    _refresh_and_verify_grading_files() later checks the post-agent-session
-    state against (EnterpriseBench-7jpm).
+    Returns (grading_checksums, canonical_checkpoint_names, checkpoint_meta):
+    a sha256 of every grading file computed immediately after copying, while
+    the container is still pre-agent-session and therefore trusted — the
+    anchor _refresh_and_verify_grading_files() later checks the
+    post-agent-session state against (EnterpriseBench-7jpm). checkpoint_meta
+    is returned so the refresh pass can reuse it instead of recomputing it.
     """
     # Copy instruction.md with output format appendix and optional MCP preamble
     combined = _build_instruction_text(task_dir, mode, repos=task_data.get("repos", []))
@@ -753,7 +760,7 @@ def _setup_container(
         timeout=60,
     )
 
-    return grading_checksums, canonical_names
+    return grading_checksums, canonical_names, checkpoint_meta
 
 
 def _install_claude_cli(container_id: str) -> bool:
@@ -800,14 +807,18 @@ def _install_claude_cli(container_id: str) -> bool:
     # user owning /workspace (USER agent before git clone), so cloned repos are
     # correctly owned. For older images we still create the user and fix up
     # output dirs only (never chown -R on /workspace — too slow for large repos).
+    # Deliberately excludes .task/.verifiers: _setup_container (which always
+    # runs before this) already created and root-owned+locked them via
+    # _copy_grading_files. Re-chowning them to agent:agent here would reopen
+    # the write access that lockdown exists to remove (EnterpriseBench-7jpm).
     _docker_exec(
         container_id,
         [
             "bash",
             "-c",
             "id agent >/dev/null 2>&1 || useradd -m -s /bin/bash agent; "
-            "mkdir -p /workspace/agent_output /workspace/.task /workspace/.verifiers; "
-            "chown -R agent:agent /home/agent /workspace/agent_output /workspace/.task /workspace/.verifiers",
+            "mkdir -p /workspace/agent_output; "
+            "chown -R agent:agent /home/agent /workspace/agent_output",
         ],
     )
 
@@ -995,8 +1006,9 @@ def _run_scoring(
 
     if canonical_checkpoint_names is not None:
         checkpoints = scores.get("checkpoints", [])
-        accepted = [c for c in checkpoints if c.get("name") in canonical_checkpoint_names]
-        rejected = [c for c in checkpoints if c.get("name") not in canonical_checkpoint_names]
+        accepted, rejected = [], []
+        for c in checkpoints:
+            (accepted if c.get("name") in canonical_checkpoint_names else rejected).append(c)
         if rejected:
             logger.error(
                 "REJECTED %d non-canonical checkpoint(s) from scoring: %s",
@@ -1005,11 +1017,8 @@ def _run_scoring(
             )
             scores["rejected_checkpoints"] = rejected
             scores["checkpoints"] = accepted
-            total_weight = sum(c.get("weight", 1.0) for c in accepted)
-            scores["task_score"] = (
-                sum(c.get("score", 0.0) * c.get("weight", 1.0) for c in accepted)
-                if total_weight > 0
-                else 0.0
+            scores["task_score"] = sum(
+                c.get("score", 0.0) * c.get("weight", 1.0) for c in accepted
             )
             scores["checkpoints_passed"] = sum(1 for c in accepted if c.get("passed"))
             scores["checkpoints_total"] = len(accepted)
@@ -1407,53 +1416,41 @@ def _configure_mcp(container_id: str, mode: str) -> bool:
         }
     )
 
-    # Write config via docker cp to both project-level and user-level paths.
-    # Same format works for both; writing to two locations ensures Claude Code
-    # finds auth headers regardless of which config path it resolves first.
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".mcp.json", delete=False) as fh:
-        fh.write(mcp_config_json)
-        tmp_project = fh.name
+    # Write config to both project-level and user-level paths. Same format
+    # works for both; writing to two locations ensures Claude Code finds auth
+    # headers regardless of which config path it resolves first.
+    _write_content_to_container(
+        container_id, mcp_config_json, "/workspace/.mcp.json", suffix=".mcp.json"
+    )
+    _docker_exec(container_id, ["chown", "agent:agent", "/workspace/.mcp.json"])
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".mcp.json", delete=False) as fh:
-        fh.write(mcp_config_json)
-        tmp_user = fh.name
+    _docker_exec(
+        container_id,
+        [
+            "bash",
+            "-c",
+            "mkdir -p /home/agent/.claude && chown agent:agent /home/agent/.claude",
+        ],
+    )
+    _write_content_to_container(
+        container_id,
+        mcp_config_json,
+        "/home/agent/.claude/.mcp.json",
+        suffix=".mcp.json",
+    )
+    _docker_exec(
+        container_id, ["chown", "agent:agent", "/home/agent/.claude/.mcp.json"]
+    )
 
-    try:
-        # Project-level config: /workspace/.mcp.json
-        _docker_cp(tmp_project, f"{container_id}:/workspace/.mcp.json")
-        _docker_exec(
-            container_id,
-            ["chown", "agent:agent", "/workspace/.mcp.json"],
-        )
-
-        # User-level config: /home/agent/.claude/.mcp.json
-        _docker_exec(
-            container_id,
-            [
-                "bash",
-                "-c",
-                "mkdir -p /home/agent/.claude && chown agent:agent /home/agent/.claude",
-            ],
-        )
-        _docker_cp(tmp_user, f"{container_id}:/home/agent/.claude/.mcp.json")
-        _docker_exec(
-            container_id,
-            ["chown", "agent:agent", "/home/agent/.claude/.mcp.json"],
-        )
-
-        # Also write to /home/agent/.mcp.json for --mcp-config flag
-        _docker_cp(tmp_project, f"{container_id}:/home/agent/.mcp.json")
-        _docker_exec(
-            container_id,
-            ["chown", "agent:agent", "/home/agent/.mcp.json"],
-        )
-        logger.info(
-            "MCP config written to /workspace/.mcp.json, "
-            "/home/agent/.claude/.mcp.json, and /home/agent/.mcp.json"
-        )
-    finally:
-        os.unlink(tmp_project)
-        os.unlink(tmp_user)
+    # Also write to /home/agent/.mcp.json for --mcp-config flag
+    _write_content_to_container(
+        container_id, mcp_config_json, "/home/agent/.mcp.json", suffix=".mcp.json"
+    )
+    _docker_exec(container_id, ["chown", "agent:agent", "/home/agent/.mcp.json"])
+    logger.info(
+        "MCP config written to /workspace/.mcp.json, "
+        "/home/agent/.claude/.mcp.json, and /home/agent/.mcp.json"
+    )
 
     # Step 3: Verify Claude Code sees the MCP server with retries
     handshake_ok = False
@@ -1776,8 +1773,8 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
             )
             result.container_id = container_id
             _docker_start(container_id)
-            grading_checksums, canonical_checkpoint_names = _setup_container(
-                container_id, task_dir, task_data, mode=config.mode
+            grading_checksums, canonical_checkpoint_names, checkpoint_meta = (
+                _setup_container(container_id, task_dir, task_data, mode=config.mode)
             )
         except Exception as setup_exc:
             result.phase = "setup_failed"
@@ -1937,7 +1934,7 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         # trusting any of it (EnterpriseBench-7jpm AC1+AC2). This must run
         # immediately before _run_scoring(), after the agent phase ends.
         tampered_files = _refresh_and_verify_grading_files(
-            container_id, task_dir, task_data, grading_checksums
+            container_id, task_dir, checkpoint_meta, grading_checksums
         )
         scores = _run_scoring(
             container_id, config.verifier_timeout, canonical_checkpoint_names

@@ -304,4 +304,30 @@ rm -f /tmp/eb_test_runner_pwned
 echo "weight=0.4" > "$WORKSPACE/.verifiers/01-alpha-exists.meta"
 
 echo ""
+echo "=== Test 10: Malicious timeout metadata falls back to the default ==="
+
+# timeout is read from the same agent-writable .meta file as weight and is
+# interpolated into a JSON string on the timeout path ("Timed out after
+# ${timeout_sec}s") — a non-numeric value would corrupt that JSON the same
+# way an unvalidated weight corrupted the awk expression in Test 9.
+cat > "$WORKSPACE/.verifiers/01-alpha-exists.meta" << 'META'
+weight=0.4
+timeout=1);system(">/tmp/eb_test_runner_pwned");x=(1
+META
+
+stderr_file="$TMPDIR/test10_stderr"
+output=$(bash "$PATCHED_RUNNER" 2>"$stderr_file")
+
+if [ ! -e /tmp/eb_test_runner_pwned ] && grep -q 'timeout=120s' "$stderr_file"; then
+    echo "  PASS: Malformed timeout metadata falls back to the 120s default"
+else
+    echo "  FAIL: Timeout metadata injection was not neutralized"
+    echo "  Output: $output"
+    echo "  Stderr: $(cat "$stderr_file")"
+fi
+
+rm -f /tmp/eb_test_runner_pwned "$stderr_file"
+echo "weight=0.4" > "$WORKSPACE/.verifiers/01-alpha-exists.meta"
+
+echo ""
 echo "=== All tests complete ==="
