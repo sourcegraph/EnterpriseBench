@@ -26,6 +26,9 @@ from mirror_naming import ORG  # noqa: E402
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "sandbox"))
 from dockerfile_generator import mirror_name_for_repo  # noqa: E402
 
+sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
+from validation import validate_repo_entry  # noqa: E402
+
 
 # ═══════════════════════════════════════════════════════════════
 #  MCP INSTRUCTION GENERATION
@@ -77,7 +80,10 @@ def generate_instruction_mcp(task_data: dict) -> str:
     ]
 
     # List each mirror with its filter syntax
+    full_mirrors = []
     for repo in repos:
+        validate_repo_entry(repo)
+
         url = repo.get("url", "")
         rev = repo.get("rev", "")
         path = repo.get("path", "")
@@ -86,8 +92,8 @@ def generate_instruction_mcp(task_data: dict) -> str:
         if not url or not rev:
             continue
 
-        mirror = mirror_name_for_repo(url, rev)
-        full_mirror = f"{ORG}/{mirror}"
+        full_mirror = f"{ORG}/{mirror_name_for_repo(url, rev)}"
+        full_mirrors.append(full_mirror)
 
         lines.append(f"### {path} ({role})")
         lines.append(f"- **Upstream**: {url} @ `{rev}`")
@@ -97,13 +103,7 @@ def generate_instruction_mcp(task_data: dict) -> str:
 
     # Multi-repo search example
     if len(repos) > 1:
-        all_filters = []
-        for repo in repos:
-            url = repo.get("url", "")
-            rev = repo.get("rev", "")
-            if url and rev:
-                mirror = mirror_name_for_repo(url, rev)
-                all_filters.append(f"github.com/{ORG}/{mirror}")
+        all_filters = [f"github.com/{m}" for m in full_mirrors]
 
         lines.append("### Searching Across All Repos")
         lines.append("")
