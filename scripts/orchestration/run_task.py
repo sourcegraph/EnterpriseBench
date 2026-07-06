@@ -653,6 +653,68 @@ def _container_file_checksums(container_id: str, paths: list[str]) -> dict[str, 
     return {path: _container_file_checksum(container_id, path) for path in paths}
 
 
+def _diff_checksums(
+    container_id: str, expected_checksums: dict[str, str], when: str
+) -> list[dict[str, str]]:
+    """Compare current in-container checksums against a prior baseline.
+
+    Shared by the pre-scoring refresh and the post-scoring check — both need
+    the exact same "what changed since I last looked" comparison, just at
+    different points in the container's lifecycle (EnterpriseBench-7jpm).
+    `when` is folded into the tamper-detected log line (e.g. "since setup",
+    "during the scoring window") so both call sites share one log-and-record
+    step instead of each logging it separately.
+
+    Returns a list of {"path", "expected", "found"} entries for every path
+    whose current checksum no longer matches the baseline; empty if clean.
+    """
+    paths = list(expected_checksums)
+    found_checksums = _container_file_checksums(container_id, paths)
+    # found_checksums covers exactly `paths` (== expected_checksums.keys()),
+    # so a plain index is safe — no default needed.
+    tampered = [
+        {"path": path, "expected": expected, "found": found_checksums[path]}
+        for path, expected in expected_checksums.items()
+        if found_checksums[path] != expected
+    ]
+    if tampered:
+        logger.error(
+            "GRADING FILE TAMPER DETECTED (%s): %d file(s): %s",
+            when,
+            len(tampered),
+            [t["path"] for t in tampered],
+        )
+    return tampered
+
+
+def _check_post_scoring_tamper(
+    container_id: str, grading_checksums: dict[str, str]
+) -> list[dict[str, str]]:
+    """_diff_checksums for the post-scoring window, tolerating infra faults.
+
+    _container_file_checksum (called transitively) deliberately raises
+    RuntimeError on a genuine docker-exec failure so infra faults never get
+    misrecorded as tamper evidence. That's the right contract for the
+    pre-scoring refresh, which runs before any scores exist. But by the time
+    this post-scoring check runs, _run_scoring() has already produced a
+    valid scores dict — letting the exception propagate up would discard an
+    otherwise-successful, fully-scored run over a transient failure in this
+    detect-only, defense-in-depth check (EnterpriseBench-7jpm). Fail open on
+    the check itself instead: log it and report no tamper found.
+    """
+    try:
+        return _diff_checksums(
+            container_id, grading_checksums, when="during the scoring window"
+        )
+    except RuntimeError as exc:
+        logger.error(
+            "Post-scoring integrity check itself failed (infra error, not "
+            "treated as tamper): %s",
+            exc,
+        )
+        return []
+
+
 def _refresh_and_verify_grading_files(
     container_id: str,
     task_dir: Path,
@@ -679,26 +741,48 @@ def _refresh_and_verify_grading_files(
     grading file that was missing or modified since setup; empty if clean.
     """
     _kill_agent_processes(container_id)
-    paths = list(expected_checksums)
-    found_checksums = _container_file_checksums(container_id, paths)
-
-    # found_checksums covers exactly `paths` (== expected_checksums.keys()),
-    # so a plain index is safe — no default needed.
-    tampered = [
-        {"path": path, "expected": expected, "found": found_checksums[path]}
-        for path, expected in expected_checksums.items()
-        if found_checksums[path] != expected
-    ]
-    if tampered:
-        logger.error(
-            "GRADING FILE TAMPER DETECTED: %d file(s) modified since setup: %s",
-            len(tampered),
-            [t["path"] for t in tampered],
-        )
+    tampered = _diff_checksums(container_id, expected_checksums, when="since setup")
 
     # Unconditional: discard whatever the agent left, tamper or not.
     _copy_grading_files(container_id, task_dir, checkpoint_meta)
     return tampered
+
+
+def _lock_workspace_root(container_id: str) -> None:
+    """Chown /workspace itself to root:agent + set the sticky bit.
+
+    /workspace stays agent:agent-owned for the container's whole life
+    (dockerfile_generator.py, image-build time), so unlink/rename of a
+    directory ENTRY — gated by permissions on the PARENT, not the entry's
+    own owner/mode — let the agent swap out a whole locked grading dir
+    (``mv .verifiers .verifiers.bak && mkdir .verifiers``) or test.sh
+    directly, routing around the per-file root:root+go-w lockdown entirely.
+    Reproduced locally and independently confirmed by two reviewers in
+    EnterpriseBench-7jpm's second review round.
+
+    root:agent + sticky bit closes that vector while preserving the
+    legitimate case: agent (group member) can still create new entries
+    under /workspace, but only an entry's owner (or root) may unlink/rename
+    it — so the agent keeps write access to its own entries (agent_output/,
+    cloned repos, output artifacts) but can no longer swap out the
+    root-owned .verifiers/.task/.eb_verify/test.sh. Non-recursive, so this
+    is cheap regardless of repo size. Applied as the last step of
+    _setup_container, after every setup write under /workspace has landed.
+
+    Raises if the chown/chmod itself fails: this is the sole *preventive*
+    control in EnterpriseBench-7jpm's fix (everything else is detect-only),
+    so a silently-ignored failure here would leave /workspace unlocked with
+    no signal at all — fail closed instead, matching the raise-on-exec-
+    failure discipline _container_file_checksum already uses.
+    """
+    result = _docker_exec(
+        container_id,
+        ["bash", "-c", "chown root:agent /workspace && chmod 1775 /workspace"],
+        user="root",
+        timeout=30,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"failed to lock /workspace: {result.stderr.strip()}")
 
 
 def _setup_container(
@@ -759,6 +843,10 @@ def _setup_container(
         user="root",
         timeout=60,
     )
+
+    # Last step, after every setup write above has landed and before the
+    # agent's session starts (EnterpriseBench-7jpm).
+    _lock_workspace_root(container_id)
 
     return grading_checksums, canonical_names, checkpoint_meta
 
@@ -1941,10 +2029,22 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         )
         timings["scoring"] = time.monotonic() - t0
 
+        # _lock_workspace_root (the rename/swap vector) and the per-file
+        # root:root+go-w lockdown (direct content writes) together close every
+        # grading-file tamper path this diff identified. This check exists as
+        # a backstop against an unproven escalation path this diff did not
+        # verify — e.g. a setuid binary in the base image letting the agent
+        # regain root mid-scoring — not a named, confirmed residual gap
+        # (EnterpriseBench-7jpm).
+        post_scoring_tamper = _check_post_scoring_tamper(container_id, grading_checksums)
+
         if tampered_files:
             scores["grading_tamper"] = tampered_files
+        if post_scoring_tamper:
+            scores["post_scoring_tamper"] = post_scoring_tamper
 
-        if scores.get("grading_tamper") or scores.get("rejected_checkpoints"):
+        tamper_keys = ("grading_tamper", "post_scoring_tamper", "rejected_checkpoints")
+        if any(scores.get(key) for key in tamper_keys):
             # Distinct from verifier_infra_error: this is agent malfeasance,
             # not a system fault, so it gets its own failure_class for
             # run_task.py's own routing below...
@@ -1969,8 +2069,10 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
                 },
             )
             logger.warning(
-                "Grading integrity violation: tampered=%s rejected_checkpoints=%s",
+                "Grading integrity violation: tampered=%s "
+                "post_scoring_tampered=%s rejected_checkpoints=%s",
                 [t["path"] for t in scores.get("grading_tamper", [])],
+                [t["path"] for t in scores.get("post_scoring_tamper", [])],
                 [c.get("name") for c in scores.get("rejected_checkpoints", [])],
             )
 

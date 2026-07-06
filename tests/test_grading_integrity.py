@@ -30,14 +30,18 @@ import run_task
 from run_task import (
     TEST_RUNNER_SH,
     _apply_llm_judge,
+    _check_post_scoring_tamper,
     _container_file_checksum,
     _container_file_checksums,
     _copy_grading_files,
+    _diff_checksums,
     _grading_file_manifest,
     _install_claude_cli,
     _kill_agent_processes,
+    _lock_workspace_root,
     _refresh_and_verify_grading_files,
     _run_scoring,
+    _setup_container,
 )
 
 
@@ -411,3 +415,135 @@ def test_container_file_checksum_raises_on_docker_exec_failure(fake_container):
 
 def test_container_file_checksum_returns_empty_for_missing_file(fake_container):
     assert _container_file_checksum("cid", "/workspace/does_not_exist.sh") == ""
+
+
+# ---------------------------------------------------------------------------
+# Workspace-root lockdown — see _lock_workspace_root's docstring for the
+# directory-swap bypass this closes.
+# ---------------------------------------------------------------------------
+
+def test_lock_workspace_root_chowns_to_root_agent_and_sets_sticky_bit(fake_container):
+    _lock_workspace_root("cid")
+
+    lock_scripts = [
+        (cmd[2], user)
+        for cmd, user in fake_container.exec_calls
+        if cmd[:2] == ["bash", "-c"] and "chown root:agent /workspace" in cmd[2]
+    ]
+    assert lock_scripts, "expected a chown root:agent /workspace call"
+    script, user = lock_scripts[0]
+    assert "chmod 1775 /workspace" in script
+    assert user == "root"
+
+
+def test_lock_workspace_root_raises_on_exec_failure(fake_container):
+    """The lock is the sole preventive control in this fix — a silently
+    swallowed failure would leave /workspace unlocked with no signal at all,
+    so a failed chown/chmod must raise, not no-op."""
+    fake_container.force_exec_failure = True
+
+    with pytest.raises(RuntimeError):
+        _lock_workspace_root("cid")
+
+
+def test_setup_container_locks_workspace_root_last(fake_container, task_dir, task_data):
+    """The lock must be the LAST thing _setup_container does — every write
+    directly under /workspace (grading files, instruction.md, agent_output,
+    .mcp.json) must land before /workspace's own ownership is changed, since
+    the agent has no path to root and therefore can't undo the lock once
+    it's applied (no sudo grant in dockerfile_generator.py)."""
+    _setup_container("cid", task_dir, task_data)
+
+    bash_scripts = [
+        cmd[2] for cmd, _user in fake_container.exec_calls if cmd[:2] == ["bash", "-c"]
+    ]
+    lock_indices = [i for i, s in enumerate(bash_scripts) if "chown root:agent /workspace" in s]
+    assert lock_indices, "expected the workspace lock to run"
+    assert lock_indices[0] == len(bash_scripts) - 1, (
+        "workspace lock must be the last bash -c exec in _setup_container"
+    )
+
+
+def test_directory_swap_around_locked_verifiers_is_detected_by_checksum(
+    fake_container, task_dir, task_data
+):
+    """Models the directory-swap bypass (rename .verifiers out of the way,
+    recreate it with a forged, agent-owned checkpoint) that _lock_workspace_root
+    closes; the checksum diff must catch it regardless of mechanism."""
+    checkpoint_meta, _ = _grading_file_manifest(task_dir, task_data)
+    grading_paths = _copy_grading_files("cid", task_dir, checkpoint_meta)
+    expected_checksums = _container_file_checksums("cid", grading_paths)
+
+    swapped = {
+        path.replace("/workspace/.verifiers", "/workspace/.verifiers.bak"): content
+        for path, content in fake_container.files.items()
+        if path.startswith("/workspace/.verifiers")
+    }
+    for path in list(fake_container.files):
+        if path.startswith("/workspace/.verifiers"):
+            del fake_container.files[path]
+    fake_container.files.update(swapped)
+    fake_container.files["/workspace/.verifiers/api_migration.sh"] = (
+        "echo '{\"score\":1.0,\"passed\":true}'  # forged after swap\n"
+    )
+
+    tampered = _diff_checksums("cid", expected_checksums, when="since setup")
+
+    tampered_paths = [t["path"] for t in tampered]
+    assert "/workspace/.verifiers/api_migration.sh" in tampered_paths
+
+
+# ---------------------------------------------------------------------------
+# Post-scoring checksum diff — defense-in-depth for the test.sh execution
+# window itself, see _diff_checksums'/_run_scoring's call site docstrings.
+# ---------------------------------------------------------------------------
+
+def test_diff_checksums_detects_tamper_during_scoring_window(
+    fake_container, task_dir, task_data
+):
+    checkpoint_meta, _ = _grading_file_manifest(task_dir, task_data)
+    grading_paths = _copy_grading_files("cid", task_dir, checkpoint_meta)
+    grading_checksums = _container_file_checksums("cid", grading_paths)
+
+    # This is the exact state _refresh_and_verify_grading_files leaves the
+    # container in right before _run_scoring() execs test.sh. Simulate a
+    # writer that fires *during* that window, after the refresh's own
+    # checksum read completed.
+    fake_container.files["/workspace/test.sh"] = "#!/usr/bin/env bash\necho PWNED\n"
+
+    post_scoring_tamper = _diff_checksums(
+        "cid", grading_checksums, when="during the scoring window"
+    )
+
+    assert [t["path"] for t in post_scoring_tamper] == ["/workspace/test.sh"]
+
+
+def test_diff_checksums_clean_when_nothing_changed(fake_container, task_dir, task_data):
+    checkpoint_meta, _ = _grading_file_manifest(task_dir, task_data)
+    grading_paths = _copy_grading_files("cid", task_dir, checkpoint_meta)
+    grading_checksums = _container_file_checksums("cid", grading_paths)
+
+    assert _diff_checksums("cid", grading_checksums, when="since setup") == []
+
+
+def test_check_post_scoring_tamper_tolerates_infra_failure(fake_container, task_dir, task_data):
+    """A genuine docker-exec failure in this detect-only check must not
+    propagate and destroy an already-computed, valid scores dict — by the
+    time this check runs, _run_scoring() has already succeeded."""
+    checkpoint_meta, _ = _grading_file_manifest(task_dir, task_data)
+    grading_paths = _copy_grading_files("cid", task_dir, checkpoint_meta)
+    grading_checksums = _container_file_checksums("cid", grading_paths)
+    fake_container.force_exec_failure = True
+
+    assert _check_post_scoring_tamper("cid", grading_checksums) == []
+
+
+def test_check_post_scoring_tamper_detects_real_tamper(fake_container, task_dir, task_data):
+    checkpoint_meta, _ = _grading_file_manifest(task_dir, task_data)
+    grading_paths = _copy_grading_files("cid", task_dir, checkpoint_meta)
+    grading_checksums = _container_file_checksums("cid", grading_paths)
+    fake_container.files["/workspace/test.sh"] = "#!/usr/bin/env bash\necho PWNED\n"
+
+    tampered = _check_post_scoring_tamper("cid", grading_checksums)
+
+    assert [t["path"] for t in tampered] == ["/workspace/test.sh"]
