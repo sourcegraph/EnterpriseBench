@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -296,9 +297,11 @@ def _docker_exec(
     cmd: list[str],
     timeout: int = 120,
     workdir: str = "/workspace",
+    user: str | None = None,
 ) -> subprocess.CompletedProcess:
-    """Run a command inside the container."""
-    full_cmd = ["docker", "exec", "-w", workdir, container_id] + cmd
+    """Run a command inside the container, optionally as a specific user."""
+    user_flag = ["-u", user] if user else []
+    full_cmd = ["docker", "exec", "-w", workdir, *user_flag, container_id] + cmd
     return subprocess.run(
         full_cmd,
         capture_output=True,
@@ -447,62 +450,90 @@ def _verifier_meta_by_name(checkpoints: list[dict]) -> dict[str, tuple[float, in
     return meta
 
 
-def _setup_container(
+def _grading_file_manifest(
+    task_dir: Path, task_data: dict
+) -> tuple[dict[str, tuple[float, int]], set[str]]:
+    """Canonical checkpoint metadata and the full set of legitimate checkpoint names.
+
+    checkpoint_meta maps .verifiers/<name> -> (weight, timeout) from the task
+    toml, as before. canonical_names is the union of those toml-declared
+    checkpoints and the check scripts actually present under task_dir/checks
+    — either source can drift from the other, and both are host-authored
+    (never agent-writable), so the union is the trust boundary
+    _run_scoring() cross-validates returned checkpoint names against
+    (EnterpriseBench-7jpm AC3).
+    """
+    checkpoint_meta = _verifier_meta_by_name(task_data.get("checkpoints", []))
+    checks_dir = task_dir / "checks"
+    canonical_names = set(checkpoint_meta)
+    if checks_dir.is_dir():
+        canonical_names.update(
+            _checkpoint_verifier_name(p) for p in checks_dir.glob("*.sh")
+        )
+    return checkpoint_meta, canonical_names
+
+
+def _copy_grading_files(
     container_id: str,
     task_dir: Path,
-    task_data: dict,
-    mode: str = "baseline",
-) -> None:
-    """Copy task files into the running container.
+    checkpoint_meta: dict[str, tuple[float, int]],
+) -> list[str]:
+    """(Re-)copy every file scoring depends on fresh from the host.
 
-    - instruction.md -> /workspace/instruction.md
-    - checks/*.sh -> /workspace/.verifiers/
-    - test_runner.sh -> /workspace/test.sh
-    - eb_verify library -> /workspace/.eb_verify/ (if needed by check scripts)
+    Copies test.sh, each checkpoint verifier + its .meta, the eb_verify
+    library, and ground_truth.json. Deletes the destination paths first —
+    docker cp only overwrites the files it names, so without the delete an
+    agent-injected extra file (e.g. .verifiers/evil.sh + evil.meta) would
+    survive a "refresh" untouched and keep running via test_runner.sh's
+    unfiltered ``for verifier in .verifiers/*.sh`` loop. Called once at
+    initial setup and again immediately before scoring so nothing an agent
+    wrote during its session survives into the grading pass
+    (EnterpriseBench-7jpm). ground_truth.json is included alongside the
+    other grading files: verifiers read it directly, so rewriting it lets a
+    canonically-named, otherwise-legitimate verifier report a false pass —
+    the same bypass class as rewriting the verifier itself.
+
+    Returns the in-container paths written, for checksum verification. The
+    eb_verify library's own files are re-copied (so tampering there is
+    discarded like everything else) but not included in the returned list —
+    it's a whole vendored package tree, not a handful of small files, so it
+    isn't individually checksummed; the unconditional recopy is its only
+    integrity guarantee.
     """
-    # Copy instruction.md with output format appendix and optional MCP preamble
-    combined = _build_instruction_text(task_dir, mode, repos=task_data.get("repos", []))
-    if combined is not None:
-        _write_content_to_container(
-            container_id, combined, "/workspace/instruction.md", suffix=".md"
-        )
-        logger.info(
-            "Copied instruction.md (mode=%s) with output appendix into container",
-            mode,
-        )
-    else:
-        logger.warning("No instruction.md found in %s", task_dir)
-
-    # Create .verifiers directory and copy check scripts
+    _docker_exec(
+        container_id,
+        [
+            "bash",
+            "-c",
+            "rm -rf /workspace/.verifiers /workspace/test.sh /workspace/.eb_verify "
+            "/workspace/.task/ground_truth.json",
+        ],
+        user="root",
+    )
     _docker_exec(container_id, ["mkdir", "-p", "/workspace/.verifiers"])
 
-    # Map checkpoint verifier name -> (weight, timeout) from the task toml so
-    # test_runner.sh can read real weights from .verifiers/<name>.meta. Keyed by
-    # the same name the .sh file is copied under (verifier basename, "check_"
-    # prefix stripped). Without this, every checkpoint defaults to weight 1.0
-    # and task_score becomes a 0-N sum instead of the toml-weighted 0-1.
-    checkpoint_meta = _verifier_meta_by_name(task_data.get("checkpoints", []))
-
+    written: list[str] = []
     checks_dir = task_dir / "checks"
     if checks_dir.is_dir():
         check_scripts = sorted(checks_dir.glob("*.sh"))
         for check_script in check_scripts:
             # Rename to just <name>.sh for test_runner.sh compatibility
             name = _checkpoint_verifier_name(check_script)
-            dest = f"{container_id}:/workspace/.verifiers/{name}.sh"
-            _docker_cp(str(check_script), dest)
-            _docker_exec(
-                container_id, ["chmod", "+x", f"/workspace/.verifiers/{name}.sh"]
-            )
+            sh_path = f"/workspace/.verifiers/{name}.sh"
+            _docker_cp(str(check_script), f"{container_id}:{sh_path}")
+            _docker_exec(container_id, ["chmod", "+x", sh_path])
+            written.append(sh_path)
             meta = checkpoint_meta.get(name)
             if meta is not None:
                 weight, timeout = meta
+                meta_path = f"/workspace/.verifiers/{name}.meta"
                 _write_content_to_container(
                     container_id,
                     f"weight={weight}\ntimeout={timeout}\n",
-                    f"/workspace/.verifiers/{name}.meta",
+                    meta_path,
                     suffix=".meta",
                 )
+                written.append(meta_path)
         logger.info(
             "Copied %d check scripts into .verifiers/ (%d with weight metadata)",
             len(check_scripts),
@@ -515,6 +546,7 @@ def _setup_container(
     if TEST_RUNNER_SH.exists():
         _docker_cp(str(TEST_RUNNER_SH), f"{container_id}:/workspace/test.sh")
         _docker_exec(container_id, ["chmod", "+x", "/workspace/test.sh"])
+        written.append("/workspace/test.sh")
         logger.info("Copied test_runner.sh as /workspace/test.sh")
 
     # Copy eb_verify library for check scripts that import it.
@@ -531,36 +563,197 @@ def _setup_container(
     gt_file = task_dir / "ground_truth.json"
     _docker_exec(container_id, ["mkdir", "-p", "/workspace/.task"])
     if gt_file.exists():
-        _docker_cp(str(gt_file), f"{container_id}:/workspace/.task/ground_truth.json")
+        gt_path = "/workspace/.task/ground_truth.json"
+        _docker_cp(str(gt_file), f"{container_id}:{gt_path}")
+        written.append(gt_path)
         logger.info("Copied ground_truth.json into container")
 
-    # Fix ownership of copied files only — docker cp preserves host UID which
-    # may not match the agent user inside the container.
-    # Never chown -R /workspace (too slow for large repos like K8s, Terraform).
-    # Must run as root since the container default user may be non-root.
-    subprocess.run(
+    # Grading files are root-owned and non-writable by agent — never
+    # agent:agent. The agent has no legitimate reason to read or write
+    # test.sh/.verifiers/.eb_verify/ground_truth.json during its own
+    # session; granting it write access here was the direct cause of the
+    # original bug (EnterpriseBench-7jpm). The container's default user
+    # (docker exec with no -u) is `agent`, so root-owned + no group/other
+    # write is enough: read+execute bits from the host source files are
+    # preserved (test.sh/checks still run fine as agent at scoring time),
+    # only write access is removed.
+    _docker_exec(
+        container_id,
         [
-            "docker",
-            "exec",
-            "-u",
-            "root",
-            container_id,
             "bash",
             "-c",
-            "chown -R agent:agent "
-            "/workspace/instruction.md "
+            "chown -R root:root "
             "/workspace/.verifiers "
             "/workspace/.task "
             "/workspace/.eb_verify "
             "/workspace/test.sh "
+            "2>/dev/null; "
+            "chmod -R go-w "
+            "/workspace/.verifiers "
+            "/workspace/.task "
+            "/workspace/.eb_verify "
+            "/workspace/test.sh "
+            "2>/dev/null; true",
+        ],
+        user="root",
+        timeout=60,
+    )
+    return written
+
+
+def _container_file_checksum(container_id: str, path: str) -> str:
+    """sha256 of a single in-container file; "" if missing.
+
+    Runs as root so an agent that changed ownership or permissions on a
+    grading file can't hide it from the check by making it unreadable to
+    the default exec user (EnterpriseBench-7jpm AC2). Raises if the docker
+    exec itself fails (container gone, daemon error) instead of treating
+    that the same as "file missing" — cut's exit status, not sha256sum's,
+    determines this pipeline's own exit code, so a bad `docker exec`
+    invocation is the only case where the OUTER returncode is nonzero; an
+    infra fault must never be recorded as tamper evidence.
+    """
+    result = _docker_exec(
+        container_id,
+        ["bash", "-c", f"sha256sum {shlex.quote(path)} 2>/dev/null | cut -d' ' -f1"],
+        user="root",
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"docker exec failed while checksumming {path}: {result.stderr.strip()}"
+        )
+    return result.stdout.strip()
+
+
+def _kill_agent_processes(container_id: str) -> None:
+    """Terminate anything still running as the agent user.
+
+    A session can background a process (``cmd & disown``) that outlives its
+    own docker-exec invocation — orphans reparent inside the container and
+    keep running. Without this, such a process could keep rewriting
+    canonically-named grading files throughout the entire scoring window,
+    defeating the checksum-then-recopy defense by racing it instead of
+    editing a file once (EnterpriseBench-7jpm). Run before every refresh,
+    not just once, since a new one could be spawned between checks.
+    pkill exits 1 when nothing matches — the common case, not an error.
+    """
+    _docker_exec(container_id, ["pkill", "-9", "-u", "agent"], user="root")
+
+
+def _container_file_checksums(container_id: str, paths: list[str]) -> dict[str, str]:
+    """sha256 of each in-container path.
+
+    One docker exec per path — the grading-file set is small (a handful of
+    checkpoints per task), so per-path simplicity outweighs batching into a
+    single positionally-parsed script.
+    """
+    return {path: _container_file_checksum(container_id, path) for path in paths}
+
+
+def _refresh_and_verify_grading_files(
+    container_id: str,
+    task_dir: Path,
+    task_data: dict,
+    expected_checksums: dict[str, str],
+) -> list[dict[str, str]]:
+    """Kill lingering agent processes, detect tampering, then discard it.
+
+    Kills anything still running as the agent user FIRST — otherwise a
+    backgrounded process could keep rewriting a grading file after this
+    function's own checksum read, through the recopy below, and into
+    test_runner.sh's execution window. Then checksums grading files exactly
+    as the agent's session left them, diffs against the checksums
+    _setup_container recorded before the agent ever ran, then
+    unconditionally re-copies pristine, non-agent-writable files from the
+    host — scoring must never trust in-container grading state, tampered or
+    not (EnterpriseBench-7jpm AC1+AC2).
+
+    Returns a list of {"path", "expected", "found"} entries for every
+    grading file that was missing or modified since setup; empty if clean.
+    """
+    _kill_agent_processes(container_id)
+    checkpoint_meta, _ = _grading_file_manifest(task_dir, task_data)
+    paths = list(expected_checksums)
+    found_checksums = _container_file_checksums(container_id, paths)
+
+    # found_checksums covers exactly `paths` (== expected_checksums.keys()),
+    # so a plain index is safe — no default needed.
+    tampered = [
+        {"path": path, "expected": expected, "found": found_checksums[path]}
+        for path, expected in expected_checksums.items()
+        if found_checksums[path] != expected
+    ]
+    if tampered:
+        logger.error(
+            "GRADING FILE TAMPER DETECTED: %d file(s) modified since setup: %s",
+            len(tampered),
+            [t["path"] for t in tampered],
+        )
+
+    # Unconditional: discard whatever the agent left, tamper or not.
+    _copy_grading_files(container_id, task_dir, checkpoint_meta)
+    return tampered
+
+
+def _setup_container(
+    container_id: str,
+    task_dir: Path,
+    task_data: dict,
+    mode: str = "baseline",
+) -> tuple[dict[str, str], set[str]]:
+    """Copy task files into the running container.
+
+    - instruction.md -> /workspace/instruction.md
+    - checks/*.sh -> /workspace/.verifiers/
+    - test_runner.sh -> /workspace/test.sh
+    - eb_verify library -> /workspace/.eb_verify/ (if needed by check scripts)
+    - ground_truth.json -> /workspace/.task/ground_truth.json
+
+    Returns (grading_checksums, canonical_checkpoint_names): a sha256 of
+    every grading file computed immediately after copying, while the
+    container is still pre-agent-session and therefore trusted — the anchor
+    _refresh_and_verify_grading_files() later checks the post-agent-session
+    state against (EnterpriseBench-7jpm).
+    """
+    # Copy instruction.md with output format appendix and optional MCP preamble
+    combined = _build_instruction_text(task_dir, mode, repos=task_data.get("repos", []))
+    if combined is not None:
+        _write_content_to_container(
+            container_id, combined, "/workspace/instruction.md", suffix=".md"
+        )
+        logger.info(
+            "Copied instruction.md (mode=%s) with output appendix into container",
+            mode,
+        )
+    else:
+        logger.warning("No instruction.md found in %s", task_dir)
+
+    checkpoint_meta, canonical_names = _grading_file_manifest(task_dir, task_data)
+    grading_paths = _copy_grading_files(container_id, task_dir, checkpoint_meta)
+    grading_checksums = _container_file_checksums(container_id, grading_paths)
+
+    # Fix ownership of the remaining copied files — docker cp preserves host
+    # UID which may not match the agent user inside the container. Never
+    # chown -R /workspace (too slow for large repos like K8s, Terraform).
+    # Grading files (.verifiers, .eb_verify, test.sh, .task) are chowned
+    # inside _copy_grading_files, since that's also where they get refreshed
+    # pre-scoring.
+    _docker_exec(
+        container_id,
+        [
+            "bash",
+            "-c",
+            "chown -R agent:agent "
+            "/workspace/instruction.md "
             "/workspace/agent_output "
             "/workspace/.mcp.json "
             "2>/dev/null; true",
         ],
-        capture_output=True,
-        text=True,
+        user="root",
         timeout=60,
     )
+
+    return grading_checksums, canonical_names
 
 
 def _install_claude_cli(container_id: str) -> bool:
@@ -746,8 +939,23 @@ def _run_agent(
     return exit_code, duration
 
 
-def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
-    """Run /workspace/test.sh and capture the JSON results."""
+def _run_scoring(
+    container_id: str,
+    verifier_timeout: int = 600,
+    canonical_checkpoint_names: set[str] | None = None,
+) -> dict:
+    """Run /workspace/test.sh and capture the JSON results.
+
+    If canonical_checkpoint_names is given, any returned checkpoint whose
+    name isn't in that set is excluded from the recomputed task_score /
+    checkpoints_passed / checkpoints_total / all_passed and reported under
+    scores["rejected_checkpoints"] — a forged, renamed, or extra checkpoint
+    an agent injected via .verifiers/*.sh + *.meta (EnterpriseBench-7jpm
+    AC3). Rejected entries are removed from scores["checkpoints"] itself,
+    not just flagged, so downstream consumers — including
+    _apply_llm_judge()'s own task_score recompute for llm_curator tasks —
+    can't re-inflate the score from them.
+    """
     logger.info("Running checkpoint verifiers (timeout=%ds)...", verifier_timeout)
 
     result = _docker_exec(
@@ -784,6 +992,31 @@ def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
             "error": f"test.sh output was not valid JSON: {e}",
             "raw_output": stdout[:2000],
         }
+
+    if canonical_checkpoint_names is not None:
+        checkpoints = scores.get("checkpoints", [])
+        accepted = [c for c in checkpoints if c.get("name") in canonical_checkpoint_names]
+        rejected = [c for c in checkpoints if c.get("name") not in canonical_checkpoint_names]
+        if rejected:
+            logger.error(
+                "REJECTED %d non-canonical checkpoint(s) from scoring: %s",
+                len(rejected),
+                [c.get("name") for c in rejected],
+            )
+            scores["rejected_checkpoints"] = rejected
+            scores["checkpoints"] = accepted
+            total_weight = sum(c.get("weight", 1.0) for c in accepted)
+            scores["task_score"] = (
+                sum(c.get("score", 0.0) * c.get("weight", 1.0) for c in accepted)
+                if total_weight > 0
+                else 0.0
+            )
+            scores["checkpoints_passed"] = sum(1 for c in accepted if c.get("passed"))
+            scores["checkpoints_total"] = len(accepted)
+            scores["all_passed"] = (
+                scores["checkpoints_total"] > 0
+                and scores["checkpoints_passed"] == scores["checkpoints_total"]
+            )
 
     return scores
 
@@ -866,7 +1099,12 @@ def _apply_llm_judge(
             "expected_solution (candidates: %s) — routing to verifier_infra_error",
             ", ".join(candidates),
         )
-        scores["verifier_infra_error"] = {
+        # setdefault, not assignment: a grading-integrity violation detected
+        # earlier in the pipeline (EnterpriseBench-7jpm) already recorded its
+        # own reason here, and that's the more actionable one to keep — an
+        # agent tampering with grading files explains a missing artifact
+        # better than "no_agent_output" alone would.
+        scores.setdefault("verifier_infra_error", {
             "reason": "no_agent_output",
             "stage": "llm_judge",
             "detail": (
@@ -876,7 +1114,7 @@ def _apply_llm_judge(
                 "must not be recorded as the final measurement"
             ),
             "candidates": candidates,
-        }
+        })
         return scores
 
     try:
@@ -1538,7 +1776,9 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
             )
             result.container_id = container_id
             _docker_start(container_id)
-            _setup_container(container_id, task_dir, task_data, mode=config.mode)
+            grading_checksums, canonical_checkpoint_names = _setup_container(
+                container_id, task_dir, task_data, mode=config.mode
+            )
         except Exception as setup_exc:
             result.phase = "setup_failed"
             result.error = str(setup_exc)
@@ -1692,15 +1932,57 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
 
         # --- Phase 5: Score (Tier 1 — deterministic) ---
         t0 = time.monotonic()
-        scores = _run_scoring(container_id, config.verifier_timeout)
+        # Discard anything the agent wrote to test.sh/.verifiers/.eb_verify/
+        # ground_truth.json during its session and re-check integrity before
+        # trusting any of it (EnterpriseBench-7jpm AC1+AC2). This must run
+        # immediately before _run_scoring(), after the agent phase ends.
+        tampered_files = _refresh_and_verify_grading_files(
+            container_id, task_dir, task_data, grading_checksums
+        )
+        scores = _run_scoring(
+            container_id, config.verifier_timeout, canonical_checkpoint_names
+        )
         timings["scoring"] = time.monotonic() - t0
+
+        if tampered_files:
+            scores["grading_tamper"] = tampered_files
+
+        if scores.get("grading_tamper") or scores.get("rejected_checkpoints"):
+            # Distinct from verifier_infra_error: this is agent malfeasance,
+            # not a system fault, so it gets its own failure_class for
+            # run_task.py's own routing below...
+            result.failure_class = "grading_integrity_violation"
+            result.phase = "grading_integrity_violation"
+            # ...but existing result-aggregation consumers (aggregate_baseline_aq8e.py,
+            # rescore_baseline_aq8e.py) only key off scores["verifier_infra_error"],
+            # so also set that marker to keep the run excluded from their
+            # scored-results totals without touching five more scripts.
+            scores.setdefault(
+                "verifier_infra_error",
+                {
+                    "reason": "grading_integrity",
+                    "stage": "scoring",
+                    "detail": (
+                        "grading files were tampered with and/or the scoring "
+                        "JSON contained non-canonical checkpoint names during "
+                        "this run; task_score reflects only canonical, "
+                        "post-refresh checkpoints and this run must not be "
+                        "counted as a normal scored result"
+                    ),
+                },
+            )
+            logger.warning(
+                "Grading integrity violation: tampered=%s rejected_checkpoints=%s",
+                [t["path"] for t in scores.get("grading_tamper", [])],
+                [c.get("name") for c in scores.get("rejected_checkpoints", [])],
+            )
 
         # --- Phase 5b: Score (Tier 2 — LLM curator) ---
         verification_modes = task_data.get("verification_modes", ["deterministic"])
         if "llm_curator" in verification_modes:
             scores = _apply_llm_judge(scores, task_dir, container_id, task_data)
             infra_err = scores.get("verifier_infra_error")
-            if infra_err:
+            if infra_err and result.phase != "grading_integrity_violation":
                 result.failure_class = "verifier_infra_error"
                 result.phase = "verifier_infra_error"
                 logger.warning(
@@ -1712,7 +1994,7 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         result.scores = scores
 
         # --- Save ---
-        if result.phase not in ("agent_infra_error", "verifier_infra_error"):
+        if result.phase not in ("agent_infra_error", "verifier_infra_error", "grading_integrity_violation"):
             result.phase = "complete"
             result.success = True
         result.timing = timings

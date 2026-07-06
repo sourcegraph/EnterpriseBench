@@ -12,6 +12,7 @@ Verifies:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sys
@@ -198,11 +199,13 @@ class TestMcpEnvVars:
         ), patch(
             "run_task._docker_start"
         ), patch(
-            "run_task._setup_container"
+            "run_task._setup_container", return_value=({}, set())
         ), patch(
             "run_task._run_health_check", return_value=True
         ), patch(
             "run_task._configure_mcp"
+        ), patch(
+            "run_task._refresh_and_verify_grading_files", return_value=[]
         ), patch(
             "run_task._run_agent", side_effect=mock_run_agent
         ) as mock_agent, patch(
@@ -308,39 +311,54 @@ class TestMcpPreflightHardFail:
             mode=mode,
         )
 
-        with patch("run_task._parse_task", return_value=self._fake_task_data()), patch(
-            "run_task._generate_dockerfile", return_value=Path("/fake/Dockerfile")
-        ), patch("run_task._docker_build"), patch(
-            "run_task._docker_create_container", return_value="fake-container-id"
-        ), patch("run_task._docker_start"), patch("run_task._setup_container"), patch(
-            "run_task._run_health_check", return_value=True
-        ), patch(
+        # ExitStack, not a chained `with A, B, C, ...:` — this many patches
+        # chained in one `with` statement sits right at CPython's
+        # statically-nested-block compile limit, and nesting a second `with`
+        # inside the first doesn't help (the depth is cumulative).
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(
+                patch("run_task._parse_task", return_value=self._fake_task_data())
+            )
+            stack.enter_context(
+                patch("run_task._generate_dockerfile", return_value=Path("/fake/Dockerfile"))
+            )
+            stack.enter_context(patch("run_task._docker_build"))
+            stack.enter_context(
+                patch("run_task._docker_create_container", return_value="fake-container-id")
+            )
+            stack.enter_context(patch("run_task._docker_start"))
+            stack.enter_context(
+                patch("run_task._setup_container", return_value=({}, set()))
+            )
+            stack.enter_context(patch("run_task._run_health_check", return_value=True))
             # Simulate a 401 / unreachable endpoint: HTTP pre-flight fails.
-            "run_task._verify_mcp_endpoint",
-            return_value=False,
-        ), patch(
-            "run_task._docker_cp"
-        ), patch(
-            "run_task._docker_exec",
-            return_value=MagicMock(returncode=0, stdout="", stderr=""),
-        ), patch(
-            "run_task._mcp_exec",
-            return_value=MagicMock(returncode=0, stdout="", stderr=""),
-        ), patch(
-            "run_task._run_agent", side_effect=agent_mock
-        ), patch(
-            "run_task._run_scoring", return_value={"task_score": 0.0}
-        ), patch("run_task._save_results"), patch(
-            "run_task._extract_tool_usage", return_value={}
-        ), patch(
-            "run_task._copy_agent_trace", return_value=False
-        ), patch(
-            "run_task._check_disk_space", return_value=True
-        ), patch("run_task._docker_stop_rm"), patch(
-            "run_task.time.sleep"
-        ), patch.dict(
-            os.environ, {"SOURCEGRAPH_ACCESS_TOKEN": "sgp_expired_token"}
-        ):
+            stack.enter_context(patch("run_task._verify_mcp_endpoint", return_value=False))
+            stack.enter_context(patch("run_task._docker_cp"))
+            stack.enter_context(
+                patch(
+                    "run_task._docker_exec",
+                    return_value=MagicMock(returncode=0, stdout="", stderr=""),
+                )
+            )
+            stack.enter_context(
+                patch(
+                    "run_task._mcp_exec",
+                    return_value=MagicMock(returncode=0, stdout="", stderr=""),
+                )
+            )
+            stack.enter_context(patch("run_task._run_agent", side_effect=agent_mock))
+            stack.enter_context(patch("run_task._refresh_and_verify_grading_files", return_value=[]))
+            stack.enter_context(patch("run_task._run_scoring", return_value={"task_score": 0.0}))
+            stack.enter_context(patch("run_task._save_results"))
+            stack.enter_context(patch("run_task._extract_tool_usage", return_value={}))
+            stack.enter_context(patch("run_task._copy_agent_trace", return_value=False))
+            stack.enter_context(patch("run_task._check_disk_space", return_value=True))
+            stack.enter_context(patch("run_task._docker_stop_rm"))
+            stack.enter_context(patch("run_task.time.sleep"))
+            stack.enter_context(
+                patch.dict(os.environ, {"SOURCEGRAPH_ACCESS_TOKEN": "sgp_expired_token"})
+            )
+
             result = run_task(config)
 
         return result, agent_mock
@@ -384,7 +402,9 @@ class TestMcpPreflightHardFail:
             "run_task._generate_dockerfile", return_value=Path("/fake/Dockerfile")
         ), patch("run_task._docker_build"), patch(
             "run_task._docker_create_container", return_value="fake-container-id"
-        ), patch("run_task._docker_start"), patch("run_task._setup_container"), patch(
+        ), patch("run_task._docker_start"), patch(
+            "run_task._setup_container", return_value=({}, set())
+        ), patch(
             "run_task._run_health_check", return_value=True
         ), patch(
             "run_task._verify_mcp_endpoint", side_effect=verify_mock
@@ -394,6 +414,8 @@ class TestMcpPreflightHardFail:
             "run_task._assert_agent_readable", return_value=(True, "")
         ), patch(
             "run_task._run_agent", side_effect=agent_mock
+        ), patch(
+            "run_task._refresh_and_verify_grading_files", return_value=[]
         ), patch(
             "run_task._run_scoring", return_value={"task_score": 1.0}
         ), patch("run_task._save_results"), patch(
