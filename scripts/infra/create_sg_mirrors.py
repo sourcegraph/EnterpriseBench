@@ -46,6 +46,9 @@ from mirror_naming import GITHUB_REPO_NAME_RE, ORG, derive_mirror_name, is_hex_r
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MANIFEST_DIR = REPO_ROOT / "configs" / "runs"
 
+sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
+from validation import validate_repo_entry  # noqa: E402
+
 
 # ═══════════════════════════════════════════════════════════════
 #  TASK.TOML PARSING
@@ -211,6 +214,7 @@ def extract_mirrors_from_task(task_data: dict, task_file: Path) -> list[dict]:
         rev = repo.get("rev", "")
         if not url or not rev:
             continue
+        validate_repo_entry(repo)
 
         # Normalize URL: strip https://, trailing .git
         upstream = url.replace("https://", "").replace("http://", "").rstrip("/")
@@ -248,16 +252,31 @@ def merge_mirrors(all_mirrors: list[dict]) -> list[dict]:
 # ═══════════════════════════════════════════════════════════════
 
 def generate_manifest(task_files: list[Path]) -> dict:
-    """Generate a mirror creation manifest from task files."""
+    """Generate a mirror creation manifest from task files.
+
+    A task file with a repo entry that fails validate_repo_entry() (unsafe
+    characters, path traversal) is rejected outright and listed under
+    "_rejected" so callers can fail the run loudly, rather than silently
+    dropping an unsafe entry alongside ordinary TOML parse errors.
+    """
     all_mirrors = []
+    rejected = []
 
     for task_file in task_files:
         try:
             task_data = parse_toml(task_file)
-            mirrors = extract_mirrors_from_task(task_data, task_file)
-            all_mirrors.extend(mirrors)
         except Exception as e:
             print(f"WARNING: Failed to parse {task_file}: {e}", file=sys.stderr)
+            continue
+
+        try:
+            mirrors = extract_mirrors_from_task(task_data, task_file)
+        except ValueError as e:
+            print(f"ERROR: Rejected unsafe repo entry in {task_file}: {e}", file=sys.stderr)
+            rejected.append(str(task_file))
+            continue
+
+        all_mirrors.extend(mirrors)
 
     merged = merge_mirrors(all_mirrors)
 
@@ -265,6 +284,7 @@ def generate_manifest(task_files: list[Path]) -> dict:
         "_description": "Mirrors needed for reproducible Sourcegraph indexing (EnterpriseBench)",
         "_generated": str(date.today()),
         "_status": f"{len(merged)} mirrors from {len(task_files)} task files",
+        "_rejected": rejected,
         "mirrors": merged,
     }
 
@@ -515,6 +535,12 @@ def main():
     # Generate manifest
     manifest = generate_manifest(task_files)
     print(f"Generated manifest with {len(manifest['mirrors'])} mirrors")
+    if manifest["_rejected"]:
+        print(
+            f"REJECTED {len(manifest['_rejected'])} task file(s) with unsafe repo "
+            f"entries (see ERROR lines above): {', '.join(manifest['_rejected'])}",
+            file=sys.stderr,
+        )
 
     # Write manifest
     output_path = args.output or (MANIFEST_DIR / "mirror_creation_manifest.json")
@@ -534,6 +560,9 @@ def main():
         print("\n" + "=" * 60)
         execute_mirrors(manifest, dry_run=args.dry_run,
                         skip_existing=not args.no_skip)
+
+    if manifest["_rejected"]:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
