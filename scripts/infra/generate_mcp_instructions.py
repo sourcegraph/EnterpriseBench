@@ -89,9 +89,6 @@ def generate_instruction_mcp(task_data: dict) -> str:
         path = repo.get("path", "")
         role = repo.get("role", "unknown")
 
-        if not url or not rev:
-            continue
-
         full_mirror = f"{ORG}/{mirror_name_for_repo(url, rev)}"
         full_mirrors.append(full_mirror)
 
