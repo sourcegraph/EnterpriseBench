@@ -130,3 +130,21 @@ confidence = 0.85
 path = "clientv3/balancer/connectivity.go"
 repo = "etcd"
 confidence = 0.80
+
+[[qa.waivers]]
+code = "F2"
+token = "balancer/balancer.go"
+decision = "waive"
+rationale = "Producer-side changed file named as the given upstream change (grpc-go PR #3309 type-alias removal). The scored discovery is the unnamed etcd clientv3 balancer/resolver consumers; naming the producer file is intrinsic to the ticket."
+approved_by = "stephanie.jarmak (dec-uon CLOSED)"
+bead = "EnterpriseBench-1is"
+date = "2026-06-04"
+
+[[qa.waivers]]
+code = "F2"
+token = "resolver/resolver.go"
+decision = "waive"
+rationale = "Second producer-side changed file from the same PR #3309, named alongside balancer.go as the given entry point. Discriminative discovery (etcd consumers) is not named."
+approved_by = "stephanie.jarmak (dec-uon CLOSED)"
+bead = "EnterpriseBench-1is"
+date = "2026-06-04"

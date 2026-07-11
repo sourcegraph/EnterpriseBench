@@ -103,6 +103,25 @@ This is the natural-language prompt shown to the agent. Write it as if you are a
 
 See `benchmarks/feature_delivery/monorepo-boundary-001/instruction.md` for a good example.
 
+**Gate B (leakage classifier)** checks this automatically once `ground_truth.json` /
+`task.toml [ground_truth]` exist:
+
+```bash
+python3 scripts/validation/leak_classifier.py benchmarks/{suite}/{task-id}
+```
+
+It classifies the instruction against `required_files`/`sufficient_files` into a leak
+bucket: `exact_path` / `symbol` / `dir` reject (the instruction hands the agent the
+answer's location); `behavioral` / `grep_hard` admit. If it REJECTs, reword the
+instruction to describe the *problem* (symptom, context, desired output) rather than
+naming the file/symbol/directory that holds the fix. A named path is only acceptable
+when it is a genuine given entry point and the *scored* discovery target is downstream
+(e.g. "the migration is already written at `X`, assess the impact") — in that case,
+record the exception as a `[[qa.waivers]]` entry in `task.toml` (see
+`docs/qa/eb_f2_triage_2026_06_04.md` for worked examples) rather than rewording away a
+task's realism. Gate B honors `qa.waivers` for `exact_path` only; `symbol`/`dir` leaks
+always reject and must be reworded.
+
 ### 4. Write ground_truth.json
 
 Provide the provenance data that verifiers use to score the agent's output:
@@ -230,6 +249,9 @@ Before submitting a new task:
 
 - [ ] `task.toml` passes schema validation
 - [ ] `instruction.md` reads naturally, does not give away the answer
+- [ ] `python3 scripts/validation/leak_classifier.py benchmarks/{suite}/{task-id}` reports
+      `ADMIT` (Gate B) — or, if it REJECTs a genuine given entry point, a
+      `[[qa.waivers]]` entry is recorded with rationale, not a reworded-away task
 - [ ] `ground_truth.json` has provenance data with confidence scores
 - [ ] Each checkpoint has a verifier script in `checks/`
 - [ ] Verifier scripts output valid JSON with score/passed/reason
