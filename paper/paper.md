@@ -189,10 +189,14 @@ evaluated, ensuring tool-independent ground truth.
 
 This section states the analytical design used to interpret cost and outcome
 differences between EnterpriseBench's tool-access modes, building on prior
-measurement from CodeScaleBench, EnterpriseBench's direct predecessor (§8). No
-retrieval effect in this paper is reported as a single corpus-wide number:
-every effect is reported within a difficulty stratum, because the underlying
-task mix otherwise determines the aggregate on its own. The design rests on
+measurement from CodeScaleBench, EnterpriseBench's direct predecessor (§8). A
+retrieval effect read off the whole corpus at once is not interpretable,
+because the underlying task mix determines the aggregate on its own; the
+design therefore commits to reporting every effect within a difficulty
+stratum. The results in §6 predate that commitment. They come from a single
+flat pass over the corpus (§5.4), so the aggregate per-mode deltas reported
+there still carry the task-mix confound this section is built to remove, and
+the stratified re-analysis remains pending (§3.2, §3.6). The design rests on
 seven commitments: an information-parity precondition on the baseline, a
 localization-difficulty stratification distinct from the repo-count strata of
 §2.4, a corpus leakage audit, a subagent-inclusive cost decomposition, a
