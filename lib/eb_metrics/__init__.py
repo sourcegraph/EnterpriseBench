@@ -12,9 +12,16 @@ from eb_metrics.trace_quality_adapter import (
     metrics_from_results_file,
 )
 from eb_metrics.aggregate_quality import build_quality_metrics
-from eb_metrics.ir_metrics import IRScores, compute_ir_scores
+from eb_metrics.ir_metrics import (
+    IRScores,
+    compute_ir_scores,
+    localization_at_1,
+    localization_at_k,
+)
 from eb_metrics.retrieval_extraction import (
+    TTFRResult,
     compute_run_ir_scores,
+    compute_ttfr,
     required_files_from_ground_truth,
     resolve_ground_truth,
     retrieved_files_from_trace,
@@ -32,7 +39,11 @@ __all__ = [
     "metrics_from_results_file",
     "IRScores",
     "compute_ir_scores",
+    "localization_at_1",
+    "localization_at_k",
     "compute_run_ir_scores",
+    "TTFRResult",
+    "compute_ttfr",
     "required_files_from_ground_truth",
     "resolve_ground_truth",
     "retrieved_files_from_trace",

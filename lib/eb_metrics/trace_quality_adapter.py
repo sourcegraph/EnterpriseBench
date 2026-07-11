@@ -125,10 +125,14 @@ def metrics_from_eb_record(
       ``retrieval`` argument: ``recall = file_recall`` (fraction of a
       task's ``required_files`` the agent opened) and ``f1`` = its harmonic
       mean with context-efficiency. Both stay ``None`` when no retrieval
-      signal is available. The full per-k IR object is stored under
-      ``detail['retrieval_metrics']``, and ``recall`` below
+      signal is available. The full per-k IR object — including
+      localization@1/@k and the turns-/tokens-/seconds-to-first-relevant
+      (TTFR) fields (jn73.1) — is stored under
+      ``detail['retrieval_metrics']``. ``recall`` below
       ``LOW_RECALL_THRESHOLD`` adds the ``low_recall`` flag (mirroring
-      codeprobe's native oracle path).
+      codeprobe's native oracle path); a TTFR ``ttfr_coverage`` of
+      ``"no_tool_calls"`` (an observability gap, not a genuine miss) adds
+      ``ttfr_unavailable`` rather than leaving a silently absent signal.
     * Flags: a per-failure-class flag for every non-null
       ``failure_class``; ``invalid`` for every invalid trial; one
       ``checkpoint_<name>_failed`` flag per failing checkpoint.
@@ -203,6 +207,8 @@ def metrics_from_eb_record(
         detail["retrieval_metrics"] = retrieval.to_dict()
         if recall < LOW_RECALL_THRESHOLD:
             flags.append("low_recall")
+        if retrieval.ttfr_coverage == "no_tool_calls":
+            flags.append("ttfr_unavailable")
 
     return TraceQualityMetrics(
         task_id=task_id,

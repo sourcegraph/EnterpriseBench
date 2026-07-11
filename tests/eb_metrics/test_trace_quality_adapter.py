@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 from typing import Any
@@ -220,6 +221,47 @@ def test_no_retrieval_leaves_recall_none() -> None:
     assert m.recall is None
     assert m.f1 is None
     assert "retrieval_metrics" not in m.detail
+
+
+def test_retrieval_metrics_detail_carries_localization_and_ttfr(tmp_path: Path) -> None:
+    # jn73.1: localization@k and TTFR ride along in the full IRScores dict,
+    # no adapter-side schema change needed to surface them.
+    ir = compute_ir_scores(["pkg/a.go"], ["pkg/a.go"], "t", "baseline")
+    ir = dataclasses.replace(
+        ir,
+        turns_to_first_relevant=3,
+        tokens_to_first_relevant=1200,
+        ttfr_seconds=8.5,
+        ttfr_coverage="ok",
+    )
+    m = metrics_from_eb_record(_record(task_id="ret-004"), run_name="baseline", retrieval=ir)
+
+    rm = m.detail["retrieval_metrics"]
+    assert rm["localization"] == {1: 1.0, 3: 1.0, 5: 1.0, 10: 1.0}
+    assert rm["turns_to_first_relevant"] == 3
+    assert rm["tokens_to_first_relevant"] == 1200
+    assert rm["ttfr_seconds"] == 8.5
+    assert rm["ttfr_coverage"] == "ok"
+    assert "ttfr_unavailable" not in m.quality_flags
+
+
+def test_retrieval_ttfr_no_tool_calls_flags_observability_gap() -> None:
+    # An observability gap (agent made zero tool calls) is distinct from a
+    # genuine "found nothing" miss -- it gets its own flag, not low_recall
+    # alone, so it's not misread as the agent having tried and failed.
+    ir = compute_ir_scores([], ["pkg/a.go"], "t", "baseline")
+    ir = dataclasses.replace(ir, ttfr_coverage="no_tool_calls")
+    m = metrics_from_eb_record(_record(task_id="ret-005"), run_name="baseline", retrieval=ir)
+    assert "ttfr_unavailable" in m.quality_flags
+
+
+def test_retrieval_ttfr_genuine_miss_does_not_flag_unavailable() -> None:
+    # coverage == "not_found" is a real signal (the agent tried and missed),
+    # not an observability gap -- must NOT get the ttfr_unavailable flag.
+    ir = compute_ir_scores(["pkg/other.go"], ["pkg/a.go"], "t", "baseline")
+    ir = dataclasses.replace(ir, ttfr_coverage="not_found")
+    m = metrics_from_eb_record(_record(task_id="ret-006"), run_name="baseline", retrieval=ir)
+    assert "ttfr_unavailable" not in m.quality_flags
 
 
 def _trace_line(name: str, inp: dict) -> str:
