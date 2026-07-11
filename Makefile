@@ -49,6 +49,10 @@ verify-crnt: ## Validate Cross-Repo Necessity Test for multi-repo tasks
 verify-expected-solutions: ## Validate expected_solution.json files
 	$(PYTHON) scripts/validation/validate_expected_solutions.py
 
+.PHONY: verify-leak
+verify-leak: ## Gate B: oracle-token leakage classification over the task corpus
+	$(PYTHON) scripts/validation/leak_classifier.py --corpus benchmarks/
+
 .PHONY: analyze
 analyze: ## Run the score analysis engine (always re-scans raw runs)
 	@mkdir -p $(dir $(ANALYSIS_JSON))
