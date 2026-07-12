@@ -464,3 +464,27 @@ def test_ttfr_is_keyed_by_task_id_not_directory_name():
                            params, runs_root=runs)
     assert scored is not None
     assert scored.gates["C"].evidence.get("run_key") == "cal-err-flask-blueprint-001"
+
+
+def test_an_absent_gate_is_unmeasured_not_final():
+    """Found by self-attack: `unmeasured_gates` originally counted only PENDING
+    gates, so an artifact whose tasks simply OMITTED gates C/E/F reported
+    is_final=True and admitted_task_ids() did not raise.
+
+    An absent gate is strictly worse than a pending one -- it carries no status,
+    no reason and no input contract, so nothing downstream can even see it was
+    never evaluated. Finality must require presence, not just absence of PENDING.
+    """
+    partial = ss.TaskGates("t1", "s", {
+        g: ss.GateEvidence(g, ss.GateStatus.PASS, "ok") for g in ("A", "B", "D")
+    })
+    assert partial.missing_gates == ["C", "E", "F"]
+    assert partial.is_final is False
+    assert partial.admitted is False
+
+    art = ss.StratumArtifact("v", ss.SelectorParams(), [partial], "sha")
+    assert art.unmeasured_gates == ["C", "E", "F"]
+    assert art.is_final is False
+    assert art.to_dict()["stratum_status"] == "CANDIDATE"
+    with pytest.raises(ss.StratumNotFinalError):
+        art.admitted_task_ids()

@@ -198,8 +198,20 @@ class TaskGates:
                 and self.gates[g].status is GateStatus.PENDING_MEASUREMENT]
 
     @property
+    def missing_gates(self) -> list[str]:
+        """Gates absent from the dict entirely -- not pending, just not there.
+
+        An ABSENT gate is strictly worse than a pending one: it carries no
+        status, no reason and no input contract, so nothing downstream can even
+        see that it was never evaluated. Finality must therefore require
+        presence, not merely the absence of PENDING -- otherwise an artifact
+        that simply omits its gates stamps itself FINAL.
+        """
+        return [g for g in ALL_GATES if g not in self.gates]
+
+    @property
     def is_final(self) -> bool:
-        return not self.pending_gates
+        return not self.pending_gates and not self.missing_gates
 
     @property
     def failed_gates(self) -> list[str]:
@@ -259,9 +271,15 @@ class StratumArtifact:
 
     @property
     def unmeasured_gates(self) -> list[str]:
+        """Gates that are pending OR absent for at least one task.
+
+        Absent counts as unmeasured. A gate nobody scored and nobody recorded
+        is not a measured gate just because it left no trace.
+        """
         seen: set[str] = set()
         for t in self.tasks:
             seen.update(t.pending_gates)
+            seen.update(t.missing_gates)
         return [g for g in ALL_GATES if g in seen]
 
     @property
