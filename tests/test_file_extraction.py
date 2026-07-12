@@ -16,6 +16,13 @@ from pathlib import Path
 
 import pytest
 
+# Import the real sentinel rather than re-spelling it: scorer_guard is what greps
+# for it, so a test asserting against its own copy would pass straight through a
+# drift that silently re-books infra failures as agent zeros.
+from eb_verify.scorer_guard import INFRA_SENTINEL
+from eb_verify.runner import CheckpointRunner
+from eb_verify.task_parser import parse_task
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LIB_DIR = REPO_ROOT / "lib"
 
@@ -25,10 +32,8 @@ AFFECTED_TASKS = [
     "benchmarks/customer_escalation/err-provenance-tri-httpx-proxy-001",
 ]
 
-INFRA_SENTINEL = "VERIFIER_INFRA_ERROR"
 
-
-def run_cli(answer_file, gt_file, keys="source_files,files,error_source.files", policy="suffix"):
+def run_cli(answer_file, gt_file, keys="source_files,files,error_source.files", argv=None):
     """Invoke the scorer exactly as the check scripts do."""
     env = os.environ.copy()
     env["PYTHONPATH"] = str(LIB_DIR)
@@ -36,7 +41,7 @@ def run_cli(answer_file, gt_file, keys="source_files,files,error_source.files", 
     env["GT_FILE"] = str(gt_file)
     proc = subprocess.run(
         [sys.executable, "-m", "eb_verify.plugins.file_extraction",
-         "--keys", keys, "--policy", policy],
+         *(argv if argv is not None else ["--keys", keys])],
         capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
     )
     return proc
@@ -219,9 +224,9 @@ def test_non_utf8_answer_is_a_real_zero_not_a_crash(tmp_path):
 
 
 @pytest.mark.parametrize("argv", [
-    ["--policy", "suffix"],                    # --keys omitted
-    ["--keys", "source_files", "--polciy", "suffix"],  # typo'd flag
-    ["--keys", "source_files", "--policy", "bogus"],   # bad choice
+    [],                                        # --keys omitted
+    ["--kesy", "source_files"],                # typo'd flag
+    ["--keys", "source_files", "--policy", "suffix"],  # flag that no longer exists
     ["--help"],                                # would print usage on stdout, exit 0
 ])
 def test_cli_misuse_emits_infra_json_and_never_a_fabricated_score(tmp_path, argv):
@@ -233,14 +238,8 @@ def test_cli_misuse_emits_infra_json_and_never_a_fabricated_score(tmp_path, argv
     gt = gt_with(tmp_path, ["httpx/httpx/_config.py"])
     answer = write_json(tmp_path / "answer.json", {"source_files": ["httpx/_config.py"]})
 
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(LIB_DIR)
-    env["ANSWER_FILE"] = str(answer)
-    env["GT_FILE"] = str(gt)
-    proc = subprocess.run(
-        [sys.executable, "-m", "eb_verify.plugins.file_extraction", *argv],
-        capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
-    )
+    proc = run_cli(answer, gt, argv=argv)
+
     payload = json.loads(proc.stdout)  # must be JSON, not usage text
     assert payload["score"] == 0.0
     assert payload["passed"] is False
@@ -261,7 +260,7 @@ def test_broken_stdout_is_an_infra_error_not_a_false_zero(tmp_path):
     env["GT_FILE"] = str(gt)
     proc = subprocess.Popen(
         [sys.executable, "-m", "eb_verify.plugins.file_extraction",
-         "--keys", "source_files", "--policy", "suffix"],
+         "--keys", "source_files"],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=str(REPO_ROOT),
     )
     proc.stdout.close()  # the reader goes away, so the write breaks
@@ -376,52 +375,66 @@ def test_deeply_nested_gt_is_an_infra_error_not_a_recursion_crash(tmp_path):
     assert proc.returncode != 0
 
 
-# --- end-to-end through the actual check scripts -----------------------------
+# --- end-to-end through the real runner --------------------------------------
+#
+# Driven through CheckpointRunner, not by shelling out to the check script
+# directly: the runner is the real host-side caller, and it is what puts the
+# harness on PYTHONPATH. Invoking the script standalone would pass even if the
+# runner stopped exporting it — which is the missing-module false zero (ssikq)
+# wearing a different hat.
 
-@pytest.mark.parametrize("task_dir", AFFECTED_TASKS)
-def test_real_check_script_scores_a_correct_answer(tmp_path, task_dir):
-    """`bash check_error_source.sh` on the real task, with a correct answer.
+def run_error_source_checkpoint(task_dir: str, answer, tmp_path, monkeypatch):
+    """Score the real error_source checkpoint of a real task against `answer`.
 
-    This is the regression that would have caught the missing module: before the
-    fix it exits 1 with empty stdout and a ModuleNotFoundError.
+    PYTHONPATH is scrubbed first. The suite itself is run with PYTHONPATH=lib, and
+    run_checkpoint inherits os.environ — so leaving it set would let the ambient
+    value carry the child process and these tests would still pass if the runner
+    stopped exporting it. Dropping it here is what makes them a real guard. (Safe
+    in-process: eb_verify is already imported, and PYTHONPATH is only read at
+    interpreter startup.)
     """
-    task = REPO_ROOT / task_dir
-    gt = json.loads((task / "ground_truth.json").read_text())
-    # Answer with the repo-relative form an agent working inside /workspace/<repo> emits.
-    agent_files = ["/".join(f["path"].split("/")[1:]) for f in gt["required_files"]]
+    monkeypatch.delenv("PYTHONPATH", raising=False)
 
+    task_path = REPO_ROOT / task_dir
     workspace = tmp_path / "ws"
     (workspace / "agent_output").mkdir(parents=True)
-    write_json(workspace / "agent_output" / "answer.json", {"source_files": agent_files})
+    write_json(workspace / "agent_output" / "answer.json", answer)
 
-    env = os.environ.copy()
-    env["WORKSPACE"] = str(workspace)
-    env["TASK_DIR"] = str(task)
-    proc = subprocess.run(
-        ["bash", str(task / "checks" / "check_error_source.sh")],
-        capture_output=True, text=True, env=env, cwd=str(workspace),
-    )
-    assert proc.returncode == 0, f"stderr: {proc.stderr}"
-    payload = json.loads(proc.stdout)
-    assert payload["score"] == 1.0, payload
-    assert payload["passed"] is True
+    task = parse_task(task_path / "task.toml")
+    checkpoint = next(c for c in task.checkpoints if c.name == "error_source")
+    runner = CheckpointRunner(task, task_dir=task_path, workspace=workspace)
+    return runner.run_checkpoint(checkpoint)
+
+
+def correct_answer_for(task_dir: str):
+    """The repo-relative form an agent working inside /workspace/<repo> emits."""
+    gt = json.loads((REPO_ROOT / task_dir / "ground_truth.json").read_text())
+    return {"source_files": ["/".join(f["path"].split("/")[1:]) for f in gt["required_files"]]}
 
 
 @pytest.mark.parametrize("task_dir", AFFECTED_TASKS)
-def test_real_check_script_discriminates_a_wrong_answer(tmp_path, task_dir):
-    """The checkpoint must be agent-dependent — a wrong answer scores below a right one."""
-    task = REPO_ROOT / task_dir
-    workspace = tmp_path / "ws"
-    (workspace / "agent_output").mkdir(parents=True)
-    write_json(workspace / "agent_output" / "answer.json",
-               {"source_files": ["some/irrelevant/file.py"]})
+def test_real_checkpoint_scores_a_correct_answer(tmp_path, monkeypatch, task_dir):
+    """The regression that would have caught the missing module: before the fix
+    this checkpoint exited 1 with empty stdout and a ModuleNotFoundError, which
+    the runner books as a silent 0.0.
 
-    env = os.environ.copy()
-    env["WORKSPACE"] = str(workspace)
-    env["TASK_DIR"] = str(task)
-    proc = subprocess.run(
-        ["bash", str(task / "checks" / "check_error_source.sh")],
-        capture_output=True, text=True, env=env, cwd=str(workspace),
+    Also guards the runner's PYTHONPATH export: with it removed, this drops to
+    0.0 with 'No module named eb_verify' (verified by reverting the line)."""
+    result = run_error_source_checkpoint(
+        task_dir, correct_answer_for(task_dir), tmp_path, monkeypatch
     )
-    assert proc.returncode == 0, f"stderr: {proc.stderr}"
-    assert json.loads(proc.stdout)["score"] == 0.0
+
+    assert result.score == 1.0, result.detail
+    assert result.passed is True
+    assert INFRA_SENTINEL not in result.detail
+
+
+@pytest.mark.parametrize("task_dir", AFFECTED_TASKS)
+def test_real_checkpoint_discriminates_a_wrong_answer(tmp_path, monkeypatch, task_dir):
+    """The checkpoint must be agent-dependent — a wrong answer scores below a right one."""
+    result = run_error_source_checkpoint(
+        task_dir, {"source_files": ["some/irrelevant/file.py"]}, tmp_path, monkeypatch
+    )
+
+    assert result.score == 0.0
+    assert INFRA_SENTINEL not in result.detail, "a wrong answer is the agent's miss, not infra"

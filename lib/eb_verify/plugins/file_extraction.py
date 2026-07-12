@@ -1,12 +1,11 @@
 """file_extraction scorer — did the agent name the right source files?
 
 Run as a ``python -m`` CLI by checkpoint scripts, not through the validator
-registry, so it must stay dependency-free (stdlib only): task sandboxes ship a
-bare Python. ``plugins/__init__.py`` guards its numpy/sklearn import for exactly
-this reason.
+registry. ``eb_verify.runner`` puts the package on PYTHONPATH for every
+checkpoint it execs; in the sandbox ``run_task.py`` stages it and does the same.
 
     ANSWER_FILE=... GT_FILE=... python3 -m eb_verify.plugins.file_extraction \
-        --keys source_files,files,error_source.files --policy suffix
+        --keys source_files,files,error_source.files
 
 Scoring: recall over ground truth — the fraction of ``required_files[].path``
 that the agent named. Partial credit; ``passed`` at >= 0.5. An answer only earns
@@ -39,14 +38,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import posixpath
 import sys
 from typing import Any, Iterable, List
 
-# Duplicated rather than imported from eb_verify.scorer_guard: that module is
-# not guaranteed to be staged into a task sandbox, and this scorer must stay
-# importable with nothing but the stdlib. The guard owns the canonical
-# definition; this is a deliberate copy of the one string they must agree on.
-INFRA_SENTINEL = "VERIFIER_INFRA_ERROR"
+# scorer_guard greps stderr/detail for this exact string to tell "the harness
+# broke" apart from "the agent scored zero". Import it rather than copying it:
+# the two must agree, and a silent drift would book our own infra failures as
+# agent zeros — the bug this module exists to close.
+from eb_verify.scorer_guard import INFRA_SENTINEL
 
 PASS_THRESHOLD = 0.5
 
@@ -105,49 +105,34 @@ def components(path: str) -> List[str]:
 
     Normalizes away the decorations agents add ('./', '..', a leading '/',
     backslashes, surrounding whitespace or quotes) so matching compares path
-    structure rather than punctuation.
+    structure rather than punctuation. normpath, not realpath: resolution is
+    lexical because these paths name files in a repo that need not exist here.
+    posixpath, not os.path, so a Windows host does not start emitting backslashes.
     """
     cleaned = str(path).strip().strip("'\"").replace("\\", "/")
-    parts: List[str] = []
-    for part in cleaned.split("/"):
-        if part in ("", "."):
-            continue
-        if part == "..":
-            # Lexical resolution only — these paths name files in a repo that may
-            # not exist on this box, so there is nothing to resolve against.
-            if parts:
-                parts.pop()
-            continue
-        parts.append(part)
-    return parts
+    return [p for p in posixpath.normpath(cleaned).split("/") if p not in ("", ".", "..")]
 
 
-def matches(gt_path: str, agent_path: str, policy: str) -> bool:
-    """Does ``agent_path`` name the file that ``gt_path`` names?"""
+def matches(gt_path: str, agent_path: str) -> bool:
+    """Does ``agent_path`` name the file that ``gt_path`` names?
+
+    Symmetric path-component suffix match. Ground truth is repo-prefixed
+    ('httpx/httpx/_config.py') because it indexes a multi-repo workspace; an agent
+    working inside /workspace/httpx naturally answers repo-relative
+    ('httpx/_config.py'). Neither is wrong, so either may be the suffix of the other.
+
+    Comparing components (not raw string endswith) is what keeps
+    'httpx/my_config.py' from satisfying a GT of '.../_config.py' — the trap the
+    ~26 sibling check blobs fall into with `af.endswith(gt)`.
+    """
     gt, agent = components(gt_path), components(agent_path)
     if not gt or not agent:
         return False
-
-    if policy == "exact":
-        return gt == agent
-
-    # policy == "suffix": symmetric path-component suffix match.
-    #
-    # Ground truth is repo-prefixed ('httpx/httpx/_config.py') because it indexes
-    # a multi-repo workspace; an agent working inside /workspace/httpx naturally
-    # answers repo-relative ('httpx/_config.py'). Neither is wrong, so either may
-    # be the suffix of the other.
-    #
-    # Comparing components (not raw string endswith) is what keeps
-    # 'httpx/my_config.py' from satisfying a GT of '.../_config.py' — the trap
-    # the ~26 sibling check blobs fall into with `af.endswith(gt)`.
     shorter, longer = (gt, agent) if len(gt) <= len(agent) else (agent, gt)
     return longer[-len(shorter):] == shorter
 
 
-def score_answer(
-    gt_paths: List[str], found: List[str], policy: str
-) -> "tuple[List[str], List[str]]":
+def score_answer(gt_paths: List[str], found: List[str]) -> "tuple[set, List[str]]":
     """Which required files the agent identified, and which guesses were ambiguous.
 
     Credit is per *answer*, not per ground-truth entry, and only an answer that
@@ -165,16 +150,14 @@ def score_answer(
     sharing a 2-component tail) and under-credits (a repo-root file, whose only
     natural repo-relative answer is a bare name).
     """
-    matched: List[str] = []
+    matched: set = set()
     ambiguous: List[str] = []
     for af in found:
-        hits = [gt for gt in gt_paths if matches(gt, af, policy)]
+        hits = [gt for gt in gt_paths if matches(gt, af)]
         if len(hits) > 1:
             ambiguous.append(af)
-            continue
-        for gt in hits:
-            if gt not in matched:
-                matched.append(gt)
+        elif hits:
+            matched.add(hits[0])
     return matched, ambiguous
 
 
@@ -292,13 +275,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated answer keys to try, in order. Dotted keys traverse "
              "nested objects (e.g. error_source.files).",
     )
-    parser.add_argument(
-        "--policy",
-        default="suffix",
-        choices=("suffix", "exact"),
-        help="suffix: symmetric path-component suffix match (default). "
-             "exact: full path equality.",
-    )
     return parser
 
 
@@ -322,7 +298,7 @@ def main(argv: List[str] | None = None) -> int:
     if not found:
         return emit(0.0, f"Agent answer names no files under any of: {', '.join(keys)}")
 
-    matched, ambiguous = score_answer(gt_paths, found, args.policy)
+    matched, ambiguous = score_answer(gt_paths, found)
     score = len(matched) / len(gt_paths)
     missed = [gt for gt in gt_paths if gt not in matched]
 

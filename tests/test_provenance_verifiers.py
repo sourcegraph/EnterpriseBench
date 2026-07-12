@@ -45,6 +45,14 @@ def _run_verifier(
     env["WORKSPACE"] = str(workspace)
     env["TASK_DIR"] = str(task_dir)
     env["TASK_ID"] = "test"
+    # Mirror CheckpointRunner.run_checkpoint, which is what really execs these in
+    # production: checks that shell out to `python -m eb_verify.…` need the harness
+    # on PYTHONPATH. Absolute, because we run with cwd=workspace — an inherited
+    # relative PYTHONPATH (the suite is run as `PYTHONPATH=lib pytest`) resolves
+    # against that tmp dir and silently fails to import.
+    env["PYTHONPATH"] = os.pathsep.join(
+        p for p in (str(REPO_ROOT / "lib"), env.get("PYTHONPATH", "")) if p
+    )
 
     result = subprocess.run(
         ["bash", str(verifier_path)],

@@ -32,6 +32,10 @@ from eb_verify.plugins import ValidationResult, get_validator
 
 logger = logging.getLogger(__name__)
 
+# The directory holding the eb_verify package, i.e. what has to be on PYTHONPATH
+# for a checkpoint script to `python -m eb_verify.…`.
+_LIB_DIR = Path(__file__).resolve().parents[1]
+
 
 class _GroundednessCapableValidator(Protocol):
     """An artifact validator whose validate() accepts the groundedness flag.
@@ -183,6 +187,13 @@ class CheckpointRunner:
         env["WORKSPACE"] = str(self.workspace)
         env["TASK_DIR"] = str(self.task_dir)
         env["TASK_ID"] = self.task.id
+        # Checkpoint scripts invoke scorers as `python -m eb_verify.…`. In the
+        # sandbox run_task.py stages the harness and exports PYTHONPATH; host-side
+        # this is the only place the checkpoint environment exists, so it has to
+        # happen here or every such scorer dies on ModuleNotFoundError.
+        env["PYTHONPATH"] = os.pathsep.join(
+            p for p in (str(_LIB_DIR), env.get("PYTHONPATH", "")) if p
+        )
 
         verdict = run_verifier_subprocess(
             checkpoint.verifier,
