@@ -52,25 +52,25 @@ So the guard is structural, not advisory:
 THE RESULT (measured, at the time of writing)
 
 35 candidates out of 116 tasks -- BELOW the >=50 the bead's acceptance criterion
-asks for. This is not an artifact of the two ambiguous knobs below: the pool is
-34-37 across all four of their combinations, because Gate C dominates. Of the 60
-tasks with an OBSERVED turns-to-first-relevant the median is 3.5 and 49 are
-trivial (<=7); NOT ONE reaches tier-1 (>=20) -- the band the bead cites as where
-sgx went 9/9 is empty in this corpus. A further 23 tasks are not_found (the
-baseline delegated to a subagent the extractor cannot see into) and are pending,
-not credited as hard. The corpus cannot reach 50 by selection: see
-EnterpriseBench-jn73.2.7 (author new tasks, or relax a named criterion on the
-record; do NOT tune the gates until the count clears, which would invert an
-admission rule into a quota).
+asks for. This is not an artifact of the ambiguous knob below: the pool holds at
+34-37 across its readings, because Gate C dominates. Of the 60 tasks with an
+OBSERVED turns-to-first-relevant the median is 3.5 and 49 are trivial (<=7); NOT
+ONE reaches tier-1 (>=20) -- the band the bead cites as where sgx went 9/9 is
+empty in this corpus. A further 23 tasks are not_found (the baseline delegated to
+a subagent the extractor cannot see into) and are pending, not credited as hard.
+The corpus cannot reach 50 by selection: see EnterpriseBench-jn73.2.7 (author new
+tasks, or relax a named criterion on the record; do NOT tune the gates until the
+count clears, which would invert an admission rule into a quota).
 
-The two knobs are explicit params, recorded in the artifact's provenance, and
-`--sensitivity` prints the pool under every reading:
+Gate B has ONE rule, implemented once, in `leak_classifier.decide()`: reject the
+exact_path / symbol / dir buckets, admit behavioral / grep_hard. `make
+verify-leak` and this selector both call it, so an author and the selector cannot
+be told different things about the same task. The waiver-aware variant that used
+to live behind a `--gate-b-mode` flag was withdrawn -- see leak_classifier's
+module docstring and EnterpriseBench-jn73.2.12.
 
-  gate_b_mode        "strict"   bucket in {behavioral, grep_hard} -- the bead's
-                                literal wording
-                     "ref_impl" also admits exact_path leaks whose token is a
-                                recorded qa.waivers entry point -- what the
-                                reference implementation (jn73.3) does
+The remaining knob is an explicit param, recorded in the artifact's provenance,
+and `--sensitivity` prints the pool under every reading:
 
   module_granularity "parent_dir"  a module is a file's parent directory
                      "top_segment" a module is the top-level path segment
@@ -84,6 +84,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -114,11 +115,6 @@ from scripts.validation import crnt_validator  # noqa: E402
 from scripts.validation import leak_classifier as lc  # noqa: E402
 
 ARTIFACT_VERSION = "enterprise_v1"
-
-#: The locked 3-arm run set. Gate C reads the baseline arm's traces from here.
-#: It lives outside the worktree (untracked results/), so it is resolved from
-#: the main checkout rather than assumed to be beside the corpus.
-DEFAULT_RUNS_ROOT = Path("/home/ds/projects/EnterpriseBench/results/runs")
 
 COMPUTABLE_GATES = ("A", "B", "D")
 MEASUREMENT_GATES = ("C", "E", "F")
@@ -158,6 +154,20 @@ GATE_F_ADVERSARIAL_MAX = 0.5
 
 GATE_D_MIN_FILES = 3
 GATE_D_MIN_MODULES = 2
+
+#: Every constant that can move the pool, recorded in the artifact. A reader who
+#: cannot see the thresholds cannot tell a 35 from a 46.
+GATE_THRESHOLDS: dict[str, Any] = {
+    "gate_c_trivial_max": GATE_C_TRIVIAL_MAX,
+    "gate_c_tier1_min": GATE_C_TIER1_MIN,
+    "gate_c_tier2_min": GATE_C_TIER2_MIN,
+    "gate_d_min_files": GATE_D_MIN_FILES,
+    "gate_d_min_modules": GATE_D_MIN_MODULES,
+    "gate_e_reward_floor": GATE_E_REWARD_FLOOR,
+    "gate_f_null_max": GATE_F_NULL_MAX,
+    "gate_f_golden_min": GATE_F_GOLDEN_MIN,
+    "gate_f_adversarial_max": GATE_F_ADVERSARIAL_MAX,
+}
 
 
 class StratumNotFinalError(RuntimeError):
@@ -292,24 +302,70 @@ class TaskGates:
 
 @dataclass(frozen=True)
 class SelectorParams:
-    #: "strict" = bucket in {behavioral, grep_hard} (the bead's literal Gate B).
-    #: "ref_impl" = also admit exact_path leaks waived via qa.waivers, which is
-    #: what jn73.3 -- the reference implementation the bead names -- does.
-    gate_b_mode: str = "strict"
     #: What counts as a "module" for single-repo dispersion.
     module_granularity: str = "parent_dir"
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "gate_b_mode": self.gate_b_mode,
-            "module_granularity": self.module_granularity,
-        }
+        return {"module_granularity": self.module_granularity}
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> SelectorParams:
+        return cls(module_granularity=d.get("module_granularity", "parent_dir"))
+
+
+@dataclass(frozen=True)
+class Provenance:
+    """Everything that has to be true for a reader to reproduce this artifact.
+
+    Recording the params alone is not enough, and that gap was a real defect: a
+    run whose ``runs_root`` did not exist silently scored Gate C as PENDING for
+    every task, dropping its 49 FAILs and inflating the pool from 35 to 46 --
+    while emitting params, version and source_sha byte-identical to the correct
+    run. Only a stderr warning distinguished them.
+
+    So the inputs are recorded, not just the knobs:
+
+    ``traces_digest`` is the load-bearing one. Coverage counts say only WHETHER a
+    trace was resolved, never WHAT it said -- a re-run baseline whose ttfr moves
+    3 -> 25 flips Gate C with ``coverage="ok"`` both times, changing the pool
+    while leaving the counts identical. The digest is taken over the trace
+    CONTENT, so two artifacts built from different traces cannot look alike.
+    """
+
+    source_sha: str
+    #: A dirty tree emits the same sha as a clean one, so the sha alone does not
+    #: identify the code that ran.
+    source_dirty: bool
+    corpus_root: str
+    #: "" when Gate C was not measured at all (every task PENDING).
+    runs_root: str
+    gate_thresholds: dict[str, Any] = field(default_factory=dict)
+    #: {"ok": n, "not_found": n, "no_trace": n} over the scored corpus.
+    trace_coverage: dict[str, int] = field(default_factory=dict)
+    #: sha256 over the sorted (run_key, sha256(trace_bytes)) pairs.
+    traces_digest: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source_sha": self.source_sha,
+            "source_dirty": self.source_dirty,
+            "corpus_root": self.corpus_root,
+            "runs_root": self.runs_root,
+            "gate_thresholds": self.gate_thresholds,
+            "trace_coverage": self.trace_coverage,
+            "traces_digest": self.traces_digest,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Provenance:
         return cls(
-            gate_b_mode=d.get("gate_b_mode", "strict"),
-            module_granularity=d.get("module_granularity", "parent_dir"),
+            source_sha=d.get("source_sha", ""),
+            source_dirty=bool(d.get("source_dirty", False)),
+            corpus_root=d.get("corpus_root", ""),
+            runs_root=d.get("runs_root", ""),
+            gate_thresholds=d.get("gate_thresholds", {}),
+            trace_coverage=d.get("trace_coverage", {}),
+            traces_digest=d.get("traces_digest", ""),
         )
 
 
@@ -318,7 +374,7 @@ class StratumArtifact:
     version: str
     params: SelectorParams
     tasks: list[TaskGates]
-    source_sha: str
+    provenance: Provenance
 
     @property
     def unmeasured_gates(self) -> list[str]:
@@ -370,7 +426,7 @@ class StratumArtifact:
             "unmeasured_gates": self.unmeasured_gates,
             "input_contracts": {g: INPUT_CONTRACTS[g] for g in self.unmeasured_gates
                                 if g in INPUT_CONTRACTS},
-            "source_sha": self.source_sha,
+            "provenance": self.provenance.to_dict(),
             "params": self.params.to_dict(),
             "summary": self.summary(),
             "tasks": [t.to_dict() for t in self.tasks],
@@ -400,7 +456,7 @@ class StratumArtifact:
             version=d["version"],
             params=SelectorParams.from_dict(d.get("params", {})),
             tasks=[TaskGates.from_dict(t) for t in d.get("tasks", [])],
-            source_sha=d.get("source_sha", ""),
+            provenance=Provenance.from_dict(d.get("provenance", {})),
         )
 
 
@@ -453,59 +509,26 @@ def score_gate_a(declared_repos: set[str], oracle_repos: set[str],
     )
 
 
-def waiver_has_downstream_target(waived_token: str, oracle_files: list[str]) -> bool:
-    """Is a qa.waivers entry structurally sound?
+def score_gate_b(result: lc.GateBResult | None) -> GateEvidence:
+    """NON-LEAKY: the instruction must not localize the oracle for free.
 
-    The waiver rationale (jn73.3 Option B) is: the leaked path is the *given
-    entry point*, and the scored discovery lies downstream of it. That only
-    holds if there IS something downstream -- i.e. the task has at least one
-    oracle file that is not the waived token. If the leaked path is the task's
-    only oracle file, the task is grep-trivial and the waiver is simply wrong.
-
-    That is a deterministic check, so it should be checked rather than trusted.
+    Gate B does not re-derive the verdict -- it reports `leak_classifier.decide()`,
+    the one implementation of the rule. Re-litigating it here is exactly how the
+    selector and `make verify-leak` came to disagree about the same task.
     """
-    waived = lc.strip_repo_slug(waived_token).lower()
-
-    def is_the_waived_file(oracle_file: str) -> bool:
-        path = lc.strip_repo_slug(oracle_file).lower()
-        return path == waived or path.endswith("/" + waived)
-
-    return any(not is_the_waived_file(f) for f in oracle_files)
-
-
-def score_gate_b(result: lc.GateBResult | None,
-                 mode: str,
-                 oracle_files: list[str] | None = None) -> GateEvidence:
-    """NON-LEAKY: the instruction must not localize the oracle for free."""
     if result is None:
         return GateEvidence(
             "B", GateStatus.FAIL,
             "no instruction+oracle could be loaded; Gate B cannot clear",
         )
-    strict_pass = result.bucket in (lc.Bucket.BEHAVIORAL, lc.Bucket.GREP_HARD)
-    passed = strict_pass if mode == "strict" else result.admit
-    ev = {
-        "bucket": result.bucket.value,
-        "token": result.token,
-        "waived": result.waived,
-        "strict_pass": strict_pass,
-        "ref_impl_pass": result.admit,
-        "mode": mode,
-    }
-    if result.waived:
-        sound = waiver_has_downstream_target(result.token, oracle_files or [])
-        ev["waiver_has_downstream_target"] = sound
-        if not sound:
-            # The waiver claims the leak is a mere entry point, but there is
-            # nothing downstream of it. Refuse the waiver regardless of mode.
-            return GateEvidence(
-                "B", GateStatus.FAIL,
-                f"waiver is unsound: leaked token {result.token!r} is the task's "
-                f"only oracle file, so there is no downstream discovery to score",
-                ev,
-            )
-    return GateEvidence("B", GateStatus.PASS if passed else GateStatus.FAIL,
-                        result.reason, ev)
+    return GateEvidence(
+        "B", GateStatus.PASS if result.admit else GateStatus.FAIL, result.reason,
+        {
+            "bucket": result.bucket.value,
+            "token": result.token,
+            "source_path": result.source_path,
+        },
+    )
 
 
 def _modules(paths: list[str], granularity: str) -> set[str]:
@@ -797,7 +820,19 @@ def measure_ttfr(run_key: str, oracle_files: list[str],
     trace = runs_root / run_key / "baseline" / "agent_trace.jsonl"
     r = compute_ttfr(trace, oracle_files)
     return {"coverage": r.coverage, "ttfr": r.turns_to_first_relevant,
-            "run_key": run_key}
+            "run_key": run_key, "trace_sha256": _sha256_file(trace)}
+
+
+def _sha256_file(path: Path) -> str:
+    """Content hash of one trace, or "" when it is absent.
+
+    Gate C's verdict is a function of the trace's CONTENT, so the content is what
+    provenance has to pin. Hashing the path would pin nothing.
+    """
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return ""
 
 
 def score_task(task_dir: Path,
@@ -842,8 +877,7 @@ def score_task(task_dir: Path,
     gates = {
         "A": score_gate_a(declared, _oracle_repos(oracle.ground_truth),
                           has_oracle_files=bool(oracle.oracle_files)),
-        "B": score_gate_b(lc.decide(run_key, oracle), params.gate_b_mode,
-                          oracle.oracle_files),
+        "B": score_gate_b(lc.decide(run_key, oracle)),
         "C": score_gate_c(m.get("C")),
         "D": score_gate_d(declared, oracle.oracle_files, params.module_granularity,
                           crnt_positive=_crnt_positive(task_toml),
@@ -866,23 +900,72 @@ def score_corpus(root: Path,
     return out
 
 
-def _git_sha() -> str:
+def _git_sha() -> tuple[str, bool]:
+    """(HEAD sha, is_dirty) for the REPO, not for whatever cwd we were run from."""
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], capture_output=True, text=True,
+                              check=True, cwd=_REPO_ROOT).stdout
     try:
-        return subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
-                              text=True, check=True).stdout.strip()
+        return git("rev-parse", "HEAD").strip(), bool(git("status", "--porcelain").strip())
     except Exception:  # pragma: no cover - git absent
-        return "unknown"
+        return "unknown", True
+
+
+def trace_coverage(measurements: dict[str, dict[str, Any]] | None) -> dict[str, int]:
+    """How many traces resolved, and how they landed. Zero `ok`+`not_found` means
+    the runs_root held no traces at all -- see `resolved_traces`."""
+    counts = {"ok": 0, "not_found": 0, "no_trace": 0}
+    for m in (measurements or {}).values():
+        cov = (m.get("C") or {}).get("coverage")
+        if cov in counts:
+            counts[cov] += 1
+    return counts
+
+
+def resolved_traces(coverage: dict[str, int]) -> int:
+    """Traces that were actually FOUND on disk.
+
+    `no_trace` means the file was absent; `ok` and `not_found` both mean a real
+    trace was read (they differ only in whether the baseline ever opened an
+    oracle file). So this is the count that tells an empty runs_root from a
+    populated one.
+    """
+    return coverage.get("ok", 0) + coverage.get("not_found", 0)
+
+
+def _traces_digest(measurements: dict[str, dict[str, Any]] | None) -> str:
+    """One hash over every trace that fed Gate C."""
+    pairs = sorted(
+        (m["C"]["run_key"], m["C"].get("trace_sha256", ""))
+        for m in (measurements or {}).values()
+        if m.get("C", {}).get("trace_sha256")
+    )
+    if not pairs:
+        return ""
+    joined = "\n".join(f"{k}:{h}" for k, h in pairs)
+    return hashlib.sha256(joined.encode()).hexdigest()
 
 
 def build_artifact(root: Path,
                    params: SelectorParams,
                    measurements: dict[str, dict[str, Any]] | None = None,
                    runs_root: Path | None = None) -> StratumArtifact:
+    if measurements is None and runs_root is not None:
+        measurements = measure_corpus_ttfr(root, runs_root)
+    sha, dirty = _git_sha()
     return StratumArtifact(
         version=ARTIFACT_VERSION,
         params=params,
-        tasks=score_corpus(root, params, measurements, runs_root),
-        source_sha=_git_sha(),
+        tasks=score_corpus(root, params, measurements),
+        provenance=Provenance(
+            source_sha=sha,
+            source_dirty=dirty,
+            corpus_root=str(root),
+            runs_root=str(runs_root) if runs_root else "",
+            gate_thresholds=dict(GATE_THRESHOLDS),
+            trace_coverage=trace_coverage(measurements),
+            traces_digest=_traces_digest(measurements),
+        ),
     )
 
 
@@ -904,28 +987,59 @@ def measure_corpus_ttfr(root: Path, runs_root: Path) -> dict[str, dict[str, Any]
     return out
 
 
-def _sensitivity(root: Path, runs_root: Path | None) -> int:
-    """Print the pool size under all four readings of the two ambiguous knobs.
+def _sensitivity(root: Path, measurements: dict[str, dict[str, Any]]) -> int:
+    """Print the pool size under both readings of the one ambiguous knob.
 
     The acceptance criterion asks for >=50 tasks; whether that is met depends
-    on choices the bead leaves open. Printing the band is the honest answer.
-    """
-    # Gate C is knob-independent: score the traces once, reuse across the 2x2.
-    measurements = measure_corpus_ttfr(root, runs_root) if runs_root else None
+    on a choice the bead leaves open. Printing the band is the honest answer.
 
+    Gate C is knob-independent, so its traces are measured once by the caller and
+    reused across readings rather than re-read per combination.
+    """
     print("Candidate-pool sensitivity (no gate has FAILED; C is partial, E/F pending):\n")
-    print(f"  {'gate_b_mode':<12} {'module_granularity':<20} {'pool':>5}")
-    for b_mode in ("strict", "ref_impl"):
-        for gran in ("top_segment", "parent_dir"):
-            art = build_artifact(root, SelectorParams(b_mode, gran),
-                                 measurements=measurements)
-            n = len(art.candidate_task_ids())
-            flag = "" if n >= 50 else "   <-- BELOW the >=50 acceptance criterion"
-            print(f"  {b_mode:<12} {gran:<20} {n:>5}{flag}")
-    print("\nNo reading is 'the' answer: the bead's literal Gate B wording says")
-    print("strict, but the reference impl it names (jn73.3) admits waived")
-    print("exact_path leaks. 'Module' is undefined for single-repo tasks.")
+    print(f"  {'module_granularity':<20} {'pool':>5}")
+    for gran in ("top_segment", "parent_dir"):
+        art = build_artifact(root, SelectorParams(gran), measurements=measurements)
+        n = len(art.candidate_task_ids())
+        flag = "" if n >= 50 else "   <-- BELOW the >=50 acceptance criterion"
+        print(f"  {gran:<20} {n:>5}{flag}")
+    print("\n'Module' is undefined for single-repo tasks, so neither reading is")
+    print("'the' answer. Gate C dominates the pool either way.")
     return 0
+
+
+def _resolve_runs_root(runs_root: Path, root: Path) -> dict[str, dict[str, Any]]:
+    """Measure Gate C, or refuse to run.
+
+    Both failure modes here USED to be silent, and both produced a 46-candidate
+    artifact indistinguishable from the correct 35-candidate one:
+
+      * a runs_root that does not exist -> a stderr WARNING, then Gate C PENDING
+        for every task and the pool inflates by the 49 tasks Gate C would fail;
+      * a runs_root that exists but is EMPTY (or points at the wrong tree) ->
+        not even a warning, because the directory check passed.
+
+    Provenance cannot fix this: provenance is inert, and by the time anyone reads
+    it the number is already published. So it is a precondition, and it exits
+    non-zero without writing anything.
+    """
+    if not runs_root.is_dir():
+        raise SystemExit(
+            f"stratum_selector: --runs-root {runs_root} does not exist.\n"
+            f"  Gate C reads the baseline arm's traces from there. Without them "
+            f"every task scores PENDING, no task fails Gate C, and the candidate "
+            f"pool silently inflates. Refusing to score.")
+
+    measurements = measure_corpus_ttfr(root, runs_root)
+    cov = trace_coverage(measurements)
+    if resolved_traces(cov) == 0:
+        raise SystemExit(
+            f"stratum_selector: --runs-root {runs_root} exists but holds no "
+            f"baseline traces ({cov}).\n"
+            f"  Expected <runs-root>/<task-id>/baseline/agent_trace.jsonl. Gate C "
+            f"would be PENDING for all {len(measurements)} tasks and the pool "
+            f"would inflate. Refusing to score.")
+    return measurements
 
 
 def main(argv: list[str]) -> int:
@@ -933,31 +1047,32 @@ def main(argv: list[str]) -> int:
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--corpus", default="benchmarks", help="corpus root")
     p.add_argument("--out", help="write the stratum artifact here")
-    p.add_argument("--gate-b-mode", choices=("strict", "ref_impl"), default="strict")
     p.add_argument("--module-granularity", choices=("parent_dir", "top_segment"),
                    default="parent_dir")
-    p.add_argument("--runs-root", default=str(DEFAULT_RUNS_ROOT),
+    # Required, and with no default: the default used to be a hardcoded absolute
+    # path to one machine's checkout, so the same command on any other machine
+    # scored a different pool and said nothing about it.
+    p.add_argument("--runs-root", required=True,
                    help="locked run set; Gate C reads baseline traces from here")
     p.add_argument("--sensitivity", action="store_true",
-                   help="print pool size under all four readings and exit")
+                   help="print pool size under both knob readings and exit")
     args = p.parse_args(argv)
 
     root = Path(args.corpus)
-    runs_root = Path(args.runs_root) if args.runs_root else None
-    if runs_root and not runs_root.is_dir():
-        print(f"WARNING: runs-root {runs_root} does not exist; Gate C will be "
-              f"PENDING for every task.", file=sys.stderr)
+    runs_root = Path(args.runs_root)
+    measurements = _resolve_runs_root(runs_root, root)
 
     if args.sensitivity:
-        return _sensitivity(root, runs_root)
+        return _sensitivity(root, measurements)
 
-    params = SelectorParams(gate_b_mode=args.gate_b_mode,
-                            module_granularity=args.module_granularity)
-    art = build_artifact(root, params, runs_root=runs_root)
+    params = SelectorParams(module_granularity=args.module_granularity)
+    art = build_artifact(root, params, measurements=measurements, runs_root=runs_root)
     s = art.summary()
 
     print(f"Stratum {art.version} [{'FINAL' if art.is_final else 'CANDIDATE'}]")
     print(f"  params: {params.to_dict()}")
+    print(f"  traces: {art.provenance.trace_coverage} "
+          f"digest={art.provenance.traces_digest[:12] or '-'}")
     print(f"  scored:     {s['scored']}")
     print(f"  candidates: {s['candidates']}  (no gate has FAILED)")
     print(f"  admitted:   {s['admitted']}  (all SIX gates PASS)")

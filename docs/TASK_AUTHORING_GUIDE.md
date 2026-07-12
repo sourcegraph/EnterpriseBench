@@ -111,16 +111,30 @@ python3 scripts/validation/leak_classifier.py benchmarks/{suite}/{task-id}
 ```
 
 It classifies the instruction against `required_files`/`sufficient_files` into a leak
-bucket: `exact_path` / `symbol` / `dir` reject (the instruction hands the agent the
-answer's location); `behavioral` / `grep_hard` admit. If it REJECTs, reword the
-instruction to describe the *problem* (symptom, context, desired output) rather than
-naming the file/symbol/directory that holds the fix. A named path is only acceptable
-when it is a genuine given entry point and the *scored* discovery target is downstream
-(e.g. "the migration is already written at `X`, assess the impact") — in that case,
-record the exception as a `[[qa.waivers]]` entry in `task.toml` (see
-`docs/qa/eb_f2_triage_2026_06_04.md` for worked examples) rather than rewording away a
-task's realism. Gate B honors `qa.waivers` for `exact_path` only; `symbol`/`dir` leaks
-always reject and must be reworded.
+bucket: `exact_path` and `dir` reject (the instruction hands the agent the answer's
+location); `behavioral` and `grep_hard` admit.
+
+**There is no waiver.** If Gate B REJECTs, the only remedy is to reword the instruction
+to describe the *problem* (symptom, context, desired output) rather than naming the file
+or directory that holds the fix. A task that names its own oracle cannot separate
+retrieval from grep, which is the contrast this benchmark exists to measure, so the gate
+fails closed and stays that way. The same `decide()` call backs both this CLI and the
+stratum selector's Gate B, so the answer you get here is the answer the selector gets.
+
+> An earlier revision let a `[[qa.waivers]]` entry admit an `exact_path` leak when the
+> named path was a *given entry point* whose real discovery target lay downstream. It was
+> withdrawn: the guard meant to verify "there IS something downstream" compared a
+> two-segment leak fragment against full oracle paths and so never rejected anything, and
+> the underlying claim is untestable with the measurements we have (Gate C's
+> turns-to-first-relevant counts the waived file itself as a hit). To restore it, see
+> `EnterpriseBench-jn73.2.12`. Do not re-add a waiver field in the meantime — nothing
+> reads it.
+
+The `symbol` bucket exists in `classify()` but is **dormant**: `decide()` passes
+`oracle_symbols=None` because EB's ground truth records files, not symbols, so no task
+can currently land in it. Extracting symbols heuristically from an instruction would be
+exactly the semantic guessing this gate is built to avoid. It is wired the day the corpus
+carries symbol-level ground truth, not before.
 
 ### 4. Write ground_truth.json
 

@@ -3,8 +3,8 @@
 Covers: bucket-classification parity with the CSB reference's own
 --selftest cases, the EB task.toml [ground_truth] loader (replacing the
 CSB-shipped adapter's broken expected_solution.json{"files"} reader), the
-qa.waivers admit path (Option B, EnterpriseBench-jn73.3), and a real-corpus
-run producing the leak-bucket distribution.
+fail-closed admission rule (no waiver forgives a localization leak), and a
+real-corpus run producing the leak-bucket distribution.
 """
 
 from __future__ import annotations
@@ -149,16 +149,49 @@ def test_load_task_none_when_no_task_toml(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Gate B decision: Option B waiver-admit path
+# Gate B decision: one rule, and it fails closed
 # ---------------------------------------------------------------------------
 
 
-def test_exact_path_leak_admits_when_waived(tmp_path):
+def test_exact_path_leak_rejects(tmp_path):
+    task_dir = _write_task(
+        tmp_path,
+        instruction="Fix the bug in `metadata/metadata.go`.",
+        required_files=[{"path": "metadata/metadata.go", "repo": "grpc-go"}],
+    )
+    result = lc.decide_task_dir(task_dir)
+    assert result is not None
+    assert result.bucket is lc.Bucket.EXACT_PATH
+    assert result.admit is False
+
+
+def test_no_waiver_can_forgive_a_leak(tmp_path):
+    """The withdrawn Option B rule, pinned shut.
+
+    A `[[qa.waivers]]` entry naming the leaked path used to ADMIT the task, on
+    the rationale that the path was a *given entry point* whose scored discovery
+    lay downstream. Nothing reads that ledger now, and this test is what keeps it
+    that way -- a waiver must be inert, not merely un-consulted-by-default.
+
+    Two things killed the rule. The guard that was supposed to enforce "there IS
+    something downstream" compared the leak TOKEN (in practice a two-segment
+    fragment like `manifests/ha`) against full oracle paths, so it returned True
+    unconditionally and never once rejected a waiver. And the claim itself is
+    untestable with what we can measure: Gate C's turns-to-first-relevant counts
+    the waived file as a hit, because the waived file is itself a required_file,
+    so it scores how fast the agent opened the file the instruction handed it.
+
+    An admission gate fails CLOSED on an untested claim. Restoring the rule is
+    EnterpriseBench-jn73.2.12 and needs the measurement, not the argument.
+    """
     task_dir = _write_task(
         tmp_path,
         instruction="The producer entry point is `metadata/metadata.go`; find every "
         "consumer of the old API in the etcd codebase.",
-        required_files=[{"path": "metadata/metadata.go", "repo": "grpc-go"}],
+        required_files=[
+            {"path": "metadata/metadata.go", "repo": "grpc-go"},
+            {"path": "clientv3/watch.go", "repo": "etcd"},
+        ],
         waivers=[{
             "code": "F2",
             "token": "metadata/metadata.go",
@@ -169,66 +202,33 @@ def test_exact_path_leak_admits_when_waived(tmp_path):
     result = lc.decide_task_dir(task_dir)
     assert result is not None
     assert result.bucket is lc.Bucket.EXACT_PATH
-    assert result.admit is True
-    assert result.waived is True
+    assert result.admit is False, "a waiver must not forgive a localization leak"
 
 
-def test_exact_path_leak_rejects_when_not_waived(tmp_path):
-    """Synthetic non-waived exact-path task -> REJECT (jn73.3 acceptance
-    criterion)."""
-    task_dir = _write_task(
-        tmp_path,
-        instruction="Fix the bug in `metadata/metadata.go`.",
-        required_files=[{"path": "metadata/metadata.go", "repo": "grpc-go"}],
-    )
-    result = lc.decide_task_dir(task_dir)
-    assert result is not None
-    assert result.bucket is lc.Bucket.EXACT_PATH
-    assert result.admit is False
-    assert result.waived is False
-
-
-def test_waiver_for_different_token_does_not_admit(tmp_path):
-    """Token matching is exact -- a waiver recorded for one path must not
-    suppress a different path's leak (mirrors qa_adapter's exact-match
-    guarantee: 'a waiver for one path cannot suppress a different path's
-    F2')."""
-    task_dir = _write_task(
-        tmp_path,
-        instruction="Fix the bug in `metadata/metadata.go`.",
-        required_files=[{"path": "metadata/metadata.go", "repo": "grpc-go"}],
-        waivers=[{
-            "code": "F2",
-            "token": "other/file.go",
-            "decision": "waive",
-            "rationale": "unrelated waiver, must not match",
-        }],
-    )
-    result = lc.decide_task_dir(task_dir)
-    assert result is not None
-    assert result.admit is False
-    assert result.waived is False
-
-
-def test_dir_bucket_not_waiver_admissible(tmp_path):
-    """Per Option B, only EXACT_PATH is waiver-admissible -- DIR/SYMBOL always
-    reject even if the matching token happens to appear in qa.waivers (a
-    waiver entry for the wrong bucket must not paper over a dir-level leak)."""
+def test_dir_bucket_rejects(tmp_path):
     task_dir = _write_task(
         tmp_path,
         instruction="Look under escalation/ for the handler that drops context.",
         required_files=[{"path": "escalation/handler.go", "repo": "svc"}],
-        waivers=[{
-            "code": "F2",
-            "token": "escalation",
-            "decision": "waive",
-            "rationale": "invalid attempt to waive a dir-bucket token",
-        }],
     )
     result = lc.decide_task_dir(task_dir)
     assert result is not None
     assert result.bucket is lc.Bucket.DIR
     assert result.admit is False
+
+
+def test_leak_result_carries_the_source_path_not_just_the_token(tmp_path):
+    """`token` can be a fragment of the leaked path ("manifests/ha"), so any
+    caller reasoning about the leaked FILE needs the full path. Dropping it is
+    what forced the old waiver check to match by suffix and fail open."""
+    task_dir = _write_task(
+        tmp_path,
+        instruction="Fix the bug in `metadata/metadata.go`.",
+        required_files=[{"path": "metadata/metadata.go", "repo": "grpc-go"}],
+    )
+    result = lc.decide_task_dir(task_dir)
+    assert result is not None
+    assert result.source_path == "metadata/metadata.go"
 
 
 def test_behavioral_and_grep_hard_always_admit(tmp_path):
@@ -246,20 +246,18 @@ def test_behavioral_and_grep_hard_always_admit(tmp_path):
     assert result is not None
     assert result.bucket is lc.Bucket.GREP_HARD
     assert result.admit is True
-    assert result.waived is False
 
 
 # ---------------------------------------------------------------------------
-# Real-corpus integration: the F2-waived tasks (EnterpriseBench-1is,
-# docs/qa/eb_f2_triage_2026_06_04.md)
+# Real-corpus integration: the tasks that used to be waived through
 # ---------------------------------------------------------------------------
 
-# The triage doc enumerates 12 tasks / 14 F2 tokens. One of them --
-# incident_response/incident-investigation-dual-nats-001 -- does not exist
-# anywhere in benchmarks/ on `main` OR on `fix/eb-f2-leak-triage` (confirmed
-# via `git ls-tree -r`); it was apparently never created or was removed
-# pre-merge. Only the 11 present tasks are checkable here.
-F2_WAIVED_TASK_DIRS = [
+# These 11 carried a `[[qa.waivers]]` entry, and under the withdrawn Option B
+# rule 8 of them were ADMITTED despite naming their own oracle. They are leaky
+# by the one rule Gate B now has, and they reject. Keeping them enumerated (with
+# the leak each one carries) is what makes the policy change auditable: if a
+# future edit quietly re-admits any of them, this fails.
+PREVIOUSLY_WAIVED_TASK_DIRS = [
     "dependency_management/api-contract-001",
     "dependency_management/api-contract-002",
     "dependency_management/api-contract-005",
@@ -273,64 +271,37 @@ F2_WAIVED_TASK_DIRS = [
     "security_operations/rbac-audit-001",
 ]
 
-# Of those 11, 3 carry a SECOND, un-triaged locational leak elsewhere in the
-# same task's oracle files, distinct from the token F2 actually waived:
-#   - schema-evolution-002: basename `deferred_work.py` (a required_files
-#     entry) is named verbatim in instruction.md ("A background worker in
-#     `deferred_work.py`") -- F2's check only matches a full recorded path
-#     verbatim, so a bare basename leak was never caught/triaged.
-#   - schema-evolution-004: basenames `realms.py` AND `users.py` (two of the
-#     three required_files) are both named verbatim ("`realms.py` for the
-#     addition, `users.py` for the removal").
-#   - rbac-audit-001: instruction.md literally says "hint: look in
-#     `apiserver/pkg/registry/projectcalico/` for ..." -- a directory-form
-#     hint naming the parent of 4 of the 5 oracle files.
-# Gate B's classify() reports one bucket per task (first oracle-file hit, in
-# required_files-then-sufficient_files order); for these 3 that first hit is
-# the un-triaged leak, not the waived one, so they correctly REJECT under the
-# decided Option B policy. This is a real, additional leak that predates this
-# port -- not a bug in it -- and needs its own triage pass, not a silent
-# widening of the waiver-admit rule to force these through.
-KNOWN_ADDITIONAL_UNWAIVED_LEAK = {
-    "feature_delivery/schema-evolution-002",
-    "feature_delivery/schema-evolution-004",
-    "security_operations/rbac-audit-001",
-}
 
-
-@pytest.mark.parametrize("rel_dir", F2_WAIVED_TASK_DIRS)
-def test_f2_waived_tasks_gate_b_verdict(rel_dir):
+@pytest.mark.parametrize("rel_dir", PREVIOUSLY_WAIVED_TASK_DIRS)
+def test_previously_waived_corpus_tasks_now_reject(rel_dir):
     task_dir = BENCHMARKS / rel_dir
     result = lc.decide_task_dir(task_dir)
     assert result is not None, f"could not load {rel_dir}"
-    if rel_dir in KNOWN_ADDITIONAL_UNWAIVED_LEAK:
-        assert result.admit is False
-        assert result.waived is False
-    else:
-        assert result.admit is True, f"{rel_dir}: {result.reason}"
-        assert result.waived is True
+    assert result.bucket in lc.REJECT
+    assert result.admit is False, (
+        f"{rel_dir} names its own oracle ({result.token!r}) and must reject; "
+        f"no waiver forgives a localization leak")
 
 
 def test_config_drift_001_leaks_on_real_fragment_not_generic_basename():
     """config-drift-001 is the case that proves the generic-basename filter
     (jn73.2) narrows rather than blanket-admits.
 
-    jn73.3 recorded its leak token as the generic basename `values.yaml` and
-    deferred the filter as out of scope. With the filter in, `values.yaml` no
-    longer localizes -- but the task's instruction independently names the
-    path fragment `bitnami/consul` verbatim, which IS a real localization
-    leak. So the task still buckets exact_path and still needs its waiver:
-    the filter suppressed the false-positive token and left the genuine one.
+    Its leak token was originally recorded as the generic basename `values.yaml`.
+    With the filter in, `values.yaml` no longer localizes -- but the instruction
+    independently names the path fragment `bitnami/consul` verbatim, which IS a
+    real localization leak. So the task still buckets exact_path and still
+    rejects: the filter suppressed the false-positive token and left the genuine
+    one.
 
-    Asserting the *token* is the point. A filter that admitted this task would
-    be over-broad; one that still reported `values.yaml` would be inert."""
+    Asserting the *token* is the point. A filter that admitted this task would be
+    over-broad; one that still reported `values.yaml` would be inert."""
     task_dir = BENCHMARKS / "platform_engineering" / "config-drift-001"
     result = lc.decide_task_dir(task_dir)
     assert result is not None
     assert result.bucket is lc.Bucket.EXACT_PATH
     assert result.token == "bitnami/consul"
-    assert result.admit is True
-    assert result.waived is True
+    assert result.admit is False
 
 
 # ---------------------------------------------------------------------------
@@ -345,10 +316,9 @@ def test_corpus_run_produces_bucket_distribution(capsys):
 
     assert payload["total"] > 0
     assert set(payload["bucket_distribution"]) <= {b.value for b in lc.Bucket}
-    # 8 of the 11 present F2-waived tasks admit cleanly via the waiver path
-    # (the other 3 are the KNOWN_ADDITIONAL_UNWAIVED_LEAK set above).
-    waived_ids = {w["task_id"] for w in payload["waived_tasks"]}
-    assert len(waived_ids) >= 8
+    assert payload["admitted"] + payload["rejected"] == payload["total"]
+    # Every reject carries the full leaked path, not just the matched fragment.
+    assert all(r["source_path"] for r in payload["rejects"])
 
 
 # ---------------------------------------------------------------------------

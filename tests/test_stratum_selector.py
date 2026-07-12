@@ -16,10 +16,15 @@ than returns on a non-final artifact), not toward the arithmetic.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
+from scripts.validation import leak_classifier as lc
 from scripts.validation import stratum_selector as ss
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+BENCHMARKS = REPO_ROOT / "benchmarks"
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +108,13 @@ def test_task_is_admitted_only_when_all_six_pass():
     assert result.is_final is True
 
 
+def _prov(**kw) -> ss.Provenance:
+    base = dict(source_sha="deadbeef", source_dirty=False, corpus_root="benchmarks",
+                runs_root="/runs")
+    base.update(kw)
+    return ss.Provenance(**base)
+
+
 # ---------------------------------------------------------------------------
 # The structural guarantee: you cannot ASK a non-final artifact for its
 # admitted set. A flag can be ignored; a raised exception cannot.
@@ -128,7 +140,7 @@ def _candidate_artifact() -> ss.StratumArtifact:
         version="enterprise_v1",
         params=ss.SelectorParams(),
         tasks=tasks,
-        source_sha="deadbeef",
+        provenance=_prov(),
     )
 
 
@@ -160,7 +172,7 @@ def test_admitted_task_ids_works_once_all_gates_measured():
             gates={g: ss.GateEvidence(g, ss.GateStatus.PASS, "ok")
                    for g in ("A", "B", "C", "D", "E", "F")},
         )],
-        source_sha="deadbeef",
+        provenance=_prov(),
     )
     assert art.is_final is True
     assert art.admitted_task_ids() == ["t1"]
@@ -191,19 +203,39 @@ def test_artifact_round_trips_through_json():
         reloaded.admitted_task_ids()
 
 
-def test_artifact_records_params_in_provenance():
-    """The pool size swings 46-59 with these two knobs, so an artifact that
-    does not record which reading produced it is not auditable."""
+def test_artifact_records_its_inputs_not_just_its_knobs():
+    """An artifact that records only the knobs is not reproducible, and that gap
+    shipped a real defect: a run whose runs_root did not exist scored Gate C as
+    PENDING for every task, dropped its 49 FAILs, and emitted a 46-candidate pool
+    whose params/version/source_sha were byte-identical to the correct 35.
+
+    So the INPUTS are pinned too: which corpus, which run set, which thresholds,
+    how many traces actually resolved, and a hash of what those traces SAID."""
     art = ss.StratumArtifact(
         version="enterprise_v1",
-        params=ss.SelectorParams(gate_b_mode="strict", module_granularity="top_segment"),
+        params=ss.SelectorParams(module_granularity="top_segment"),
         tasks=[],
-        source_sha="abc123",
+        provenance=_prov(source_sha="abc123", corpus_root="benchmarks",
+                         runs_root="/locked/runs",
+                         gate_thresholds=dict(ss.GATE_THRESHOLDS),
+                         trace_coverage={"ok": 60, "not_found": 23, "no_trace": 33},
+                         traces_digest="f00dcafe"),
     )
     d = art.to_dict()
-    assert d["params"]["gate_b_mode"] == "strict"
     assert d["params"]["module_granularity"] == "top_segment"
-    assert d["source_sha"] == "abc123"
+    p = d["provenance"]
+    assert p["source_sha"] == "abc123"
+    assert p["source_dirty"] is False
+    assert p["corpus_root"] == "benchmarks"
+    assert p["runs_root"] == "/locked/runs"
+    assert p["trace_coverage"] == {"ok": 60, "not_found": 23, "no_trace": 33}
+    assert p["traces_digest"] == "f00dcafe"
+    # Every constant that can move the pool, not just Gate C's.
+    assert p["gate_thresholds"]["gate_c_trivial_max"] == 7
+    assert p["gate_thresholds"]["gate_d_min_files"] == 3
+    # ...and it survives a round-trip, or a reader cannot check any of it.
+    assert ss.StratumArtifact.from_dict(json.loads(json.dumps(d))).provenance == \
+        art.provenance
 
 
 # ---------------------------------------------------------------------------
@@ -295,21 +327,37 @@ def test_gate_d_root_level_files_have_no_parent_module():
 
 
 # ---------------------------------------------------------------------------
-# Gate B -- waivers must be auditable, not asserted (M3)
+# Gate B -- one rule, one implementation
 # ---------------------------------------------------------------------------
 
 
-def test_waiver_is_only_sound_when_a_downstream_target_exists():
-    """A waived exact_path leak is defensible only if the named file is an
-    ENTRY POINT and the scored discovery lies downstream. If the leaked path
-    is the task's ONLY oracle file, the task is grep-trivial and the waiver is
-    wrong. That is a deterministic check, so make it one."""
-    assert ss.waiver_has_downstream_target(
-        waived_token="svc/api.go", oracle_files=["svc/api.go", "svc/deep/impl.go"]
-    ) is True
-    assert ss.waiver_has_downstream_target(
-        waived_token="svc/api.go", oracle_files=["svc/api.go"]
-    ) is False
+def test_gate_b_reports_decide_rather_than_re_deriving_it():
+    """The two-sources-of-truth defect, pinned. `make verify-leak` reported 69
+    admitted while the artifact reported Gate B pass=61 over the same corpus and
+    the same policy -- because the selector re-litigated the verdict instead of
+    reporting it. An author who ran the documented command was told ADMITTED
+    while the selector said REJECTED.
+
+    Gate B now reports `decide()`, so the two cannot drift. Asserting agreement
+    over the WHOLE corpus (not a fixture) is what makes that structural."""
+    disagreements = []
+    for task_dir in sorted(BENCHMARKS.glob("*/*/task.toml")):
+        oracle = lc.load_task(task_dir.parent)
+        if oracle is None:
+            continue
+        verdict = lc.decide(task_dir.parent.name, oracle)
+        gate = ss.score_gate_b(verdict)
+        if gate.status.passed is not verdict.admit:
+            disagreements.append(task_dir.parent.name)
+    assert not disagreements, (
+        f"selector Gate B disagrees with leak_classifier.decide() on "
+        f"{len(disagreements)} tasks: {disagreements[:5]}")
+
+
+def test_gate_b_fails_a_task_whose_oracle_cannot_be_loaded():
+    """Uncheckable is not the same as fine."""
+    ev = ss.score_gate_b(None)
+    assert ev.status is ss.GateStatus.FAIL
 
 
 # ---------------------------------------------------------------------------
@@ -368,7 +416,7 @@ def test_gate_c_partial_scoring_still_blocks_finality():
             "F": ss.GateEvidence("F", ss.GateStatus.PASS, "ok"),
         }),
     ]
-    art = ss.StratumArtifact("v", ss.SelectorParams(), tasks, "sha")
+    art = ss.StratumArtifact("v", ss.SelectorParams(), tasks, _prov())
     assert art.is_final is False
     with pytest.raises(ss.StratumNotFinalError):
         art.admitted_task_ids()
@@ -425,11 +473,6 @@ def test_gate_f_verifier_calibration():
 # the only kind of bug that matters in a selector.
 # ---------------------------------------------------------------------------
 
-from pathlib import Path  # noqa: E402
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-BENCHMARKS = REPO_ROOT / "benchmarks"
-
 
 def test_calibration_exclusion_actually_fires_on_the_real_corpus():
     """difficulty_stratum is a TOP-LEVEL key in task.toml. Reading it from
@@ -445,19 +488,129 @@ def test_calibration_exclusion_actually_fires_on_the_real_corpus():
     assert scored.is_candidate is False
 
 
-def test_ttfr_is_keyed_by_task_id_not_directory_name():
+def _fake_runs_root(tmp_path, run_key: str, lines: list[str]) -> Path:
+    """A minimal locked-run-set tree: <runs>/<task-id>/baseline/agent_trace.jsonl.
+
+    Built rather than borrowed. The real run set lives outside the repo on one
+    machine, and a test that reaches for it is a test that passes or skips
+    depending on whose laptop it runs on -- which is the same class of defect as
+    the hardcoded DEFAULT_RUNS_ROOT this replaced.
+    """
+    trace = tmp_path / run_key / "baseline" / "agent_trace.jsonl"
+    trace.parent.mkdir(parents=True)
+    trace.write_text("\n".join(lines) + "\n")
+    return tmp_path
+
+
+def _read_tool_call(path: str) -> str:
+    return json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Read", "input": {"file_path": path}}]}})
+
+
+def test_ttfr_is_keyed_by_task_id_not_directory_name(tmp_path):
     """benchmarks/.../calibration-001/ holds id = "cal-err-flask-blueprint-001",
-    and the locked run set is keyed by the id. Keying by directory name finds
-    40 baseline traces; keying by id finds 89. The wrong key does not raise --
-    it just reports `no_trace` and silently halves Gate C's coverage."""
-    runs = ss.DEFAULT_RUNS_ROOT
-    if not runs.is_dir():
-        pytest.skip("locked run set not present")
-    params = ss.SelectorParams()
+    and the locked run set is keyed by the id, NOT the directory name. Keying by
+    directory finds 40 baseline traces; keying by id finds 89. The wrong key does
+    not raise -- it just reports `no_trace` and silently halves Gate C's coverage.
+
+    So the fixture is keyed by the ID and left EMPTY at the directory name: if the
+    selector ever keys by directory again, it finds nothing and `run_key` moves."""
+    runs = _fake_runs_root(tmp_path, "cal-err-flask-blueprint-001",
+                           [_read_tool_call("app/__init__.py")])
     scored = ss.score_task(BENCHMARKS / "customer_escalation" / "calibration-001",
-                           params, runs_root=runs)
+                           ss.SelectorParams(), runs_root=runs)
     assert scored is not None
     assert scored.gates["C"].evidence.get("run_key") == "cal-err-flask-blueprint-001"
+    assert scored.gates["C"].evidence.get("coverage") != "no_trace"
+
+
+# ---------------------------------------------------------------------------
+# Reproducibility: the artifact must pin its inputs, and refuse to guess them.
+#
+# The defect this section exists for: --runs-root defaulted to a hardcoded
+# absolute path into one machine's checkout. Anywhere else, the SAME command
+# emitted a 46-candidate artifact whose params, version and source_sha were
+# byte-identical to the correct 35-candidate one -- Gate C had silently gone
+# PENDING for every task, dropping the 49 FAILs that hold the pool down. Only a
+# stderr WARNING distinguished them, and warnings do not survive into artifacts.
+# ---------------------------------------------------------------------------
+
+
+def test_runs_root_is_required(capsys):
+    """No default. A default that points at one machine is worse than no default:
+    it makes the wrong answer the easy one."""
+    with pytest.raises(SystemExit):
+        ss.main(["--corpus", str(BENCHMARKS)])
+    assert "runs-root" in capsys.readouterr().err
+
+
+def test_a_missing_runs_root_refuses_to_score(tmp_path):
+    """It used to WARN and then score every task's Gate C as PENDING."""
+    with pytest.raises(SystemExit) as exc:
+        ss.main(["--corpus", str(BENCHMARKS),
+                 "--runs-root", str(tmp_path / "nope")])
+    assert "does not exist" in str(exc.value)
+
+
+def test_an_empty_runs_root_refuses_to_score(tmp_path):
+    """The one an existence check does NOT catch, and the reason the fix is a
+    precondition rather than a provenance field. The directory exists, so
+    `is_dir()` passes, so Gate C goes uniformly PENDING and the pool inflates
+    from 35 to 46 -- silently, with no warning at all."""
+    empty = tmp_path / "runs"
+    empty.mkdir()
+    with pytest.raises(SystemExit) as exc:
+        ss.main(["--corpus", str(BENCHMARKS), "--runs-root", str(empty)])
+    assert "no baseline traces" in str(exc.value)
+
+
+def test_a_refused_run_writes_no_artifact(tmp_path):
+    """Fail-closed means fail-closed: a rejected run must not leave a
+    plausible-looking artifact behind for someone to pick up later."""
+    empty = tmp_path / "runs"
+    empty.mkdir()
+    out = tmp_path / "stratum.json"
+    with pytest.raises(SystemExit):
+        ss.main(["--corpus", str(BENCHMARKS), "--runs-root", str(empty),
+                 "--out", str(out)])
+    assert not out.exists()
+
+
+def test_traces_digest_discriminates_trace_CONTENT_not_just_presence(tmp_path):
+    """Coverage counts alone cannot tell two run sets apart.
+
+    A re-run baseline whose ttfr moves 3 -> 25 flips Gate C from FAIL to PASS and
+    changes the pool, while reporting coverage="ok" both times. Identical counts,
+    different answer. Only a hash of what the traces SAID separates them."""
+    # Same oracle, same coverage ("ok" both times) -- but the baseline in `b`
+    # took three turns to reach it instead of one. That is a real ttfr move, and
+    # a big enough one flips Gate C's verdict and the pool with it.
+    a = _fake_runs_root(tmp_path / "a", "t", [_read_tool_call("src/x.go")])
+    b = _fake_runs_root(tmp_path / "b", "t", [
+        _read_tool_call("noise/one.go"),
+        _read_tool_call("noise/two.go"),
+        _read_tool_call("src/x.go"),
+    ])
+
+    m_a = {"t": {"C": ss.measure_ttfr("t", ["src/x.go"], a)}}
+    m_b = {"t": {"C": ss.measure_ttfr("t", ["src/x.go"], b)}}
+
+    # Coverage is IDENTICAL and the ttfr differs -- which is exactly why the
+    # counts cannot be the pin, and the content hash has to be.
+    assert ss.trace_coverage(m_a) == ss.trace_coverage(m_b) == {
+        "ok": 1, "not_found": 0, "no_trace": 0}
+    assert m_a["t"]["C"]["ttfr"] != m_b["t"]["C"]["ttfr"]
+    assert ss._traces_digest(m_a) != ss._traces_digest(m_b)
+    assert ss._traces_digest(m_a) == ss._traces_digest(m_a)   # and it is stable
+
+
+def test_resolved_traces_counts_found_traces_not_ok_ones(tmp_path):
+    """`not_found` means a trace WAS read and the baseline never opened an oracle
+    file; `no_trace` means there was no trace. Only the latter says the run set is
+    empty, so conflating them would let a populated-but-unhelpful run set trip the
+    empty-runs-root guard."""
+    assert ss.resolved_traces({"ok": 3, "not_found": 2, "no_trace": 10}) == 5
+    assert ss.resolved_traces({"ok": 0, "not_found": 0, "no_trace": 10}) == 0
 
 
 def test_an_absent_gate_is_unmeasured_not_final():
@@ -476,7 +629,7 @@ def test_an_absent_gate_is_unmeasured_not_final():
     assert partial.is_final is False
     assert partial.admitted is False
 
-    art = ss.StratumArtifact("v", ss.SelectorParams(), [partial], "sha")
+    art = ss.StratumArtifact("v", ss.SelectorParams(), [partial], _prov())
     assert art.unmeasured_gates == ["C", "E", "F"]
     assert art.is_final is False
     assert art.to_dict()["stratum_status"] == "CANDIDATE"

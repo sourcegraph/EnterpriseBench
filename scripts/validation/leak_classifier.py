@@ -26,17 +26,34 @@ the adapter pattern in ``lib/eb_verify/qa_adapter.py``
 setdefault-merge in ``load_task_inputs``) rather than duplicating a second,
 divergent parsing convention.
 
-Policy (Option B, decided 2026-07-10 on EnterpriseBench-jn73.3): Gate B
-HONORS the ``[[qa.waivers]]`` ledger. An ``exact_path`` leak ADMITS the task
-iff the leaked oracle file's path is a recorded ``qa.waivers`` token for that
-task (rationale: the named path is the given investigation entry point, and
-the scored discovery target is downstream — see
-``docs/qa/eb_f2_triage_2026_06_04.md``); otherwise it REJECTs. ``symbol`` and
-``dir`` buckets are never waiver-admissible — only ``exact_path`` is, per the
-decided rule. This makes Gate B share exactly one waiver ledger with the F2
-runtime score-validity gate (``lib/eb_verify/qa_adapter.py`` on
-``fix/eb-f2-leak-triage``, not yet merged to main) instead of building a
-second, conflicting leak-admission mechanism.
+Policy: a task is ADMITTED iff its bucket is ``behavioral`` or ``grep_hard``.
+``exact_path`` / ``symbol`` / ``dir`` always REJECT. There is exactly one rule
+and exactly one implementation of it — ``decide()`` — which both this CLI
+(``make verify-leak``) and the stratum selector's Gate B call, so an author and
+the selector cannot be told different things about the same task.
+
+Gate B deliberately does NOT consult the ``[[qa.waivers]]`` ledger, though an
+earlier revision did (the "Option B" rule: admit an ``exact_path`` leak whose
+token is a recorded waiver, on the rationale that the named path is a *given*
+entry point whose scored discovery lies downstream). That rule was withdrawn
+because its central claim is untested and its guard did not work:
+
+* The soundness guard meant to enforce "there IS something downstream" compared
+  the *leak token* — in practice a two-segment fragment like ``manifests/ha`` —
+  against full oracle paths, so it returned True unconditionally and never once
+  rejected a waiver.
+* The claim itself is unverified. The only difficulty measurement available
+  (Gate C's turns-to-first-relevant) is confounded here: the waived token is
+  ITSELF a ``required_files`` entry, so ttfr scores how fast the agent opened
+  the file the instruction handed it, not how hard the task is.
+
+An admission gate must fail CLOSED on an untested claim. To restore the rule,
+see EnterpriseBench-jn73.2.12: it needs ttfr recomputed against the oracle MINUS
+the waived token, showing the waived tasks are non-trivial under THAT measure.
+The F2 ledger keeps its own home in the runtime score-validity gate
+(``lib/eb_verify/qa_adapter.py`` on ``fix/eb-f2-leak-triage``); "is this task's
+reward still meaningful despite a leak" and "does this task still discriminate
+retrieval from grep" are different questions and must not share one verdict.
 
 Usage:
     python3 scripts/validation/leak_classifier.py <task_dir>          # one task
@@ -139,12 +156,10 @@ class Leak:
     token: str        # the leaking token; "" for behavioral / grep_hard
     # EB addition (not in the CSB reference): the full oracle file path (as
     # given in ground_truth) that triggered an EXACT_PATH/DIR bucket. `token`
-    # may be only a basename or a partial two-segment fragment of a longer
-    # path, which is not enough to match a qa.waivers `token` field (recorded
-    # as the *complete* required/sufficient_files path). Gate B's waiver
-    # check needs the complete path, so we carry it separately rather than
-    # overload `token` and risk breaking bucket-classification parity with
-    # the CSB reference's self-test.
+    # may be only a basename or a partial two-segment fragment of that path, so
+    # any caller reasoning about the leaked FILE needs this rather than `token`.
+    # Carried separately rather than overloading `token`, which would break
+    # bucket-classification parity with the CSB reference's self-test.
     source_path: str = ""
 
     @property
@@ -296,25 +311,6 @@ def load_ground_truth(task_dir: Path, task_toml: dict[str, Any]) -> dict[str, An
     return ground_truth
 
 
-def _load_waiver_tokens(task_toml: dict[str, Any]) -> set[str]:
-    """Return the set of oracle-path tokens recorded as qa.waivers.
-
-    Any ``decision`` value counts (both "waive" and "accept" mean the finding
-    was reviewed and is not a fresh leak) — Gate B only cares whether the
-    token was triaged, not which of the two labels was applied.
-    """
-    qa = task_toml.get("qa")
-    if not isinstance(qa, dict):
-        return set()
-    waivers = qa.get("waivers")
-    if not isinstance(waivers, list):
-        return set()
-    return {
-        w["token"] for w in waivers
-        if isinstance(w, dict) and isinstance(w.get("token"), str)
-    }
-
-
 @dataclass(frozen=True)
 class TaskOracle:
     """Everything a gate needs from one task on disk, read exactly once.
@@ -354,7 +350,7 @@ def load_task(task_dir: Path) -> TaskOracle | None:
                       task_toml=task_toml, ground_truth=ground_truth)
 
 
-# --- Gate B decision (Option B: waiver-aware admission) ---------------------
+# --- Gate B decision --------------------------------------------------------
 
 @dataclass(frozen=True)
 class GateBResult:
@@ -362,53 +358,33 @@ class GateBResult:
     bucket: Bucket
     token: str
     admit: bool
-    waived: bool
     reason: str
+    #: The oracle path whose leak triggered the bucket. Carried, not dropped:
+    #: ``token`` may be a mere fragment of it, so a caller that needs to reason
+    #: about the leaked FILE (rather than the matched string) has to have this.
+    source_path: str = ""
 
 
 def decide(task_id: str, oracle: TaskOracle) -> GateBResult:
-    """Apply the Option B decision rule to one already-loaded task.
+    """Apply the Gate B decision rule to one already-loaded task.
+
+    The single implementation of the rule. Both ``make verify-leak`` and the
+    stratum selector's Gate B call this, so the two cannot disagree about a task.
 
     leak = classify(instruction, ground_truth)
-    if bucket == EXACT_PATH and token in qa.waivers -> ADMIT (waived entry point)
-    elif bucket in {EXACT_PATH, SYMBOL, DIR}        -> REJECT
-    else                                            -> ADMIT
+    bucket in {EXACT_PATH, SYMBOL, DIR} -> REJECT (the instruction localizes it)
+    else                                -> ADMIT
     """
     leak = classify(oracle.instruction, oracle.oracle_files, None)
-
-    if leak.bucket is Bucket.EXACT_PATH:
-        waiver_tokens = _load_waiver_tokens(oracle.task_toml)
-        triggering_path = leak.source_path or leak.token
-        if triggering_path in waiver_tokens:
-            return GateBResult(
-                task_id=task_id,
-                bucket=leak.bucket,
-                token=leak.token,
-                admit=True,
-                waived=True,
-                reason=(
-                    f"exact_path leak on {triggering_path!r} is a recorded "
-                    "qa.waivers entry point; admitted per Option B"
-                ),
-            )
-
-    if leak.bucket in REJECT:
-        return GateBResult(
-            task_id=task_id,
-            bucket=leak.bucket,
-            token=leak.token,
-            admit=False,
-            waived=False,
-            reason=f"{leak.bucket.value} leak on {leak.token!r}, no matching qa.waivers entry",
-        )
-
+    leaky = leak.bucket in REJECT
     return GateBResult(
         task_id=task_id,
         bucket=leak.bucket,
         token=leak.token,
-        admit=True,
-        waived=False,
-        reason="no locational leak",
+        admit=not leaky,
+        reason=(f"{leak.bucket.value} leak on {leak.token!r}: the instruction "
+                f"localizes the oracle" if leaky else "no locational leak"),
+        source_path=leak.source_path or "",
     )
 
 
@@ -437,7 +413,6 @@ def _run_corpus(root: Path, *, as_json: bool) -> int:
     for r in results:
         by_bucket[r.bucket.value] = by_bucket.get(r.bucket.value, 0) + 1
     rejects = [r for r in results if not r.admit]
-    waived = [r for r in results if r.waived]
 
     if as_json:
         payload = {
@@ -446,13 +421,10 @@ def _run_corpus(root: Path, *, as_json: bool) -> int:
             "bucket_distribution": by_bucket,
             "admitted": len(results) - len(rejects),
             "rejected": len(rejects),
-            "waived_admits": len(waived),
             "rejects": [
-                {"task_id": r.task_id, "bucket": r.bucket.value, "token": r.token, "reason": r.reason}
+                {"task_id": r.task_id, "bucket": r.bucket.value, "token": r.token,
+                 "source_path": r.source_path, "reason": r.reason}
                 for r in rejects
-            ],
-            "waived_tasks": [
-                {"task_id": r.task_id, "token": r.token} for r in waived
             ],
         }
         print(json.dumps(payload, indent=2))
@@ -462,10 +434,10 @@ def _run_corpus(root: Path, *, as_json: bool) -> int:
           f"({len(unreadable)} unreadable, skipped):")
     for bucket_name in ("exact_path", "symbol", "dir", "behavioral", "grep_hard"):
         print(f"  {bucket_name:11} {by_bucket.get(bucket_name, 0)}")
-    print(f"\n{len(waived)} exact_path leaks ADMITTED via qa.waivers:")
-    for r in waived:
-        print(f"  WAIVED  {r.task_id:40} token={r.token!r}")
-    print(f"\n{len(rejects)}/{len(results)} tasks REJECTED by Gate B (leaky, unwaived):")
+    print(f"\n{len(results) - len(rejects)}/{len(results)} tasks ADMITTED "
+          f"(behavioral / grep_hard).")
+    print(f"{len(rejects)}/{len(results)} tasks REJECTED by Gate B (the "
+          f"instruction localizes the oracle):")
     for r in rejects:
         print(f"  REJECT  {r.bucket.value:11} {r.token!r:40} {r.task_id}")
     return 1 if rejects else 0
@@ -489,8 +461,7 @@ def main(argv: list[str]) -> int:
         print("could not load an oracle+instruction for this task", file=sys.stderr)
         return 2
     verdict = "ADMIT" if result.admit else "REJECT"
-    waived_note = " (waived)" if result.waived else ""
-    print(f"{verdict}{waived_note}  bucket={result.bucket.value}  token={result.token!r}")
+    print(f"{verdict}  bucket={result.bucket.value}  token={result.token!r}")
     print(f"  {result.reason}")
     return 0 if result.admit else 1
 
