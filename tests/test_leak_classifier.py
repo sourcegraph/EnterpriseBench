@@ -315,17 +315,24 @@ def test_f2_waived_tasks_gate_b_verdict(rel_dir):
         assert result.waived is True
 
 
-def test_config_drift_001_generic_basename_admits_via_waiver():
-    """config-drift-001's leak token is the generic basename `values.yaml` --
-    the false-positive class flagged in jn73.3's verification checklist. It
-    IS a recorded qa.waivers entry, so it must ADMIT; Gate B does not
-    special-case generic basenames on its own (that would be a silent scope
-    change -- see the corpus report for the broader go.mod/package.json/
-    values.yaml false-positive count across un-waived tasks)."""
+def test_config_drift_001_leaks_on_real_fragment_not_generic_basename():
+    """config-drift-001 is the case that proves the generic-basename filter
+    (jn73.2) narrows rather than blanket-admits.
+
+    jn73.3 recorded its leak token as the generic basename `values.yaml` and
+    deferred the filter as out of scope. With the filter in, `values.yaml` no
+    longer localizes -- but the task's instruction independently names the
+    path fragment `bitnami/consul` verbatim, which IS a real localization
+    leak. So the task still buckets exact_path and still needs its waiver:
+    the filter suppressed the false-positive token and left the genuine one.
+
+    Asserting the *token* is the point. A filter that admitted this task would
+    be over-broad; one that still reported `values.yaml` would be inert."""
     task_dir = BENCHMARKS / "platform_engineering" / "config-drift-001"
     result = lc.decide_task_dir(task_dir)
     assert result is not None
-    assert result.token == "values.yaml"
+    assert result.bucket is lc.Bucket.EXACT_PATH
+    assert result.token == "bitnami/consul"
     assert result.admit is True
     assert result.waived is True
 
@@ -346,3 +353,47 @@ def test_corpus_run_produces_bucket_distribution(capsys):
     # (the other 3 are the KNOWN_ADDITIONAL_UNWAIVED_LEAK set above).
     waived_ids = {w["task_id"] for w in payload["waived_tasks"]}
     assert len(waived_ids) >= 8
+
+
+# ---------------------------------------------------------------------------
+# Generic build-manifest basenames are not localization leaks (jn73.2)
+# ---------------------------------------------------------------------------
+#
+# Every Go repo has a go.mod; every Node repo a package.json. Naming one in a
+# prompt tells the agent nothing about WHICH file to investigate, so it is not
+# an exact_path leak. Ported from the F2 checker (76f5469), where the same
+# false positive inflated the Gate B reject set by 14 of 45.
+
+
+@pytest.mark.parametrize("basename", ["go.mod", "package.json", "pom.xml", "values.yaml"])
+def test_generic_manifest_basename_is_not_an_exact_path_leak(basename):
+    """A bare generic manifest basename must not localize (no exact_path)."""
+    leak = lc.classify(
+        instruction=f"The build fails after a dependency bump. Inspect the {basename}.",
+        oracle_files=[f"svc/deps/{basename}"],
+        oracle_symbols=[],
+    )
+    assert leak.bucket is not lc.Bucket.EXACT_PATH
+    assert leak.admit is True
+
+
+def test_qualified_generic_manifest_path_still_leaks():
+    """`envoy/go.mod` has a directory component -- still specific, still a leak."""
+    leak = lc.classify(
+        instruction="The bump landed in envoy/go.mod and broke the build.",
+        oracle_files=["envoy/go.mod"],
+        oracle_symbols=[],
+    )
+    assert leak.bucket is lc.Bucket.EXACT_PATH
+    assert leak.admit is False
+
+
+def test_non_generic_basename_still_leaks():
+    """The filter must not blanket-suppress real basename leaks."""
+    leak = lc.classify(
+        instruction="The regression is in retry_policy.go somewhere.",
+        oracle_files=["svc/net/retry_policy.go"],
+        oracle_symbols=[],
+    )
+    assert leak.bucket is lc.Bucket.EXACT_PATH
+    assert leak.admit is False

@@ -89,6 +89,34 @@ _COMMON_WORDS = frozenset({
     "response", "process", "update", "create", "delete", "list", "check",
 })
 
+# Build-manifest basenames that exist in (almost) every repo of a given
+# language. Naming one in a prompt ("look at go.mod") is not a localization
+# leak: the basename is non-discriminative, so it tells the agent nothing about
+# WHICH file holds the answer. A token *with* directory components (e.g.
+# ``envoy/go.mod``) is specific and is still treated as a leak.
+#
+# Kept in sync with the F2 aux-file leakage checker's list of the same name
+# (fix/eb-f2-leak-triage, 76f5469). That branch is unmerged, so the two copies
+# cannot yet share one definition -- unify them when it lands.
+GENERIC_MANIFEST_BASENAMES = frozenset({
+    # Go
+    "go.mod", "go.sum",
+    # Node / JS-TS
+    "package.json", "package-lock.json", "yarn.lock",
+    # Python
+    "setup.py", "setup.cfg", "requirements.txt", "pyproject.toml",
+    "Pipfile", "Pipfile.lock",
+    # Rust
+    "Cargo.toml", "Cargo.lock",
+    # JVM
+    "pom.xml", "build.gradle",
+    # Bazel
+    "BUILD", "BUILD.bazel",
+    # Helm -- EB addition beyond the F2 list. Every chart has a values.yaml and
+    # a Chart.yaml, so they are non-discriminative by the identical argument.
+    "values.yaml", "Chart.yaml",
+})
+
 
 @dataclass(frozen=True)
 class Leak:
@@ -144,7 +172,12 @@ def classify(instruction: str,
     # 1) exact path or basename, or >=2 consecutive path segments verbatim
     for f in oracle_files:
         basename, _dirs, segs = _path_parts(f)
-        if basename and names(basename):
+        # A bare generic manifest basename does not localize -- skip it here,
+        # but keep checking the multi-segment fragments below, which restore
+        # specificity (`envoy/go.mod` still leaks).
+        if (basename
+                and basename not in GENERIC_MANIFEST_BASENAMES
+                and names(basename)):
             return Leak(Bucket.EXACT_PATH, basename, admit=False, source_path=f)
         for i in range(len(segs) - 1):
             frag = "/".join(segs[i:i + 2]).lower()
