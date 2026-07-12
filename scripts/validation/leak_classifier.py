@@ -288,6 +288,15 @@ def load_ground_truth(task_dir: Path, task_toml: dict[str, Any]) -> dict[str, An
     ``ground_truth.json`` (task-type-specific keys, and on some older tasks a
     mirror of required_files/sufficient_files) only fills keys the TOML
     table doesn't have via ``setdefault``.
+
+    An unparseable ``ground_truth.json`` RAISES rather than degrading to ``{}``.
+    Swallowing it silently shrinks the oracle Gate B is checked against -- and on
+    the older tasks whose required_files live ONLY in the json, it shrinks it to
+    nothing, so the very oracle files the instruction leaks become invisible and
+    the task is admitted as "no locational leak". A task's own malformed file must
+    not make that task's own admission gate more permissive. ``score_task`` turns
+    this into an explicit FAIL, which is how an unparseable task.toml is already
+    treated.
     """
     gt_embedded = task_toml.get("ground_truth")
     ground_truth: dict[str, Any] = dict(gt_embedded) if isinstance(gt_embedded, dict) else {}
@@ -295,8 +304,8 @@ def load_ground_truth(task_dir: Path, task_toml: dict[str, Any]) -> dict[str, An
     if gt_path.is_file():
         try:
             gt_json = json.loads(gt_path.read_text(encoding="utf-8", errors="replace"))
-        except json.JSONDecodeError:
-            gt_json = {}
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"unparseable ground_truth.json: {exc}") from exc
         if isinstance(gt_json, dict):
             block = gt_json.get("ground_truth", gt_json)
             if isinstance(block, dict):
@@ -321,6 +330,10 @@ class TaskOracle:
     ground_truth: dict[str, Any] = field(default_factory=dict)
 
 
+class UnsafeTaskIdError(ValueError):
+    """A ``[task].id`` that cannot be used as a single path segment."""
+
+
 def task_run_key(task_toml: dict[str, Any], fallback: str) -> str:
     """A task's identity for anything keyed by the run set: ``[task].id``.
 
@@ -329,10 +342,31 @@ def task_run_key(task_toml: dict[str, Any], fallback: str) -> str:
     and the locked run set is keyed by id: keying by directory finds 40 baseline
     traces, keying by id finds 89. One definition, so Gate B's task_id and Gate
     C's trace lookup cannot drift apart.
+
+    The id is validated as a SINGLE path segment, because Gate C joins it onto the
+    run set (``runs_root / run_key / "baseline" / "agent_trace.jsonl"``). Left
+    unchecked, a task's own task.toml chooses which trace its own difficulty gate
+    reads: ``id = "../other-task"`` walks out of runs_root, and an absolute id
+    discards runs_root entirely. Either way the task ends up scored on evidence
+    that is not its own -- and an id that resolves to nothing is not even a
+    failure, it is coverage="no_trace" -> Gate C PENDING, which does NOT block
+    candidacy. So a bad id makes a task MORE likely to be admitted.
+
+    Raising is the point. The schema already pins `id` to ``^[a-z][a-z0-9-]+-\\d{3}$``,
+    but that check lives in a separate tool this module never calls, and the
+    module's own documented usage runs it standalone against benchmarks/.
     """
     task = task_toml.get("task")
     task_id = task.get("id") if isinstance(task, dict) else None
-    return task_id if isinstance(task_id, str) and task_id else fallback
+    if not (isinstance(task_id, str) and task_id):
+        return fallback
+    if task_id in (".", "..") or "/" in task_id or "\\" in task_id or task_id.startswith("."):
+        raise UnsafeTaskIdError(
+            f"[task].id {task_id!r} is not a single path segment. Gate C joins it "
+            f"onto the run set, so this id could read another task's trace (or a "
+            f"path outside it entirely) and be scored on evidence that is not its own."
+        )
+    return task_id
 
 
 def load_task(task_dir: Path) -> TaskOracle | None:

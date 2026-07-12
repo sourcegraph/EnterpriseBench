@@ -11,24 +11,18 @@ Depends on stratum_model (the evidence types) and never the other way round.
 from __future__ import annotations
 
 import hashlib
-import sys
 from pathlib import Path
 from typing import Any
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-
-# Path setup ONLY in script mode. When imported as a package module (which is how
-# the tests and the CLI get it) __package__ is set and we touch nothing: mutating
-# sys.path at import time makes test outcomes depend on collection order.
-if __package__ in (None, ""):  # pragma: no cover - script-mode only
-    sys.path.insert(0, str(_REPO_ROOT))
-    sys.path.insert(0, str(_REPO_ROOT / "lib"))
-
-from eb_metrics.retrieval_extraction import compute_ttfr  # noqa: E402
-from scripts.lib.tasks import find_task_dirs  # noqa: E402
-from scripts.validation import crnt_validator  # noqa: E402
-from scripts.validation import leak_classifier as lc  # noqa: E402
-from scripts.validation.stratum_model import (  # noqa: E402
+# No sys.path bootstrap here: this module has no __main__ and is only ever
+# imported as `scripts.validation.stratum_gates`, by which point the CLI (or
+# pytest) has already made the repo root importable. A script-mode shim here
+# would be unreachable code pretending to be a safety net.
+from eb_metrics.retrieval_extraction import compute_ttfr
+from scripts.lib.tasks import find_task_dirs
+from scripts.validation import crnt_validator
+from scripts.validation import leak_classifier as lc
+from scripts.validation.stratum_model import (
     COMPUTABLE_GATES,
     GATE_C_TIER1_MIN,
     GATE_C_TIER2_MIN,
@@ -448,7 +442,13 @@ def score_task(task_dir: Path,
         )
 
     task_toml = oracle.task_toml
-    run_key = lc.task_run_key(task_toml, task_id)
+    try:
+        run_key = lc.task_run_key(task_toml, task_id)
+    except lc.UnsafeTaskIdError as exc:
+        # An id that cannot be a path segment is a malformed task, and malformed
+        # must FAIL -- not degrade to a missing trace, which reads as Gate C
+        # PENDING and leaves the task a candidate.
+        return unloadable_task_gates(task_id, suite, str(exc))
 
     m = dict((measurements or {}).get(task_id, {}))
     if runs_root is not None and "C" not in m:

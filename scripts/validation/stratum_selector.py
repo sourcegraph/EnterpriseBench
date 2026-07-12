@@ -148,14 +148,18 @@ def resolved_traces(coverage: dict[str, int]) -> int:
 def _traces_digest(measurements: dict[str, dict[str, Any]] | None) -> str:
     """One hash over every trace that fed Gate C."""
     pairs = sorted(
-        (m["C"]["run_key"], m["C"].get("trace_sha256", ""))
-        for m in (measurements or {}).values()
-        if m.get("C", {}).get("trace_sha256")
+        (c["run_key"], c["trace_sha256"])
+        for c in ((m or {}).get("C") or {} for m in (measurements or {}).values())
+        if c.get("trace_sha256") and c.get("run_key")
     )
     if not pairs:
         return ""
     joined = "\n".join(f"{k}:{h}" for k, h in pairs)
     return hashlib.sha256(joined.encode()).hexdigest()
+
+
+class UnmeasuredGateCError(RuntimeError):
+    """Raised rather than quietly scoring Gate C as unmeasured for the corpus."""
 
 
 def build_artifact(root: Path,
@@ -164,12 +168,26 @@ def build_artifact(root: Path,
                    runs_root: Path | None = None) -> StratumArtifact:
     """Score the corpus and pin the inputs that produced the scores.
 
-    ``measurements`` is REQUIRED, with no default: an artifact built without them
-    scores Gate C as PENDING for every task and inflates the pool by the tasks
-    Gate C would have failed. `_resolve_runs_root` is the one place that produces
-    them, and it refuses to return an empty set -- so there is no signature here
-    that lets a caller skip the measurement by omission.
+    The Gate C precondition lives HERE, at the function boundary, not only in the
+    CLI's `_resolve_runs_root`. Requiring `measurements` as a parameter stops a
+    caller skipping it by OMISSION; it does nothing about a caller passing `{}`,
+    and `build_artifact({})` reproduced the original defect exactly -- 46
+    candidates instead of 35, because Gate C went PENDING for all 116 tasks and
+    the 49 it would have FAILed stopped failing. An invariant enforced at one
+    caller is not an invariant.
+
+    A pending Gate C does not block candidacy (only a FAIL does), so anything that
+    turns a would-be FAIL into PENDING makes the pool bigger. That is the
+    fail-open direction, and this gate has now shipped through it twice.
     """
+    if runs_root is not None and resolved_traces(trace_coverage(measurements)) == 0:
+        raise UnmeasuredGateCError(
+            f"build_artifact was given a runs_root ({runs_root}) but measurements "
+            f"that resolve ZERO traces. Gate C would be PENDING for every task and "
+            f"the candidate pool would inflate. Pass measurements from "
+            f"measure_corpus_ttfr(), or pass runs_root=None to declare Gate C "
+            f"unmeasured on purpose."
+        )
     sha, dirty = _git_sha()
     return StratumArtifact(
         version=ARTIFACT_VERSION,

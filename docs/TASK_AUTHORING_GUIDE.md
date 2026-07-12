@@ -264,8 +264,8 @@ Before submitting a new task:
 - [ ] `task.toml` passes schema validation
 - [ ] `instruction.md` reads naturally, does not give away the answer
 - [ ] `python3 scripts/validation/leak_classifier.py benchmarks/{suite}/{task-id}` reports
-      `ADMIT` (Gate B) — or, if it REJECTs a genuine given entry point, a
-      `[[qa.waivers]]` entry is recorded with rationale, not a reworded-away task
+      `ADMIT` (Gate B). If it REJECTs, reword the instruction — there is no waiver
+      and no other way through the gate
 - [ ] `ground_truth.json` has provenance data with confidence scores
 - [ ] Each checkpoint has a verifier script in `checks/`
 - [ ] Verifier scripts output valid JSON with score/passed/reason

@@ -615,6 +615,79 @@ def test_resolved_traces_counts_found_traces_not_ok_ones(tmp_path):
     assert ss.resolved_traces({"ok": 0, "not_found": 0, "no_trace": 10}) == 0
 
 
+def test_build_artifact_refuses_measurements_that_resolve_no_traces():
+    """The invariant has to live at the FUNCTION boundary, not at one caller.
+
+    Requiring `measurements` as a parameter stops a caller skipping it by
+    OMISSION. It does nothing about a caller passing `{}` -- and
+    `build_artifact(measurements={})` reproduced the original defect exactly: 46
+    candidates instead of 35, because Gate C went PENDING for all 116 tasks and
+    the 49 it would have FAILed stopped failing. The fail-closed check used to
+    live only in the CLI's `_resolve_runs_root`, so every other caller walked
+    straight around it. An invariant enforced at one caller is not an invariant."""
+    with pytest.raises(ss.UnmeasuredGateCError) as exc:
+        ss.build_artifact(BENCHMARKS, sm.SelectorParams(), measurements={},
+                          runs_root=Path("/plausible/looking/runs"))
+    assert "ZERO traces" in str(exc.value)
+
+
+def test_build_artifact_allows_gate_c_unmeasured_only_when_declared():
+    """Leaving Gate C unmeasured is legitimate -- but you have to SAY so, by
+    passing runs_root=None, not by handing over an empty measurements dict and
+    letting the pool quietly grow."""
+    art = ss.build_artifact(BENCHMARKS, sm.SelectorParams(), measurements={},
+                            runs_root=None)
+    assert art.is_final is False
+    assert "C" in art.unmeasured_gates
+    assert art.provenance.runs_root == ""
+
+
+def test_an_unsafe_task_id_fails_the_task_rather_than_escaping_the_run_set(tmp_path):
+    """Gate C joins [task].id onto the run set:
+
+        runs_root / run_key / "baseline" / "agent_trace.jsonl"
+
+    An id of "../other-task" walks OUT of runs_root; an absolute id discards it
+    entirely. Either way a task's own task.toml chooses which trace its own
+    difficulty gate is scored on.
+
+    And the failure is not a crash. An id that resolves to nothing yields
+    coverage="no_trace" -> Gate C PENDING -> and PENDING does NOT block candidacy.
+    So a bad id makes a task MORE likely to be admitted. Malformed must FAIL."""
+    task_dir = tmp_path / "evil-task"
+    task_dir.mkdir()
+    (task_dir / "instruction.md").write_text("Find the bug in the checkout flow.")
+    (task_dir / "task.toml").write_text(
+        '[task]\nid = "../../../../etc"\n\n'
+        '[[ground_truth.required_files]]\npath = "svc/a.go"\nrepo = "r"\n'
+    )
+    scored = sg.score_task(task_dir, sm.SelectorParams(), runs_root=tmp_path)
+    assert scored is not None
+    assert scored.is_candidate is False
+    assert scored.gates["A"].status is sm.GateStatus.FAIL
+    assert "single path segment" in scored.gates["A"].reason
+
+
+def test_a_malformed_ground_truth_json_fails_the_task_rather_than_shrinking_its_oracle(tmp_path):
+    """A task's own broken file must not make that task's own gate more permissive.
+
+    load_ground_truth used to swallow JSONDecodeError and fall back to {}. On the
+    older tasks whose required_files live ONLY in ground_truth.json, that shrinks
+    the oracle to nothing -- so the very files the instruction leaks become
+    invisible to Gate B, and the task is admitted as "no locational leak"."""
+    task_dir = tmp_path / "broken-gt"
+    task_dir.mkdir()
+    (task_dir / "instruction.md").write_text("Fix the bug in `svc/secret_handler.go`.")
+    (task_dir / "task.toml").write_text('[task]\nid = "broken-gt-001"\n')
+    (task_dir / "ground_truth.json").write_text('{"required_files": [ THIS IS NOT JSON')
+
+    scored = sg.score_task(task_dir, sm.SelectorParams(), runs_root=None)
+    assert scored is not None
+    assert scored.is_candidate is False
+    assert scored.gates["B"].status is sm.GateStatus.FAIL
+    assert "ground_truth.json" in scored.gates["B"].reason
+
+
 def test_an_absent_gate_is_unmeasured_not_final():
     """Found by self-attack: `unmeasured_gates` originally counted only PENDING
     gates, so an artifact whose tasks simply OMITTED gates C/E/F reported
