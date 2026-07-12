@@ -234,7 +234,7 @@ def localization_at_k(retrieved: list[str], relevant: set[str], k: int) -> float
 
     Reported in every ``IRScores`` payload; no gate consumes it yet. (Gate C
     keys on turns-to-first-relevant, not on this — see
-    ``scripts/validation/stratum_selector.score_gate_c``.)
+    ``scripts/validation/stratum_gates.score_gate_c``.)
     """
     if k <= 0:
         return 0.0
