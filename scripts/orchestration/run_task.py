@@ -55,6 +55,24 @@ from agents.harnesses.claude.mcp.sourcegraph import (
     build_system_prompt as _build_mcp_preamble,
 )
 
+# Filesystem enforcement of the mcp_only arm (see mode_gate for why the arm is
+# gated by directory permissions rather than by a tool denylist). The explicit
+# path insert matches the sibling imports above: this module is imported both as
+# `run_task` (script, cwd on sys.path) and as `scripts.orchestration.run_task`
+# (package), and only the former puts this directory on sys.path for free.
+sys.path.insert(0, str(REPO_ROOT / "scripts" / "orchestration"))
+from mode_gate import (
+    AGENT_USER,
+    ROOT_USER,
+    VERIFIER_USER,
+    IneligibleTask,
+    check_eligibility,
+    lockdown_commands,
+    repo_dirs,
+    should_gate,
+    verifier_lockdown_commands,
+)
+
 # Scorer trust boundary — single definition of "infra failure vs real score",
 # shared by every scoring entry point in this file and by code_patch.validate.
 sys.path.insert(0, str(REPO_ROOT / "lib"))
@@ -455,6 +473,18 @@ def _chown_to_agent(container_id: str, paths: list[str]) -> None:
         )
 
 
+def _agent_can_read(container_id: str, path: str) -> bool:
+    """Whether the AGENT user can read *path* inside the container.
+
+    The single source of truth for "can the agent see this file": the pre-agent
+    readability gate wants this True, the mcp_only leak probe wants it False.
+    """
+    check = _docker_exec(
+        container_id, ["test", "-r", path], timeout=30, user=AGENT_USER
+    )
+    return check.returncode == 0
+
+
 def _assert_agent_readable(container_id: str, paths: list[str]) -> tuple[bool, str]:
     """Verify the AGENT user can read each path inside the container.
 
@@ -464,14 +494,117 @@ def _assert_agent_readable(container_id: str, paths: list[str]) -> tuple[bool, s
     (bead EnterpriseBench-s58f).
     """
     for path in paths:
-        check = _docker_exec(
-            container_id, ["test", "-r", path], timeout=30, user="agent"
-        )
-        if check.returncode != 0:
+        if not _agent_can_read(container_id, path):
             return False, (
                 f"agent user cannot read {path} "
                 "(EACCES or missing) — run is INVALID, not a real 0.0 score"
             )
+    return True, ""
+
+
+#: A recursive chown/chmod over an enterprise-scale tree (Kubernetes, Terraform)
+#: is far slower than a normal exec. The gate is security-critical, so give it
+#: room rather than let a slow tree turn into a spurious INVALID run.
+GATE_CHOWN_TIMEOUT = 900
+
+
+def _lock_verifier_assets(container_id: str) -> None:
+    """Take test.sh, .verifiers, .task and .eb_verify away from the agent.
+
+    Runs in EVERY arm. The verifier executes as root, and ``test_runner.sh``
+    runs every ``.verifiers/*.sh`` it globs — so an agent-writable check script
+    is root code execution, and an agent-writable ``.task/ground_truth.json`` is
+    a forged score. Neither is specific to the gated arm.
+    """
+    for cmd in verifier_lockdown_commands():
+        try:
+            res = _docker_exec(
+                container_id,
+                ["bash", "-c", cmd],
+                timeout=GATE_CHOWN_TIMEOUT,
+                user=ROOT_USER,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"timed out locking verifier assets ({cmd!r})") from exc
+        if res.returncode != 0:
+            # Never silently continue: a half-applied lockdown still leaves the
+            # root verifier executing agent-writable scripts.
+            raise RuntimeError(
+                f"failed to lock verifier assets ({cmd!r}): {res.stderr.strip()}"
+            )
+    logger.info("Verifier assets locked to root (agent cannot read or replace them)")
+
+
+def _apply_mode_gate(
+    container_id: str, task_data: dict, mode: str
+) -> tuple[bool, str]:
+    """Deny the agent local source access for gated arms, and PROVE it worked.
+
+    Returns (ok, error_message). A gate that silently fails to apply would
+    produce exactly the bug this exists to fix: an "mcp_only" run that quietly
+    read local files all along. So the permissions are applied as root and then
+    re-tested as the agent user; if the agent can still read repo source, the run
+    is aborted as an infra failure rather than scored.
+    """
+    if not should_gate(mode):
+        return True, ""
+
+    try:
+        dirs = repo_dirs(task_data)
+    except ValueError as exc:
+        return False, f"mode gate cannot run: {exc} — run is INVALID, not a real score"
+    if not dirs:
+        return True, ""
+
+    for cmd in lockdown_commands(dirs):
+        try:
+            res = _docker_exec(
+                container_id,
+                ["bash", "-c", cmd],
+                timeout=GATE_CHOWN_TIMEOUT,
+                user=ROOT_USER,
+            )
+        except subprocess.TimeoutExpired:
+            # A recursive chown over a Kubernetes-sized tree can outlast the
+            # default exec timeout. Catch it here so it lands as a mode-gate
+            # failure with a usable message, rather than as a generic error from
+            # the outer handler — the arms most likely to hit this are exactly
+            # the large-repo ones this benchmark is built on.
+            return False, (
+                f"mode gate timed out after {GATE_CHOWN_TIMEOUT}s ({cmd!r}) — "
+                "run is INVALID, not a real score"
+            )
+        if res.returncode != 0:
+            return False, (
+                f"mode gate failed to apply ({cmd!r}): {res.stderr.strip()} — "
+                "run is INVALID, not a real score"
+            )
+
+    # Prove the denial holds for the UID the agent actually runs as. `find` is
+    # run as root so the probe itself can enumerate the tree it just locked.
+    for repo_dir in dirs:
+        probe = _docker_exec(
+            container_id,
+            ["bash", "-c", f"find {shlex.quote(repo_dir)} -type f -print -quit"],
+            timeout=60,
+            user=ROOT_USER,
+        )
+        victim = probe.stdout.strip()
+        if not victim:
+            # No file to probe means the gate was never actually tested here. An
+            # unprovable gate is treated as a failed one — the alternative is to
+            # assume an ablation held because we did not look.
+            return False, (
+                f"mode gate unprovable: no file found under {repo_dir} to probe — "
+                "refusing to assume the ablation held"
+            )
+        if _agent_can_read(container_id, victim):
+            return False, (
+                f"mode gate LEAKED: agent can still read {victim} in mode={mode} — "
+                "refusing to score a run whose ablation did not hold"
+            )
+
+    logger.info("Mode gate applied: agent denied local source in %d repo(s)", len(dirs))
     return True, ""
 
 
@@ -650,16 +783,13 @@ def _setup_container(
     # _configure_mcp; agent_output is created by the agent step — both are
     # intentionally omitted here (s58f design intent: don't chown stale
     # leftovers from a reused container).
-    _chown_to_agent(
-        container_id,
-        [
-            "/workspace/instruction.md",
-            "/workspace/.verifiers",
-            "/workspace/.task",
-            "/workspace/.eb_verify",
-            "/workspace/test.sh",
-        ],
-    )
+    # Only the instruction is the agent's to read. The verifier's assets used to
+    # be chown'd here as well, back when the verifier ran as `agent` too; now
+    # that it runs as root, agent ownership of the scripts it executes and of the
+    # ground truth it scores against is a privilege-escalation and score-forgery
+    # vector. See _lock_verifier_assets.
+    _chown_to_agent(container_id, ["/workspace/instruction.md"])
+    _lock_verifier_assets(container_id)
 
 
 def _install_claude_cli(container_id: str) -> bool:
@@ -713,7 +843,10 @@ def _install_claude_cli(container_id: str) -> bool:
             "-c",
             "id agent >/dev/null 2>&1 || useradd -m -s /bin/bash agent; "
             "mkdir -p /workspace/agent_output /workspace/.task /workspace/.verifiers; "
-            "chown -R agent:agent /home/agent /workspace/agent_output /workspace/.task /workspace/.verifiers",
+            # .task/.verifiers are deliberately NOT chown'd to agent — the root
+            # verifier owns them (see _lock_verifier_assets). Re-granting them
+            # here would silently reopen the escalation this closes.
+            "chown -R agent:agent /home/agent /workspace/agent_output",
         ],
     )
 
@@ -869,6 +1002,17 @@ def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
     """Run /workspace/test.sh and capture the JSON results."""
     logger.info("Running checkpoint verifiers (timeout=%ds)...", verifier_timeout)
 
+    # Run as root in EVERY arm, not just the gated one. The Dockerfile ends with
+    # `USER agent`, so a bare exec would inherit the same UID the mcp_only gate
+    # denies and the verifier would be unable to read the source it scores. Root
+    # is applied uniformly so that verification is identical across arms and the
+    # only thing varying between them stays the agent's retrieval channel.
+    #
+    # NOTE for check-script authors: checks/*.sh therefore run as root. Do not
+    # write a check that depends on the invoking UID — a permission-bit assertion
+    # ([ -r ] / [ -w ]), $HOME, or `pip install --user` will behave differently
+    # here than it did when the verifier ran as `agent`. Root bypasses DAC, so
+    # read-access checks in particular will silently always pass.
     result = _docker_exec(
         container_id,
         [
@@ -879,6 +1023,7 @@ def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
             "bash /workspace/test.sh",
         ],
         timeout=verifier_timeout,
+        user=VERIFIER_USER,
     )
 
     # test.sh outputs JSON to stdout, diagnostics to stderr
@@ -1611,6 +1756,7 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         repos = task_data.get("repos", [])
 
         result.task_id = task_id
+
         # Include mode + ablation variant in image tag to prevent cache collisions
         mode_suffix = f"-{config.mode}" if config.mode != "baseline" else ""
         ablation_suffix = (
@@ -1643,6 +1789,22 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
             task_info.get("suite"),
             task_info.get("task_type"),
         )
+
+        # A task whose required artifact can only be produced by editing source
+        # cannot run in an arm that denies source access. Fail before spending a
+        # container on it — a silent near-zero here would be indistinguishable
+        # from a genuine retrieval failure and would poison the arm mean.
+        try:
+            check_eligibility(task_data, config.mode)
+        except IneligibleTask as exc:
+            result.phase = "ineligible_for_mode"
+            result.status = RUN_STATUS_INVALID
+            result.success = False
+            result.failure_class = "task_ineligible"
+            result.error = str(exc)
+            result.timing = timings
+            _save_results(result, task_data, output_dir, config)
+            return result
 
         # --- Disk pre-flight ---
         if not _check_disk_space(min_gb=config.min_disk_gb):
@@ -1785,6 +1947,22 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
                 return result
 
         if agent_command:
+            # --- Mode gate: deny local source for gated arms, and prove it ---
+            # Applied after setup (which needs the repos readable) and before the
+            # agent starts, so the arm's ablation is a kernel-enforced fact for
+            # every tool the agent has — including ones added by a future CLI.
+            gated, gate_err = _apply_mode_gate(container_id, task_data, config.mode)
+            if not gated:
+                logger.error("Mode gate FAILED: %s", gate_err)
+                result.phase = "mode_gate_failed"
+                result.status = RUN_STATUS_INVALID
+                result.success = False
+                result.failure_class = "infra_perms"
+                result.error = gate_err
+                result.timing = timings
+                _save_results(result, task_data, output_dir, config)
+                return result
+
             # --- Pre-agent readability gate (fail loud, never fake-0) ---
             # Re-assert ownership then verify the AGENT user can actually read
             # the files it needs. A silent EACCES here previously let the agent
