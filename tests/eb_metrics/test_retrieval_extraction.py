@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from eb_metrics.retrieval_extraction import (
+    _mcp_repo_dir,
     compute_run_ir_scores,
     required_files_from_ground_truth,
     retrieved_files_from_trace,
@@ -21,6 +22,9 @@ from eb_metrics.retrieval_extraction import (
 
 WORKER = "/workspace/kubernetes/pkg/kubelet/prober/worker.go"
 WORKER_TEST = "pkg/kubelet/prober/worker_test.go"  # MCP read_file, repo-relative
+# What the MCP read of WORKER_TEST must extract to: repo-qualified, i.e. the
+# same workspace-relative shape a local Read of the same file would yield.
+WORKER_TEST_QUALIFIED = "kubernetes/pkg/kubelet/prober/worker_test.go"
 MANAGER = "pkg/kubelet/prober/results/manager.go"  # surfaced via search result
 
 
@@ -70,13 +74,184 @@ def test_retrieved_files_local_and_mcp_reads(tmp_path: Path) -> None:
             _assistant_tool_use("t1", "Read", {"file_path": WORKER}),
             _assistant_tool_use("t2", "Bash", {"command": "ls"}),  # ignored
             _assistant_tool_use(
-                "t3", "mcp__sourcegraph__read_file", {"repo": "k8s", "path": WORKER_TEST}
+                "t3",
+                "mcp__sourcegraph__read_file",
+                {"repo": "kubernetes", "path": WORKER_TEST},
             ),
         ],
     )
     got = retrieved_files_from_trace(trace)
-    # First-seen order preserved; Bash contributes nothing.
-    assert got == [WORKER, WORKER_TEST]
+    # First-seen order preserved; Bash contributes nothing. The MCP read carries
+    # its repo, so it lands workspace-relative like the local Read above it.
+    assert got == [WORKER, WORKER_TEST_QUALIFIED]
+
+
+# ---------------------------------------------------------------------------
+# MCP read_file carries its repo (EnterpriseBench-0nru)
+#
+# The MCP read input is {repo, path} with `path` *repo*-relative, while ground
+# truth is *workspace*-relative ("requests/setup.cfg"). Dropping the repo left a
+# root-level MCP read one component short — "setup.cfg" — which can never align
+# to a 2-component GT key, so the mcp_only arm silently scored 0.0 on files the
+# agent had actually opened. Carrying the repo restores parity with the local
+# Read path, whose /workspace/<repo>/ prefix already made it workspace-relative.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("repo", "expected"),
+    [
+        # Sourcegraph sg-evals: host/org prefix + `--<rev>` version pin.
+        ("github.com/sg-evals/requests--v2.31.0", "requests"),
+        ("github.com/sg-evals/botocore--1.31.0", "botocore"),
+        # No version pin.
+        ("github.com/sg-evals/grafana", "grafana"),
+        # GitHub MCP passes a bare repo name.
+        ("requests", "requests"),
+        # Pin on a bare name; repo names may contain dots and dashes.
+        ("urllib3--2.0.0", "urllib3"),
+        ("my-repo.js--abc123", "my-repo.js"),
+        # Absent/degenerate → no prefix to add.
+        ("", ""),
+        ("github.com/sg-evals/", ""),
+    ],
+)
+def test_mcp_repo_dir_shapes(repo: str, expected: str) -> None:
+    assert _mcp_repo_dir(repo) == expected
+
+
+def test_mcp_read_without_repo_falls_back_to_bare_path(tmp_path: Path) -> None:
+    # No repo field → nothing to prefix; the bare path is still a retrieval.
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [_assistant_tool_use("t1", "mcp__sourcegraph__read_file", {"path": "setup.cfg"})],
+    )
+    assert retrieved_files_from_trace(trace) == ["setup.cfg"]
+
+
+def test_mcp_read_prefixes_repo_even_when_path_repeats_it(tmp_path: Path) -> None:
+    # tonic-style: the repo dir legitimately repeats as the inner crate dir, so
+    # the prefix must be unconditional. Guarding on `startswith(repo_dir)` would
+    # yield "tonic/Cargo.toml" — the wrong workspace-relative path for a file
+    # that really lives at /workspace/tonic/tonic/Cargo.toml.
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _assistant_tool_use(
+                "t1",
+                "mcp__sourcegraph__read_file",
+                {"repo": "github.com/sg-evals/tonic--v0.10.0", "path": "tonic/Cargo.toml"},
+            )
+        ],
+    )
+    assert retrieved_files_from_trace(trace) == ["tonic/tonic/Cargo.toml"]
+
+
+def test_mcp_reads_of_same_filename_in_different_repos_stay_distinct(
+    tmp_path: Path,
+) -> None:
+    # Dedup keys on the normalized form, so dropping the repo collapsed two
+    # genuinely different reads into one bare "setup.cfg" — undercounting
+    # n_retrieved and inviting a cross-repo false match.
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _assistant_tool_use(
+                "t1",
+                "mcp__sourcegraph__read_file",
+                {"repo": "github.com/sg-evals/requests--v2.31.0", "path": "setup.cfg"},
+            ),
+            _assistant_tool_use(
+                "t2",
+                "mcp__sourcegraph__read_file",
+                {"repo": "github.com/sg-evals/botocore--1.31.0", "path": "setup.cfg"},
+            ),
+        ],
+    )
+    assert retrieved_files_from_trace(trace) == [
+        "requests/setup.cfg",
+        "botocore/setup.cfg",
+    ]
+
+
+def test_compute_run_ir_scores_tri_repo_mcp_only_regression(tmp_path: Path) -> None:
+    # Regression trial for the arm-distorting misscore, mirroring the real
+    # dep-graph-tri-boto3-urllib3-requests-001 mcp_only run: the agent read all
+    # three ground-truth files over MCP, each at its repo root, and scored 0.0.
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _assistant_tool_use(
+                "t1",
+                "mcp__sourcegraph__read_file",
+                {"repo": "github.com/sg-evals/requests--v2.31.0", "path": "setup.cfg"},
+            ),
+            _assistant_tool_use(
+                "t2",
+                "mcp__sourcegraph__read_file",
+                {"repo": "github.com/sg-evals/botocore--1.31.0", "path": "setup.py"},
+            ),
+            _assistant_tool_use(
+                "t3",
+                "mcp__sourcegraph__read_file",
+                {"repo": "github.com/sg-evals/urllib3--2.0.0", "path": "CHANGES.rst"},
+            ),
+        ],
+    )
+    gt = _write_ground_truth(
+        tmp_path / "ground_truth.json",
+        [
+            {"path": "urllib3/CHANGES.rst", "repo": "urllib3"},
+            {"path": "requests/setup.cfg", "repo": "requests"},
+            {"path": "botocore/setup.py", "repo": "botocore"},
+        ],
+    )
+    scores = compute_run_ir_scores(
+        trace, gt, "dep-graph-tri-boto3-urllib3-requests-001", "mcp_only"
+    )
+    assert scores is not None
+    assert scores.file_recall == 1.0
+    assert scores.n_overlap == 3
+
+
+def test_compute_run_ir_scores_mcp_deep_path_still_matches(tmp_path: Path) -> None:
+    # C6 no-regression. These deep-path hits currently match only by accident:
+    # the repo drop left them repo-relative, and normalize_path's lead-strip
+    # happened to bring GT to the same string. Post-fix both sides carry the
+    # repo lead and normalize_path strips it symmetrically, so they must still
+    # match — now via the primary suffix-align path rather than by coincidence.
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _assistant_tool_use(
+                "t1",
+                "mcp__sourcegraph__read_file",
+                {
+                    "repo": "github.com/sg-evals/grafana--v10.0.0",
+                    "path": "pkg/services/sqlstore/migrator/migrator.go",
+                },
+            ),
+            _assistant_tool_use(
+                "t2",
+                "mcp__sourcegraph__read_file",
+                {"repo": "github.com/sg-evals/tonic--v0.10.0", "path": "tonic/Cargo.toml"},
+            ),
+        ],
+    )
+    gt = _write_ground_truth(
+        tmp_path / "ground_truth.json",
+        [
+            {
+                "path": "grafana/pkg/services/sqlstore/migrator/migrator.go",
+                "repo": "grafana",
+            },
+            {"path": "tonic/tonic/Cargo.toml", "repo": "tonic"},
+        ],
+    )
+    scores = compute_run_ir_scores(trace, gt, "dep-graph-tri-tokio-hyper-tonic-001", "mcp_only")
+    assert scores is not None
+    assert scores.file_recall == 1.0
+    assert scores.n_overlap == 2
 
 
 def test_retrieved_files_scrapes_search_results(tmp_path: Path) -> None:

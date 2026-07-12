@@ -5,10 +5,12 @@ Two structural readers plus one compute helper, feeding
 
 * :func:`retrieved_files_from_trace` — parse a Claude-Code ``agent_trace.jsonl``
   and recover the ordered, first-seen-unique list of file paths the agent
-  accessed (``Read``/``Grep``/``Glob`` inputs, MCP ``read_file`` inputs, paths
-  scraped from MCP search-result payloads, and — an EB extension beyond the CSB
-  port — file arguments to shell read-commands like ``cat``/``grep``, without
-  which the baseline arm's retrieval is largely unobservable).
+  accessed (``Read``/``Grep``/``Glob`` inputs, MCP ``read_file`` inputs — whose
+  repo-relative ``path`` is re-qualified with its ``repo`` so every arm's paths
+  are workspace-relative and comparable — paths scraped from MCP search-result
+  payloads, and — an EB extension beyond the CSB port — file arguments to shell
+  read-commands like ``cat``/``grep``, without which the baseline arm's
+  retrieval is largely unobservable).
 * :func:`required_files_from_ground_truth` — read a task ``ground_truth.json``
   and return its ``required_files`` as the relevant set. Following CSB's
   dict-flattening, the repo qualifier is dropped and the repo-relative
@@ -174,6 +176,17 @@ def _bash_read_files(command: str) -> list[str]:
     return files
 
 
+def _mcp_repo_dir(repo: str) -> str:
+    """MCP ``repo`` identifier → the workspace directory that repo is cloned into.
+
+    ``github.com/sg-evals/requests--v2.31.0`` → ``requests``: drop the host/org
+    qualifier, then the ``--<rev>`` pin the eval corpus appends. GitHub MCP's bare
+    ``repo`` name passes through unchanged. Returns ``""`` when there is nothing
+    to prefix with. Mechanical string transform — no lookup, no inference.
+    """
+    return repo.strip().rsplit("/", 1)[-1].split("--", 1)[0]
+
+
 def _looks_like_file(path: str) -> bool:
     """Heuristic: does the normalized path look like a real file path?
 
@@ -251,7 +264,14 @@ def retrieved_files_from_trace(trace_path: Path) -> list[str]:
         elif tool_name in _MCP_READ_TOOLS:
             fp = tool_input.get("path", "")
             if fp:
-                _add(fp)
+                # `path` is repo-relative but ground truth is workspace-relative
+                # ("requests/setup.cfg"), so carry the repo to make them comparable.
+                # Unconditionally: a repo dir legitimately repeats as an inner dir
+                # ("tonic/tonic/Cargo.toml"), so skipping the prefix on paths that
+                # already start with it would corrupt exactly those.
+                repo = tool_input.get("repo", "")
+                repo_dir = _mcp_repo_dir(repo) if isinstance(repo, str) else ""
+                _add(f"{repo_dir}/{fp.lstrip('/')}" if repo_dir else fp)
 
     def _process_tool_result(tool_name: str, content: str) -> None:
         if tool_name in _MCP_SEARCH_TOOLS or tool_name in _MCP_READ_TOOLS:
