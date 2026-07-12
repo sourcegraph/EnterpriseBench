@@ -100,9 +100,7 @@ if __package__ in (None, ""):  # pragma: no cover - script-mode only
 
 from scripts.validation.stratum_gates import (  # noqa: E402
     measure_corpus_ttfr,
-    measure_ttfr,
     score_corpus,
-    score_task,
 )
 from scripts.validation.stratum_model import (  # noqa: E402
     ALL_GATES,
@@ -112,6 +110,7 @@ from scripts.validation.stratum_model import (  # noqa: E402
     SelectorParams,
     StratumArtifact,
 )
+
 
 def _git_sha() -> tuple[str, bool]:
     """(HEAD sha, is_dirty) for the REPO, not for whatever cwd we were run from."""
@@ -161,10 +160,16 @@ def _traces_digest(measurements: dict[str, dict[str, Any]] | None) -> str:
 
 def build_artifact(root: Path,
                    params: SelectorParams,
-                   measurements: dict[str, dict[str, Any]] | None = None,
+                   measurements: dict[str, dict[str, Any]],
                    runs_root: Path | None = None) -> StratumArtifact:
-    if measurements is None and runs_root is not None:
-        measurements = measure_corpus_ttfr(root, runs_root)
+    """Score the corpus and pin the inputs that produced the scores.
+
+    ``measurements`` is REQUIRED, with no default: an artifact built without them
+    scores Gate C as PENDING for every task and inflates the pool by the tasks
+    Gate C would have failed. `_resolve_runs_root` is the one place that produces
+    them, and it refuses to return an empty set -- so there is no signature here
+    that lets a caller skip the measurement by omission.
+    """
     sha, dirty = _git_sha()
     return StratumArtifact(
         version=ARTIFACT_VERSION,
@@ -180,7 +185,6 @@ def build_artifact(root: Path,
             traces_digest=_traces_digest(measurements),
         ),
     )
-
 
 
 def _sensitivity(root: Path, measurements: dict[str, dict[str, Any]]) -> int:

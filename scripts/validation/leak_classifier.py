@@ -143,11 +143,10 @@ GENERIC_MANIFEST_BASENAMES = frozenset({
 })
 
 
-# Public aliases. `stratum_selector` (Gate A/D) needs the same path-normalisation
-# and ground-truth-loading logic; a sibling module should not have to reach into
-# underscore names to get it. The unified loader (rule of three: qa_adapter,
-# leak_classifier, retrieval_extraction) is tracked as EnterpriseBench-jn73.2.8 --
-# until then these aliases mark the shared surface explicitly.
+#: The shared surface. `strip_repo_slug`, `load_task` and `task_run_key` are
+#: public because the stratum gates read tasks through them rather than through a
+#: second, divergent parse. The unified loader (rule of three: qa_adapter,
+#: leak_classifier, retrieval_extraction) is tracked as EnterpriseBench-jn73.2.8.
 
 
 @dataclass(frozen=True)
@@ -268,21 +267,16 @@ def _flatten_gt_paths(ground_truth: dict[str, Any]) -> list[str]:
     stays empty for the EB corpus, so the SYMBOL bucket structurally exists
     (parity with the CSB taxonomy) but does not currently fire.
     """
-    paths: list[str] = []
+    seen: set[str] = set()
+    out: list[str] = []
     for section in ("required_files", "sufficient_files"):
         for entry in ground_truth.get(section, []) or []:
             if not isinstance(entry, dict):
                 continue
             path = entry.get("path")
-            if isinstance(path, str) and path:
-                paths.append(path)
-    seen: set[str] = set()
-    out: list[str] = []
-    for p in paths:
-        if p in seen:
-            continue
-        seen.add(p)
-        out.append(p)
+            if isinstance(path, str) and path and path not in seen:
+                seen.add(path)
+                out.append(path)
     return out
 
 
@@ -325,6 +319,20 @@ class TaskOracle:
     oracle_files: list[str]
     task_toml: dict[str, Any] = field(default_factory=dict)
     ground_truth: dict[str, Any] = field(default_factory=dict)
+
+
+def task_run_key(task_toml: dict[str, Any], fallback: str) -> str:
+    """A task's identity for anything keyed by the run set: ``[task].id``.
+
+    NOT the directory name. The two diverge across much of the corpus
+    (``benchmarks/.../calibration-001/`` holds ``id = "cal-err-flask-blueprint-001"``)
+    and the locked run set is keyed by id: keying by directory finds 40 baseline
+    traces, keying by id finds 89. One definition, so Gate B's task_id and Gate
+    C's trace lookup cannot drift apart.
+    """
+    task = task_toml.get("task")
+    task_id = task.get("id") if isinstance(task, dict) else None
+    return task_id if isinstance(task_id, str) and task_id else fallback
 
 
 def load_task(task_dir: Path) -> TaskOracle | None:
@@ -376,15 +384,17 @@ def decide(task_id: str, oracle: TaskOracle) -> GateBResult:
     else                                -> ADMIT
     """
     leak = classify(oracle.instruction, oracle.oracle_files, None)
-    leaky = leak.bucket in REJECT
     return GateBResult(
         task_id=task_id,
         bucket=leak.bucket,
         token=leak.token,
-        admit=not leaky,
-        reason=(f"{leak.bucket.value} leak on {leak.token!r}: the instruction "
-                f"localizes the oracle" if leaky else "no locational leak"),
-        source_path=leak.source_path or "",
+        # `Leak.admit` is the rule; re-deriving `bucket in REJECT` here would be a
+        # second copy of it, free to drift from the first.
+        admit=leak.admit,
+        reason=("no locational leak" if leak.admit else
+                f"{leak.bucket.value} leak on {leak.token!r}: the instruction "
+                f"localizes the oracle"),
+        source_path=leak.source_path,
     )
 
 
@@ -392,9 +402,7 @@ def decide_task_dir(task_dir: Path) -> GateBResult | None:
     oracle = load_task(task_dir)
     if oracle is None:
         return None
-    task_block = oracle.task_toml.get("task", {})
-    task_id = task_block.get("id", task_dir.name) if isinstance(task_block, dict) else task_dir.name
-    return decide(task_id, oracle)
+    return decide(task_run_key(oracle.task_toml, task_dir.name), oracle)
 
 
 # --- CLI --------------------------------------------------------------------

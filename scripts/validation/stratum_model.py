@@ -360,5 +360,3 @@ class StratumArtifact:
             tasks=[TaskGates.from_dict(t) for t in d.get("tasks", [])],
             provenance=Provenance.from_dict(d.get("provenance", {})),
         )
-
-

@@ -29,7 +29,6 @@ from scripts.lib.tasks import find_task_dirs  # noqa: E402
 from scripts.validation import crnt_validator  # noqa: E402
 from scripts.validation import leak_classifier as lc  # noqa: E402
 from scripts.validation.stratum_model import (  # noqa: E402
-    ALL_GATES,
     COMPUTABLE_GATES,
     GATE_C_TIER1_MIN,
     GATE_C_TIER2_MIN,
@@ -395,10 +394,8 @@ def measure_ttfr(run_key: str, oracle_files: list[str],
                  runs_root: Path) -> dict[str, Any]:
     """Gate C's measurement, from the baseline arm's real trace.
 
-    ``run_key`` is the task's ``[task].id``, NOT its directory name. The two
-    diverge across much of the corpus (``benchmarks/.../calibration-001/`` holds
-    ``id = "cal-err-flask-blueprint-001"``), and the locked run set is keyed by
-    id: keying by directory finds 40 baseline traces, keying by id finds 89.
+    ``run_key`` is the task's ``[task].id`` (see ``lc.task_run_key``), which the
+    locked run set is keyed by.
 
     Note the oracle is passed IN. ``compute_ttfr`` takes ``required_files`` as
     an argument, so Gate C can be fed the task.toml-aware oracle without
@@ -451,8 +448,7 @@ def score_task(task_dir: Path,
         )
 
     task_toml = oracle.task_toml
-    # The run set is keyed by [task].id, which is NOT the directory name.
-    run_key = (task_toml.get("task") or {}).get("id") or task_id
+    run_key = lc.task_run_key(task_toml, task_id)
 
     m = dict((measurements or {}).get(task_id, {}))
     if runs_root is not None and "C" not in m:
@@ -478,14 +474,14 @@ def score_task(task_dir: Path,
 
 def score_corpus(root: Path,
                  params: SelectorParams,
-                 measurements: dict[str, dict[str, Any]] | None = None,
-                 runs_root: Path | None = None) -> list[TaskGates]:
+                 measurements: dict[str, dict[str, Any]] | None = None) -> list[TaskGates]:
     out: list[TaskGates] = []
     for task_dir in find_task_dirs(root):
-        scored = score_task(task_dir, params, measurements, runs_root)
+        scored = score_task(task_dir, params, measurements)
         if scored is not None:
             out.append(scored)
     return out
+
 
 def measure_corpus_ttfr(root: Path, runs_root: Path) -> dict[str, dict[str, Any]]:
     """Gate C's measurement for every task in the corpus, computed once.
@@ -498,7 +494,7 @@ def measure_corpus_ttfr(root: Path, runs_root: Path) -> dict[str, dict[str, Any]
         oracle = lc.load_task(task_dir)
         if oracle is None:
             continue
-        run_key = (oracle.task_toml.get("task") or {}).get("id") or task_dir.name
+        run_key = lc.task_run_key(oracle.task_toml, task_dir.name)
         out[task_dir.name] = {
             "C": measure_ttfr(run_key, oracle.oracle_files, runs_root)
         }
