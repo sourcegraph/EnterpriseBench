@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from eb_metrics.retrieval_extraction import (
-    _mcp_repo_dir,
+    _mcp_repo_name,
     compute_run_ir_scores,
     required_files_from_ground_truth,
     retrieved_files_from_trace,
@@ -80,7 +80,7 @@ def test_retrieved_files_local_and_mcp_reads(tmp_path: Path) -> None:
     got = retrieved_files_from_trace(trace)
     # First-seen order preserved; Bash contributes nothing. The MCP read carries
     # its repo, so it lands workspace-relative like the local Read above it.
-    assert got == [WORKER, f"kubernetes/{WORKER_TEST}"]
+    assert got == [WORKER, f"/workspace/kubernetes/{WORKER_TEST}"]
 
 
 # ---------------------------------------------------------------------------
@@ -102,13 +102,25 @@ def test_retrieved_files_local_and_mcp_reads(tmp_path: Path) -> None:
         # Pin on a bare name; repo names may contain dots and dashes.
         ("urllib3--2.0.0", "urllib3"),
         ("my-repo.js--abc123", "my-repo.js"),
-        # Absent/degenerate → no prefix to add.
+        # Trailing slash must not silently yield "" and drop the qualifier —
+        # that would quietly restore the very bug this carries the repo to fix.
+        ("github.com/sg-evals/requests--v2.31.0/", "requests"),
+        # _repo_dirs feeds task.toml urls through here, and derive_mirror_name
+        # (which mints the MCP identifier from that same url) drops `.git`. If
+        # this kept it, the url would key "next.js.git" while the identifier said
+        # "next.js" — the repo would silently score 0 on every read.
+        ("https://github.com/vercel/next.js.git", "next.js"),
+        ("https://github.com/pallets/flask.git/", "flask"),
+        # Absent → no prefix to add.
         ("", ""),
-        ("github.com/sg-evals/", ""),
+        # A name-less identifier is indistinguishable from a bare "org/repo", so
+        # its last segment is used. Malformed input, no real caller produces it;
+        # pinned so the trailing-slash handling above stays honest about it.
+        ("github.com/sg-evals/", "sg-evals"),
     ],
 )
-def test_mcp_repo_dir_shapes(repo: str, expected: str) -> None:
-    assert _mcp_repo_dir(repo) == expected
+def test_mcp_repo_name_shapes(repo: str, expected: str) -> None:
+    assert _mcp_repo_name(repo) == expected
 
 
 def test_mcp_read_without_repo_falls_back_to_bare_path(tmp_path: Path) -> None:
@@ -129,7 +141,7 @@ def test_mcp_read_prefixes_repo_even_when_path_repeats_it(tmp_path: Path) -> Non
         tmp_path / "agent_trace.jsonl",
         [_mcp_read("t1", "github.com/sg-evals/tonic--v0.10.0", "tonic/Cargo.toml")],
     )
-    assert retrieved_files_from_trace(trace) == ["tonic/tonic/Cargo.toml"]
+    assert retrieved_files_from_trace(trace) == ["/workspace/tonic/tonic/Cargo.toml"]
 
 
 def test_mcp_reads_of_same_filename_in_different_repos_stay_distinct(
@@ -146,8 +158,8 @@ def test_mcp_reads_of_same_filename_in_different_repos_stay_distinct(
         ],
     )
     assert retrieved_files_from_trace(trace) == [
-        "requests/setup.cfg",
-        "botocore/setup.cfg",
+        "/workspace/requests/setup.cfg",
+        "/workspace/botocore/setup.cfg",
     ]
 
 
@@ -212,6 +224,176 @@ def test_compute_run_ir_scores_mcp_deep_path_still_matches(tmp_path: Path) -> No
     assert scores.n_overlap == 2
 
 
+# ---------------------------------------------------------------------------
+# Precision: carrying the repo is only worth anything if the join keeps it.
+# Each of these is a file the agent did NOT open; none may score a hit.
+# ---------------------------------------------------------------------------
+
+
+def test_root_manifest_read_is_not_credited_for_nested_manifest(tmp_path: Path) -> None:
+    # dep-graph-dual-tokio-hyper-001: GT wants tokio's CRATE manifest. An agent
+    # that reads only the two workspace-ROOT manifests never opened it. Scoring
+    # this 1.0 is credit for a file that was never read — it happened because
+    # the repo qualifier was stripped back off before the join, making
+    # "tokio/Cargo.toml" and "tokio/tokio/Cargo.toml" the same key.
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _mcp_read("t1", "github.com/sg-evals/tokio--tokio-1.0.0", "Cargo.toml"),
+            _mcp_read("t2", "github.com/sg-evals/hyper--v1.0.0", "Cargo.toml"),
+        ],
+    )
+    gt = _write_ground_truth(
+        tmp_path / "ground_truth.json",
+        [
+            {"path": "tokio/tokio/Cargo.toml", "repo": "tokio"},
+            {"path": "hyper/Cargo.toml", "repo": "hyper"},
+        ],
+    )
+    scores = compute_run_ir_scores(trace, gt, "dep-graph-dual-tokio-hyper-001", "mcp_only")
+    assert scores is not None
+    # hyper's GT *is* the root manifest, so that one is a genuine hit; tokio's
+    # crate manifest was never opened and must not be.
+    assert scores.file_recall == 0.5
+    assert scores.n_overlap == 1
+
+
+def test_root_and_nested_manifest_reads_stay_two_retrievals(tmp_path: Path) -> None:
+    # Reading the workspace root manifest and then the crate manifest is the
+    # natural exploration order in a Rust workspace. They are DIFFERENT files;
+    # collapsing them undercounts n_retrieved, inflates context_efficiency, and
+    # ranks the hit at the wrong position for MRR/nDCG.
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _mcp_read("t1", "github.com/sg-evals/tokio--tokio-1.0.0", "Cargo.toml"),
+            _mcp_read("t2", "github.com/sg-evals/tokio--tokio-1.0.0", "tokio/Cargo.toml"),
+        ],
+    )
+    assert retrieved_files_from_trace(trace) == [
+        "/workspace/tokio/Cargo.toml",
+        "/workspace/tokio/tokio/Cargo.toml",
+    ]
+
+
+def test_read_from_wrong_repo_is_not_a_hit(tmp_path: Path) -> None:
+    # f5wh: same repo-relative path, different repo. Without the repo on both
+    # sides of the join these normalize to the same key and the agent is
+    # credited for a file it opened in the wrong repository.
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [_assistant_tool_use("t1", "Read", {"file_path": "/workspace/prometheus/pkg/svc/migrator.go"})],
+    )
+    gt = _write_ground_truth(
+        tmp_path / "ground_truth.json",
+        [{"path": "pkg/svc/migrator.go", "repo": "grafana"}],
+    )
+    scores = compute_run_ir_scores(trace, gt, "t", "baseline")
+    assert scores is not None
+    assert scores.file_recall == 0.0
+    assert scores.n_overlap == 0
+
+
+# ---------------------------------------------------------------------------
+# Aliased repos: the repo a task CLONES is not always the repo name upstream.
+# ---------------------------------------------------------------------------
+
+
+def test_mcp_read_of_aliased_repo_matches_ground_truth(tmp_path: Path) -> None:
+    # refactor-orchestration-tri-babel-001 clones github.com/vercel/next.js into
+    # /workspace/nextjs. The MCP repo identifier is minted from the URL, so it
+    # carries "next.js" while ground truth says "nextjs". Resolving both through
+    # task.toml is what makes them the same key — without it the MCP arm silently
+    # scores 0.0 on every aliased repo while the baseline arm (which reads
+    # /workspace/nextjs/... directly) scores 1.0, re-introducing exactly the arm
+    # distortion this join exists to remove.
+    (tmp_path / "task.toml").write_text(
+        '[[repos]]\nurl = "https://github.com/vercel/next.js"\npath = "nextjs"\n'
+    )
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _mcp_read(
+                "t1",
+                "github.com/sg-evals/next.js--v14.0.0",
+                "packages/next/package.json",
+            )
+        ],
+    )
+    gt = _write_ground_truth(
+        tmp_path / "ground_truth.json",
+        [{"path": "packages/next/package.json", "repo": "nextjs"}],
+    )
+    scores = compute_run_ir_scores(trace, gt, "refactor-orchestration-tri-babel-001", "mcp_only")
+    assert scores is not None
+    assert scores.file_recall == 1.0
+
+
+def test_aliased_repo_with_dot_git_url_still_joins(tmp_path: Path) -> None:
+    # The alias map keys on the task.toml url, and the MCP identifier is minted
+    # from that same url by derive_mirror_name — which drops `.git`. So the alias
+    # map must drop it too, or a `.git` url keys "next.js.git", never matches the
+    # identifier's "next.js", and the repo silently scores 0. No corpus url ends
+    # in `.git` today; the schema does not forbid one, and the failure would be
+    # silent, so pin the agreement rather than the current corpus.
+    (tmp_path / "task.toml").write_text(
+        '[[repos]]\nurl = "https://github.com/vercel/next.js.git"\npath = "nextjs"\n'
+    )
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [_mcp_read("t1", "github.com/sg-evals/next.js--v14.0.0", "packages/next/package.json")],
+    )
+    gt = _write_ground_truth(
+        tmp_path / "ground_truth.json",
+        [{"path": "packages/next/package.json", "repo": "nextjs"}],
+    )
+    scores = compute_run_ir_scores(trace, gt, "t", "mcp_only")
+    assert scores is not None
+    assert scores.file_recall == 1.0
+
+
+def test_ground_truth_naming_repo_upstream_matches_workspace_read(tmp_path: Path) -> None:
+    # err-provenance-dual-docker-001 does the reverse: ground truth names the
+    # repo "cli" (its upstream name) though the task clones it as "docker-cli".
+    # Both sides must still land on the clone dir.
+    (tmp_path / "task.toml").write_text(
+        '[[repos]]\nurl = "https://github.com/docker/cli"\npath = "docker-cli"\n'
+    )
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _assistant_tool_use(
+                "t1",
+                "Read",
+                {"file_path": "/workspace/docker-cli/cli/command/container/create.go"},
+            )
+        ],
+    )
+    gt = _write_ground_truth(
+        tmp_path / "ground_truth.json",
+        [{"path": "cli/command/container/create.go", "repo": "cli"}],
+    )
+    scores = compute_run_ir_scores(trace, gt, "err-provenance-dual-docker-001", "baseline")
+    assert scores is not None
+    assert scores.file_recall == 1.0
+
+
+def test_repo_relative_ground_truth_is_qualified_with_its_repo(tmp_path: Path) -> None:
+    gt = _write_ground_truth(
+        tmp_path / "ground_truth.json",
+        [
+            {"path": "pkg/kubelet/worker.go", "repo": "kubernetes"},  # repo-relative
+            {"path": "hyper/Cargo.toml", "repo": "hyper"},  # already qualified
+            {"path": "no/repo/field.go"},  # no repo → unchanged
+        ],
+    )
+    assert required_files_from_ground_truth(gt) == [
+        "kubernetes/pkg/kubelet/worker.go",
+        "hyper/Cargo.toml",
+        "no/repo/field.go",
+    ]
+
+
 def test_retrieved_files_scrapes_search_results(tmp_path: Path) -> None:
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
@@ -224,7 +406,24 @@ def test_retrieved_files_scrapes_search_results(tmp_path: Path) -> None:
 
 
 def test_retrieved_files_dedup_on_normalized_form(tmp_path: Path) -> None:
-    # A /workspace/ path and its repo-relative twin collapse to one entry.
+    # Re-reading the same file (bare "/" and case differences aside) is one
+    # retrieval, not two.
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _assistant_tool_use("t1", "Read", {"file_path": WORKER}),
+            _assistant_tool_use("t2", "Read", {"file_path": WORKER + "  "}),
+        ],
+    )
+    assert retrieved_files_from_trace(trace) == [WORKER]
+
+
+def test_workspace_read_and_repo_relative_twin_collapse_at_align(tmp_path: Path) -> None:
+    # A /workspace/<repo>/ read and a bare repo-relative read of the same file
+    # are no longer conflated by normalize_path (it cannot know the bare path's
+    # repo). They still collapse where it matters — the align step rewrites both
+    # onto the required key — so a relevant file is not double-counted and
+    # context_efficiency is not deflated.
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
         [
@@ -234,7 +433,14 @@ def test_retrieved_files_dedup_on_normalized_form(tmp_path: Path) -> None:
             ),
         ],
     )
-    assert retrieved_files_from_trace(trace) == [WORKER]
+    gt = _write_ground_truth(
+        tmp_path / "ground_truth.json",
+        [{"path": "pkg/kubelet/prober/worker.go", "repo": "kubernetes"}],
+    )
+    scores = compute_run_ir_scores(trace, gt, "t", "baseline")
+    assert scores is not None
+    assert scores.n_retrieved == 1
+    assert scores.file_recall == 1.0
 
 
 def test_retrieved_files_missing_trace_returns_empty(tmp_path: Path) -> None:
@@ -377,7 +583,7 @@ def test_bash_redirect_target_still_counted(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_required_files_reads_paths_dropping_repo(tmp_path: Path) -> None:
+def test_required_files_carries_repo(tmp_path: Path) -> None:
     gt = _write_ground_truth(
         tmp_path / "ground_truth.json",
         [
@@ -386,8 +592,8 @@ def test_required_files_reads_paths_dropping_repo(tmp_path: Path) -> None:
         ],
     )
     assert required_files_from_ground_truth(gt) == [
-        "pkg/kubelet/prober/worker.go",
-        "pkg/kubelet/prober/worker_test.go",
+        "kubernetes/pkg/kubelet/prober/worker.go",
+        "kubernetes/pkg/kubelet/prober/worker_test.go",
     ]
 
 
@@ -409,8 +615,11 @@ def test_required_files_optional_sufficient(tmp_path: Path) -> None:
             }
         )
     )
-    assert required_files_from_ground_truth(path) == ["a.go"]
-    assert required_files_from_ground_truth(path, include_sufficient=True) == ["a.go", "b.go"]
+    assert required_files_from_ground_truth(path) == ["r/a.go"]
+    assert required_files_from_ground_truth(path, include_sufficient=True) == [
+        "r/a.go",
+        "r/b.go",
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -424,7 +633,9 @@ def test_compute_run_ir_scores_full_recall(tmp_path: Path) -> None:
         [
             _assistant_tool_use("t1", "Read", {"file_path": WORKER}),
             _assistant_tool_use(
-                "t2", "mcp__sourcegraph__read_file", {"repo": "k8s", "path": WORKER_TEST}
+                "t2",
+                "mcp__sourcegraph__read_file",
+                {"repo": "github.com/sg-evals/kubernetes--v1.28.0", "path": WORKER_TEST},
             ),
         ],
     )
@@ -537,3 +748,24 @@ def test_compute_run_ir_scores_none_when_no_required_files(tmp_path: Path) -> No
     )
     gt = _write_ground_truth(tmp_path / "ground_truth.json", [])
     assert compute_run_ir_scores(trace, gt, "t", "c") is None
+
+
+def test_ambiguous_repo_lead_credits_both_manifests(tmp_path: Path) -> None:
+    # Pins the KNOWN GAP in _workspace_path (EnterpriseBench-y64cp) rather than
+    # letting it look closed. The tokio repo really has BOTH a root Cargo.toml and
+    # a tokio/ crate dir, so GT {repo: tokio, path: tokio/Cargo.toml} cannot be
+    # resolved by the scorer, and credit flows in both directions. This is
+    # symmetric across arms — it does not bias the arm comparison — but it is a
+    # precision leak, and it is the corpus that has to fix it.
+    gt = _write_ground_truth(
+        tmp_path / "ground_truth.json",
+        [{"path": "tokio/Cargo.toml", "repo": "tokio"}],
+    )
+    for read in ("/workspace/tokio/Cargo.toml", "/workspace/tokio/tokio/Cargo.toml"):
+        trace = _write_trace(
+            tmp_path / "agent_trace.jsonl",
+            [_assistant_tool_use("t1", "Read", {"file_path": read})],
+        )
+        scores = compute_run_ir_scores(trace, gt, "refactor-orchestration-tri-tokio-001", "baseline")
+        assert scores is not None
+        assert scores.file_recall == 1.0, read

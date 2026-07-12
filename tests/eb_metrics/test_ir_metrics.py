@@ -24,6 +24,7 @@ from eb_metrics.ir_metrics import (
     precision_at_k,
     recall_at_k,
 )
+from eb_metrics.retrieval_extraction import _align_retrieved_to_required
 
 
 # ---------------------------------------------------------------------------
@@ -34,9 +35,19 @@ from eb_metrics.ir_metrics import (
 @pytest.mark.parametrize(
     "raw,expected",
     [
-        ("kubernetes::pkg/kubelet/prober/worker.go", "pkg/kubelet/prober/worker.go"),
-        ("/workspace/kubernetes/pkg/kubelet/prober/worker.go", "pkg/kubelet/prober/worker.go"),
-        ("workspace/grafana/public/app/x.ts", "public/app/x.ts"),
+        # repo::path and /workspace/<repo>/<path> name the same file and must
+        # canonicalize alike — both keep the repo.
+        (
+            "kubernetes::pkg/kubelet/prober/worker.go",
+            "kubernetes/pkg/kubelet/prober/worker.go",
+        ),
+        # The /workspace/ prefix goes; the repo dir STAYS — it identifies which
+        # repo of a multi-repo task the file came from.
+        (
+            "/workspace/kubernetes/pkg/kubelet/prober/worker.go",
+            "kubernetes/pkg/kubelet/prober/worker.go",
+        ),
+        ("workspace/grafana/public/app/x.ts", "grafana/public/app/x.ts"),
         ("chromium--2d05e315/third_party/blink/x.cc", "third_party/blink/x.cc"),
         ("a/pkg/server/main.go", "pkg/server/main.go"),
         ("b/lib/util.py", "lib/util.py"),
@@ -47,40 +58,51 @@ def test_normalize_path_canonicalizes(raw: str, expected: str) -> None:
     assert normalize_path(raw) == expected
 
 
-def test_normalize_keeps_code_dir_lead() -> None:
-    # 'src' is in the _CODE_DIRS allowlist, so it is NOT stripped as a repo name.
+def test_normalize_keeps_repo_lead() -> None:
+    # The repo segment is never guessed away. "kubernetes" is what says WHICH
+    # repo of a multi-repo task the file came from; dropping it is what let a
+    # read of prometheus/pkg/x.go score a hit on grafana/pkg/x.go.
+    assert normalize_path("kubernetes/pkg/kubelet/x.go") == "kubernetes/pkg/kubelet/x.go"
     assert normalize_path("src/server/handler.go") == "src/server/handler.go"
 
 
-def test_normalize_strips_non_code_dir_lead() -> None:
-    # 'kubernetes' is not a code dir → the leading repo segment is stripped.
-    assert normalize_path("kubernetes/pkg/kubelet/x.go") == "pkg/kubelet/x.go"
+def test_normalize_does_not_conflate_root_and_nested_manifest() -> None:
+    # The false equality that made a repo-qualified path a non-distinct key:
+    # a workspace-root manifest and a crate manifest are DIFFERENT files.
+    assert normalize_path("tokio/Cargo.toml") != normalize_path("tokio/tokio/Cargo.toml")
 
 
-def test_normalize_matches_when_repo_relative_leads_with_code_dir() -> None:
-    # When the repo-relative path leads with a _CODE_DIRS segment (kept, not
-    # stripped), a repo::path GT and a /workspace/<repo>/ retrieved path
-    # canonicalize to the SAME value → they match.
-    gt = normalize_path("kubernetes::pkg/kubelet/prober/worker.go")
-    ret = normalize_path("/workspace/kubernetes/pkg/kubelet/prober/worker.go")
-    assert gt == ret == "pkg/kubelet/prober/worker.go"
+def test_normalize_does_not_conflate_same_path_in_different_repos() -> None:
+    assert normalize_path("grafana/pkg/svc/x.go") != normalize_path("prometheus/pkg/svc/x.go")
 
 
-def test_normalize_known_limitation_non_code_dir_lead() -> None:
-    """Inherited CSB limitation: repos whose relative paths lead with a
-    non-code dir (grafana → ``public/``) do NOT round-trip symmetrically.
+# The two path conventions are reconciled by _align_retrieved_to_required, not
+# by normalize_path guessing at a repo lead. These assert that at the pipeline
+# level — the level that actually scores a run. (Asserting on normalize_path in
+# isolation is what previously produced a confident wrong conclusion about
+# whether a repo-qualified key survives to the join: it does not, on its own.)
 
-    ``repo::`` GT drops the ``::`` then over-strips ``public``; the
-    ``/workspace/<repo>/`` retrieved path strips only the repo. The single
-    leading-segment strip leaves them one level apart. Ported verbatim from
-    CSB ``_normalize`` — pinned here so the fragility is visible, not a
-    silent recall undercount. (Improving this is a flagged follow-up.)
-    """
-    gt = normalize_path("grafana::public/app/plugins/datasource/jaeger/x.ts")
-    ret = normalize_path("/workspace/grafana/public/app/plugins/datasource/jaeger/x.ts")
-    assert gt == "app/plugins/datasource/jaeger/x.ts"
-    assert ret == "public/app/plugins/datasource/jaeger/x.ts"
-    assert gt != ret  # the documented mismatch
+
+def test_repo_relative_gt_matches_workspace_read_through_align() -> None:
+    required = ["kubernetes/pkg/kubelet/prober/worker.go"]
+    retrieved = ["/workspace/kubernetes/pkg/kubelet/prober/worker.go"]
+    scores = compute_ir_scores(
+        _align_retrieved_to_required(retrieved, required), required, "t", "baseline"
+    )
+    assert scores.file_recall == 1.0
+
+
+def test_non_code_dir_lead_now_matches_through_align() -> None:
+    # Previously pinned as a known CSB limitation: grafana's repo-relative paths
+    # lead with `public/`, which the old lead-strip ate on the GT side, leaving
+    # the two sides one level apart and silently undercounting recall. Carrying
+    # the repo on both sides and suffix-aligning makes it a hit.
+    required = ["grafana/public/app/plugins/datasource/jaeger/x.ts"]
+    retrieved = ["/workspace/grafana/public/app/plugins/datasource/jaeger/x.ts"]
+    scores = compute_ir_scores(
+        _align_retrieved_to_required(retrieved, required), required, "t", "baseline"
+    )
+    assert scores.file_recall == 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -192,9 +214,10 @@ def test_compute_ir_scores_multi_repo_match() -> None:
 
 
 def test_compute_ir_scores_dedup_ground_truth_by_normalized_form() -> None:
-    # Two GT entries that normalize to the same path collapse in the set.
+    # The two spellings of one file — repo::path and /workspace/<repo>/path —
+    # collapse to a single ground-truth entry.
     gt = ["kubernetes::pkg/a.go", "/workspace/kubernetes/pkg/a.go"]
-    s = compute_ir_scores(["pkg/a.go"], gt, "t", "c")
+    s = compute_ir_scores(["kubernetes/pkg/a.go"], gt, "t", "c")
     assert s.n_ground_truth == 1
     assert s.file_recall == 1.0
 

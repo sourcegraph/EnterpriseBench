@@ -19,7 +19,7 @@ ZFC compliance
 --------------
 Every function here is pure, deterministic set/count math over path
 strings — no model call, no semantic classification, no learned
-thresholds. Matching is exact string equality on normalized, repo-relative,
+thresholds. Matching is exact string equality on normalized, workspace-relative,
 lowercased paths (see :func:`normalize_path`).
 """
 
@@ -30,6 +30,7 @@ import re
 from dataclasses import dataclass, field
 
 __all__ = [
+    "WORKSPACE_PREFIXES",
     "normalize_path",
     "precision_at_k",
     "recall_at_k",
@@ -46,16 +47,12 @@ __all__ = [
 
 DEFAULT_K_VALUES: tuple[int, ...] = (1, 3, 5, 10)
 
-# First segment of a multi-repo path that must NOT be stripped as a repo
-# name, because it is a conventional code directory that legitimately leads
-# a repo-relative path. Ported verbatim from CSB ``_normalize``.
-_CODE_DIRS = frozenset(
-    {
-        "src", "lib", "pkg", "cmd", "internal", "api", "app", "third_party",
-        "test", "tests", "docs", "build", "tools", "scripts", "vendor",
-        "include", "client", "server", "core", "util", "common",
-    }
-)
+# The sandbox container root every repo is cloned under. A path carrying one of
+# these prefixes is sandbox-absolute, so the segment that follows it *is* the
+# repo's clone directory — which is why stripping the prefix must not also strip
+# that segment. Single definition; ``retrieval_extraction`` reads it to decide
+# whether a retrieved path states its repo or merely omits it.
+WORKSPACE_PREFIXES: tuple[str, ...] = ("/workspace/", "workspace/")
 
 # ``name--<6-12 hex>/`` repo-slug prefix used by the sandbox workspace layout.
 _REPO_SLUG_RE = re.compile(r"^[a-zA-Z0-9_.-]+--[a-f0-9]{6,12}/")
@@ -64,31 +61,31 @@ _REPO_SLUG_RE = re.compile(r"^[a-zA-Z0-9_.-]+--[a-f0-9]{6,12}/")
 def normalize_path(path: str) -> str:
     """Normalize a file path for comparison.
 
-    Strips ``repo::path`` prefixes (multi-repo ground-truth format),
+    Rewrites a ``repo::path`` ground-truth prefix to ``repo/path``; strips
     ``/workspace/`` container prefixes, a ``name--<hexhash>/`` repo-slug
-    subdirectory, a single leading plain repo-name segment (guarded by the
-    :data:`_CODE_DIRS` allowlist so real repo-relative leads survive),
-    ``a/``/``b/`` diff prefixes, and leading/trailing slashes, then
-    lowercases the result. Faithful port of CSB ``ir_metrics._normalize``.
+    subdirectory, ``a/``/``b/`` diff prefixes, and leading/trailing slashes;
+    lowercases the result.
+
+    The leading repo segment is deliberately **kept**, so ``tokio/Cargo.toml``
+    and ``tokio/tokio/Cargo.toml`` stay distinct keys and a read from the wrong
+    repo of a multi-repo task cannot match ground truth. Reconciling a
+    repo-relative path against a workspace-relative one is
+    :func:`~eb_metrics.retrieval_extraction._align_retrieved_to_required`'s job;
+    callers must align **before** scoring, as
+    :func:`~eb_metrics.retrieval_extraction.compute_run_ir_scores` does.
     """
     p = path.strip()
-    # repo::path prefix (multi-repo ground truth from oracle_answer.json).
+    # repo::path names the same file as /workspace/<repo>/<path>, so the two
+    # spellings must canonicalize alike: the separator becomes a slash.
     if "::" in p:
-        p = p.split("::", 1)[1]
+        p = p.replace("::", "/", 1)
     # /workspace/ container prefix (sandbox paths).
-    for prefix in ("/workspace/", "workspace/"):
+    for prefix in WORKSPACE_PREFIXES:
         if p.startswith(prefix):
             p = p[len(prefix):]
     # Repo-slug prefix: "chromium--2d05e315/third_party/..." → "third_party/...".
     if _REPO_SLUG_RE.match(p):
         p = p.split("/", 1)[1] if "/" in p else p
-    # Plain repo-name prefix (e.g. "kubernetes/pkg/..." when GT is "pkg/..."):
-    # only strip when the first segment is not a file (no dot), the path has
-    # further depth, and the segment is not a conventional code directory.
-    parts = p.split("/", 1)
-    if len(parts) == 2 and "." not in parts[0] and "/" in parts[1]:
-        if parts[0].lower() not in _CODE_DIRS:
-            p = parts[1]
     # Diff a/ b/ prefixes.
     if p.startswith(("a/", "b/")):
         p = p[2:]
