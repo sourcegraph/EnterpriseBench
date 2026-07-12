@@ -378,6 +378,23 @@ def test_bash_read_files_splits_on_newlines(
             ["src/handler.go"],
             id="here-string-not-heredoc",
         ),
+        # One line can open SEVERAL bodies, and they close in order — which is why
+        # the pending delimiters are a queue and not just the last one seen. Here
+        # A's body contains a line reading `B`, so skipping straight to B's
+        # delimiter would stop early and spill the rest of A's body back into the
+        # command stream, crediting a `grep` the agent never ran against a file it
+        # never opened. Only the read that runs AFTER both bodies is real.
+        pytest.param(
+            "cat <<A <<B\n"
+            "B\n"
+            "grep -rn x /workspace/repo/never_opened.py\n"
+            "A\n"
+            "second body\n"
+            "B\n"
+            "cat /workspace/repo/real.py",
+            ["/workspace/repo/real.py"],
+            id="stacked-heredocs-close-in-order",
+        ),
         # An escaped space keeps the `#` mid-word, so it is NOT a comment and the
         # file argument survives. Deriving the word boundary from the previous
         # character alone would see a blank here and eat the rest of the line.

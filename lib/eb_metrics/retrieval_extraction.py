@@ -155,10 +155,16 @@ def _skip_heredoc_bodies(command: str, i: int, delims: list[str]) -> int:
     """Consume the here-doc bodies queued in ``delims`` → index past them.
 
     Scanned as raw text, never as shell: a here-doc body is literal data, so an
-    apostrophe in it (``It's a race``) must not open a quote. Consumes ``delims``.
+    apostrophe in it (``It's a race``) must not open a quote.
+
+    ``delims`` is a queue, not a single delimiter, because one line may open
+    several bodies (``cat <<A <<B``) and they close *in order*. Skipping only to
+    the last delimiter would stop early whenever an earlier body happens to
+    contain a line equal to it, spilling the rest of that body back into the
+    command stream — where a body line like ``grep -rn x never_opened.py`` would
+    be credited as a read of a file the agent only wrote *about*.
     """
-    while delims:
-        delim = delims.pop(0)
+    for delim in delims:
         while i < len(command):
             end = command.find("\n", i)
             line = command[i:] if end == -1 else command[i:end]
@@ -237,6 +243,7 @@ def _split_sub_lines(command: str) -> list[str]:
                 current = []
                 at_boundary = True
                 i = _skip_heredoc_bodies(command, i + 1, heredocs)
+                heredocs = []
             else:
                 current.append(ch)
                 at_boundary = quote is None and ch in " \t"
