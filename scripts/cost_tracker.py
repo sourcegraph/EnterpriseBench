@@ -1,9 +1,22 @@
 #!/usr/bin/env python3
 """
-cost_tracker.py — Parse agent traces and compute per-task / aggregate costs.
+cost_tracker.py — Report per-task / aggregate costs for EnterpriseBench runs.
 
-Reads agent_trace.jsonl files from result directories, sums token usage per
-task, applies Anthropic pricing, and writes a structured cost_report.json.
+Cost comes from the vendor wherever the vendor reported it. Claude Code writes a
+per-model ``modelUsage`` block to agent_stdout.log carrying its own ``costUSD``
+alongside input / output / cache token counts; that block is authoritative and is
+what this module bills from (tier 1).
+
+Only when a run has no such block does this module fall back to re-deriving cost
+from agent_trace.jsonl against the local PRICING table (tier 2). That derivation
+is lossy and must not be trusted as a primary source: the trace records a single
+model per run and never carries sub-agent usage at all, so a multi-model run
+cannot be priced correctly from it no matter how carefully the usage is summed
+(EnterpriseBench-qc7f, -jepu). Every fallback run is disclosed in the report.
+
+Both numbers are computed for every run, and their disagreement is published as a
+reconciliation block — a cost source that silently diverges from the trace is the
+failure this module exists to make visible.
 """
 
 from __future__ import annotations
@@ -11,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +36,10 @@ logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Pricing — per million tokens
+#
+# Used only for tier-2 (trace-derived) runs. Tier-1 runs are billed with the
+# vendor's own costUSD, which prices every model it saw — including ones this
+# table has never heard of (claude-opus-4-8, claude-fable-5).
 # ---------------------------------------------------------------------------
 
 PRICING: dict[str, dict[str, float]] = {
@@ -47,14 +65,61 @@ PRICING: dict[str, dict[str, float]] = {
 
 DEFAULT_MODEL = "claude-sonnet-4-6"
 
+# Label for the flat modelUsage shape, which names no model. Vendor-priced, so it
+# never needs a PRICING entry.
+UNKNOWN_MODEL = "unknown"
+
+# How far the per-model costUSD records may drift from the vendor's own
+# total_cost_usd before the block is treated as incomplete. Floating-point
+# summation of a handful of values needs only the absolute floor; the relative
+# term is slack for a vendor that rounds its total.
+COST_RECONCILE_ABS = 1e-6
+COST_RECONCILE_REL = 0.005
+
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
-class TraceUsage:
-    """Aggregated token usage from a single trace file."""
+class ModelUsage:
+    """One model's usage for one run, exactly as the vendor reported it.
+
+    ``cost_usd`` is the vendor's own price for this model's tokens, not a local
+    re-derivation, so it is correct even for a model absent from PRICING.
+    """
+
+    model: str
+    input_tokens: int
+    output_tokens: int
+    cache_write_tokens: int
+    cache_read_tokens: int
+    cost_usd: float
+
+
+@dataclass(frozen=True)
+class VendorUsage:
+    """One run's usage as the vendor reported it, with the vendor's own bottom line.
+
+    ``models`` carries the per-model split (tokens, both cache columns included)
+    that the report needs and that the flattened task_metrics.json copy of this
+    same data throws away.
+    """
+
+    models: tuple[ModelUsage, ...]
+    total_cost_usd: float
+
+
+@dataclass(frozen=True)
+class Usage:
+    """Aggregated token usage for one run.
+
+    Tokens come from the vendor's modelUsage block when the run has one, and from
+    the trace otherwise; :attr:`TaskCost.cost_source` records which. ``model`` is
+    the single largest spender — a representative label, with the full set on
+    :attr:`TaskCost.models`. ``num_requests`` is always trace-derived; the vendor
+    block reports no request count.
+    """
 
     input_tokens: int
     output_tokens: int
@@ -66,14 +131,22 @@ class TraceUsage:
 
 @dataclass(frozen=True)
 class TaskCost:
-    """Per-task cost record."""
+    """Per-task cost record.
+
+    ``cost_usd`` is authoritative. ``trace_cost_usd`` is what the old trace
+    derivation would have billed, retained for every run so the two can be
+    reconciled; on a tier-2 run the two are equal by construction.
+    """
 
     task_id: str
     mode: str
     suite: str
     difficulty: str
-    usage: TraceUsage
+    usage: Usage
     cost_usd: float
+    cost_source: str  # "sdk" (vendor modelUsage) | "trace" (PRICING derivation)
+    trace_cost_usd: float
+    models: tuple[str, ...]
     agent_duration_seconds: float
 
 
@@ -106,8 +179,11 @@ def _request_key(entry: dict[str, Any]) -> str | None:
     return None
 
 
-def parse_trace(trace_path: Path) -> TraceUsage:
+def parse_trace(trace_path: Path) -> Usage:
     """Read an agent_trace.jsonl and sum token usage once per API request.
+
+    The tier-2 (fallback) token source, reached only when a run carries no vendor
+    block; the module docstring says why it cannot be the primary one.
 
     Usage is deduplicated per request (see :func:`_request_key`); summing every
     assistant line instead billed one request once per content block.
@@ -181,7 +257,7 @@ def parse_trace(trace_path: Path) -> TraceUsage:
     def total(field: str) -> int:
         return sum(u.get(field, 0) for u in selected.values())
 
-    return TraceUsage(
+    return Usage(
         input_tokens=total("input_tokens"),
         output_tokens=total("output_tokens"),
         cache_write_tokens=total("cache_creation_input_tokens"),
@@ -191,13 +267,218 @@ def parse_trace(trace_path: Path) -> TraceUsage:
     )
 
 
-def compute_cost(usage: TraceUsage, model: str | None = None) -> float:
-    """Return USD cost for a TraceUsage given Anthropic pricing."""
+# ---------------------------------------------------------------------------
+# Vendor usage (tier 1) — Claude Code's own modelUsage block
+# ---------------------------------------------------------------------------
+
+
+def _finite(value: Any, model: str, field: str) -> float:
+    """Return ``value`` as a float, rejecting anything that is not a real number.
+
+    ``json.loads`` accepts the non-standard literals ``NaN`` / ``Infinity``, and a
+    NaN would be catastrophic here precisely because it is quiet: every comparison
+    against NaN is False, so a NaN cost slips through the reconciliation gate below
+    untouched and then poisons the batch total — one unreadable run silently
+    turning the whole report's bottom line into NaN. Reject it at the boundary
+    instead, where it becomes a disclosed fallback rather than a wrong number.
+    """
+
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"model {model!r} field {field} is {value!r}, not a number")
+    if not math.isfinite(value):
+        raise ValueError(f"model {model!r} field {field} is non-finite ({value!r})")
+    return float(value)
+
+
+def _count(value: Any, model: str, field: str) -> int:
+    """Return a token count as an int. Absent means zero; unreadable means reject.
+
+    The :func:`_finite` call has to come before the ``int()``, and that ordering is
+    the whole safety property: ``int(float("inf"))`` raises OverflowError, which is
+    not a ValueError and so would sail past the caller's fallback handler and abort
+    the entire batch scan over one malformed log. Validating first means ``int()``
+    only ever sees a finite number and the overflow is unreachable.
+    """
+
+    if value is None:
+        return 0
+    return int(_finite(value, model, field))
+
+
+def _model_usage_records(block: dict[str, Any]) -> tuple[ModelUsage, ...]:
+    """Convert a raw modelUsage mapping into per-model records.
+
+    The block comes in two shapes, matching run_task.py::_sum_model_usage:
+    flat (``{"inputTokens": N, ...}``, one anonymous model) or per-model
+    (``{"claude-sonnet-4-6": {...}, ...}``). Every run in the current corpus is
+    per-model; flat is handled because the writer that produces this file still
+    emits it.
+
+    Parsing is strict, and deliberately so: raises ValueError on anything it
+    cannot read whole rather than skipping the entry, because a skipped model
+    still bills the run, just for less. The caller turns that into a loud
+    fallback.
+    """
+
+    def record(model: str, entry: Any) -> ModelUsage:
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"model {model!r} maps to {type(entry).__name__}, not an object"
+            )
+        if "costUSD" not in entry:
+            raise ValueError(f"model {model!r} carries no costUSD")
+        return ModelUsage(
+            model=model,
+            input_tokens=_count(entry.get("inputTokens"), model, "inputTokens"),
+            output_tokens=_count(entry.get("outputTokens"), model, "outputTokens"),
+            cache_write_tokens=_count(
+                entry.get("cacheCreationInputTokens"), model, "cacheCreationInputTokens"
+            ),
+            cache_read_tokens=_count(
+                entry.get("cacheReadInputTokens"), model, "cacheReadInputTokens"
+            ),
+            cost_usd=_finite(entry["costUSD"], model, "costUSD"),
+        )
+
+    if "inputTokens" in block:
+        if any(isinstance(value, dict) for value in block.values()):
+            raise ValueError("block mixes the flat and per-model shapes")
+        return (record(UNKNOWN_MODEL, block),)
+
+    return tuple(record(name, entry) for name, entry in sorted(block.items()))
+
+
+def _result_object(content: str) -> dict[str, Any] | None:
+    """Return the vendor result object carrying a modelUsage block, or None.
+
+    Whole-file JSON first (``--output-format json``), then the last stream-json
+    line that carries a block — earlier lines hold partial totals.
+    """
+
+    try:
+        whole = json.loads(content)
+    except ValueError:  # JSONDecodeError is a ValueError subclass
+        whole = None
+
+    if isinstance(whole, dict) and isinstance(whole.get("modelUsage"), dict):
+        return whole
+
+    found: dict[str, Any] | None = None
+    for line in content.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            obj = json.loads(line)
+        except ValueError:  # JSONDecodeError is a ValueError subclass
+            continue
+        if isinstance(obj, dict) and isinstance(obj.get("modelUsage"), dict):
+            found = obj
+
+    return found
+
+
+def parse_model_usage(stdout_path: Path) -> VendorUsage | None:
+    """Read agent_stdout.log and return the vendor's own usage and bottom line.
+
+    Returns None when the run carries no block this module is willing to bill
+    from — the caller's signal to fall back to trace derivation, which is worse
+    but is disclosed in the report. Every rejection is logged with its reason.
+
+    The vendor writes its bottom line as ``total_cost_usd`` beside the block, and
+    that total — not a re-summation of the parts — is what gets billed. Re-summing
+    would be one more local re-derivation of a number the vendor already computed,
+    which is the whole bug this module was rebuilt to stop committing.
+
+    The per-model records still have to reconcile with that total, and a block
+    that does not is rejected rather than billed: a block missing a model agrees
+    with a total that also omits it, so a quiet undercount is exactly what a
+    "close enough" sum would buy. A block with no total cannot be checked at all,
+    so it is rejected too; the writer emits the total beside every block.
+    """
+
+    if not stdout_path.exists():
+        return None
+
+    try:
+        content = stdout_path.read_text()
+    except OSError:
+        logger.warning("Failed to read %s", stdout_path)
+        return None
+
+    if not content.strip():
+        return None
+
+    result = _result_object(content)
+    if result is None:
+        return None
+
+    block = result["modelUsage"]
+    if not block:
+        return None
+
+    try:
+        records = _model_usage_records(block)
+        vendor_total = _finite(result.get("total_cost_usd"), "<run>", "total_cost_usd")
+    except ValueError as exc:
+        logger.warning(
+            "%s: unusable modelUsage block (%s) — falling back to trace derivation",
+            stdout_path,
+            exc,
+        )
+        return None
+
+    summed = sum(r.cost_usd for r in records)
+    tolerance = max(COST_RECONCILE_ABS, COST_RECONCILE_REL * abs(vendor_total))
+    if abs(summed - vendor_total) > tolerance:
+        logger.warning(
+            "%s: per-model costUSD sums to %.6f but the vendor reports "
+            "total_cost_usd=%.6f — the block is incomplete, so it is rejected "
+            "rather than billed short. Falling back to trace derivation.",
+            stdout_path,
+            summed,
+            vendor_total,
+        )
+        return None
+
+    return VendorUsage(models=records, total_cost_usd=vendor_total)
+
+
+def merge_model_usage(models: tuple[ModelUsage, ...], num_requests: int) -> Usage:
+    """Fold per-model vendor records into one run-level Usage.
+
+    ``model`` is the largest spender, so the representative label survives the
+    haiku sub-agent calls that ride along with most runs.
+
+    Requires at least one record: folding zero would yield a zero-cost Usage that
+    still looked vendor-authoritative.
+    """
+
+    if not models:
+        raise ValueError("merge_model_usage requires at least one ModelUsage record")
+
+    primary = max(models, key=lambda m: (m.cost_usd, m.output_tokens))
+    return Usage(
+        input_tokens=sum(m.input_tokens for m in models),
+        output_tokens=sum(m.output_tokens for m in models),
+        cache_write_tokens=sum(m.cache_write_tokens for m in models),
+        cache_read_tokens=sum(m.cache_read_tokens for m in models),
+        model=primary.model,
+        num_requests=num_requests,
+    )
+
+
+def compute_cost(usage: Usage, model: str | None = None) -> float:
+    """Return USD cost for a Usage given the local PRICING table (tier 2 only)."""
 
     resolved_model = model or usage.model or DEFAULT_MODEL
     prices = PRICING.get(resolved_model)
     if prices is None:
-        logger.warning(
+        # Debug, not warning: this runs on every task to produce the
+        # reconciliation baseline, including the vendor-priced ones whose cost
+        # never comes from this table. aggregate_report raises the real alarm,
+        # scoped to the tasks PRICING actually billed.
+        logger.debug(
             "Unknown model %r — falling back to %s pricing",
             resolved_model,
             DEFAULT_MODEL,
@@ -287,8 +568,23 @@ def scan_results_dirs(
             task_id, mode = _parse_dir_identity(task_dir)
             meta = _get_task_meta(task_id, benchmarks_root)
 
-            usage = parse_trace(trace_path)
-            cost = compute_cost(usage)
+            # Derive from the trace unconditionally: it is the tier-2 cost when
+            # there is no vendor block, and the reconciliation baseline when
+            # there is.
+            trace_usage = parse_trace(trace_path)
+            trace_cost = compute_cost(trace_usage)
+
+            vendor = parse_model_usage(task_dir / "agent_stdout.log")
+            if vendor:
+                usage = merge_model_usage(vendor.models, trace_usage.num_requests)
+                cost = round(vendor.total_cost_usd, 6)
+                cost_source = "sdk"
+                models = tuple(m.model for m in vendor.models)
+            else:
+                usage = trace_usage
+                cost = trace_cost
+                cost_source = "trace"
+                models = (trace_usage.model,)
 
             # Try to get agent duration from task_metrics.json
             duration = 0.0
@@ -309,6 +605,9 @@ def scan_results_dirs(
                     difficulty=meta["difficulty"],
                     usage=usage,
                     cost_usd=cost,
+                    cost_source=cost_source,
+                    trace_cost_usd=trace_cost,
+                    models=models,
                     agent_duration_seconds=duration,
                 )
             )
@@ -337,6 +636,37 @@ def _bucket_stats(items: list[TaskCost]) -> dict[str, Any]:
     }
 
 
+def _cost_source_summary(costs: list[TaskCost]) -> dict[str, Any]:
+    """Report where cost came from, and how far the trace derivation missed.
+
+    Two things a reader of this JSON must not have to guess: how many runs are
+    still trace-derived (those carry the old distortion and are not mixed in
+    silently), and by how much the trace derivation disagrees with the vendor on
+    the runs where both exist. The ratio sizes the bug this module was rebuilt to
+    fix, so a regression shows up as a number rather than a quietly wrong total.
+    """
+
+    sdk = [tc for tc in costs if tc.cost_source == "sdk"]
+    trace = [tc for tc in costs if tc.cost_source == "trace"]
+
+    vendor_total = round(sum(tc.cost_usd for tc in sdk), 6)
+    derived_total = round(sum(tc.trace_cost_usd for tc in sdk), 6)
+
+    return {
+        "sdk": len(sdk),
+        "trace": len(trace),
+        "trace_derived_task_ids": sorted(f"{tc.task_id}:{tc.mode}" for tc in trace),
+        "reconciliation": {
+            "vendor_cost_usd": vendor_total,
+            "trace_derived_cost_usd": derived_total,
+            "delta_usd": round(vendor_total - derived_total, 6),
+            "trace_over_vendor_ratio": (
+                round(derived_total / vendor_total, 4) if vendor_total else 0.0
+            ),
+        },
+    }
+
+
 def aggregate_report(costs: list[TaskCost]) -> dict[str, Any]:
     """Build the full cost report with suite/mode/difficulty breakdowns."""
 
@@ -356,23 +686,33 @@ def aggregate_report(costs: list[TaskCost]) -> dict[str, Any]:
             "suite": tc.suite,
             "difficulty": tc.difficulty,
             "model": tc.usage.model,
+            "models": list(tc.models),
             "input_tokens": tc.usage.input_tokens,
             "output_tokens": tc.usage.output_tokens,
             "cache_write_tokens": tc.usage.cache_write_tokens,
             "cache_read_tokens": tc.usage.cache_read_tokens,
             "num_requests": tc.usage.num_requests,
             "cost_usd": tc.cost_usd,
+            "cost_source": tc.cost_source,
+            "trace_cost_usd": tc.trace_cost_usd,
             "agent_duration_seconds": tc.agent_duration_seconds,
         }
         for tc in sorted(costs, key=lambda c: c.task_id)
     ]
 
-    # compute_cost bills an unpriced model at DEFAULT_MODEL rates. Those models
-    # cluster in a single arm, so the substitution skews arm-to-arm cost deltas,
-    # not just absolute cost. The caveat rides in the report itself — a warning
+    # Only the trace-derived population is exposed to PRICING, so only it can be
+    # mispriced. An unpriced model here is billed at DEFAULT_MODEL rates, and such
+    # models cluster in a single arm, so the substitution skews arm-to-arm deltas
+    # rather than just absolute cost. The caveat rides in the report — a warning
     # in a batch log does not reach whoever reads the JSON.
     unpriced_models = sorted(
-        {tc.usage.model for tc in costs if tc.usage.model not in PRICING}
+        {
+            model
+            for tc in costs
+            if tc.cost_source == "trace"
+            for model in tc.models
+            if model not in PRICING
+        }
     )
     if unpriced_models:
         logger.warning(
@@ -387,6 +727,7 @@ def aggregate_report(costs: list[TaskCost]) -> dict[str, Any]:
         "total_cost_usd": round(sum(tc.cost_usd for tc in costs), 6),
         "total_tasks": len(costs),
         "unpriced_models": unpriced_models,
+        "cost_sources": _cost_source_summary(costs),
         "by_mode": {k: _bucket_stats(v) for k, v in sorted(by_mode.items())},
         "by_suite": {k: _bucket_stats(v) for k, v in sorted(by_suite.items())},
         "by_difficulty": {
