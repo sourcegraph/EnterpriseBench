@@ -615,6 +615,30 @@ def test_resolved_traces_counts_found_traces_not_ok_ones(tmp_path):
     assert ss.resolved_traces({"ok": 0, "not_found": 0, "no_trace": 10}) == 0
 
 
+def test_the_shipped_artifact_was_built_from_a_clean_tree():
+    """A committed artifact generated from a DIRTY tree is not reproducible: its
+    source_sha names a commit whose code is not the code that produced it.
+
+    This is not hypothetical -- it has now happened twice on this bead. The first
+    time the shipped artifact's sha was two commits stale; the second time
+    (caught by this test's absence, then by hand) it was generated mid-edit and
+    recorded source_dirty=true. Regenerating is a one-line command, so the only
+    thing missing was something that noticed.
+
+    source_sha is NOT asserted to equal HEAD: the commit that lands the artifact
+    necessarily comes after the commit that produced it, so the artifact's sha is
+    legitimately its parent. `source_dirty` is the invariant that actually matters.
+    """
+    shipped = REPO_ROOT / "benchmarks" / "strata" / "enterprise_v1_candidates.json"
+    art = json.loads(shipped.read_text())
+    assert art["provenance"]["source_dirty"] is False, (
+        "the shipped stratum artifact was generated from a dirty working tree, so "
+        "its source_sha does not identify the code that produced it. Regenerate "
+        "from a clean tree.")
+    assert art["provenance"]["traces_digest"], "shipped artifact pins no trace content"
+    assert art["provenance"]["runs_root"], "shipped artifact does not say which run set it used"
+
+
 def test_build_artifact_refuses_measurements_that_resolve_no_traces():
     """The invariant has to live at the FUNCTION boundary, not at one caller.
 
