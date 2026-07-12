@@ -6,14 +6,20 @@ Provides standard IR metrics (precision, recall, F1, MRR, nDCG, MAP) plus
 file-level recall and context efficiency over *file-path* lists — the unit
 of retrieval CSB scores against.
 
-Scope (co-4cb.1 — the retrieval-quality metric axis / *reward* side)
--------------------------------------------------------------------
-Only the deterministic retrieval-quality computation is ported here. The
-CSB module's dollar-cost and time-to-context fields (``ttfr``,
-``cost_before_first_relevant``, …) are intentionally **not** ported: they
-belong to the *cost* lever (track A's separate child bead) and require
-transcript timing/token extraction, which is out of scope for the
-retrieval-quality axis.
+Scope (co-4cb.1 / jn73.1 — the retrieval-quality metric axis / *reward* side)
+------------------------------------------------------------------------
+The deterministic retrieval-quality computation (precision/recall/F1/MRR/
+nDCG/MAP + file_recall + context_efficiency), the named localization@1/@k
+hit-rate helpers, and — as of jn73.1 — the turns-/tokens-to-first-relevant
+fields (``turns_to_first_relevant``, ``tokens_to_first_relevant``,
+``ttfr_seconds``) live here. The CSB module's *dollar-cost* fields
+(``cost_before_first_relevant``, ``agent_time_to_first_relevant`` priced in
+USD) remain **out of scope**: they belong to the separate cost lever, not
+the stratum-labeling axis (jn73.2 Gate C keys on turns-to-first-relevant,
+not dollar cost). :class:`IRScores`' TTFR fields are populated by
+:func:`eb_metrics.retrieval_extraction.compute_run_ir_scores` (which has
+trace-file access for timestamps/token usage) rather than by
+:func:`compute_ir_scores` itself, which stays pure list-of-paths math.
 
 ZFC compliance
 --------------
@@ -39,6 +45,8 @@ __all__ = [
     "mean_average_precision",
     "file_level_recall",
     "context_efficiency",
+    "localization_at_1",
+    "localization_at_k",
     "IRScores",
     "compute_ir_scores",
     "DEFAULT_K_VALUES",
@@ -197,13 +205,60 @@ def context_efficiency(retrieved: list[str], relevant: set[str]) -> float:
     return hits / len(retrieved)
 
 
+def localization_at_1(retrieved: list[str], relevant: set[str]) -> float:
+    """Localization accuracy@1: 1.0 iff the very first retrieved file is relevant.
+
+    Thin wrapper over :func:`precision_at_k` — with a single-item top-k,
+    precision@1 (``hits / 1``) already *is* the binary "is rank 1 correct"
+    indicator, so no new arithmetic is introduced. Distinct from
+    ``recall_at_k(..., 1)``, which divides by ``len(relevant)`` instead of
+    by 1 and so is not a 0/1 accuracy signal when there is more than one
+    ground-truth file.
+    """
+    return precision_at_k(retrieved, relevant, 1)
+
+
+def localization_at_k(retrieved: list[str], relevant: set[str], k: int) -> float:
+    """Localization accuracy@k: 1.0 iff ANY relevant file ranks within the
+    first ``k`` retrieved (a.k.a. hit-rate@k / success@k), 0.0 otherwise.
+
+    Thin wrapper over :func:`mrr`: ``mrr() == 1 / rank_of_first_relevant``,
+    so the first relevant file ranks within ``k`` exactly when
+    ``mrr() >= 1 / k``. Unlike ``recall_at_k`` — the *fraction* of the
+    ground-truth set found within the top ``k`` — this is a single 0/1 hit
+    indicator per trial: "did the agent open a correct file within its
+    first k reads." That is the localization-breadth signal downstream
+    stratum labeling (jn73.2 Gate C) keys on. ``k <= 0`` and an empty
+    ``relevant`` set (no rank exists to hit) both yield 0.0, matching
+    ``mrr``'s own behavior on an empty relevant set.
+
+    Reported in every ``IRScores`` payload; no gate consumes it yet. (Gate C
+    keys on turns-to-first-relevant, not on this — see
+    ``scripts/validation/stratum_selector.score_gate_c``.)
+    """
+    if k <= 0:
+        return 0.0
+    return 1.0 if mrr(retrieved, relevant) >= (1.0 / k) else 0.0
+
+
 @dataclass(frozen=True)
 class IRScores:
     """Retrieval-quality scores for a single (task, config) pair.
 
-    ``precision``/``recall``/``f1``/``ndcg`` are keyed by ``k``; the scalar
-    fields (``file_recall``, ``context_efficiency``, …) have no cutoff.
-    All values are rounded to 4 decimals by :func:`compute_ir_scores`.
+    ``precision``/``recall``/``f1``/``ndcg``/``localization`` are keyed by
+    ``k``; the scalar fields (``file_recall``, ``context_efficiency``, …)
+    have no cutoff. All values are rounded to 4 decimals by
+    :func:`compute_ir_scores`.
+
+    The TTFR fields (``turns_to_first_relevant``, ``tokens_to_first_relevant``,
+    ``ttfr_seconds``, ``ttfr_coverage``) are **not** populated by
+    :func:`compute_ir_scores` — it is pure list-of-paths math with no trace
+    access. They default to ``None``/``"not_computed"`` here and are filled
+    in by :func:`eb_metrics.retrieval_extraction.compute_run_ir_scores` via
+    :func:`dataclasses.replace` once it has joined the trace file. A caller
+    that sees ``ttfr_coverage == "not_computed"`` is looking at a bare
+    :func:`compute_ir_scores` result, not a missing signal — never treat it
+    as "the agent found nothing."
     """
 
     task_id: str
@@ -212,6 +267,7 @@ class IRScores:
     recall: dict[int, float] = field(default_factory=dict)
     f1: dict[int, float] = field(default_factory=dict)
     ndcg: dict[int, float] = field(default_factory=dict)
+    localization: dict[int, float] = field(default_factory=dict)
     mrr: float = 0.0
     map_score: float = 0.0
     file_recall: float = 0.0
@@ -219,6 +275,13 @@ class IRScores:
     n_retrieved: int = 0
     n_ground_truth: int = 0
     n_overlap: int = 0
+
+    # Turns-/tokens-to-first-relevant (TTFR). See class docstring — filled
+    # post-hoc by retrieval_extraction.compute_run_ir_scores, not here.
+    turns_to_first_relevant: int | None = None
+    tokens_to_first_relevant: int | None = None
+    ttfr_seconds: float | None = None
+    ttfr_coverage: str = "not_computed"
 
     def to_dict(self) -> dict:
         return {
@@ -228,6 +291,7 @@ class IRScores:
             "recall": dict(self.recall),
             "f1": dict(self.f1),
             "ndcg": dict(self.ndcg),
+            "localization": dict(self.localization),
             "mrr": self.mrr,
             "map_score": self.map_score,
             "file_recall": self.file_recall,
@@ -235,6 +299,10 @@ class IRScores:
             "n_retrieved": self.n_retrieved,
             "n_ground_truth": self.n_ground_truth,
             "n_overlap": self.n_overlap,
+            "turns_to_first_relevant": self.turns_to_first_relevant,
+            "tokens_to_first_relevant": self.tokens_to_first_relevant,
+            "ttfr_seconds": self.ttfr_seconds,
+            "ttfr_coverage": self.ttfr_coverage,
         }
 
 
@@ -265,6 +333,7 @@ def compute_ir_scores(
         recall={k: round(recall_at_k(retrieved, relevant, k), 4) for k in ks},
         f1={k: round(f1_at_k(retrieved, relevant, k), 4) for k in ks},
         ndcg={k: round(ndcg_at_k(retrieved, relevant, k), 4) for k in ks},
+        localization={k: round(localization_at_k(retrieved, relevant, k), 4) for k in ks},
         mrr=round(mrr(retrieved, relevant), 4),
         map_score=round(mean_average_precision(retrieved, relevant), 4),
         file_recall=round(file_level_recall(retrieved, relevant), 4),

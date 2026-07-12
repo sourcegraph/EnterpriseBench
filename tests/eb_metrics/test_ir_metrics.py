@@ -17,6 +17,8 @@ from eb_metrics.ir_metrics import (
     context_efficiency,
     f1_at_k,
     file_level_recall,
+    localization_at_1,
+    localization_at_k,
     mean_average_precision,
     mrr,
     ndcg_at_k,
@@ -134,6 +136,63 @@ def test_map_single_query_average_precision() -> None:
 
 
 # ---------------------------------------------------------------------------
+# localization@1 / localization@k — hit-rate accuracy, distinct from recall@k
+# ---------------------------------------------------------------------------
+
+
+def test_localization_at_1_is_top_1_correct_indicator() -> None:
+    relevant = {"a.py", "b.py"}
+    assert localization_at_1(["a.py", "x.py"], relevant) == 1.0
+    assert localization_at_1(["x.py", "a.py"], relevant) == 0.0
+    assert localization_at_1([], relevant) == 0.0
+
+
+def test_localization_at_1_equals_precision_at_1() -> None:
+    # Named wrapper is literally precision_at_k(..., 1) per the bead's spec.
+    retrieved, relevant = ["b.py", "a.py"], {"a.py"}
+    assert localization_at_1(retrieved, relevant) == precision_at_k(retrieved, relevant, 1)
+
+
+def test_localization_at_k_is_hit_rate_not_fraction_found() -> None:
+    # Only 1 of 2 relevant files ranks within the top 3 — recall@3 is 0.5,
+    # but localization@3 is a binary "found something by rank 3" → 1.0.
+    retrieved = ["x.py", "y.py", "a.py"]
+    relevant = {"a.py", "b.py"}
+    assert recall_at_k(retrieved, relevant, 3) == 0.5
+    assert localization_at_k(retrieved, relevant, 3) == 1.0
+    # Nothing relevant within the top 2 → localization@2 is 0.0.
+    assert localization_at_k(retrieved, relevant, 2) == 0.0
+
+
+def test_localization_at_k_equals_mrr_reciprocal_rank_threshold() -> None:
+    # First relevant file at rank 3 (mrr = 1/3): hits @3+ but not @1 or @2.
+    retrieved = ["x.py", "y.py", "a.py", "z.py"]
+    relevant = {"a.py"}
+    assert mrr(retrieved, relevant) == pytest.approx(1 / 3)
+    assert localization_at_k(retrieved, relevant, 1) == 0.0
+    assert localization_at_k(retrieved, relevant, 2) == 0.0
+    assert localization_at_k(retrieved, relevant, 3) == 1.0
+    assert localization_at_k(retrieved, relevant, 10) == 1.0
+
+
+def test_localization_at_k_non_positive_k_and_empty_relevant() -> None:
+    assert localization_at_k(["a.py"], {"a.py"}, 0) == 0.0
+    assert localization_at_k(["a.py"], {"a.py"}, -1) == 0.0
+    # Matches mrr's own (undocumented-but-consistent) empty-relevant behavior:
+    # there is no rank to hit, so 0.0 — not the recall-family 1.0.
+    assert localization_at_k(["a.py"], set(), 5) == 0.0
+    assert localization_at_1(["a.py"], set()) == 0.0
+
+
+def test_compute_ir_scores_populates_localization_dict() -> None:
+    # First relevant file at rank 2 of 2 relevant → hit@2+ but not @1.
+    gt = ["a.py", "b.py"]
+    retrieved = ["x.py", "a.py"]
+    s = compute_ir_scores(retrieved, gt, "t", "c")
+    assert s.localization == {1: 0.0, 3: 1.0, 5: 1.0, 10: 1.0}
+
+
+# ---------------------------------------------------------------------------
 # Empty-set asymmetry — must be preserved verbatim from CSB
 # ---------------------------------------------------------------------------
 
@@ -205,3 +264,45 @@ def test_compute_ir_scores_to_dict_roundtrip() -> None:
     assert d["file_recall"] == 1.0
     assert d["n_overlap"] == 1
     assert set(d["recall"]) == {1, 3, 5, 10}
+
+
+# ---------------------------------------------------------------------------
+# IRScores.to_dict() schema stability — guards the quality_metrics
+# detail['retrieval_metrics'] shape against silent drift (no separate JSON
+# schema file governs this dict; this test is the schema contract).
+# ---------------------------------------------------------------------------
+
+
+def test_ir_scores_to_dict_schema_keys_are_stable() -> None:
+    s = compute_ir_scores(["a.py"], ["a.py"], "t", "c")
+    assert set(s.to_dict()) == {
+        "task_id",
+        "config_name",
+        "precision",
+        "recall",
+        "f1",
+        "ndcg",
+        "localization",
+        "mrr",
+        "map_score",
+        "file_recall",
+        "context_efficiency",
+        "n_retrieved",
+        "n_ground_truth",
+        "n_overlap",
+        "turns_to_first_relevant",
+        "tokens_to_first_relevant",
+        "ttfr_seconds",
+        "ttfr_coverage",
+    }
+
+
+def test_compute_ir_scores_leaves_ttfr_fields_uncomputed() -> None:
+    # compute_ir_scores is pure list-of-paths math with no trace access —
+    # TTFR is filled in later by retrieval_extraction.compute_run_ir_scores.
+    # "not_computed" is a distinct sentinel from "not_found" (a real miss).
+    s = compute_ir_scores(["a.py"], ["a.py"], "t", "c")
+    assert s.turns_to_first_relevant is None
+    assert s.tokens_to_first_relevant is None
+    assert s.ttfr_seconds is None
+    assert s.ttfr_coverage == "not_computed"
