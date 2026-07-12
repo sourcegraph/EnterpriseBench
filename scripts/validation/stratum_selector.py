@@ -673,11 +673,16 @@ def _oracle_repos(task_dir: Path, task_toml: dict[str, Any]) -> set[str]:
 
 def _crnt_positive(task_toml: dict[str, Any]) -> bool:
     """Per-task CRNT boolean. Stricter than "declares >= 2 repos": every
-    declared repo must be covered by a required_files entry."""
-    try:
-        return bool(crnt_validator.evaluate_crnt(task_toml).passes_crnt)
-    except Exception:
-        return False
+    declared repo must be covered by a required_files entry.
+
+    Deliberately NOT wrapped in a try/except. ``evaluate_crnt`` is deterministic
+    over already-parsed TOML and raises for none of the 119 task.toml files in
+    the corpus, so a swallow would be dead code today -- and a landmine
+    tomorrow: a task that started raising would be silently scored CRNT-negative,
+    quietly downgrading Gate D to its dispersion fallback instead of failing.
+    A gate that cannot be evaluated must never evaluate to "no".
+    """
+    return bool(crnt_validator.evaluate_crnt(task_toml).passes_crnt)
 
 
 def measure_ttfr(run_key: str, oracle_files: list[str],
