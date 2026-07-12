@@ -182,9 +182,13 @@ def _mcp_repo_dir(repo: str) -> str:
     ``github.com/sg-evals/requests--v2.31.0`` → ``requests``: drop the host/org
     qualifier, then the ``--<rev>`` pin the eval corpus appends. GitHub MCP's bare
     ``repo`` name passes through unchanged. Returns ``""`` when there is nothing
-    to prefix with. Mechanical string transform — no lookup, no inference.
+    to prefix with.
+
+    Inverse of ``scripts/infra/mirror_naming.derive_mirror_name``, which is the
+    SSOT for this grammar but is not importable from ``lib/`` today
+    (EnterpriseBench-k2d8 tracks unifying them).
     """
-    return repo.strip().rsplit("/", 1)[-1].split("--", 1)[0]
+    return repo.rsplit("/", 1)[-1].split("--", 1)[0]
 
 
 def _looks_like_file(path: str) -> bool:
@@ -218,6 +222,11 @@ def retrieved_files_from_trace(trace_path: Path) -> list[str]:
     result payloads. Dedup is on the normalized form; the original string is
     kept in first-seen order so downstream rank metrics (MRR/MAP/@k) are
     faithful.
+
+    Postcondition: every returned path is workspace-relative (repo-qualified),
+    which is what lets :func:`_align_retrieved_to_required` suffix-match it
+    against ground truth. A new extraction site whose source yields
+    *repo*-relative paths must re-qualify them before calling ``_add``.
     """
     trace_path = Path(trace_path)
     if not trace_path.is_file():
@@ -264,12 +273,10 @@ def retrieved_files_from_trace(trace_path: Path) -> list[str]:
         elif tool_name in _MCP_READ_TOOLS:
             fp = tool_input.get("path", "")
             if fp:
-                # `path` is repo-relative but ground truth is workspace-relative
-                # ("requests/setup.cfg"), so carry the repo to make them comparable.
-                # Unconditionally: a repo dir legitimately repeats as an inner dir
-                # ("tonic/tonic/Cargo.toml"), so skipping the prefix on paths that
-                # already start with it would corrupt exactly those.
-                repo = tool_input.get("repo", "")
+                # Prefix unconditionally: a repo dir legitimately repeats as an
+                # inner dir ("tonic/tonic/Cargo.toml"), so skipping the prefix
+                # when fp already starts with it would corrupt exactly those.
+                repo = tool_input.get("repo")
                 repo_dir = _mcp_repo_dir(repo) if isinstance(repo, str) else ""
                 _add(f"{repo_dir}/{fp.lstrip('/')}" if repo_dir else fp)
 

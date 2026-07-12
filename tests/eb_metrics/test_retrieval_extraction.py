@@ -22,9 +22,6 @@ from eb_metrics.retrieval_extraction import (
 
 WORKER = "/workspace/kubernetes/pkg/kubelet/prober/worker.go"
 WORKER_TEST = "pkg/kubelet/prober/worker_test.go"  # MCP read_file, repo-relative
-# What the MCP read of WORKER_TEST must extract to: repo-qualified, i.e. the
-# same workspace-relative shape a local Read of the same file would yield.
-WORKER_TEST_QUALIFIED = "kubernetes/pkg/kubelet/prober/worker_test.go"
 MANAGER = "pkg/kubelet/prober/results/manager.go"  # surfaced via search result
 
 
@@ -37,6 +34,10 @@ def _assistant_tool_use(tid: str, name: str, inp: dict) -> str:
             },
         }
     )
+
+
+def _mcp_read(tid: str, repo: str, path: str) -> str:
+    return _assistant_tool_use(tid, "mcp__sourcegraph__read_file", {"repo": repo, "path": path})
 
 
 def _user_tool_result(tid: str, content: str) -> str:
@@ -73,28 +74,18 @@ def test_retrieved_files_local_and_mcp_reads(tmp_path: Path) -> None:
         [
             _assistant_tool_use("t1", "Read", {"file_path": WORKER}),
             _assistant_tool_use("t2", "Bash", {"command": "ls"}),  # ignored
-            _assistant_tool_use(
-                "t3",
-                "mcp__sourcegraph__read_file",
-                {"repo": "kubernetes", "path": WORKER_TEST},
-            ),
+            _mcp_read("t3", "kubernetes", WORKER_TEST),
         ],
     )
     got = retrieved_files_from_trace(trace)
     # First-seen order preserved; Bash contributes nothing. The MCP read carries
     # its repo, so it lands workspace-relative like the local Read above it.
-    assert got == [WORKER, WORKER_TEST_QUALIFIED]
+    assert got == [WORKER, f"kubernetes/{WORKER_TEST}"]
 
 
 # ---------------------------------------------------------------------------
-# MCP read_file carries its repo (EnterpriseBench-0nru)
-#
-# The MCP read input is {repo, path} with `path` *repo*-relative, while ground
-# truth is *workspace*-relative ("requests/setup.cfg"). Dropping the repo left a
-# root-level MCP read one component short — "setup.cfg" — which can never align
-# to a 2-component GT key, so the mcp_only arm silently scored 0.0 on files the
-# agent had actually opened. Carrying the repo restores parity with the local
-# Read path, whose /workspace/<repo>/ prefix already made it workspace-relative.
+# MCP read_file carries its repo — GT is workspace-relative, MCP `path` is not
+# (EnterpriseBench-0nru)
 # ---------------------------------------------------------------------------
 
 
@@ -136,13 +127,7 @@ def test_mcp_read_prefixes_repo_even_when_path_repeats_it(tmp_path: Path) -> Non
     # that really lives at /workspace/tonic/tonic/Cargo.toml.
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
-        [
-            _assistant_tool_use(
-                "t1",
-                "mcp__sourcegraph__read_file",
-                {"repo": "github.com/sg-evals/tonic--v0.10.0", "path": "tonic/Cargo.toml"},
-            )
-        ],
+        [_mcp_read("t1", "github.com/sg-evals/tonic--v0.10.0", "tonic/Cargo.toml")],
     )
     assert retrieved_files_from_trace(trace) == ["tonic/tonic/Cargo.toml"]
 
@@ -156,16 +141,8 @@ def test_mcp_reads_of_same_filename_in_different_repos_stay_distinct(
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
         [
-            _assistant_tool_use(
-                "t1",
-                "mcp__sourcegraph__read_file",
-                {"repo": "github.com/sg-evals/requests--v2.31.0", "path": "setup.cfg"},
-            ),
-            _assistant_tool_use(
-                "t2",
-                "mcp__sourcegraph__read_file",
-                {"repo": "github.com/sg-evals/botocore--1.31.0", "path": "setup.cfg"},
-            ),
+            _mcp_read("t1", "github.com/sg-evals/requests--v2.31.0", "setup.cfg"),
+            _mcp_read("t2", "github.com/sg-evals/botocore--1.31.0", "setup.cfg"),
         ],
     )
     assert retrieved_files_from_trace(trace) == [
@@ -181,21 +158,9 @@ def test_compute_run_ir_scores_tri_repo_mcp_only_regression(tmp_path: Path) -> N
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
         [
-            _assistant_tool_use(
-                "t1",
-                "mcp__sourcegraph__read_file",
-                {"repo": "github.com/sg-evals/requests--v2.31.0", "path": "setup.cfg"},
-            ),
-            _assistant_tool_use(
-                "t2",
-                "mcp__sourcegraph__read_file",
-                {"repo": "github.com/sg-evals/botocore--1.31.0", "path": "setup.py"},
-            ),
-            _assistant_tool_use(
-                "t3",
-                "mcp__sourcegraph__read_file",
-                {"repo": "github.com/sg-evals/urllib3--2.0.0", "path": "CHANGES.rst"},
-            ),
+            _mcp_read("t1", "github.com/sg-evals/requests--v2.31.0", "setup.cfg"),
+            _mcp_read("t2", "github.com/sg-evals/botocore--1.31.0", "setup.py"),
+            _mcp_read("t3", "github.com/sg-evals/urllib3--2.0.0", "CHANGES.rst"),
         ],
     )
     gt = _write_ground_truth(
@@ -223,19 +188,12 @@ def test_compute_run_ir_scores_mcp_deep_path_still_matches(tmp_path: Path) -> No
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
         [
-            _assistant_tool_use(
+            _mcp_read(
                 "t1",
-                "mcp__sourcegraph__read_file",
-                {
-                    "repo": "github.com/sg-evals/grafana--v10.0.0",
-                    "path": "pkg/services/sqlstore/migrator/migrator.go",
-                },
+                "github.com/sg-evals/grafana--v10.0.0",
+                "pkg/services/sqlstore/migrator/migrator.go",
             ),
-            _assistant_tool_use(
-                "t2",
-                "mcp__sourcegraph__read_file",
-                {"repo": "github.com/sg-evals/tonic--v0.10.0", "path": "tonic/Cargo.toml"},
-            ),
+            _mcp_read("t2", "github.com/sg-evals/tonic--v0.10.0", "tonic/Cargo.toml"),
         ],
     )
     gt = _write_ground_truth(
