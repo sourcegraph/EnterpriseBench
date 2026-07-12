@@ -491,6 +491,48 @@ def test_compute_ttfr_bills_a_request_at_its_complete_output_not_its_first(
     assert result.tokens_to_first_relevant == 3589
 
 
+def test_compute_ttfr_prices_a_step_on_a_non_final_line_of_its_request(
+    tmp_path: Path,
+) -> None:
+    # The case the deferred pricing exists for, and the one the test above does
+    # NOT cover: there, the tool_use closes its request, so its line already
+    # carries the complete snapshot and an implementation that froze the usage it
+    # saw at the time of the call would score identically. On real traces ~30% of
+    # tool_use blocks sit on a *non-final* line of their request, so the step
+    # fires while output_tokens is still climbing.
+    #
+    # A step is priced at what its request finally billed, which is only knowable
+    # once the request's last line has been read — hence _Step.requests_seen plus
+    # _TraceWalk.billed_prefix rather than a token count frozen at the call. This
+    # also pins the ordering _walk_trace depends on: usage.offer() must run
+    # before the tool_use blocks of the same line are opened as steps, or the
+    # step would miss its own request entirely.
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            # The tool_use opens the request — line 1 of 3, output still partial.
+            _assistant_tool_use(
+                "t1", "Read", {"file_path": WORKER},
+                ts="2026-01-01T00:00:00.000Z",
+                usage={"input_tokens": 1000, "output_tokens": 140},
+                request_id="req_stream",
+            ),
+            _assistant_text("still writing...", request_id="req_stream",
+                            usage={"input_tokens": 1000, "output_tokens": 900}),
+            _assistant_text("done.", request_id="req_stream",
+                            usage={"input_tokens": 1000, "output_tokens": 2589}),
+        ],
+    )
+
+    result = compute_ttfr(trace, ["pkg/kubelet/prober/worker.go"])
+    assert result.coverage == "ok"
+    assert result.turns_to_first_relevant == 1
+
+    # The whole request, resolved after the walk (1000 + 2589) — not the 1140 an
+    # eager, price-at-the-call implementation would have frozen.
+    assert result.tokens_to_first_relevant == 3589
+
+
 def test_compute_ttfr_ok_counts_turns_tokens_and_seconds(tmp_path: Path) -> None:
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
