@@ -338,15 +338,9 @@ def test_gate_c_reports_tier():
     assert ss.score_gate_c(measurement={"coverage": "ok", "ttfr": 15}).evidence["tier"] == 2
 
 
-def test_gate_c_not_found_is_maximally_hard_not_a_failure():
-    """The baseline made tool calls and NEVER opened an oracle file. That is
-    the strongest possible evidence of hard-to-localize -- it must not be
-    confused with a trivial task. compute_ttfr's contract states not_found is
-    distinct from an observability gap."""
-    ev = ss.score_gate_c(measurement={"coverage": "not_found", "ttfr": None})
-    assert ev.status is ss.GateStatus.PASS
-    assert ev.evidence["tier"] == "unlocalized"
-    assert ev.evidence["coverage"] == "not_found"
+# NOTE: the former test_gate_c_not_found_is_maximally_hard_not_a_failure asserted
+# that coverage="not_found" PASSES Gate C. That ruling was refuted by the traces
+# and has been removed -- see test_gate_c_not_found_is_pending_not_a_pass below.
 
 
 def test_gate_c_is_pending_when_the_task_has_no_baseline_trace():
@@ -509,3 +503,33 @@ def test_gate_a_does_not_pass_vacuously_when_the_oracle_has_no_repo_tags():
     ev = ss.score_gate_a({"repo-a"}, set(), has_oracle_files=True)
     assert ev.status is ss.GateStatus.FAIL
     assert "cannot be verified" in ev.reason
+
+
+def test_gate_c_not_found_is_pending_not_a_pass():
+    """The ruling this gate got WRONG at first. compute_ttfr's contract claims
+    not_found is "distinct from an observability gap", and an earlier version
+    scored it PASS ("baseline never localized => maximally hard"). The traces
+    falsify that: dep-traversal-005's baseline delegates to an `Agent` subagent
+    and the extractor sees Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP but NOT
+    Agent/Task/Skill/Workflow -- the reads are invisible. Its observable siblings
+    measure ttfr=2-4, i.e. trivial.
+
+    not_found therefore cannot separate "never localized" from "localized out of
+    view". Asserting difficulty from an unobserved trace is the silent-pass this
+    module exists to prevent."""
+    ev = ss.score_gate_c(measurement={"coverage": "not_found", "ttfr": None})
+    assert ev.status is ss.GateStatus.PENDING_MEASUREMENT
+    assert ev.status.passed is False
+    # and the contract must name the extraction gap, or it is not actionable
+    assert "Agent/Task/Skill" in ev.input_contract
+
+
+def test_is_candidate_is_not_vacuously_true_for_an_empty_gates_dict():
+    """The sibling of the absent-gate fix: is_final and admitted were hardened to
+    require gate PRESENCE, but is_candidate -- the property candidate_task_ids()
+    actually relies on -- was left checking only `not failed_gates`, which is
+    trivially true when there are no gates at all."""
+    assert ss.TaskGates("x", "s", {}).is_candidate is False
+    partial = ss.TaskGates("x", "s", {
+        g: ss.GateEvidence(g, ss.GateStatus.PASS, "ok") for g in ("A", "B", "D")})
+    assert partial.is_candidate is False

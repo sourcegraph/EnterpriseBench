@@ -8,18 +8,18 @@
     "F"
   ],
   "input_contracts": {
-    "C": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19.",
+    "C": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized.",
     "E": "gold / strong-agent run: per-task reward on the oracle solution. Threshold: reward >= 0.6 (the CSB stratum floor was 0.132).",
     "F": "verifier calibration run: score the null, golden and adversarial submissions per task. Threshold: null <= 0.1, golden >= 0.9, adversarial <= 0.5."
   },
-  "source_sha": "dc704b343beacc11444cbfb737f805f080283001",
+  "source_sha": "68632d4c1bb768491b27cedd24a94735b3ff69bb",
   "params": {
     "gate_b_mode": "strict",
     "module_granularity": "parent_dir"
   },
   "summary": {
     "scored": 116,
-    "candidates": 38,
+    "candidates": 35,
     "admitted": 0,
     "gate_counts": {
       "A": {
@@ -28,14 +28,14 @@
         "pending_measurement": 0
       },
       "B": {
-        "pass": 70,
-        "fail": 46,
+        "pass": 61,
+        "fail": 55,
         "pending_measurement": 0
       },
       "C": {
-        "pass": 37,
-        "fail": 46,
-        "pending_measurement": 33
+        "pass": 11,
+        "fail": 49,
+        "pending_measurement": 56
       },
       "D": {
         "pass": 92,
@@ -343,11 +343,11 @@
         "C": {
           "gate": "C",
           "status": "fail",
-          "reason": "trivial to localize: turns-to-first-relevant=6 (<=7)",
+          "reason": "trivial to localize: turns-to-first-relevant=3 (<=7)",
           "evidence": {
             "coverage": "ok",
             "run_key": "cal-err-flask-endpoint-004",
-            "ttfr": 6,
+            "ttfr": 3,
             "tier": null
           }
         },
@@ -391,6 +391,7 @@
         "F"
       ],
       "failed_gates": [
+        "C",
         "D"
       ],
       "gates": {
@@ -422,12 +423,12 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "hard to localize: turns-to-first-relevant=8 (above the trivial cut, untiered band 8-11)",
+          "status": "fail",
+          "reason": "trivial to localize: turns-to-first-relevant=4 (<=7)",
           "evidence": {
             "coverage": "ok",
             "run_key": "cal-sup-click-sentinel-005",
-            "ttfr": 8,
+            "ttfr": 4,
             "tier": null
           }
         },
@@ -753,7 +754,7 @@
             "coverage": "no_trace",
             "run_key": "chain-err-flask-import-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -918,7 +919,7 @@
             "coverage": "no_trace",
             "run_key": "error-trace-k8s-nftables-sync-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -991,11 +992,11 @@
         "C": {
           "gate": "C",
           "status": "pass",
-          "reason": "hard to localize: turns-to-first-relevant=9 (above the trivial cut, untiered band 8-11)",
+          "reason": "hard to localize: turns-to-first-relevant=8 (above the trivial cut, untiered band 8-11)",
           "evidence": {
             "coverage": "ok",
             "run_key": "error-trace-k8s-poststarthook-001",
-            "ttfr": 9,
+            "ttfr": 8,
             "tier": null
           }
         },
@@ -1082,7 +1083,7 @@
             "coverage": "no_trace",
             "run_key": "err-provenance-dual-celery-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -1163,7 +1164,7 @@
             "coverage": "no_trace",
             "run_key": "err-provenance-dual-docker-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -1246,7 +1247,7 @@
             "coverage": "no_trace",
             "run_key": "err-provenance-dual-grafana-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -1327,7 +1328,7 @@
             "coverage": "no_trace",
             "run_key": "err-provenance-dual-requests-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -1408,7 +1409,7 @@
             "coverage": "no_trace",
             "run_key": "err-provenance-dual-terraform-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -1443,14 +1444,16 @@
     {
       "task_id": "err-provenance-tri-httpx-proxy-001",
       "suite": "customer_escalation",
-      "is_candidate": true,
+      "is_candidate": false,
       "admitted": false,
       "is_final": false,
       "pending_gates": [
         "E",
         "F"
       ],
-      "failed_gates": [],
+      "failed_gates": [
+        "C"
+      ],
       "gates": {
         "A": {
           "gate": "A",
@@ -1484,12 +1487,12 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "hard to localize: turns-to-first-relevant=9 (above the trivial cut, untiered band 8-11)",
+          "status": "fail",
+          "reason": "trivial to localize: turns-to-first-relevant=3 (<=7)",
           "evidence": {
             "coverage": "ok",
             "run_key": "err-provenance-tri-httpx-proxy-001",
-            "ttfr": 9,
+            "ttfr": 3,
             "tier": null
           }
         },
@@ -1531,6 +1534,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -1568,14 +1572,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "err-provenance-tri-httpx-socks-001",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -1649,12 +1654,12 @@
         "C": {
           "gate": "C",
           "status": "pass",
-          "reason": "hard to localize: turns-to-first-relevant=15 (tier-2)",
+          "reason": "hard to localize: turns-to-first-relevant=8 (above the trivial cut, untiered band 8-11)",
           "evidence": {
             "coverage": "ok",
             "run_key": "support-map-envoy-connpool-001",
-            "ttfr": 15,
-            "tier": 2
+            "ttfr": 8,
+            "tier": null
           }
         },
         "D": {
@@ -1738,11 +1743,11 @@
         "C": {
           "gate": "C",
           "status": "fail",
-          "reason": "trivial to localize: turns-to-first-relevant=7 (<=7)",
+          "reason": "trivial to localize: turns-to-first-relevant=6 (<=7)",
           "evidence": {
             "coverage": "ok",
             "run_key": "support-map-llvm-assertion-002",
-            "ttfr": 7,
+            "ttfr": 6,
             "tier": null
           }
         },
@@ -1918,7 +1923,7 @@
             "coverage": "no_trace",
             "run_key": "support-map-grafana-alerts-004"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -1999,7 +2004,7 @@
             "coverage": "no_trace",
             "run_key": "support-mapping-dual-ansible-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -2080,7 +2085,7 @@
             "coverage": "no_trace",
             "run_key": "support-mapping-dual-flask-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -2161,7 +2166,7 @@
             "coverage": "no_trace",
             "run_key": "support-mapping-dual-grafana-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -2242,7 +2247,7 @@
             "coverage": "no_trace",
             "run_key": "support-mapping-dual-httpx-httpcore-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -2281,6 +2286,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -2319,14 +2325,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "api-contract-grpc-metadata-001",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -2450,6 +2457,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -2487,14 +2495,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "api-contract-grpc-transport-003",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -2718,6 +2727,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -2756,14 +2766,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "api-contract-envoy-xds-v2-006",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -2810,6 +2821,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -2845,14 +2857,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "api-contract-gocp-module-007",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -2898,6 +2911,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -2933,14 +2947,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "api-contract-celgo-program-008",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -3025,7 +3040,7 @@
             "coverage": "no_trace",
             "run_key": "api-contract-dual-fastapi-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -3234,6 +3249,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -3269,14 +3285,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "ccx-dep-trace-106",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -3322,6 +3339,7 @@
         "F"
       ],
       "failed_gates": [
+        "B",
         "C"
       ],
       "gates": {
@@ -3344,14 +3362,14 @@
         },
         "B": {
           "gate": "B",
-          "status": "pass",
-          "reason": "no locational leak",
+          "status": "fail",
+          "reason": "exact_path leak on 'package.json', no matching qa.waivers entry",
           "evidence": {
-            "bucket": "grep_hard",
-            "token": "",
+            "bucket": "exact_path",
+            "token": "package.json",
             "waived": false,
-            "strict_pass": true,
-            "ref_impl_pass": true,
+            "strict_pass": false,
+            "ref_impl_pass": false,
             "mode": "strict"
           }
         },
@@ -3408,6 +3426,7 @@
         "F"
       ],
       "failed_gates": [
+        "B",
         "C"
       ],
       "gates": {
@@ -3430,14 +3449,14 @@
         },
         "B": {
           "gate": "B",
-          "status": "pass",
-          "reason": "no locational leak",
+          "status": "fail",
+          "reason": "exact_path leak on 'package.json', no matching qa.waivers entry",
           "evidence": {
-            "bucket": "grep_hard",
-            "token": "",
+            "bucket": "exact_path",
+            "token": "package.json",
             "waived": false,
-            "strict_pass": true,
-            "ref_impl_pass": true,
+            "strict_pass": false,
+            "ref_impl_pass": false,
             "mode": "strict"
           }
         },
@@ -3494,6 +3513,7 @@
         "F"
       ],
       "failed_gates": [
+        "B",
         "C"
       ],
       "gates": {
@@ -3514,14 +3534,14 @@
         },
         "B": {
           "gate": "B",
-          "status": "pass",
-          "reason": "no locational leak",
+          "status": "fail",
+          "reason": "exact_path leak on 'go.mod', no matching qa.waivers entry",
           "evidence": {
-            "bucket": "grep_hard",
-            "token": "",
+            "bucket": "exact_path",
+            "token": "go.mod",
             "waived": false,
-            "strict_pass": true,
-            "ref_impl_pass": true,
+            "strict_pass": false,
+            "ref_impl_pass": false,
             "mode": "strict"
           }
         },
@@ -3577,6 +3597,7 @@
         "F"
       ],
       "failed_gates": [
+        "B",
         "C"
       ],
       "gates": {
@@ -3599,14 +3620,14 @@
         },
         "B": {
           "gate": "B",
-          "status": "pass",
-          "reason": "no locational leak",
+          "status": "fail",
+          "reason": "exact_path leak on 'go.mod', no matching qa.waivers entry",
           "evidence": {
-            "bucket": "grep_hard",
-            "token": "",
+            "bucket": "exact_path",
+            "token": "go.mod",
             "waived": false,
-            "strict_pass": true,
-            "ref_impl_pass": true,
+            "strict_pass": false,
+            "ref_impl_pass": false,
             "mode": "strict"
           }
         },
@@ -3655,14 +3676,17 @@
     {
       "task_id": "dep-traversal-005",
       "suite": "dependency_management",
-      "is_candidate": true,
+      "is_candidate": false,
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
-      "failed_gates": [],
+      "failed_gates": [
+        "B"
+      ],
       "gates": {
         "A": {
           "gate": "A",
@@ -3683,27 +3707,28 @@
         },
         "B": {
           "gate": "B",
-          "status": "pass",
-          "reason": "no locational leak",
+          "status": "fail",
+          "reason": "exact_path leak on 'go.mod', no matching qa.waivers entry",
           "evidence": {
-            "bucket": "grep_hard",
-            "token": "",
+            "bucket": "exact_path",
+            "token": "go.mod",
             "waived": false,
-            "strict_pass": true,
-            "ref_impl_pass": true,
+            "strict_pass": false,
+            "ref_impl_pass": false,
             "mode": "strict"
           }
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "dep-traversal-005",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -3747,6 +3772,7 @@
         "F"
       ],
       "failed_gates": [
+        "B",
         "C"
       ],
       "gates": {
@@ -3769,14 +3795,14 @@
         },
         "B": {
           "gate": "B",
-          "status": "pass",
-          "reason": "no locational leak",
+          "status": "fail",
+          "reason": "exact_path leak on 'go.mod', no matching qa.waivers entry",
           "evidence": {
-            "bucket": "grep_hard",
-            "token": "",
+            "bucket": "exact_path",
+            "token": "go.mod",
             "waived": false,
-            "strict_pass": true,
-            "ref_impl_pass": true,
+            "strict_pass": false,
+            "ref_impl_pass": false,
             "mode": "strict"
           }
         },
@@ -3916,6 +3942,7 @@
         "F"
       ],
       "failed_gates": [
+        "B",
         "C"
       ],
       "gates": {
@@ -3938,14 +3965,14 @@
         },
         "B": {
           "gate": "B",
-          "status": "pass",
-          "reason": "no locational leak",
+          "status": "fail",
+          "reason": "exact_path leak on 'setup.cfg', no matching qa.waivers entry",
           "evidence": {
-            "bucket": "grep_hard",
-            "token": "",
+            "bucket": "exact_path",
+            "token": "setup.cfg",
             "waived": false,
-            "strict_pass": true,
-            "ref_impl_pass": true,
+            "strict_pass": false,
+            "ref_impl_pass": false,
             "mode": "strict"
           }
         },
@@ -3998,6 +4025,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -4035,14 +4063,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "dep-traversal-009",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -4078,14 +4107,17 @@
     {
       "task_id": "dep-traversal-010",
       "suite": "dependency_management",
-      "is_candidate": true,
+      "is_candidate": false,
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
-      "failed_gates": [],
+      "failed_gates": [
+        "B"
+      ],
       "gates": {
         "A": {
           "gate": "A",
@@ -4106,27 +4138,28 @@
         },
         "B": {
           "gate": "B",
-          "status": "pass",
-          "reason": "no locational leak",
+          "status": "fail",
+          "reason": "exact_path leak on 'pom.xml', no matching qa.waivers entry",
           "evidence": {
-            "bucket": "grep_hard",
-            "token": "",
+            "bucket": "exact_path",
+            "token": "pom.xml",
             "waived": false,
-            "strict_pass": true,
-            "ref_impl_pass": true,
+            "strict_pass": false,
+            "ref_impl_pass": false,
             "mode": "strict"
           }
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "dep-traversal-010",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -4252,6 +4285,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -4289,14 +4323,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "dep-traversal-012",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -4336,6 +4371,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -4375,14 +4411,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "dep-traversal-tri-boto3-001",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -4509,6 +4546,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -4548,14 +4586,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "dep-traversal-tri-openssl-001",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -4858,6 +4897,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -4891,14 +4931,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "monorepo-boundary-babel-metadata-003",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -5332,11 +5373,11 @@
         "C": {
           "gate": "C",
           "status": "fail",
-          "reason": "trivial to localize: turns-to-first-relevant=7 (<=7)",
+          "reason": "trivial to localize: turns-to-first-relevant=3 (<=7)",
           "evidence": {
             "coverage": "ok",
             "run_key": "monorepo-boundary-nextjs-og-008",
-            "ttfr": 7,
+            "ttfr": 3,
             "tier": null
           }
         },
@@ -5473,6 +5514,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -5508,14 +5550,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "monorepo-boundary-rustc-statics-010",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -5752,7 +5795,8 @@
         "F"
       ],
       "failed_gates": [
-        "B"
+        "B",
+        "C"
       ],
       "gates": {
         "A": {
@@ -5783,13 +5827,13 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "fail",
+          "reason": "trivial to localize: turns-to-first-relevant=5 (<=7)",
           "evidence": {
-            "coverage": "not_found",
+            "coverage": "ok",
             "run_key": "schema-evolution-003",
-            "ttfr": null,
-            "tier": "unlocalized"
+            "ttfr": 5,
+            "tier": null
           }
         },
         "D": {
@@ -5974,7 +6018,7 @@
             "coverage": "no_trace",
             "run_key": "schema-evolution-dual-django-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -6057,7 +6101,7 @@
             "coverage": "no_trace",
             "run_key": "schema-evolution-dual-sentry-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -6217,11 +6261,11 @@
         "C": {
           "gate": "C",
           "status": "fail",
-          "reason": "trivial to localize: turns-to-first-relevant=4 (<=7)",
+          "reason": "trivial to localize: turns-to-first-relevant=2 (<=7)",
           "evidence": {
             "coverage": "ok",
             "run_key": "ansible-galaxy-tar-regression-prove-001",
-            "ttfr": 4,
+            "ttfr": 2,
             "tier": null
           }
         },
@@ -6396,7 +6440,7 @@
             "coverage": "no_trace",
             "run_key": "event-replay-click-ci-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -6740,7 +6784,7 @@
             "coverage": "no_trace",
             "run_key": "incident-inv-docker-shutdown-004"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -6823,7 +6867,7 @@
             "coverage": "no_trace",
             "run_key": "incident-investigation-dual-flux-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -6904,7 +6948,7 @@
             "coverage": "no_trace",
             "run_key": "incident-investigation-dual-istio-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -6985,7 +7029,7 @@
             "coverage": "no_trace",
             "run_key": "incident-investigation-dual-kafka-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -7066,7 +7110,7 @@
             "coverage": "no_trace",
             "run_key": "incident-investigation-dual-prometheus-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -7145,12 +7189,12 @@
         "C": {
           "gate": "C",
           "status": "pass",
-          "reason": "hard to localize: turns-to-first-relevant=31 (tier-1)",
+          "reason": "hard to localize: turns-to-first-relevant=17 (tier-2)",
           "evidence": {
             "coverage": "ok",
             "run_key": "incident-investigation-quad-containerd-001",
-            "ttfr": 31,
-            "tier": 1
+            "ttfr": 17,
+            "tier": 2
           }
         },
         "D": {
@@ -7747,7 +7791,7 @@
             "coverage": "no_trace",
             "run_key": "config-drift-argocd-redis-ha-004"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -7828,7 +7872,7 @@
             "coverage": "no_trace",
             "run_key": "config-drift-dual-argocd-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -7909,7 +7953,7 @@
             "coverage": "no_trace",
             "run_key": "config-drift-dual-prometheus-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -7992,7 +8036,7 @@
             "coverage": "no_trace",
             "run_key": "config-drift-dual-terraform-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -8031,6 +8075,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -8068,14 +8113,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "config-drift-tri-kustomize-001",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -8318,7 +8364,7 @@
           "gate": "C",
           "status": "pending_measurement",
           "reason": "task oracle could not be loaded (no instruction+ground_truth oracle could be loaded)",
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "E": {
           "gate": "E",
@@ -8370,7 +8416,7 @@
           "gate": "C",
           "status": "pending_measurement",
           "reason": "task oracle could not be loaded (no instruction+ground_truth oracle could be loaded)",
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "E": {
           "gate": "E",
@@ -8422,7 +8468,7 @@
           "gate": "C",
           "status": "pending_measurement",
           "reason": "task oracle could not be loaded (no instruction+ground_truth oracle could be loaded)",
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "E": {
           "gate": "E",
@@ -8474,7 +8520,7 @@
           "gate": "C",
           "status": "pending_measurement",
           "reason": "task oracle could not be loaded (no instruction+ground_truth oracle could be loaded)",
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "E": {
           "gate": "E",
@@ -8526,7 +8572,7 @@
           "gate": "C",
           "status": "pending_measurement",
           "reason": "task oracle could not be loaded (no instruction+ground_truth oracle could be loaded)",
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "E": {
           "gate": "E",
@@ -8593,7 +8639,7 @@
             "coverage": "no_trace",
             "run_key": "dead-code-dual-angular-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -8676,7 +8722,7 @@
             "coverage": "no_trace",
             "run_key": "dead-code-dual-k8s-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -8757,7 +8803,7 @@
             "coverage": "no_trace",
             "run_key": "dead-code-dual-react-001"
           },
-          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -8796,6 +8842,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -8831,14 +8878,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "refactor-orch-001",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -8998,12 +9046,12 @@
         "C": {
           "gate": "C",
           "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "reason": "hard to localize: turns-to-first-relevant=9 (above the trivial cut, untiered band 8-11)",
           "evidence": {
-            "coverage": "not_found",
+            "coverage": "ok",
             "run_key": "refactor-orch-003",
-            "ttfr": null,
-            "tier": "unlocalized"
+            "ttfr": 9,
+            "tier": null
           }
         },
         "D": {
@@ -9044,6 +9092,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -9081,14 +9130,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "refactor-orch-004",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -9214,10 +9264,12 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
       "failed_gates": [
+        "B",
         "D"
       ],
       "gates": {
@@ -9236,27 +9288,28 @@
         },
         "B": {
           "gate": "B",
-          "status": "pass",
-          "reason": "no locational leak",
+          "status": "fail",
+          "reason": "exact_path leak on 'go.mod', no matching qa.waivers entry",
           "evidence": {
-            "bucket": "grep_hard",
-            "token": "",
+            "bucket": "exact_path",
+            "token": "go.mod",
             "waived": false,
-            "strict_pass": true,
-            "ref_impl_pass": true,
+            "strict_pass": false,
+            "ref_impl_pass": false,
             "mode": "strict"
           }
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "refactor-orch-006",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -9299,6 +9352,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -9337,14 +9391,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "refactor-orch-007",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -9479,6 +9534,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -9516,14 +9572,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "refactor-orchestration-tri-babel-001",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -9563,6 +9620,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -9602,14 +9660,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "refactor-orchestration-tri-spring-001",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -9649,6 +9708,7 @@
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
@@ -9686,14 +9746,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "pass",
-          "reason": "baseline never opened an oracle file across the whole trace: maximally hard to localize",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
             "coverage": "not_found",
             "run_key": "refactor-orchestration-tri-tokio-001",
             "ttfr": null,
-            "tier": "unlocalized"
-          }
+            "tier": null
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",

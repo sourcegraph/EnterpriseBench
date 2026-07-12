@@ -186,15 +186,29 @@ def classify(instruction: str,
         return re.search(r"(?<![\w/.\-])" + re.escape(word.lower()) + r"(?![\w])",
                          ins) is not None
 
+    # The generic-manifest skip is only sound when the manifest is an ENTRY POINT
+    # to something else. Its rationale -- "naming go.mod does not tell you WHICH
+    # file holds the answer" -- collapses when the manifest IS the answer, as in
+    # the dep-traversal tasks whose entire oracle is ["go.mod", "go.sum"]. There,
+    # naming the manifest names the oracle exactly, and suppressing it would
+    # promote a grep-trivial task into grep_hard (the *preferred* bucket).
+    #
+    # So suppress generic basenames only if at least one oracle file is NOT a
+    # generic manifest -- i.e. only when there is genuinely something downstream
+    # left to discover.
+    oracle_has_non_generic = any(
+        _path_parts(f)[0] not in GENERIC_MANIFEST_BASENAMES for f in oracle_files
+    )
+
     # 1) exact path or basename, or >=2 consecutive path segments verbatim
     for f in oracle_files:
         basename, _dirs, segs = _path_parts(f)
         # A bare generic manifest basename does not localize -- skip it here,
         # but keep checking the multi-segment fragments below, which restore
         # specificity (`envoy/go.mod` still leaks).
-        if (basename
-                and basename not in GENERIC_MANIFEST_BASENAMES
-                and names(basename)):
+        is_generic = (basename in GENERIC_MANIFEST_BASENAMES
+                      and oracle_has_non_generic)
+        if basename and not is_generic and names(basename):
             return Leak(Bucket.EXACT_PATH, basename, admit=False, source_path=f)
         for i in range(len(segs) - 1):
             frag = "/".join(segs[i:i + 2]).lower()

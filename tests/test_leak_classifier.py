@@ -367,10 +367,17 @@ def test_corpus_run_produces_bucket_distribution(capsys):
 
 @pytest.mark.parametrize("basename", ["go.mod", "package.json", "pom.xml", "values.yaml"])
 def test_generic_manifest_basename_is_not_an_exact_path_leak(basename):
-    """A bare generic manifest basename must not localize (no exact_path)."""
+    """A generic manifest basename must not localize (no exact_path).
+
+    The oracle carries a real source file alongside the manifest, which is the
+    ONLY situation where the filter's rationale holds: the manifest is an entry
+    point and the scored discovery lies downstream of it. When the manifest is
+    the whole oracle, naming it names the answer -- see
+    test_generic_filter_does_not_apply_when_the_manifest_IS_the_oracle.
+    """
     leak = lc.classify(
         instruction=f"The build fails after a dependency bump. Inspect the {basename}.",
-        oracle_files=[f"svc/deps/{basename}"],
+        oracle_files=[f"svc/deps/{basename}", "svc/internal/resolver/graph.go"],
         oracle_symbols=[],
     )
     assert leak.bucket is not lc.Bucket.EXACT_PATH
@@ -397,3 +404,43 @@ def test_non_generic_basename_still_leaks():
     )
     assert leak.bucket is lc.Bucket.EXACT_PATH
     assert leak.admit is False
+
+
+def test_generic_filter_does_not_apply_when_the_manifest_IS_the_oracle():
+    """The filter's rationale -- "naming go.mod does not say WHICH file holds the
+    answer" -- requires the manifest to be an ENTRY POINT to something else. The
+    dep-traversal tasks' entire oracle is ["go.mod", "go.sum"]: there the manifest
+    IS the answer, so naming it localizes perfectly.
+
+    Suppressing it there would promote a grep-trivial task into grep_hard -- the
+    *preferred*, hardest bucket -- and pass Gate B. The filter must narrow, never
+    launder."""
+    leak = lc.classify(
+        instruction="A CVE landed in a transitive dep. Check go.mod for the pin.",
+        oracle_files=["go.mod", "go.sum"],   # the manifest IS the oracle
+        oracle_symbols=[],
+    )
+    assert leak.bucket is lc.Bucket.EXACT_PATH
+    assert leak.admit is False
+
+    # ...but with a real source file alongside it, the manifest is once again a
+    # mere entry point, and the filter applies.
+    leak = lc.classify(
+        instruction="A CVE landed in a transitive dep. Check go.mod for the pin.",
+        oracle_files=["go.mod", "internal/auth/verify.go"],
+        oracle_symbols=[],
+    )
+    assert leak.bucket is not lc.Bucket.EXACT_PATH
+    assert leak.admit is True
+
+
+def test_dep_traversal_manifest_only_tasks_reject_on_the_real_corpus():
+    """The three tasks the filter regressed, pinned against the real corpus."""
+    for tid in ("dep-traversal-004", "dep-traversal-005", "dep-traversal-006"):
+        hits = list(BENCHMARKS.glob(f"*/{tid}"))
+        if not hits:
+            continue
+        r = lc.decide_task_dir(hits[0])
+        assert r is not None
+        assert r.bucket is lc.Bucket.EXACT_PATH, f"{tid} should leak: oracle is only manifests"
+        assert r.admit is False, f"{tid} must not be admitted"

@@ -51,14 +51,17 @@ So the guard is structural, not advisory:
 
 THE RESULT (measured, at the time of writing)
 
-38 candidates out of 116 tasks -- BELOW the >=50 the bead's acceptance criterion
+35 candidates out of 116 tasks -- BELOW the >=50 the bead's acceptance criterion
 asks for. This is not an artifact of the two ambiguous knobs below: the pool is
-37-40 across all four of their combinations, because Gate C dominates. Of the 58
-tasks with a measured turns-to-first-relevant the median is 4 and 46 (79%) are
-trivial (<=7); exactly one task reaches tier-1 (>=20). The corpus cannot reach 50
-by selection -- see EnterpriseBench-jn73.2.7 (author new tasks, or relax a named
-criterion on the record; do NOT tune the gates until the count clears, which
-would invert an admission rule into a quota).
+34-37 across all four of their combinations, because Gate C dominates. Of the 60
+tasks with an OBSERVED turns-to-first-relevant the median is 3.5 and 49 are
+trivial (<=7); NOT ONE reaches tier-1 (>=20) -- the band the bead cites as where
+sgx went 9/9 is empty in this corpus. A further 23 tasks are not_found (the
+baseline delegated to a subagent the extractor cannot see into) and are pending,
+not credited as hard. The corpus cannot reach 50 by selection: see
+EnterpriseBench-jn73.2.7 (author new tasks, or relax a named criterion on the
+record; do NOT tune the gates until the count clears, which would invert an
+admission rule into a quota).
 
 The two knobs are explicit params, recorded in the artifact's provenance, and
 `--sensitivity` prints the pool under every reading:
@@ -132,7 +135,12 @@ INPUT_CONTRACTS: dict[str, str] = {
     "C": (
         "baseline calibration run: per-task agent trace -> compute_ttfr(trace, "
         "required_files) (jn73.1). Needs turns-to-first-relevant per task. "
-        "Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19."
+        "Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. "
+        "ALSO REQUIRED for the not_found cases: teach the path extractor to see "
+        "inside Agent/Task/Skill/Workflow delegations (it currently recognizes "
+        "only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline "
+        "that delegates its investigation is indistinguishable from one that "
+        "never localized."
     ),
     "E": (
         "gold / strong-agent run: per-task reward on the oracle solution. "
@@ -225,8 +233,12 @@ class TaskGates:
         corpus, and the 46 tasks among those that are trivially localizable
         (ttfr <= 7) must drop out NOW rather than linger in the pool until the
         remaining traces happen to exist.
+
+        Requires gate PRESENCE too: an empty or partial gates dict has no failed
+        gates, so without this it would report is_candidate=True -- the same
+        vacuous-truth defect fixed for is_final/admitted.
         """
-        return not self.failed_gates
+        return not self.failed_gates and not self.missing_gates
 
     @property
     def admitted(self) -> bool:
@@ -620,11 +632,26 @@ def score_gate_c(measurement: dict[str, Any] | None) -> GateEvidence:
     whole bug this module exists to prevent:
 
       coverage="ok"         -> scored. ttfr <= 7 is trivial and FAILS.
-      coverage="not_found"  -> the baseline made tool calls and never opened an
-                               oracle file. That is not a gap, it is the
-                               strongest possible evidence of hard-to-localize,
-                               so it PASSES as tier "unlocalized".
+      coverage="not_found"  -> the baseline made tool calls but the extractor
+                               never saw it open an oracle file. PENDING -- see
+                               below; this is NOT evidence of difficulty.
       coverage="no_trace"   -> genuinely unmeasured. PENDING.
+
+    On ``not_found``. ``compute_ttfr``'s contract claims it is "a genuine miss ...
+    distinct from an observability gap", and an earlier version of this gate took
+    that at face value and scored it PASS ("the baseline never localized, so the
+    task is maximally hard"). That was WRONG, and the traces falsify it: the
+    baseline for dep-traversal-005 delegates its investigation to an ``Agent``
+    subagent and only ``Write``s the result, and the extractor recognizes
+    Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP -- not Agent/Task/Skill/Workflow.
+    The subagent's reads are simply invisible. Corroborating: the tasks in that
+    same family whose traces ARE observable measure ttfr=2-4, i.e. trivial.
+
+    So ``not_found`` cannot distinguish "never localized" (hard) from "localized
+    somewhere we cannot see" (possibly trivial). Asserting difficulty from an
+    unobserved trace is exactly the silent-pass this module exists to prevent, so
+    it is PENDING: the task stays a candidate, but the stratum never claims it is
+    hard on evidence it does not have.
     """
     if not measurement:
         return _pending("C", "no baseline trace for this task")
@@ -634,11 +661,13 @@ def score_gate_c(measurement: dict[str, Any] | None) -> GateEvidence:
     base = {"coverage": coverage, "run_key": measurement.get("run_key")}
 
     if coverage == "not_found":
-        return GateEvidence(
-            "C", GateStatus.PASS,
-            "baseline never opened an oracle file across the whole trace: "
-            "maximally hard to localize",
-            {**base, "ttfr": None, "tier": "unlocalized"},
+        return _pending(
+            "C",
+            "baseline trace shows no oracle-file read, but the extractor cannot "
+            "see inside Agent/Task/Skill delegations -- 'never localized' and "
+            "'localized out of view' are indistinguishable here, so difficulty "
+            "is NOT asserted",
+            {**base, "ttfr": None, "tier": None},
         )
     if coverage != "ok" or measurement.get("ttfr") is None:
         return _pending(
