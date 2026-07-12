@@ -118,6 +118,23 @@ GENERIC_MANIFEST_BASENAMES = frozenset({
 })
 
 
+# Public aliases. `stratum_selector` (Gate A/D) needs the same path-normalisation
+# and ground-truth-loading logic; a sibling module should not have to reach into
+# underscore names to get it. The unified loader (rule of three: qa_adapter,
+# leak_classifier, retrieval_extraction) is tracked as EnterpriseBench-jn73.2.8 --
+# until then these aliases mark the shared surface explicitly.
+
+
+def strip_repo_slug(path: str) -> str:
+    """Public alias of :func:`_strip_repo_slug`."""
+    return _strip_repo_slug(path)
+
+
+def load_ground_truth(task_dir: "Path", task_toml: dict[str, Any]) -> dict[str, Any]:
+    """Public alias of :func:`_load_ground_truth`."""
+    return _load_ground_truth(task_dir, task_toml)
+
+
 @dataclass(frozen=True)
 class Leak:
     bucket: Bucket

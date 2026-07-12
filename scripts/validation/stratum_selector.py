@@ -2,48 +2,79 @@
 """Enterprise win-regime stratum selector -- the Gate A-F harness (jn73.2).
 
 Scores every task in the corpus against the enterprise-admission rule and emits
-a versioned, per-task gate-evidence artifact (benchmarks/strata/enterprise_v1.json).
+a versioned, per-task gate-evidence artifact:
 
-The gates split cleanly into two kinds, and conflating them is the failure this
-module exists to prevent:
+    benchmarks/strata/enterprise_v1_candidates.json
 
-  COMPUTABLE NOW (static, from task.toml + the repo tree)
-    A  PARITY            baseline has local access to all oracle code
+named "candidates", not "stratum", because it is not final and must not be read
+as though it were.
+
+THE GATES
+
+  STATIC (from task.toml + the repo tree)
+    A  PARITY            baseline clones every repo the oracle files live in
     B  NON-LEAKY         leak_classifier bucket (see leak_classifier.py)
-    D  ENTERPRISE CHAR.  CRNT-positive (multi-repo) OR single-repo dispersion
+    D  ENTERPRISE CHAR.  CRNT-positive, or a dispersed single-repo oracle, and
+                         never a calibration task
 
-  MEASUREMENTS (require a run whose output does not exist on disk)
-    C  HARD-TO-LOCALIZE  baseline turns-to-first-relevant  -> needs a baseline
-                         calibration run
-    E  SOLVABLE          gold/strong-agent reward >= 0.6   -> needs a gold run
-    F  VERIFIER-CALIB.   null<=0.1 / golden>=0.9 / adv<=0.5 -> needs a verifier
-                         calibration run
+  MEASURED (from a run; each may be scored, failed, or genuinely unmeasured)
+    C  HARD-TO-LOCALIZE  baseline turns-to-first-relevant, via compute_ttfr over
+                         the locked run set's baseline traces. PARTIAL: scored
+                         for the tasks that have a trace, PENDING for the rest.
+    E  SOLVABLE          gold/strong-agent reward >= 0.6. No gold artifact exists
+                         anywhere on disk, so this is PENDING for every task.
+    F  VERIFIER-CALIB.   null<=0.1 / golden>=0.9 / adv<=0.5. PENDING for every
+                         task. (The null and adversarial legs are cheap offline
+                         computations -- only the golden leg needs Gate E's
+                         artifact. See EnterpriseBench-jn73.2.3.)
 
-A measurement gate with no measurement emits PENDING_MEASUREMENT, never PASS.
-It carries an `input_contract` naming the run that would resolve it, so that
-"pending" is never mistaken for "we forgot".
+THE INVARIANT THIS MODULE EXISTS TO ENFORCE
 
-Guarding that distinction is structural, not advisory. `StratumArtifact` will
-not hand out an admitted set while any gate is unmeasured -- `admitted_task_ids`
-raises `StratumNotFinalError`. A caller that wants today's pool must ask for
-`candidate_task_ids`, which is the honest word for it. A boolean flag can be
-ignored; a raised exception cannot.
+An unmeasured gate is not a passing gate. Gate C's history is the cautionary
+tale: this bead's original plan asserted no baseline run existed and would have
+emitted C as uniformly pending -- shipping the stratum with NO difficulty filter
+while looking principled. In fact 109 baseline traces were sitting on disk, and
+once scored they reject 46 tasks as trivially localizable. A gate that quietly
+defaults to "fine" is worse than no gate.
 
-CAUTION -- the pool size is definition-dependent (46-59 tasks). Two knobs in
-`SelectorParams` move it, both recorded in the artifact's provenance:
+So the guard is structural, not advisory:
 
-  gate_b_mode        "strict"   bucket in {behavioral, grep_hard}   (the bead's
-                                literal wording)            -> 70 tasks
+  * GateStatus is a tri-state enum whose __bool__ is False for PENDING (an enum
+    member is otherwise truthy, so `if gate.status:` would silently pass).
+  * There is no per-gate `pass` boolean to misread -- only the enum.
+  * A gate that is ABSENT counts as unmeasured, not as satisfied.
+  * Every pending gate carries an `input_contract` naming the run that resolves
+    it, so "pending" is never confused with "we forgot".
+  * `admitted_task_ids()` RAISES StratumNotFinalError while any gate is
+    unmeasured. `candidate_task_ids()` is the explicit non-final accessor.
+    A flag can be ignored; a raised exception cannot.
+
+THE RESULT (measured, at the time of writing)
+
+38 candidates out of 116 tasks -- BELOW the >=50 the bead's acceptance criterion
+asks for. This is not an artifact of the two ambiguous knobs below: the pool is
+37-40 across all four of their combinations, because Gate C dominates. Of the 58
+tasks with a measured turns-to-first-relevant the median is 4 and 46 (79%) are
+trivial (<=7); exactly one task reaches tier-1 (>=20). The corpus cannot reach 50
+by selection -- see EnterpriseBench-jn73.2.7 (author new tasks, or relax a named
+criterion on the record; do NOT tune the gates until the count clears, which
+would invert an admission rule into a quota).
+
+The two knobs are explicit params, recorded in the artifact's provenance, and
+`--sensitivity` prints the pool under every reading:
+
+  gate_b_mode        "strict"   bucket in {behavioral, grep_hard} -- the bead's
+                                literal wording
                      "ref_impl" also admits exact_path leaks whose token is a
-                                recorded qa.waivers entry point (what the
-                                reference implementation, jn73.3, does) -> 78
+                                recorded qa.waivers entry point -- what the
+                                reference implementation (jn73.3) does
 
-  module_granularity "parent_dir"  a module is a file's parent directory  -> 96
-                     "top_segment" a module is the top-level path segment -> 78
+  module_granularity "parent_dir"  a module is a file's parent directory
+                     "top_segment" a module is the top-level path segment
 
 Usage:
     python3 scripts/validation/stratum_selector.py --corpus benchmarks \
-        --out benchmarks/strata/enterprise_v1.json
+        --out benchmarks/strata/enterprise_v1_candidates.json
     python3 scripts/validation/stratum_selector.py --corpus benchmarks --sensitivity
 """
 
@@ -59,8 +90,20 @@ from pathlib import Path
 from typing import Any
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(_REPO_ROOT))
-sys.path.insert(0, str(_REPO_ROOT / "lib"))
+
+# Path setup ONLY when this file is run directly as a script (`python3
+# scripts/validation/stratum_selector.py`), where neither the repo root nor lib/
+# is importable yet. When imported as `scripts.validation.stratum_selector` --
+# which is how the tests get it -- __package__ is set and we touch nothing.
+#
+# Doing this unconditionally at module level made importing this module mutate
+# sys.path for the whole process, so tests/eb_metrics/ passed or failed depending
+# on whether something had imported stratum_selector earlier in the pytest
+# session. Test outcomes must not depend on collection order. Tests get their
+# paths from tests/conftest.py instead.
+if __package__ in (None, ""):  # pragma: no cover - script-mode only
+    sys.path.insert(0, str(_REPO_ROOT))
+    sys.path.insert(0, str(_REPO_ROOT / "lib"))
 
 from eb_metrics.retrieval_extraction import compute_ttfr  # noqa: E402
 from scripts.validation import crnt_validator  # noqa: E402
@@ -177,10 +220,11 @@ class TaskGates:
         """No gate that could be scored has FAILED.
 
         A pending gate keeps a task in the pool (we simply do not know yet); a
-        failed gate takes it out, even a partially-scored one. That asymmetry
-        is the point: Gate C is measurable for only ~36 of 111 tasks, and the
-        17 among them that are trivially localizable (ttfr <= 7) must drop out
-        of the pool now rather than survive until the remaining traces exist.
+        failed gate takes it out, even from a partially-scored gate. That
+        asymmetry is the point: Gate C has a baseline trace for only some of the
+        corpus, and the 46 tasks among those that are trivially localizable
+        (ttfr <= 7) must drop out NOW rather than linger in the pool until the
+        remaining traces happen to exist.
         """
         return not self.failed_gates
 
@@ -358,7 +402,8 @@ class StratumArtifact:
 # ---------------------------------------------------------------------------
 
 
-def score_gate_a(declared_repos: set[str], oracle_repos: set[str]) -> GateEvidence:
+def score_gate_a(declared_repos: set[str], oracle_repos: set[str],
+                 has_oracle_files: bool = True) -> GateEvidence:
     """PARITY: the baseline arm must be able to see every oracle file locally.
 
     The baseline Dockerfile clones exactly the task's declared `[[repos]]`
@@ -371,6 +416,17 @@ def score_gate_a(declared_repos: set[str], oracle_repos: set[str]) -> GateEviden
             "A", GateStatus.FAIL,
             "task declares no repos: baseline arm would get an empty workspace",
             {"declared_repos": [], "oracle_repos": sorted(oracle_repos)},
+        )
+    if has_oracle_files and not oracle_repos:
+        # `missing = {} - declared` is empty, so this would otherwise PASS
+        # vacuously -- a parity gate that verified nothing. The schema requires
+        # a `repo` on every required_files entry; a task without one cannot be
+        # checked, and an uncheckable gate must not report success.
+        return GateEvidence(
+            "A", GateStatus.FAIL,
+            "oracle files carry no `repo` tag, so parity cannot be verified "
+            "(schemas/task.schema.json requires `repo` on every required_files entry)",
+            {"declared_repos": sorted(declared_repos), "oracle_repos": []},
         )
     missing = oracle_repos - declared_repos
     if missing:
@@ -401,10 +457,10 @@ def waiver_has_downstream_target(waived_token: str, oracle_files: list[str]) -> 
 
     That is a deterministic check, so it should be checked rather than trusted.
     """
-    norm = lc._strip_repo_slug(waived_token).lower()
+    norm = lc.strip_repo_slug(waived_token).lower()
     others = [f for f in oracle_files
-              if lc._strip_repo_slug(f).lower() != norm
-              and not lc._strip_repo_slug(f).lower().endswith("/" + norm)]
+              if lc.strip_repo_slug(f).lower() != norm
+              and not lc.strip_repo_slug(f).lower().endswith("/" + norm)]
     return bool(others)
 
 
@@ -447,7 +503,7 @@ def score_gate_b(result: lc.GateBResult | None,
 def _modules(paths: list[str], granularity: str) -> set[str]:
     out: set[str] = set()
     for p in paths:
-        segs = [s for s in lc._strip_repo_slug(p).split("/") if s]
+        segs = [s for s in lc.strip_repo_slug(p).split("/") if s]
         if granularity == "top_segment":
             out.add(segs[0] if len(segs) > 1 else ".")
         else:  # parent_dir
@@ -598,8 +654,9 @@ def score_gate_c(measurement: dict[str, Any] | None) -> GateEvidence:
             f"(<={GATE_C_TRIVIAL_MAX})",
             {**base, "ttfr": ttfr, "tier": None},
         )
+    tier: int | None
     if ttfr >= GATE_C_TIER1_MIN:
-        tier: Any = 1
+        tier = 1
     elif ttfr >= GATE_C_TIER2_MIN:
         tier = 2
     else:
@@ -653,16 +710,31 @@ def score_gate_f(measurement: dict[str, Any] | None) -> GateEvidence:
 
 
 def _declared_repos(task_toml: dict[str, Any]) -> set[str]:
+    """The repo identities the baseline actually clones.
+
+    Keyed on ``[[repos]].path`` -- the directory the sandbox clones INTO
+    (dockerfile_generator clones to /workspace/{path}) and the same key
+    crnt_validator uses and that ground_truth's ``repo`` tag refers to.
+
+    An earlier version keyed on ``name`` (which no task defines) and fell back to
+    the URL basename, which silently diverges whenever a task deliberately picks
+    a disambiguating path: docker/cli is cloned to `docker-cli`, aws/aws-cli to
+    `awscli`. Gate A then computed `missing = {docker-cli} - {cli}` and FAILED 6
+    tasks whose repos were, in fact, cloned. Falsely shrinking the pool in the
+    very gate under audit -- and biased toward the multi-repo tasks that need
+    disambiguating paths in the first place.
+    """
     out: set[str] = set()
     for r in (task_toml.get("repos") or []):
-        name = r.get("name") or r.get("url", "").rstrip("/").split("/")[-1]
-        if name:
-            out.add(name)
+        key = r.get("path") or r.get("name") \
+            or r.get("url", "").rstrip("/").split("/")[-1]
+        if key:
+            out.add(key)
     return out
 
 
 def _oracle_repos(task_dir: Path, task_toml: dict[str, Any]) -> set[str]:
-    gt = lc._load_ground_truth(task_dir, task_toml)
+    gt = lc.load_ground_truth(task_dir, task_toml)
     out: set[str] = set()
     for key in ("required_files", "sufficient_files"):
         for entry in (gt.get(key) or []):
@@ -739,7 +811,8 @@ def score_task(task_dir: Path,
     stratum = task_toml.get("difficulty_stratum", "")
 
     gates = {
-        "A": score_gate_a(declared, _oracle_repos(task_dir, task_toml)),
+        "A": score_gate_a(declared, _oracle_repos(task_dir, task_toml),
+                          has_oracle_files=bool(oracle.oracle_files)),
         "B": score_gate_b(lc.decide_task_dir(task_dir), params.gate_b_mode,
                           oracle.oracle_files),
         "C": score_gate_c(m.get("C")),

@@ -488,3 +488,24 @@ def test_an_absent_gate_is_unmeasured_not_final():
     assert art.to_dict()["stratum_status"] == "CANDIDATE"
     with pytest.raises(ss.StratumNotFinalError):
         art.admitted_task_ids()
+
+
+def test_gate_a_keys_declared_repos_on_path_not_url_basename():
+    """The bug that falsely rejected 6 tasks. [[repos]] defines `path` (the
+    directory the sandbox clones INTO, and what ground_truth's `repo` tag refers
+    to), NOT `name`. Keying on the URL basename made docker/cli -> "cli" while
+    the oracle said "docker-cli", so Gate A reported a repo missing that was in
+    fact cloned."""
+    toml = {"repos": [{"path": "docker-cli", "url": "https://github.com/docker/cli"},
+                      {"path": "moby", "url": "https://github.com/moby/moby"}]}
+    assert ss._declared_repos(toml) == {"docker-cli", "moby"}
+    ev = ss.score_gate_a(ss._declared_repos(toml), {"docker-cli", "moby"})
+    assert ev.status is ss.GateStatus.PASS
+
+
+def test_gate_a_does_not_pass_vacuously_when_the_oracle_has_no_repo_tags():
+    """`missing = {} - declared` is empty, so an oracle with no `repo` tags would
+    otherwise PASS a parity gate that verified nothing. Uncheckable != fine."""
+    ev = ss.score_gate_a({"repo-a"}, set(), has_oracle_files=True)
+    assert ev.status is ss.GateStatus.FAIL
+    assert "cannot be verified" in ev.reason
