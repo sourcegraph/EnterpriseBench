@@ -95,7 +95,18 @@ class TestBaselineMode:
 class TestMcpOnlyMode:
     def test_includes_mcp_only_header(self) -> None:
         result = build_system_prompt(mode="mcp_only")
-        assert "Local source files are not present" in result
+        assert "you do not have permission to read them" in result
+
+    def test_does_not_claim_the_workspace_is_empty(self) -> None:
+        """The repos ARE cloned into /workspace in every arm; mode_gate denies
+        READ on them rather than omitting them (the verifier scores against the
+        same files). Telling the agent they are absent describes a container
+        that does not exist and was half of bug EnterpriseBench-7rc1 — the agent
+        gets `Permission denied`, not `No such file or directory`.
+        """
+        result = build_system_prompt(mode="mcp_only")
+        assert "not present" not in result
+        assert "does not contain source code" not in result
 
     def test_does_not_include_hybrid_header(self) -> None:
         result = build_system_prompt(mode="mcp_only")

@@ -47,8 +47,8 @@ Available tools for searching the remote repository:
 | `deepsearch` | AI-powered deep analysis (async: returns a polling link) |
 | `deepsearch_read` | Read Deep Search results (call 60+ seconds after deepsearch) |
 
-Note: Sourcegraph indexes the remote repository. Local source files \
-may or may not be present depending on the access mode.
+Note: Sourcegraph indexes the remote repository. Local source files are present \
+in /workspace, but whether you may READ them depends on the access mode.
 """
 
 
@@ -57,8 +57,11 @@ may or may not be present depending on the access mode.
 # ---------------------------------------------------------------------------
 
 _MCP_ONLY_HEADER = (
-    "**IMPORTANT: Local source files are not present in /workspace. "
-    "You MUST use Sourcegraph MCP tools for all code access.**"
+    "**IMPORTANT: The repositories exist in /workspace but you do not have "
+    "permission to read them — every local read will fail with Permission "
+    "denied. Do not try to work around this; it is enforced by the filesystem, "
+    "not by instruction. You MUST use Sourcegraph MCP tools for all code "
+    "access.**"
 )
 
 _HYBRID_HEADER = """\

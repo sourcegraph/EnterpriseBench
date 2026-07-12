@@ -1,6 +1,6 @@
 # IMPORTANT: Source Code Access
 
-**Local source files are not present.** Your workspace does not contain source code. You **MUST** use Sourcegraph MCP tools to discover, read, and understand code before making any changes.
+**Local source access depends on the tool-access mode.** In `mcp_only` the repositories are present in /workspace but you may not read them — every local read fails with `Permission denied`. In `hybrid` you may read them directly. Use Sourcegraph MCP tools for all code access that local reads deny.
 
 **Target Repository:** `github.com/sg-evals/camel--1006f047`
 - Use `repo:^github.com/sg-evals/camel--1006f047$` filter in keyword_search

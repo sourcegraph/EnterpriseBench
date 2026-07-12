@@ -32,8 +32,11 @@ from run_task import _build_instruction_text
 # ---------------------------------------------------------------------------
 
 MCP_ONLY_HEADER = (
-    "**IMPORTANT: Local source files are not present in /workspace. "
-    "You MUST use Sourcegraph MCP tools for all code access.**"
+    "**IMPORTANT: The repositories exist in /workspace but you do not have "
+    "permission to read them — every local read will fail with Permission "
+    "denied. Do not try to work around this; it is enforced by the filesystem, "
+    "not by instruction. You MUST use Sourcegraph MCP tools for all code "
+    "access.**"
 )
 
 HYBRID_HEADER = "# Sourcegraph MCP Tools Available"
