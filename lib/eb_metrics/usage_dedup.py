@@ -4,30 +4,20 @@ An ``agent_trace.jsonl`` emits one assistant line per *content block* (thinking 
 text / tool_use), and every line of one API request repeats that request's usage
 snapshot. Counting each line therefore bills a multi-block turn once per block.
 
-Within a request the snapshot is not constant: ``input_tokens`` and the cache
-counts are invariant, but ``output_tokens`` streams upward and is complete only
-on the request's final line. The request's *first* line therefore undercounts
-output (140 against a true 2589 on real EB traces). A request accordingly bills
-the per-field max over its lines — see :meth:`UsageDedup.offer` for why the max
-per field, and not whichever single line looked most complete.
-
 Both token consumers drive this one accumulator — cost accounting
 (``scripts/cost_tracker.py``, which needs the final per-field breakdown) and the
 retrieval axis (``eb_metrics.retrieval_extraction``, which needs each tool_use
-step's running cost for TTFR). Two dedups could drift on what a request cost;
-one cannot.
+step's running cost for TTFR). They used to carry a dedup each and disagreed
+about what a request cost: cost billed a request at its max-output snapshot, the
+axis at its first (EnterpriseBench-4p5k). The two decisions that must never
+drift between them — how lines group into requests (:func:`request_key`), and
+which snapshot a request bills (:meth:`UsageDedup.offer`) — now live here.
 
-A request's billed total is only known once its *last* line has been read, so
-nothing here is resolved mid-stream: both consumers read their totals after the
-walk. The axis resolves a step's tokens retrospectively via
-:meth:`UsageDedup.billed_prefix` — on real traces 30% of tool_use blocks sit on
-a non-final line of their request, so a step that froze the snapshot it saw
-would report a partial output for those.
-
-Trace-shape handling deliberately stays with each caller (the axis also reads
-flat entries whose ``usage`` sits at top level; cost reads only nested
-``message.usage``). What must never drift between them — how lines group into
-requests, and which snapshot a request bills — lives here.
+Extracting the *usage* off a line does not: the axis also reads flat entries
+whose ``usage`` sits at top level, while cost reads only nested
+``message.usage``, so each caller still passes in the usage it found. The
+consumers can therefore still disagree about which lines carry usage at all —
+only the grouping and selection are shared.
 """
 
 from __future__ import annotations
@@ -66,15 +56,14 @@ def _field_value(usage: Mapping[str, Any], field: str) -> int:
     return int(value)
 
 
-def usage_total(usage: Any) -> int | None:
-    """Sum the four usage-token fields on one message.
+def _has_usage(usage: Any) -> bool:
+    """Whether a line carries usage telemetry at all.
 
-    ``None`` (not ``0``) when ``usage`` carries none of them, so a trace with no
-    usage telemetry at all cannot masquerade as "zero tokens used".
+    Presence of a *field*, not a non-zero value: a request that measured zero
+    output tokens still carries usage, while a trace with no telemetry at all
+    must not masquerade as "zero tokens used".
     """
-    if not isinstance(usage, Mapping) or not any(f in usage for f in USAGE_FIELDS):
-        return None
-    return sum(_field_value(usage, f) for f in USAGE_FIELDS)
+    return isinstance(usage, Mapping) and any(f in usage for f in USAGE_FIELDS)
 
 
 class UsageDedup:
@@ -85,39 +74,47 @@ class UsageDedup:
     """
 
     def __init__(self) -> None:
-        # A line with no request key of its own is keyed by line number (an int,
-        # so it can never collide with a requestId) and billed exactly once —
-        # correct for legacy single-block traces, where each line is its own
-        # request. Insertion order is first-appearance order, which is what
-        # :meth:`billed_prefix` walks.
+        # Keyed by request; insertion order is first-appearance order, which is
+        # what :meth:`billed_prefix` walks.
         self._selected: dict[str | int, dict[str, int]] = {}
         self.any_usage = False
         self.ungrouped_lines = 0
 
-    def offer(self, entry: Mapping[str, Any], usage: Any, line_no: int) -> None:
+    def offer(self, entry: Mapping[str, Any], usage: Any) -> None:
         """Account one assistant line against its request.
 
-        A request bills the per-field *max* over its lines, rather than whichever
-        single line looked most complete. Both reduce to the same thing on a
-        well-formed request — input and cache counts are invariant across its
-        lines, and ``output_tokens`` only grows — but taking the max per field
-        needs no such assumption to hold: it cannot be walked backwards by a line
-        that reports a smaller value or omits a field outright (a later line
-        carrying only ``output_tokens`` would otherwise zero the input and cache
-        tokens already billed), and it does not care what order the lines arrive
-        in. A trailing all-zero ``isApiErrorMessage`` record is absorbed for
-        free, since zero never wins a max.
+        Within a request the usage snapshot is not constant: ``input_tokens`` and
+        the cache counts are invariant, but ``output_tokens`` streams upward and
+        is complete only on the request's final line — so its *first* line
+        undercounts output (140 against a true 2589 on real EB traces).
+
+        A request therefore bills the per-field *max* over its lines, rather than
+        whichever single line looked most complete. Both reduce to the same thing
+        on a well-formed request, but taking the max per field needs no such
+        assumption to hold: it cannot be walked backwards by a line that reports a
+        smaller value or omits a field outright (a later line carrying only
+        ``output_tokens`` would otherwise zero the input and cache tokens already
+        billed), and it does not care what order the lines arrive in. A trailing
+        all-zero ``isApiErrorMessage`` record is absorbed for free, since zero
+        never wins a max.
         """
-        if usage_total(usage) is None:
+        if not _has_usage(usage):
             return
         self.any_usage = True
 
-        found = request_key(entry)
-        if found is None:
+        key: str | int | None = request_key(entry)
+        if key is None:
+            # A line announcing no request of its own is its own request, billed
+            # exactly once — correct for legacy single-block traces. A negative
+            # int can never collide with a requestId, so counting them is enough
+            # to key them apart; the caller does not have to supply a line number.
             self.ungrouped_lines += 1
-        key: str | int = found if found is not None else line_no
+            key = -self.ungrouped_lines
 
-        billed = self._selected.setdefault(key, dict.fromkeys(USAGE_FIELDS, 0))
+        billed = self._selected.get(key)
+        if billed is None:
+            billed = dict.fromkeys(USAGE_FIELDS, 0)
+            self._selected[key] = billed
         for field in USAGE_FIELDS:
             billed[field] = max(billed[field], _field_value(usage, field))
 

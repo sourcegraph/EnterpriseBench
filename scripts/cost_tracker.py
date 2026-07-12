@@ -192,7 +192,7 @@ def parse_trace(trace_path: Path) -> Usage:
     model = ""
 
     with trace_path.open() as fh:
-        for line_no, line in enumerate(fh):
+        for line in fh:
             line = line.strip()
             if not line:
                 continue
@@ -214,7 +214,7 @@ def parse_trace(trace_path: Path) -> Usage:
             if msg_model and not model:
                 model = msg_model
 
-            usage.offer(entry, msg.get("usage"), line_no)
+            usage.offer(entry, msg.get("usage"))
 
     if usage.ungrouped_lines:
         logger.warning(

@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 from eb_metrics.retrieval_extraction import compute_ttfr
-from eb_metrics.usage_dedup import UsageDedup, request_key, usage_total
+from eb_metrics.usage_dedup import UsageDedup, request_key
 
 # Make scripts importable (cost_tracker is the other consumer).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -35,13 +35,13 @@ def _entry(request_id: str | None = None, msg_id: str | None = None, **usage) ->
 
 def _offer_all(entries: list[dict]) -> UsageDedup:
     dedup = UsageDedup()
-    for line_no, entry in enumerate(entries):
-        dedup.offer(entry, entry["message"].get("usage"), line_no)
+    for entry in entries:
+        dedup.offer(entry, entry["message"].get("usage"))
     return dedup
 
 
 # ---------------------------------------------------------------------------
-# request_key / usage_total
+# request_key
 # ---------------------------------------------------------------------------
 
 
@@ -54,30 +54,6 @@ def test_request_key_prefers_request_id_then_message_id() -> None:
 def test_request_key_ignores_empty_and_non_string_ids() -> None:
     assert request_key({"requestId": ""}) is None
     assert request_key({"requestId": 17}) is None
-
-
-def test_usage_total_sums_all_four_fields() -> None:
-    assert usage_total(
-        {
-            "input_tokens": 1,
-            "cache_creation_input_tokens": 2,
-            "cache_read_input_tokens": 4,
-            "output_tokens": 8,
-        }
-    ) == 15
-
-
-def test_usage_total_is_none_without_telemetry_not_zero() -> None:
-    # A trace with no usage block must not masquerade as "zero tokens used".
-    assert usage_total({}) is None
-    assert usage_total(None) is None
-    assert usage_total({"unrelated": 5}) is None
-    assert usage_total({"output_tokens": 0}) == 0  # a real, measured zero
-
-
-def test_usage_total_ignores_junk_values() -> None:
-    assert usage_total({"input_tokens": "many", "output_tokens": 3}) == 3
-    assert usage_total({"input_tokens": True, "output_tokens": 3}) == 3
 
 
 # ---------------------------------------------------------------------------
@@ -101,17 +77,16 @@ def test_request_billed_at_its_complete_output_not_its_first() -> None:
     assert dedup.total_tokens == 3589
 
 
-def test_running_total_upgrades_monotonically_within_a_request() -> None:
-    # The axis reads total_tokens as the trace streams, so the running total has
-    # to converge on the billed total rather than lag at the first snapshot.
-    dedup = UsageDedup()
-    seen = []
-    for line_no, out in enumerate((140, 900, 2589)):
-        entry = _entry(request_id="r", input_tokens=1000, output_tokens=out)
-        dedup.offer(entry, entry["message"]["usage"], line_no)
-        seen.append(dedup.total_tokens)
-    assert seen == [1140, 1900, 3589]
-    assert seen == sorted(seen)
+def test_junk_and_bool_field_values_are_billed_as_absent() -> None:
+    # JSON is untrusted: a non-numeric field must not crash the walk, and a bool
+    # must not sneak through as int(True) == 1.
+    dedup = _offer_all(
+        [_entry(request_id="r", input_tokens="many", cache_read_input_tokens=True,
+                output_tokens=3)]
+    )
+    assert dedup.field_total("input_tokens") == 0
+    assert dedup.field_total("cache_read_input_tokens") == 0
+    assert dedup.total_tokens == 3
 
 
 def test_trailing_zero_error_record_does_not_erase_a_request() -> None:
@@ -161,7 +136,9 @@ def test_keyless_lines_are_each_their_own_request() -> None:
 
 
 def test_lines_without_usage_leave_any_usage_false() -> None:
-    dedup = _offer_all([_entry(request_id="r")])
+    # A usage block carrying none of the four fields is no telemetry at all — it
+    # must not masquerade as "zero tokens used".
+    dedup = _offer_all([_entry(request_id="r"), _entry(request_id="s", unrelated=5)])
     assert dedup.any_usage is False
     assert dedup.total_tokens == 0
     assert dedup.num_requests == 0

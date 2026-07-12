@@ -371,7 +371,7 @@ def _walk_trace(trace_path: Path) -> _TraceWalk:
         if step is not None:
             step.paths.extend(paths)
 
-    for line_no, line in enumerate(trace_path.read_text(errors="replace").splitlines()):
+    for line in trace_path.read_text(errors="replace").splitlines():
         line = line.strip()
         if not line:
             continue
@@ -393,7 +393,6 @@ def _walk_trace(trace_path: Path) -> _TraceWalk:
             usage.offer(
                 entry,
                 message.get("usage") if isinstance(message, Mapping) else None,
-                line_no,
             )
 
             for block in _content_blocks(message):

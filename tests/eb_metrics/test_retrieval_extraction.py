@@ -485,11 +485,10 @@ def test_compute_ttfr_bills_a_request_at_its_complete_output_not_its_first(
     assert result.coverage == "ok"
     assert result.turns_to_first_relevant == 1  # one tool_use block = one turn
 
-    # The request is billed once, at its complete snapshot: 1000 + 2589.
+    # The request is billed once, at its complete snapshot (1000 + 2589) — and
+    # so specifically NOT at its first (1000 + 140 = 1140), which is what the
+    # pre-fix first-wins dedup reported.
     assert result.tokens_to_first_relevant == 3589
-    # ...and specifically NOT at its first snapshot (1000 + 140), which is what
-    # the pre-fix first-wins dedup reported.
-    assert result.tokens_to_first_relevant != 1140
 
 
 def test_compute_ttfr_ok_counts_turns_tokens_and_seconds(tmp_path: Path) -> None:
