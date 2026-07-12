@@ -482,7 +482,7 @@ def test_calibration_exclusion_actually_fires_on_the_real_corpus():
     calibration exclusion becomes dead code that looks like it works."""
     params = sm.SelectorParams()
     scored = sg.score_task(BENCHMARKS / "customer_escalation" / "calibration-001",
-                           params, runs_root=None)
+                           params)
     assert scored is not None
     d = scored.gates["D"]
     assert d.evidence["difficulty_stratum"] == "calibration"
@@ -516,14 +516,62 @@ def test_ttfr_is_keyed_by_task_id_not_directory_name(tmp_path):
     not raise -- it just reports `no_trace` and silently halves Gate C's coverage.
 
     So the fixture is keyed by the ID and left EMPTY at the directory name: if the
-    selector ever keys by directory again, it finds nothing and `run_key` moves."""
+    selector ever keys by directory again, it finds nothing and `run_key` moves.
+
+    Measured through `measure_corpus_ttfr` -- the production path, and the one
+    place the run key is derived. score_task takes the measurement as an argument
+    and no longer resolves traces itself, so testing it any other way would be
+    testing a path production does not use."""
     runs = _fake_runs_root(tmp_path, "cal-err-flask-blueprint-001",
                            [_read_tool_call("app/__init__.py")])
+    measurements = sg.measure_corpus_ttfr(BENCHMARKS, runs)
     scored = sg.score_task(BENCHMARKS / "customer_escalation" / "calibration-001",
-                           sm.SelectorParams(), runs_root=runs)
+                           sm.SelectorParams(), measurements)
     assert scored is not None
     assert scored.gates["C"].evidence.get("run_key") == "cal-err-flask-blueprint-001"
     assert scored.gates["C"].evidence.get("coverage") != "no_trace"
+
+
+def test_tasks_sharing_a_directory_basename_do_not_share_a_gate_c_trace(tmp_path):
+    """The corpus holds THREE tasks called `calibration-001` -- one each in
+    customer_escalation, platform_engineering and technical_debt -- and three
+    called `calibration-002`. The directory basename is therefore NOT a task
+    identity: 116 tasks carry only 112 distinct basenames.
+
+    Keyed by basename, the measurements dict silently drops the collisions and the
+    last task walked donates its trace to its namesake: the other is scored on a
+    ttfr, a run_key and a trace_sha256 that are not its own. That is the exact
+    defect `task_run_key`'s path-segment check was written to prevent, arriving
+    through the other door -- not a malicious id, just a non-unique one.
+
+    (technical_debt's two calibration tasks carry no oracle, so `load_task`
+    returns None for them and they never reach the measurements dict at all. The
+    live collision is customer_escalation vs platform_engineering.)
+
+    So: give ONE of the pair a trace. Its namesake must NOT inherit it."""
+    runs = _fake_runs_root(tmp_path, "cal-err-flask-blueprint-001",
+                           [_read_tool_call("app/__init__.py")])
+    measurements = sg.measure_corpus_ttfr(BENCHMARKS, runs)
+
+    # Each namesake holds its OWN entry. Keyed by basename they collapse onto
+    # "calibration-001" and one of them vanishes.
+    for run_key in ("cal-err-flask-blueprint-001",      # customer_escalation
+                    "cal-drift-flask-config-001"):      # platform_engineering
+        assert run_key in measurements
+
+    params = sm.SelectorParams()
+    owner = sg.score_task(BENCHMARKS / "customer_escalation" / "calibration-001",
+                          params, measurements)
+    namesake = sg.score_task(BENCHMARKS / "platform_engineering" / "calibration-001",
+                             params, measurements)
+
+    assert owner.gates["C"].evidence["run_key"] == "cal-err-flask-blueprint-001"
+    assert owner.gates["C"].evidence["coverage"] != "no_trace"
+
+    # Same basename, different task: keeps its own identity and has no trace.
+    assert namesake.gates["C"].evidence["run_key"] == "cal-drift-flask-config-001"
+    assert namesake.gates["C"].evidence["coverage"] == "no_trace"
+    assert namesake.gates["C"].status is sm.GateStatus.PENDING_MEASUREMENT
 
 
 # ---------------------------------------------------------------------------
@@ -685,7 +733,7 @@ def test_an_unsafe_task_id_fails_the_task_rather_than_escaping_the_run_set(tmp_p
         '[task]\nid = "../../../../etc"\n\n'
         '[[ground_truth.required_files]]\npath = "svc/a.go"\nrepo = "r"\n'
     )
-    scored = sg.score_task(task_dir, sm.SelectorParams(), runs_root=tmp_path)
+    scored = sg.score_task(task_dir, sm.SelectorParams())
     assert scored is not None
     assert scored.is_candidate is False
     assert scored.gates["A"].status is sm.GateStatus.FAIL
@@ -705,7 +753,7 @@ def test_a_malformed_ground_truth_json_fails_the_task_rather_than_shrinking_its_
     (task_dir / "task.toml").write_text('[task]\nid = "broken-gt-001"\n')
     (task_dir / "ground_truth.json").write_text('{"required_files": [ THIS IS NOT JSON')
 
-    scored = sg.score_task(task_dir, sm.SelectorParams(), runs_root=None)
+    scored = sg.score_task(task_dir, sm.SelectorParams())
     assert scored is not None
     assert scored.is_candidate is False
     assert scored.gates["B"].status is sm.GateStatus.FAIL

@@ -22,30 +22,6 @@ COMPUTABLE_GATES = ("A", "B", "D")
 MEASUREMENT_GATES = ("C", "E", "F")
 ALL_GATES = ("A", "B", "C", "D", "E", "F")
 
-#: What run would resolve each unmeasured gate. A pending gate without one of
-#: these is indistinguishable from an oversight.
-INPUT_CONTRACTS: dict[str, str] = {
-    "C": (
-        "baseline calibration run: per-task agent trace -> compute_ttfr(trace, "
-        "required_files) (jn73.1). Needs turns-to-first-relevant per task. "
-        "Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. "
-        "ALSO REQUIRED for the not_found cases: teach the path extractor to see "
-        "inside Agent/Task/Skill/Workflow delegations (it currently recognizes "
-        "only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline "
-        "that delegates its investigation is indistinguishable from one that "
-        "never localized."
-    ),
-    "E": (
-        "gold / strong-agent run: per-task reward on the oracle solution. "
-        "Threshold: reward >= 0.6 (the CSB stratum floor was 0.132)."
-    ),
-    "F": (
-        "verifier calibration run: score the null, golden and adversarial "
-        "submissions per task. Threshold: null <= 0.1, golden >= 0.9, "
-        "adversarial <= 0.5."
-    ),
-}
-
 GATE_C_TRIVIAL_MAX = 7
 GATE_C_TIER1_MIN = 20
 GATE_C_TIER2_MIN = 12
@@ -57,6 +33,47 @@ GATE_F_ADVERSARIAL_MAX = 0.5
 GATE_D_MIN_FILES = 3
 GATE_D_MIN_MODULES = 2
 
+#: Strata that carry no enterprise character whatever their dispersion, and so
+#: fail Gate D outright. Calibration tasks are small-repo BY CONSTRUCTION, and
+#: nothing else in gates A-F tests scale -- so this is the only thing keeping
+#: them out of a stratum labelled "enterprise-complex". It auto-fails ~14 tasks,
+#: which makes it a constant that moves the pool: it belongs in GATE_THRESHOLDS
+#: below, not buried as a string compare a reader of the artifact cannot see.
+EXCLUDED_DIFFICULTY_STRATA = ("calibration",)
+
+#: What run would resolve each unmeasured gate. A pending gate without one of
+#: these is indistinguishable from an oversight.
+#:
+#: The thresholds are INTERPOLATED from the constants above, never retyped: a
+#: contract that quotes "reward >= 0.6" as prose goes stale the moment the floor
+#: moves, and it is the pending gate -- the one nobody has measured yet -- whose
+#: description nobody would think to re-check.
+INPUT_CONTRACTS: dict[str, str] = {
+    "C": (
+        "baseline calibration run: per-task agent trace -> compute_ttfr(trace, "
+        "required_files) (jn73.1). Needs turns-to-first-relevant per task. "
+        f"Threshold: exclude <={GATE_C_TRIVIAL_MAX} (trivial); "
+        f"tier-1 >={GATE_C_TIER1_MIN}; "
+        f"tier-2 {GATE_C_TIER2_MIN}-{GATE_C_TIER1_MIN - 1}. "
+        "ALSO REQUIRED for the not_found cases: teach the path extractor to see "
+        "inside Agent/Task/Skill/Workflow delegations (it currently recognizes "
+        "only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline "
+        "that delegates its investigation is indistinguishable from one that "
+        "never localized."
+    ),
+    "E": (
+        "gold / strong-agent run: per-task reward on the oracle solution. "
+        f"Threshold: reward >= {GATE_E_REWARD_FLOOR} "
+        "(the CSB stratum floor was 0.132)."
+    ),
+    "F": (
+        "verifier calibration run: score the null, golden and adversarial "
+        f"submissions per task. Threshold: null <= {GATE_F_NULL_MAX}, "
+        f"golden >= {GATE_F_GOLDEN_MIN}, "
+        f"adversarial <= {GATE_F_ADVERSARIAL_MAX}."
+    ),
+}
+
 #: Every constant that can move the pool, recorded in the artifact. A reader who
 #: cannot see the thresholds cannot tell a 35 from a 46.
 GATE_THRESHOLDS: dict[str, Any] = {
@@ -65,6 +82,7 @@ GATE_THRESHOLDS: dict[str, Any] = {
     "gate_c_tier2_min": GATE_C_TIER2_MIN,
     "gate_d_min_files": GATE_D_MIN_FILES,
     "gate_d_min_modules": GATE_D_MIN_MODULES,
+    "gate_d_excluded_strata": list(EXCLUDED_DIFFICULTY_STRATA),
     "gate_e_reward_floor": GATE_E_REWARD_FLOOR,
     "gate_f_null_max": GATE_F_NULL_MAX,
     "gate_f_golden_min": GATE_F_GOLDEN_MIN,

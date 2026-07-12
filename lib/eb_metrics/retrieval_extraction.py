@@ -687,8 +687,16 @@ class TTFRResult:
     * ``"ok"``             — a relevant file was found; the three numeric
       fields are populated (``tokens_to_first_relevant`` may still be
       ``None`` if the trace carries no ``usage`` telemetry at all).
-    * ``"not_found"``       — a genuine miss: the agent made tool calls but
-      never opened a required file. Distinct from an observability gap.
+    * ``"not_found"``       — the agent made tool calls, but none that this
+      walker could see opened a required file. NOT the same as "the agent never
+      localized": the walker recognizes Read/Grep/Glob/Bash/WebFetch/WebSearch
+      and MCP tool calls, and does NOT descend into Agent/Task/Skill/Workflow
+      delegations — so a run that hands its investigation to a subagent reads as
+      ``not_found`` however well the subagent localized. Treat this as
+      "unobserved", not as evidence of difficulty. (Gate C in
+      scripts/validation/stratum_gates.py scores it PENDING for exactly this
+      reason; an earlier version trusted the older, stronger reading of this
+      contract and wrongly scored such tasks as maximally hard.)
     * ``"no_trace"``        — the trace file is missing/unreadable.
     * ``"no_ground_truth"`` — the task declares no required files.
     * ``"no_tool_calls"``   — the trace has zero tool-use steps to measure.

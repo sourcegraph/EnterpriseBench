@@ -318,16 +318,23 @@ def load_ground_truth(task_dir: Path, task_toml: dict[str, Any]) -> dict[str, An
 class TaskOracle:
     """Everything a gate needs from one task on disk, read exactly once.
 
-    ``ground_truth`` is the merged toml+json table ``oracle_files`` was
-    flattened from. It is carried rather than dropped so a caller that needs the
-    structured entries (Gate A wants each entry's ``repo``) does not have to
-    re-read the task off disk to get them back.
+    ``ground_truth`` is the merged toml+json table. It is carried rather than
+    dropped so a caller that needs the structured entries (Gate A wants each
+    entry's ``repo``) does not have to re-read the task off disk to get them back.
+
+    ``oracle_files`` is DERIVED from it rather than stored alongside it. Stored,
+    the two fields carry one fact and can be set out of sync with no error --
+    and an oracle-file list that disagrees with the ground truth it supposedly
+    came from would quietly change what Gates A, B and D each see.
     """
 
     instruction: str
-    oracle_files: list[str]
     task_toml: dict[str, Any] = field(default_factory=dict)
     ground_truth: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def oracle_files(self) -> list[str]:
+        return _flatten_gt_paths(self.ground_truth)
 
 
 class UnsafeTaskIdError(ValueError):
@@ -384,12 +391,12 @@ def load_task(task_dir: Path) -> TaskOracle | None:
     instruction = instr_path.read_text(errors="replace") if instr_path.is_file() else ""
 
     ground_truth = load_ground_truth(task_dir, task_toml)
-    oracle_files = _flatten_gt_paths(ground_truth)
+    oracle = TaskOracle(instruction=instruction, task_toml=task_toml,
+                        ground_truth=ground_truth)
 
-    if not instruction or not oracle_files:
+    if not instruction or not oracle.oracle_files:
         return None
-    return TaskOracle(instruction=instruction, oracle_files=oracle_files,
-                      task_toml=task_toml, ground_truth=ground_truth)
+    return oracle
 
 
 # --- Gate B decision --------------------------------------------------------

@@ -24,6 +24,7 @@ from scripts.validation import crnt_validator
 from scripts.validation import leak_classifier as lc
 from scripts.validation.stratum_model import (
     COMPUTABLE_GATES,
+    EXCLUDED_DIFFICULTY_STRATA,
     GATE_C_TIER1_MIN,
     GATE_C_TIER2_MIN,
     GATE_C_TRIVIAL_MAX,
@@ -142,7 +143,10 @@ def score_gate_d(declared_repos: set[str],
       is CRNT-negative. Declaring repos is not the same as needing them.
     * Nothing else in gates A-F tests SCALE, so this is the only place that can
       keep a calibration task (small-repo by construction) out of a stratum
-      labelled "enterprise-complex".
+      labelled "enterprise-complex". The excluded strata are named in
+      ``EXCLUDED_DIFFICULTY_STRATA`` and recorded in the artifact's
+      ``gate_thresholds`` -- an exclusion that auto-fails ~14 tasks is a constant
+      that moves the pool, and a reader of the artifact has to be able to see it.
     """
     ev: dict[str, Any] = {
         "n_repos": len(declared_repos),
@@ -153,11 +157,11 @@ def score_gate_d(declared_repos: set[str],
         "module_granularity": granularity,
     }
 
-    if difficulty_stratum == "calibration":
+    if difficulty_stratum in EXCLUDED_DIFFICULTY_STRATA:
         return GateEvidence(
             "D", GateStatus.FAIL,
-            "calibration task: small-repo by design, so it carries no enterprise "
-            "character regardless of dispersion",
+            f"{difficulty_stratum} task: small-repo by design, so it carries no "
+            f"enterprise character regardless of dispersion",
             ev,
         )
 
@@ -416,14 +420,19 @@ def _sha256_file(path: Path) -> str:
 
 def score_task(task_dir: Path,
                params: SelectorParams,
-               measurements: dict[str, dict[str, Any]] | None = None,
-               runs_root: Path | None = None) -> TaskGates | None:
+               measurements: dict[str, dict[str, Any]] | None = None) -> TaskGates | None:
     """Score one task against all six gates off a SINGLE read of it.
 
     ``lc.load_task`` is the one loader: it parses task.toml, instruction.md and
     the merged ground truth once, and every gate is fed from that parse. No gate
     re-opens the task behind its own loader -- that costs redundant I/O and, far
     worse, lets two gates disagree about what the same task says.
+
+    Gate C's measurement is handed IN via ``measurements``; there is deliberately
+    no ``runs_root`` here for this function to measure it lazily off. Two ways to
+    obtain the same measurement is two places for the policy to drift, and the
+    lazy one was never on the production path -- ``score_corpus`` has always fed
+    the pre-computed dict from ``measure_corpus_ttfr``.
     """
     if not (task_dir / "task.toml").is_file():
         return None
@@ -450,9 +459,10 @@ def score_task(task_dir: Path,
         # PENDING and leaves the task a candidate.
         return unloadable_task_gates(task_id, suite, str(exc))
 
-    m = dict((measurements or {}).get(task_id, {}))
-    if runs_root is not None and "C" not in m:
-        m["C"] = measure_ttfr(run_key, oracle.oracle_files, runs_root)
+    # Keyed by run_key, not task_id: the directory basename is not unique across
+    # suites (three tasks are called calibration-001), so a task_id lookup hands
+    # colliding tasks each other's Gate C trace. See measure_corpus_ttfr.
+    m = (measurements or {}).get(run_key, {})
 
     declared = _declared_repos(task_toml)
     # difficulty_stratum is a TOP-LEVEL key in task.toml, not nested.
@@ -488,6 +498,15 @@ def measure_corpus_ttfr(root: Path, runs_root: Path) -> dict[str, dict[str, Any]
 
     Gate C reads baseline traces, which depend on neither knob below, so a knob
     sweep must not re-read them once per combination.
+
+    Keyed by RUN KEY -- the task's ``[task].id`` -- and not by the task directory's
+    basename, which is not unique. Three tasks are called ``calibration-001``
+    (customer_escalation, platform_engineering, technical_debt) and three
+    ``calibration-002``; keyed by basename they collapse onto one entry, so the
+    last one walked silently donates its trace to the other two and they are
+    scored on a ttfr, a run_key and a trace_sha256 that are not their own. The id
+    is unique across all 116 tasks, and it is what the locked run set is keyed by
+    -- the same identity ``measure_ttfr`` resolves the trace with.
     """
     out: dict[str, dict[str, Any]] = {}
     for task_dir in find_task_dirs(root):
@@ -495,7 +514,7 @@ def measure_corpus_ttfr(root: Path, runs_root: Path) -> dict[str, dict[str, Any]
         if oracle is None:
             continue
         run_key = lc.task_run_key(oracle.task_toml, task_dir.name)
-        out[task_dir.name] = {
+        out[run_key] = {
             "C": measure_ttfr(run_key, oracle.oracle_files, runs_root)
         }
     return out
