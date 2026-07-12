@@ -431,6 +431,67 @@ def _usage(total_tokens: int) -> dict:
     return {"output_tokens": total_tokens}
 
 
+def _assistant_text(text: str, *, usage: dict, request_id: str) -> str:
+    """A non-tool_use content-block line of an API request (thinking / text).
+
+    The trace logs one line per content block, so a request that thinks, talks,
+    then calls a tool emits three lines carrying the *same* request's usage.
+    """
+    return json.dumps(
+        {
+            "type": "assistant",
+            "requestId": request_id,
+            "message": {
+                "content": [{"type": "text", "text": text}],
+                "usage": usage,
+            },
+        }
+    )
+
+
+def test_compute_ttfr_bills_a_request_at_its_complete_output_not_its_first(
+    tmp_path: Path,
+) -> None:
+    # Regression (EnterpriseBench-4p5k, review C4): the axis used to take the
+    # FIRST usage snapshot per requestId. Within one request the cache/input
+    # counts are invariant but ``output_tokens`` streams upward, so the first
+    # line reports a partial output (140) and only the last carries the whole
+    # request (2589). First-wins therefore *undercounted*.
+    #
+    # Every earlier dedup test in this file repeats an identical snapshot on
+    # each line of a group, which first-wins and max-output score the same — so
+    # none of them could catch this. This one is built so the two impls must
+    # disagree.
+    stream = [
+        {"input_tokens": 1000, "output_tokens": 140},
+        {"input_tokens": 1000, "output_tokens": 900},
+        {"input_tokens": 1000, "output_tokens": 2589},
+    ]
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _assistant_text("thinking...", usage=stream[0], request_id="req_stream"),
+            _assistant_text("I'll read the worker.", usage=stream[1], request_id="req_stream"),
+            # The tool_use block closing the same request — its line carries the
+            # request's final, complete usage snapshot.
+            _assistant_tool_use(
+                "t1", "Read", {"file_path": WORKER},
+                ts="2026-01-01T00:00:00.000Z", usage=stream[2], request_id="req_stream",
+            ),
+        ],
+    )
+
+    result = compute_ttfr(trace, ["pkg/kubelet/prober/worker.go"])
+    assert result.coverage == "ok"
+    assert result.turns_to_first_relevant == 1  # one tool_use block = one turn
+
+    # The request is billed once, at its complete snapshot: 1000 + 2589.
+    assert result.tokens_to_first_relevant == 3589
+    # ...and specifically NOT at its first snapshot (1000 + 140), which is what
+    # the pre-fix first-wins dedup reported.
+    assert result.tokens_to_first_relevant != 1140
+
+
 def test_compute_ttfr_ok_counts_turns_tokens_and_seconds(tmp_path: Path) -> None:
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",

@@ -24,12 +24,19 @@ import argparse
 import json
 import logging
 import math
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from lib.shared import load_task_index, strip_mode_suffix
+LIB_DIR = Path(__file__).resolve().parent.parent / "lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from eb_metrics.usage_dedup import UsageDedup  # noqa: E402
+
+from lib.shared import load_task_index, strip_mode_suffix  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -165,56 +172,24 @@ class TaskCost:
 # ---------------------------------------------------------------------------
 
 
-def _request_key(entry: dict[str, Any]) -> str | None:
-    """Return the key identifying the API request a trace line belongs to.
-
-    A trace emits one assistant line per content block (thinking / text /
-    tool_use), and every line of one API request repeats that request's usage
-    snapshot. Grouping by request is what keeps a multi-block turn from being
-    billed once per block.
-
-    ``requestId`` carries the grouping in every assistant line of the current
-    corpus; ``message.id`` is a verified 1:1 stand-in for a writer that omits
-    it. None means the line announces no request of its own.
-    """
-
-    rid = entry.get("requestId")
-    if isinstance(rid, str) and rid:
-        return rid
-
-    msg_id = (entry.get("message") or {}).get("id")
-    if isinstance(msg_id, str) and msg_id:
-        return msg_id
-
-    return None
-
-
 def parse_trace(trace_path: Path) -> Usage:
     """Read an agent_trace.jsonl and sum token usage once per API request.
 
     The tier-2 (fallback) token source, reached only when a run carries no vendor
     block; the module docstring says why it cannot be the primary one.
 
-    Usage is deduplicated per request (see :func:`_request_key`); summing every
-    assistant line instead billed one request once per content block.
-
-    Within a request, the max-``output_tokens`` record is the one that carries
-    the complete snapshot: input and cache counts are invariant across the
-    request's lines, while ``output_tokens`` streams upward and is final only on
-    the last one. Max rather than last also survives a trailing all-zero
-    ``isApiErrorMessage`` record, which last-wins would bill at zero.
+    Usage is deduplicated per request by :class:`~eb_metrics.usage_dedup.UsageDedup`
+    — the same accumulator the retrieval axis drives, so cost and the axis cannot
+    disagree about what a request cost. Summing every assistant line instead
+    billed one request once per content block; taking a request's first line
+    instead undercounts its output.
 
     Usage on non-assistant lines (sub-agent / Task tool results) is not counted
     — see EnterpriseBench-jepu.
     """
 
-    # request key -> that request's most complete usage snapshot. A line with no
-    # request key of its own is keyed by line number (an int, so it can never
-    # collide with a requestId) and therefore billed exactly once — correct for
-    # legacy single-block traces, where each line already is its own request.
-    selected: dict[str | int, dict[str, Any]] = {}
+    usage = UsageDedup()
     model = ""
-    ungrouped_lines = 0
 
     with trace_path.open() as fh:
         for line_no, line in enumerate(fh):
@@ -239,41 +214,25 @@ def parse_trace(trace_path: Path) -> Usage:
             if msg_model and not model:
                 model = msg_model
 
-            usage = msg.get("usage", {})
-            if not usage:
-                continue
+            usage.offer(entry, msg.get("usage"), line_no)
 
-            key = _request_key(entry)
-            if key is None:
-                key = line_no
-                ungrouped_lines += 1
-
-            previous = selected.get(key)
-            if previous is None or usage.get("output_tokens", 0) >= previous.get(
-                "output_tokens", 0
-            ):
-                selected[key] = usage
-
-    if ungrouped_lines:
+    if usage.ungrouped_lines:
         logger.warning(
             "%s: %d assistant line(s) carry neither requestId nor message.id, so "
             "each was billed as its own request. Correct for legacy single-block "
             "traces; if the current format dropped those keys, this undercounts "
             "grouping and cost is inflated again.",
             trace_path,
-            ungrouped_lines,
+            usage.ungrouped_lines,
         )
 
-    def total(field: str) -> int:
-        return sum(u.get(field, 0) for u in selected.values())
-
     return Usage(
-        input_tokens=total("input_tokens"),
-        output_tokens=total("output_tokens"),
-        cache_write_tokens=total("cache_creation_input_tokens"),
-        cache_read_tokens=total("cache_read_input_tokens"),
+        input_tokens=usage.field_total("input_tokens"),
+        output_tokens=usage.field_total("output_tokens"),
+        cache_write_tokens=usage.field_total("cache_creation_input_tokens"),
+        cache_read_tokens=usage.field_total("cache_read_input_tokens"),
         model=model or DEFAULT_MODEL,
-        num_requests=len(selected),
+        num_requests=usage.num_requests,
     )
 
 

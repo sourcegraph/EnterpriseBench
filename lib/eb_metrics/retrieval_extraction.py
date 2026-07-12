@@ -65,6 +65,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from eb_metrics.ir_metrics import IRScores, compute_ir_scores, normalize_path
+from eb_metrics.usage_dedup import UsageDedup
 
 __all__ = [
     "retrieved_files_from_trace",
@@ -302,10 +303,15 @@ class _Step:
     ``paths`` holds the step's tool_use *input* paths and is extended in place
     when the paired ``tool_result`` arrives, so a step owns everything it
     surfaced. (``frozen`` blocks rebinding the field, not mutating the list.)
+
+    ``requests_seen`` is how many distinct API requests had been seen when this
+    step fired, not a token count: a request's cost is only final once its last
+    line has been read, and 30% of real tool_use blocks sit on a non-final line
+    of their request. Pricing waits for :attr:`_TraceWalk.billed_prefix`.
     """
 
     ts: float | None
-    tokens: int
+    requests_seen: int
     paths: list[str]
 
 
@@ -324,6 +330,9 @@ class _TraceWalk:
     ordered_paths: list[str]
     t0: float | None
     any_usage_seen: bool
+    # billed_prefix[n] = tokens billed by the first n distinct requests, so
+    # step.requests_seen indexes straight into it. See eb_metrics.usage_dedup.
+    billed_prefix: list[int]
 
 
 def _walk_trace(trace_path: Path) -> _TraceWalk:
@@ -338,12 +347,11 @@ def _walk_trace(trace_path: Path) -> _TraceWalk:
     ordered: list[str] = []
     tool_id_to_name: dict[str, str] = {}
     tid_to_step: dict[str, _Step] = {}
-    # One API call can log several assistant lines (thinking/text/tool_use)
-    # sharing a usage snapshot, so each requestId's tokens count once.
-    seen_request_ids: set[str] = set()
+    # One API call logs several assistant lines (thinking/text/tool_use) sharing
+    # a usage snapshot, so each request's tokens count once — at the snapshot
+    # that carries the whole request. See eb_metrics.usage_dedup.
+    usage = UsageDedup()
     t0: float | None = None
-    tokens_cumulative = 0
-    any_usage_seen = False
 
     def candidates(paths: list[str]) -> list[str]:
         """Gate junk (flags, grep patterns) out of both consumers at once."""
@@ -351,7 +359,7 @@ def _walk_trace(trace_path: Path) -> _TraceWalk:
                 if (norm := normalize_path(p)) and _looks_like_file(norm)]
 
     def open_step(ts: float | None, tid: str, paths: list[str]) -> None:
-        step = _Step(ts=ts, tokens=tokens_cumulative, paths=list(paths))
+        step = _Step(ts=ts, requests_seen=usage.num_requests, paths=list(paths))
         steps.append(step)
         ordered.extend(paths)
         if tid:
@@ -363,7 +371,7 @@ def _walk_trace(trace_path: Path) -> _TraceWalk:
         if step is not None:
             step.paths.extend(paths)
 
-    for line in trace_path.read_text(errors="replace").splitlines():
+    for line_no, line in enumerate(trace_path.read_text(errors="replace").splitlines()):
         line = line.strip()
         if not line:
             continue
@@ -382,16 +390,11 @@ def _walk_trace(trace_path: Path) -> _TraceWalk:
 
         if msg_type == "assistant":
             message = entry.get("message", entry)
-            usage = _usage_tokens(
-                message.get("usage") if isinstance(message, Mapping) else None
+            usage.offer(
+                entry,
+                message.get("usage") if isinstance(message, Mapping) else None,
+                line_no,
             )
-            if usage is not None:
-                request_key = _usage_request_key(entry)
-                if request_key is None or request_key not in seen_request_ids:
-                    any_usage_seen = True
-                    tokens_cumulative += usage
-                    if request_key is not None:
-                        seen_request_ids.add(request_key)
 
             for block in _content_blocks(message):
                 if block.get("type") != "tool_use":
@@ -436,7 +439,8 @@ def _walk_trace(trace_path: Path) -> _TraceWalk:
                 _extract_paths_from_tool_result(name, _result_text(raw))))
 
     return _TraceWalk(steps=steps, ordered_paths=ordered, t0=t0,
-                      any_usage_seen=any_usage_seen)
+                      any_usage_seen=usage.any_usage,
+                      billed_prefix=usage.billed_prefix())
 
 
 def _dedup_first_seen(paths: list[str]) -> list[str]:
@@ -632,50 +636,6 @@ def _parse_timestamp(value: Any) -> float | None:
         return None
 
 
-def _usage_tokens(usage: Any) -> int | None:
-    """Sum the four Anthropic usage-token fields on one assistant message.
-
-    ``None`` (not ``0``) when ``usage`` carries none of the four fields, so
-    a trace with no usage telemetry at all doesn't silently masquerade as
-    "zero tokens used."
-    """
-    if not isinstance(usage, Mapping):
-        return None
-    fields = (
-        "input_tokens",
-        "cache_creation_input_tokens",
-        "cache_read_input_tokens",
-        "output_tokens",
-    )
-    if not any(f in usage for f in fields):
-        return None
-    total = 0
-    for f in fields:
-        v = usage.get(f, 0)
-        if isinstance(v, (int, float)) and not isinstance(v, bool):
-            total += v
-    return total
-
-
-def _usage_request_key(entry: Mapping[str, Any]) -> str | None:
-    """The per-API-call grouping key for token dedup, when the trace has one.
-
-    EB's Claude-Code ``agent_trace.jsonl`` logs one top-level JSONL line per
-    *content block* (``thinking``, ``text``, ``tool_use`` — and a single
-    turn can even emit several ``tool_use`` blocks back to back before the
-    next user turn), not one line per API call. Every line belonging to the
-    same API call carries the identical (non-incremental) ``usage``
-    snapshot and the same ``requestId``. Summing ``usage`` once per *line*
-    therefore overcounts tokens by however many content-block lines (and
-    tool_use blocks) share that call — 2-3x was observed on real EB traces.
-    Returns ``None`` when the entry carries no ``requestId`` (e.g. a
-    synthetic test trace, or a transcript format that doesn't emit one), in
-    which case the caller falls back to counting every line once.
-    """
-    rid = entry.get("requestId")
-    return rid if isinstance(rid, str) and rid else None
-
-
 @dataclass(frozen=True)
 class TTFRResult:
     """Turns-/tokens-/wall-time-to-first-relevant for one run's trace.
@@ -715,7 +675,8 @@ def _ttfr_from_walk(walk: _TraceWalk, required_files: list[str]) -> TTFRResult:
                for p in step.paths):
             seconds = (round(step.ts - walk.t0, 3)
                        if step.ts is not None and walk.t0 is not None else None)
-            tokens = step.tokens if walk.any_usage_seen else None
+            tokens = (walk.billed_prefix[step.requests_seen]
+                      if walk.any_usage_seen else None)
             return TTFRResult(turn, tokens, seconds, "ok")
 
     return TTFRResult(None, None, None, "not_found")
