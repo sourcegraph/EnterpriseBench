@@ -229,6 +229,171 @@ def test_bash_read_files_survives_shell_metacharacters(
     assert _bash_files(tmp_path, command) == expected
 
 
+# ---------------------------------------------------------------------------
+# Multi-line Bash — a newline separates sub-commands just like `;` does.
+# Before EnterpriseBench-2hum a multi-line command collapsed into ONE
+# sub-command named after the first word of the FIRST line, so every read on
+# every later line was silently dropped — understating the Bash-mediated
+# (baseline/hybrid) arms only.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        # The three shapes from the bead. argv[0] of line 1 is `#`, `cd`, `echo`
+        # — none a read command — so each of these previously yielded nothing.
+        pytest.param(
+            '# Look at the lockfile\nsed -n "1970,1990p" /workspace/jest/yarn.lock',
+            ["/workspace/jest/yarn.lock"],
+            id="comment-led-block",
+        ),
+        pytest.param(
+            "cd /workspace/spring-boot\ncat build.gradle",
+            ["build.gradle"],
+            id="cd-then-read",
+        ),
+        pytest.param(
+            'echo "=== deps ==="\ngrep -n require src/handler.go',
+            ["src/handler.go"],
+            id="echo-then-read",
+        ),
+        # Reads inside a loop body land on their own lines and now count.
+        pytest.param(
+            "for d in one two; do\n  cat config/base.yaml\ndone",
+            ["config/base.yaml"],
+            id="for-loop-body",
+        ),
+        # An apostrophe in a comment ("Let's") must not open a quote — if it did,
+        # the newline would look quoted, the lines would glue back together, and
+        # this bug would silently return. This is why comment-stripping and
+        # newline-splitting have to be one scan.
+        pytest.param(
+            "# Let's find the config\ncat config/app.yaml",
+            ["config/app.yaml"],
+            id="apostrophe-in-comment",
+        ),
+        # A trailing comment's words were argv tokens of the read sub-command, so
+        # any path in the prose counted as a read — a false POSITIVE, opposite in
+        # direction to the dropped-lines false negative above.
+        pytest.param(
+            "grep pattern file.py # see also other/note.py",
+            ["file.py"],
+            id="trailing-comment-not-a-read",
+        ),
+        # `#` opens a comment only at a word boundary, as in a real shell. shlex's
+        # own `commenters` rule would treat this `#` as a comment start and take
+        # the file with it.
+        pytest.param(
+            "grep foo#bar src/handler.go",
+            ["src/handler.go"],
+            id="hash-inside-word",
+        ),
+        # A quoted `#` is data, not a comment.
+        pytest.param("grep '#' src/handler.go", ["src/handler.go"], id="quoted-hash"),
+        pytest.param(
+            'grep "#define MAX" src/handler.go',
+            ["src/handler.go"],
+            id="quoted-hash-in-pattern",
+        ),
+        # A newline inside quotes is data: one command, file kept.
+        pytest.param(
+            "grep -n 'foo\nbar' src/handler.go",
+            ["src/handler.go"],
+            id="quoted-newline-is-data",
+        ),
+        # A backslash-escaped newline is a line continuation: still ONE command,
+        # so `grep` stays argv[0] and its file survives.
+        pytest.param(
+            "grep -n foo \\\n  src/handler.go",
+            ["src/handler.go"],
+            id="backslash-continuation",
+        ),
+        # An unterminated quote swallows the remaining newlines and the line fails
+        # to lex — degrading to today's behaviour (nothing), never to a mangled path.
+        pytest.param(
+            "cat 'a/first.py\ncat b/second.py",
+            [],
+            id="unbalanced-quote-multiline",
+        ),
+    ],
+)
+def test_bash_read_files_splits_on_newlines(
+    tmp_path: Path, command: str, expected: list[str]
+) -> None:
+    assert _bash_files(tmp_path, command) == expected
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        # A here-doc body is DATA the agent wrote, not commands it ran. EB's own
+        # artifacts (runbooks, incident reports) are full of shell commands, so
+        # without a here-doc model an agent writing a runbook earns retrieval
+        # credit for every file it merely wrote *about*. The redirect target
+        # itself is still counted (the qefr false positive, preserved).
+        pytest.param(
+            "cat > /workspace/agent_output/runbook.md <<'EOF'\n"
+            "grep -rn timeout /workspace/repo/src/never_opened.py\n"
+            "EOF",
+            ["/workspace/agent_output/runbook.md"],
+            id="heredoc-body-led-by-read-cmd",
+        ),
+        # `tee`/`python3`-led here-docs are the live corpus shape. Splitting the
+        # body into sub-commands would credit a file the agent never opened —
+        # a false positive that inflates the Bash-mediated arms specifically.
+        pytest.param(
+            "tee /workspace/agent_output/report.md <<'EOF'\n"
+            "grep -rn panic /workspace/kafka/KafkaApis.scala\n"
+            "EOF",
+            [],
+            id="heredoc-tee-led",
+        ),
+        pytest.param(
+            "python3 <<'EOF'\n"
+            "head = open('/workspace/webpack/yarn.lock').read()\n"
+            "EOF",
+            [],
+            id="heredoc-python-led",
+        ),
+        # An apostrophe in a here-doc body must not open a quote and swallow the
+        # real read that follows the body.
+        pytest.param(
+            "cat > notes.md <<'EOF'\n"
+            "It's a race in the retry loop\n"
+            "EOF\n"
+            "grep -n retry /workspace/repo/src/real_read.py",
+            ["notes.md", "/workspace/repo/src/real_read.py"],
+            id="heredoc-body-apostrophe",
+        ),
+        # `<<-` strips leading tabs before the delimiter.
+        pytest.param(
+            "cat > out.md <<-EOF\n\tsee src/never.py\n\tEOF\ncat src/real.py",
+            ["out.md", "src/real.py"],
+            id="heredoc-dash-tab-delimiter",
+        ),
+        # A here-STRING is not a here-doc: nothing to skip.
+        pytest.param(
+            'grep -n foo src/handler.go <<< "$payload"',
+            ["src/handler.go"],
+            id="here-string-not-heredoc",
+        ),
+        # An escaped space keeps the `#` mid-word, so it is NOT a comment and the
+        # file argument survives. Deriving the word boundary from the previous
+        # character alone would see a blank here and eat the rest of the line.
+        pytest.param(
+            "grep -rn TODO\\ #123 src/handler.go",
+            ["src/handler.go"],
+            id="escaped-space-before-hash",
+        ),
+    ],
+)
+def test_bash_read_files_heredocs_and_word_boundaries(
+    tmp_path: Path, command: str, expected: list[str]
+) -> None:
+    assert _bash_files(tmp_path, command) == expected
+
+
 def test_bash_redirect_target_still_counted(tmp_path: Path) -> None:
     # Pre-existing false positive, preserved deliberately: an output-redirect
     # target is counted as a read. Fixing it changes scoring on a different

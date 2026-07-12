@@ -117,8 +117,9 @@ _BASH_READ_CMDS = frozenset(
 #     quoted bare paren and a real operator are the same token and this set cannot
 #     tell them apart. That trade re-opens the quoted-operator hole this function
 #     exists to close, so subshells stay a false negative (EnterpriseBench-fhtm).
-#   newline        — ``whitespace_split`` never emits one; it could only ever match
-#     a *quoted* newline, i.e. data.
+#   newline        — ``whitespace_split`` never emits one, so it cannot be matched
+#     here at all. Newlines separate sub-commands in :func:`_split_sub_lines`,
+#     which runs *before* the lexer.
 _SHELL_OPERATORS = frozenset({"|", "||", "&&", "&", ";", ";;"})
 
 _PATH_JSON_RE = re.compile(r'"path"\s*:\s*"([^"]+)"')
@@ -132,8 +133,121 @@ _PATH_PREFIX_RE = re.compile(r"(?:^|\n|\\n)Path: ([^\n\\]+\.\w{1,5})")
 _QUERY_PATH_RE = re.compile(r"([a-zA-Z][\w/.-]+/[\w.-]+\.\w{1,5})")
 
 
+def _heredoc_delimiter(command: str, i: int) -> tuple[str, int]:
+    """Read the delimiter word of a here-doc redirect → ``(delim, end_index)``.
+
+    ``i`` points just past ``<<`` / ``<<-``. Handles ``<<EOF``, ``<<'EOF'`` and
+    ``<<"EOF"``; returns ``("", i)`` when no delimiter parses.
+    """
+    n = len(command)
+    while i < n and command[i] in " \t":
+        i += 1
+    if i < n and command[i] in "'\"":
+        end = command.find(command[i], i + 1)
+        return ("", i) if end == -1 else (command[i + 1 : end], end + 1)
+    start = i
+    while i < n and (command[i].isalnum() or command[i] in "_-."):
+        i += 1
+    return command[start:i], i
+
+
+def _skip_heredoc_bodies(command: str, i: int, delims: list[str]) -> int:
+    """Consume the here-doc bodies queued in ``delims`` → index past them.
+
+    Scanned as raw text, never as shell: a here-doc body is literal data, so an
+    apostrophe in it (``It's a race``) must not open a quote. Consumes ``delims``.
+    """
+    while delims:
+        delim = delims.pop(0)
+        while i < len(command):
+            end = command.find("\n", i)
+            line = command[i:] if end == -1 else command[i:end]
+            i = len(command) if end == -1 else end + 1
+            if line.strip() == delim:  # `<<-` allows leading tabs
+                break
+    return i
+
+
+def _split_sub_lines(command: str) -> list[str]:
+    """Split a shell command on unquoted newlines, dropping comments and here-docs.
+
+    Agents write multi-line Bash constantly, and a newline separates
+    sub-commands exactly like ``;`` does. The lexer cannot do this job:
+    ``whitespace_split`` swallows newlines, so without this pass a multi-line
+    command collapses into one sub-command named after the first word of the
+    *first* line, and every read on every later line is dropped
+    (EnterpriseBench-2hum).
+
+    The three rules are one scan because they are entangled:
+
+    * A comment's apostrophe (``# let's check``), read as an opening quote,
+      would make every following newline look quoted and glue the lines back
+      together — silently restoring the very bug this fixes.
+    * A here-doc body is *data the agent wrote*, not commands it ran. Splitting
+      it into lines would credit every path in it as a retrieval, so an agent
+      writing a runbook full of ``grep`` commands would earn credit for files it
+      only wrote *about*. Bodies are skipped as raw text, so their apostrophes
+      and newlines never reach the quote state machine either.
+
+    Shell semantics preserved: a newline inside quotes is data, a
+    backslash-escaped newline is a line continuation, and ``#`` opens a comment
+    only at a word boundary — so ``grep foo#bar a.c`` keeps its file, unlike
+    shlex's own ``commenters`` rule, which treats any ``#`` as a comment start.
+    An unterminated quote swallows the remaining newlines, degrading to one
+    line: no worse than not splitting at all.
+    """
+    lines: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    heredocs: list[str] = []
+    at_boundary = True  # a `#` opens a comment only here (start of line, or after a blank)
+    i, n = 0, len(command)
+
+    while i < n:
+        ch = command[i]
+
+        if quote is None and ch == "#" and at_boundary:
+            while i < n and command[i] != "\n":  # comment runs to end of line
+                i += 1
+        elif quote is None and command.startswith("<<", i) and not command.startswith("<<<", i):
+            offset = 3 if command.startswith("<<-", i) else 2
+            delim, end = _heredoc_delimiter(command, i + offset)
+            if not delim:  # not a here-doc after all — treat `<` as an ordinary char
+                current.append(ch)
+                i += 1
+                continue
+            heredocs.append(delim)
+            current.extend(command[i:end])
+            at_boundary = False
+            i = end
+        elif ch == "\\" and quote != "'" and i + 1 < n:
+            if command[i + 1] == "\n":
+                i += 2  # line continuation: both chars vanish, the command goes on
+            else:
+                current.extend(command[i : i + 2])  # escaped char, kept verbatim
+                at_boundary = False  # `TODO\ #123` — the `#` is still mid-word
+                i += 2
+        else:
+            if quote is None and ch in "'\"":
+                quote = ch
+            elif ch == quote:
+                quote = None
+            if ch == "\n" and quote is None:
+                lines.append("".join(current))
+                current = []
+                at_boundary = True
+                i = _skip_heredoc_bodies(command, i + 1, heredocs)
+            else:
+                current.append(ch)
+                at_boundary = quote is None and ch in " \t"
+                i += 1
+
+    lines.append("".join(current))
+    return [line for line in lines if line.strip()]
+
+
 def _tokenize(command: str) -> list[str]:
-    """Tokenize a shell command, emitting control operators as their own tokens.
+    """Tokenize one shell line, emitting control operators as their own tokens.
 
     ``punctuation_chars`` is what lets the caller tell an operator from a search
     pattern: an unquoted ``|`` becomes a standalone token even unspaced
@@ -143,7 +257,7 @@ def _tokenize(command: str) -> list[str]:
     """
     lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
-    lexer.commenters = ""  # `#` is data here, not a comment (shlex.split parity)
+    lexer.commenters = ""  # comments already gone; shlex would eat `foo#bar` too
     tokens: list[str] = []
     try:
         tokens.extend(lexer)
@@ -155,22 +269,25 @@ def _tokenize(command: str) -> list[str]:
 def _bash_read_files(command: str) -> list[str]:
     """Extract file arguments from shell read-commands in ``command``.
 
-    Tokenizes first, *then* groups the tokens into sub-commands on
-    :data:`_SHELL_OPERATORS`, so a ``|`` inside a quoted grep alternation stays
-    part of the pattern instead of truncating the command and taking its file
-    argument with it. For each sub-command whose program is in
-    :data:`_BASH_READ_CMDS`, yields the non-flag tokens; callers gate each one
-    through ``_looks_like_file`` (via ``_add``), so search patterns and options
-    are dropped. Conservative by construction — a sub-command not led by a known
-    read program contributes nothing (a script being *run* is not a retrieval).
+    Splits into lines on unquoted newlines, then tokenizes each and *only then*
+    groups the tokens into sub-commands on :data:`_SHELL_OPERATORS` — so a ``|``
+    inside a quoted grep alternation stays part of the pattern instead of
+    truncating the command and taking its file argument with it. For each
+    sub-command whose program is in :data:`_BASH_READ_CMDS`, yields the non-flag
+    tokens; callers gate each one through ``_looks_like_file`` (via ``_add``), so
+    search patterns and options are dropped. Conservative by construction — a
+    sub-command not led by a known read program contributes nothing (a script
+    being *run* is not a retrieval, and neither is a here-doc body an agent
+    typed its own answer into).
     """
     files: list[str] = []
-    for is_operator, group in groupby(_tokenize(command), _SHELL_OPERATORS.__contains__):
-        if is_operator:
-            continue
-        sub = list(group)
-        if sub[0].rsplit("/", 1)[-1] in _BASH_READ_CMDS:
-            files.extend(tok for tok in sub[1:] if not tok.startswith("-"))
+    for line in _split_sub_lines(command):
+        for is_operator, group in groupby(_tokenize(line), _SHELL_OPERATORS.__contains__):
+            if is_operator:
+                continue
+            sub = list(group)
+            if sub[0].rsplit("/", 1)[-1] in _BASH_READ_CMDS:
+                files.extend(tok for tok in sub[1:] if not tok.startswith("-"))
     return files
 
 
