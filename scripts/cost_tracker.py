@@ -82,18 +82,58 @@ class TaskCost:
 # ---------------------------------------------------------------------------
 
 
-def parse_trace(trace_path: Path) -> TraceUsage:
-    """Read an agent_trace.jsonl and sum assistant-message token usage."""
+def _request_key(entry: dict[str, Any], line_no: int) -> tuple[str, bool]:
+    """Return (key identifying the API request this line belongs to, is_grouped).
 
-    input_tokens = 0
-    output_tokens = 0
-    cache_write_tokens = 0
-    cache_read_tokens = 0
+    A trace emits one assistant line per content block (thinking / text /
+    tool_use), and every line of a single API request repeats that request's
+    usage snapshot. Grouping by request is what keeps one multi-block turn from
+    being billed two or three times.
+
+    ``requestId`` carries the grouping in every assistant line of the current
+    corpus. ``message.id`` is a verified 1:1 stand-in and covers a writer that
+    omits ``requestId``. A line with neither key falls back to its own line
+    number, which bills it exactly once — correct for legacy single-block
+    traces, where each line already is its own request.
+    """
+
+    rid = entry.get("requestId")
+    if isinstance(rid, str) and rid:
+        return rid, True
+
+    msg_id = (entry.get("message") or {}).get("id")
+    if isinstance(msg_id, str) and msg_id:
+        return msg_id, True
+
+    return f"__line_{line_no}__", False
+
+
+def parse_trace(trace_path: Path) -> TraceUsage:
+    """Read an agent_trace.jsonl and sum token usage once per API request.
+
+    Usage is deduplicated by request (see :func:`_request_key`): summing every
+    assistant line instead counts one request's tokens once per content block,
+    which inflated cost by 1.34x-3.03x by a factor that varied per arm.
+
+    Selection within a request is per field, because the fields behave
+    differently: input and cache counts are invariant across a request's lines,
+    so any member carries them; ``output_tokens`` streams upward and is complete
+    only on the final line. Taking the max-output record yields the complete
+    snapshot for both. Max rather than strictly-last also survives a trailing
+    all-zero ``isApiErrorMessage`` record, which would otherwise bill a real
+    request at zero.
+
+    Note: usage attached to non-assistant lines (sub-agent / Task tool results)
+    is out of scope here and is not counted — see EnterpriseBench-jepu.
+    """
+
+    # request key -> the chosen (most complete) usage snapshot for that request
+    selected: dict[str, dict[str, Any]] = {}
     model = ""
-    num_turns = 0
+    ungrouped_lines = 0
 
     with trace_path.open() as fh:
-        for line in fh:
+        for line_no, line in enumerate(fh):
             line = line.strip()
             if not line:
                 continue
@@ -119,19 +159,36 @@ def parse_trace(trace_path: Path) -> TraceUsage:
             if not usage:
                 continue
 
-            num_turns += 1
-            input_tokens += usage.get("input_tokens", 0)
-            output_tokens += usage.get("output_tokens", 0)
-            cache_write_tokens += usage.get("cache_creation_input_tokens", 0)
-            cache_read_tokens += usage.get("cache_read_input_tokens", 0)
+            key, grouped = _request_key(entry, line_no)
+            if not grouped:
+                ungrouped_lines += 1
+
+            previous = selected.get(key)
+            if previous is None or usage.get("output_tokens", 0) >= previous.get(
+                "output_tokens", 0
+            ):
+                selected[key] = usage
+
+    if ungrouped_lines:
+        logger.warning(
+            "%s: %d assistant line(s) carry neither requestId nor message.id and "
+            "were billed per line. If the trace format dropped those keys, "
+            "per-content-block double-counting is silently back.",
+            trace_path,
+            ungrouped_lines,
+        )
 
     return TraceUsage(
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cache_write_tokens=cache_write_tokens,
-        cache_read_tokens=cache_read_tokens,
+        input_tokens=sum(u.get("input_tokens", 0) for u in selected.values()),
+        output_tokens=sum(u.get("output_tokens", 0) for u in selected.values()),
+        cache_write_tokens=sum(
+            u.get("cache_creation_input_tokens", 0) for u in selected.values()
+        ),
+        cache_read_tokens=sum(
+            u.get("cache_read_input_tokens", 0) for u in selected.values()
+        ),
         model=model or DEFAULT_MODEL,
-        num_turns=num_turns,
+        num_turns=len(selected),
     )
 
 
@@ -300,20 +357,39 @@ def aggregate_report(costs: list[TaskCost]) -> dict[str, Any]:
             "suite": tc.suite,
             "difficulty": tc.difficulty,
             "model": tc.usage.model,
+            "model_priced": tc.usage.model in PRICING,
             "input_tokens": tc.usage.input_tokens,
             "output_tokens": tc.usage.output_tokens,
             "cache_write_tokens": tc.usage.cache_write_tokens,
             "cache_read_tokens": tc.usage.cache_read_tokens,
+            "num_requests": tc.usage.num_turns,
             "cost_usd": tc.cost_usd,
             "agent_duration_seconds": tc.agent_duration_seconds,
         }
         for tc in sorted(costs, key=lambda c: c.task_id)
     ]
 
+    # An unpriced model is billed at DEFAULT_MODEL rates by compute_cost. In the
+    # corpus those models cluster in a single arm, so the substitution skews
+    # arm-to-arm cost deltas, not just absolute cost. Carry the caveat in the
+    # report itself — a warning in a batch log does not reach whoever reads the
+    # JSON.
+    unpriced_models = sorted(
+        {tc.usage.model for tc in costs if tc.usage.model not in PRICING}
+    )
+    if unpriced_models:
+        logger.warning(
+            "Unpriced model(s) billed at %s rates: %s. Absolute costs and "
+            "arm-to-arm deltas involving these tasks are not trustworthy.",
+            DEFAULT_MODEL,
+            ", ".join(unpriced_models),
+        )
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "total_cost_usd": round(sum(tc.cost_usd for tc in costs), 6),
         "total_tasks": len(costs),
+        "unpriced_models": unpriced_models,
         "by_mode": {k: _bucket_stats(v) for k, v in sorted(by_mode.items())},
         "by_suite": {k: _bucket_stats(v) for k, v in sorted(by_suite.items())},
         "by_difficulty": {
