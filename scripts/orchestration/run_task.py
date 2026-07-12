@@ -507,18 +507,22 @@ def _assert_agent_readable(container_id: str, paths: list[str]) -> tuple[bool, s
 GATE_CHOWN_TIMEOUT = 900
 
 
-def _apply_lockdown(container_id: str, cmd: str) -> str:
+def _apply_lockdown(container_id: str, cmd: list[str]) -> str:
     """Run one root-owned chown/chmod inside the container.
+
+    *cmd* is an argv list, executed directly — there is no shell in this path, so
+    a repo path lifted from task.toml can never be reinterpreted as syntax.
 
     Returns "" on success, else a description of the failure. A half-applied
     lockdown is never silently tolerated by either caller: for the mode gate it
     means the ablation may not hold, and for the verifier assets it means the
     root verifier may still be executing agent-writable scripts.
     """
+    printable = shlex.join(cmd)
     try:
         res = _docker_exec(
             container_id,
-            ["bash", "-c", cmd],
+            cmd,
             timeout=GATE_CHOWN_TIMEOUT,
             user="root",
         )
@@ -528,9 +532,9 @@ def _apply_lockdown(container_id: str, cmd: str) -> str:
         # rather than letting it surface as a generic error from the outer
         # handler — the large-repo tasks this benchmark is built on are exactly
         # the ones likely to hit it.
-        return f"timed out after {GATE_CHOWN_TIMEOUT}s applying {cmd!r}"
+        return f"timed out after {GATE_CHOWN_TIMEOUT}s applying {printable!r}"
     if res.returncode != 0:
-        return f"failed to apply {cmd!r}: {res.stderr.strip()}"
+        return f"failed to apply {printable!r}: {res.stderr.strip()}"
     return ""
 
 
@@ -577,7 +581,7 @@ def _apply_mode_gate(container_id: str, task_data: dict, mode: str) -> tuple[boo
     for repo_dir in dirs:
         probe = _docker_exec(
             container_id,
-            ["bash", "-c", f"find {shlex.quote(repo_dir)} -type f -print -quit"],
+            ["find", repo_dir, "-type", "f", "-print", "-quit"],
             timeout=60,
             user="root",
         )

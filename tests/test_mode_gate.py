@@ -66,20 +66,46 @@ def test_repo_dirs_empty_when_no_repos():
 
 
 def test_repo_dirs_rejects_path_escape():
-    """A task.toml path must not be able to point the chmod outside /workspace."""
-    with pytest.raises(ValueError, match="unsafe repo path"):
-        repo_dirs({"repos": [{"path": "../../etc"}]})
+    """A task.toml path must not be able to point the chmod outside /workspace.
+
+    The rule is `validation.validate_repo_entry` — the same one `_parse_task`
+    already applied — not a second, looser copy living in mode_gate.
+    """
+    escaping = {"url": "https://x/etc", "rev": "main", "path": "../../etc"}
+    with pytest.raises(ValueError, match="Invalid repo path"):
+        repo_dirs({"repos": [escaping]})
 
 
 # --- the lockdown itself ---------------------------------------------------
 
 
 def test_lockdown_denies_agent_and_keeps_root():
-    """Repo trees become root-owned and mode 700: unreadable to the agent UID."""
-    cmds = lockdown_commands(["/workspace/ansible"])
-    joined = " ".join(cmds)
-    assert "chown -R root:root /workspace/ansible" in joined
-    assert "chmod -R go-rwx /workspace/ansible" in joined
+    """Repo trees become root-owned and mode 700: unreadable to the agent UID.
+
+    Both halves matter. The Dockerfile clones AFTER `USER agent`, so the agent
+    owns the repo files to begin with — and an owner can always chmod its own
+    files back. Ownership must move to root for the mode bits to stick.
+    """
+    assert lockdown_commands(["/workspace/ansible"]) == [
+        ["chown", "-R", "root:root", "/workspace/ansible"],
+        ["chmod", "-R", "go-rwx", "/workspace/ansible"],
+    ]
+
+
+def test_lockdown_batches_every_repo_into_one_command_each():
+    """chown/chmod take many operands: repo count must not drive the exec count."""
+    cmds = lockdown_commands(["/workspace/ansible", "/workspace/galaxy-ng"])
+    assert cmds == [
+        ["chown", "-R", "root:root", "/workspace/ansible", "/workspace/galaxy-ng"],
+        ["chmod", "-R", "go-rwx", "/workspace/ansible", "/workspace/galaxy-ng"],
+    ]
+
+
+def test_lockdown_commands_need_no_shell():
+    """argv, not shell strings — a repo path can never be reparsed as syntax."""
+    for cmd in lockdown_commands(["/workspace/ansible"]) + verifier_lockdown_commands():
+        assert isinstance(cmd, list)
+        assert "bash" not in cmd and "-c" not in cmd
 
 
 def test_lockdown_never_touches_workspace_root_or_agent_output():
@@ -88,11 +114,11 @@ def test_lockdown_never_touches_workspace_root_or_agent_output():
     Locking down /workspace itself would break artifact delivery and the
     instruction file — i.e. it would zero the arm rather than gate it.
     """
-    cmds = lockdown_commands(["/workspace/ansible"])
-    for c in cmds:
-        assert not c.endswith("/workspace")
-        assert "agent_output" not in c
-        assert "instruction.md" not in c
+    for cmd in lockdown_commands(["/workspace/ansible"]):
+        for arg in cmd:
+            assert arg != "/workspace"
+            assert "agent_output" not in arg
+            assert "instruction.md" not in arg
 
 
 def test_lockdown_is_noop_without_repos():
@@ -175,7 +201,7 @@ class _FakeExec:
         self.calls.append((cmd, user))
         rc = 0
         out = ""
-        if "find" in " ".join(cmd):
+        if cmd[0] == "find":
             out = "/workspace/ansible/setup.py"
         elif cmd[:2] == ["test", "-r"]:
             # This is the leak probe, run as the agent user.
@@ -205,8 +231,9 @@ def test_gate_passes_when_agent_is_denied(monkeypatch):
     ok, err = run_task._apply_mode_gate("cid", _task(), "mcp_only")
 
     assert ok is True and err == ""
-    chowned = [c for c, _ in fake.calls if "chown -R root:root" in " ".join(c)]
+    chowned = [c for c, _ in fake.calls if c[:3] == ["chown", "-R", "root:root"]]
     assert chowned, "repo tree was never taken away from the agent UID"
+    assert "/workspace/ansible" in chowned[0]
 
 
 def test_gate_that_cannot_be_proven_is_treated_as_failed(monkeypatch):
@@ -263,14 +290,15 @@ def test_gate_timeout_invalidates_the_run(monkeypatch):
 
 def test_unsafe_repo_path_invalidates_the_run(monkeypatch):
     """A traversing task.toml path must abort the run, not chmod outside /workspace."""
-    monkeypatch.setattr(run_task, "_docker_exec", _FakeExec(agent_can_read=False))
+    fake = _FakeExec(agent_can_read=False)
+    monkeypatch.setattr(run_task, "_docker_exec", fake)
+    escaping = {"url": "https://x/etc", "rev": "main", "path": "../../etc"}
 
-    ok, err = run_task._apply_mode_gate(
-        "cid", {"repos": [{"path": "../../etc"}]}, "mcp_only"
-    )
+    ok, err = run_task._apply_mode_gate("cid", {"repos": [escaping]}, "mcp_only")
 
     assert ok is False
-    assert "unsafe repo path" in err
+    assert "Invalid repo path" in err
+    assert fake.calls == [], "aborted before touching anything, not mid-chmod"
 
 
 def test_gate_is_a_noop_for_ungated_arms(monkeypatch):
@@ -290,15 +318,16 @@ def test_gate_is_a_noop_for_ungated_arms(monkeypatch):
 def test_verifier_assets_are_taken_from_the_agent():
     """test_runner.sh executes every .verifiers/*.sh it globs, as root.
 
-    An agent-writable check script is therefore root code execution, and an
-    agent-writable .task/ground_truth.json is a forged score. Both must be
-    root-owned and unreadable to the agent — in every arm, not just the gated one.
+    An agent-writable check script is therefore root code execution, and .task
+    holds the oracle — an agent that can merely READ it need not solve the task
+    at all, which is why the mode is `go-rwx` (strips read, not just write).
+    Both must be root-owned in every arm, not just the gated one.
     """
-    joined = " ".join(verifier_lockdown_commands())
+    cmds = verifier_lockdown_commands()
+    assert ["chown", "-R", "root:root", *VERIFIER_ASSETS] in cmds
+    assert ["chmod", "-R", "go-rwx", *VERIFIER_ASSETS] in cmds
     for asset in ("/workspace/.verifiers", "/workspace/.task", "/workspace/test.sh"):
-        assert asset in joined
-    assert "chown -R root:root" in joined
-    assert "go-rwx" in joined
+        assert asset in VERIFIER_ASSETS
 
 
 def test_workspace_gets_the_sticky_bit():
@@ -306,28 +335,37 @@ def test_workspace_gets_the_sticky_bit():
     the sticky bit the agent could unlink and replace root-owned test.sh purely
     by virtue of directory write permission — the file's own mode is no defence.
     """
-    assert any(c.strip() == "chmod +t /workspace" for c in verifier_lockdown_commands())
+    assert ["chmod", "+t", "/workspace"] in verifier_lockdown_commands()
 
 
-def test_ground_truth_is_not_readable_by_the_agent():
-    """The oracle is in .task. An agent that can read it need not solve anything."""
-    assert "/workspace/.task" in VERIFIER_ASSETS
-    joined = " ".join(verifier_lockdown_commands())
-    assert "go-rwx" in joined  # strips agent read, not merely agent write
-
-
-def test_setup_does_not_hand_verifier_assets_back_to_the_agent():
+def test_setup_does_not_hand_verifier_assets_back_to_the_agent(tmp_path):
     """Regression: two setup paths used to chown .verifiers/.task to agent.
 
     They did so because the verifier once ran as agent. Re-granting either would
-    silently reopen the escalation, so assert the agent-chown list is now just
-    the instruction file.
+    silently reopen the escalation, so run the real _setup_container and assert
+    that no exec it issues hands a verifier asset to the agent UID.
     """
-    src = Path(run_task.__file__).read_text()
-    # The setup chown must not mention the verifier's assets.
-    setup_chown = src.split("_chown_to_agent(container_id, [")[1].split("])")[0]
-    for asset in (".verifiers", ".task", ".eb_verify", "test.sh"):
-        assert asset not in setup_chown, f"setup still chowns {asset} to agent"
+    (tmp_path / "instruction.md").write_text("do the thing\n")
+    calls: list[list[str]] = []
+
+    def recording_exec(container_id, cmd, timeout=120, workdir="/workspace", user=None):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(run_task, "_docker_exec", recording_exec)
+    monkeypatch.setattr(run_task, "_docker_cp", lambda *a, **k: None)
+    try:
+        run_task._setup_container("cid", tmp_path, {})
+    finally:
+        monkeypatch.undo()
+
+    granting = [c for c in calls if "agent:agent" in " ".join(c)]
+    assert granting, "setup no longer chowns anything to the agent — check the fixture"
+    for cmd in granting:
+        joined = " ".join(cmd)
+        for asset in (".verifiers", ".task", ".eb_verify", "test.sh"):
+            assert asset not in joined, f"setup still chowns {asset} to agent"
 
 
 def test_verifier_runs_as_root_in_every_arm(monkeypatch):
