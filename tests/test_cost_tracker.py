@@ -7,15 +7,17 @@ import math
 import sys
 from pathlib import Path
 
+import pytest
+
 # Make scripts importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from cost_tracker import (
     DEFAULT_MODEL,
-    UNKNOWN_MODEL,
     ModelUsage,
     TaskCost,
     Usage,
+    VendorUsage,
     aggregate_report,
     compute_cost,
     merge_model_usage,
@@ -377,20 +379,6 @@ class TestComputeCost:
         ) / 1_000_000
         assert cost == round(expected, 6)
 
-    def test_model_override(self) -> None:
-        usage = Usage(
-            input_tokens=1_000_000,
-            output_tokens=0,
-            cache_write_tokens=0,
-            cache_read_tokens=0,
-            model="claude-sonnet-4-6",
-            num_requests=1,
-        )
-        cost_sonnet = compute_cost(usage)
-        cost_opus = compute_cost(usage, model="claude-opus-4-6")
-        assert cost_sonnet == 3.0
-        assert cost_opus == 15.0
-
     def test_unknown_model_falls_back_to_default(self) -> None:
         usage = Usage(
             input_tokens=1_000_000,
@@ -526,9 +514,22 @@ def _make_cost(
     model: str = "claude-sonnet-4-6",
     cost_source: str = "sdk",
     trace_cost_usd: float | None = None,
-    models: tuple[str, ...] | None = None,
 ) -> TaskCost:
-    """Build a TaskCost record for aggregate_report tests."""
+    """Build a TaskCost record for aggregate_report tests.
+
+    ``cost_source`` selects the tier by building a vendor block or omitting one —
+    the record derives cost, source and model list from that single fact, so a
+    record that claims one tier while carrying the other's numbers cannot be
+    built here either.
+    """
+    vendor = (
+        VendorUsage(
+            models=(ModelUsage(model, input_tokens, output_tokens, 0, 0, cost_usd),),
+            total_cost_usd=cost_usd,
+        )
+        if cost_source == "sdk"
+        else None
+    )
     return TaskCost(
         task_id=task_id,
         mode=mode,
@@ -542,10 +543,8 @@ def _make_cost(
             model=model,
             num_requests=3,
         ),
-        cost_usd=cost_usd,
-        cost_source=cost_source,
         trace_cost_usd=cost_usd if trace_cost_usd is None else trace_cost_usd,
-        models=models if models is not None else (model,),
+        vendor=vendor,
         agent_duration_seconds=60.0,
     )
 
@@ -669,20 +668,6 @@ class TestUnpricedModelDisclosure:
         )
         assert report["unpriced_models"] == []
 
-    def test_unpriced_secondary_model_is_surfaced(self) -> None:
-        """A trace-derived run's flagged models come from `models`, not just the primary."""
-        report = aggregate_report(
-            [
-                _make_cost(
-                    task_id="t1",
-                    model="claude-sonnet-4-6",
-                    models=("claude-sonnet-4-6", "claude-fable-5"),
-                    cost_source="trace",
-                )
-            ]
-        )
-        assert report["unpriced_models"] == ["claude-fable-5"]
-
 
 # ---------------------------------------------------------------------------
 # Vendor modelUsage (tier 1)
@@ -767,14 +752,6 @@ class TestParseModelUsage:
         assert [u.model for u in usages] == ["claude-haiku-4-5", "claude-sonnet-4-6"]
         assert sum(u.cost_usd for u in usages) == 2.1
 
-    def test_flat_block(self, tmp_path: Path) -> None:
-        p = _write_stdout(
-            tmp_path / "agent_stdout.log", _vendor(_model_entry(cost=0.75))
-        )
-        (usage,) = parse_model_usage(p).models
-        assert usage.model == UNKNOWN_MODEL
-        assert usage.cost_usd == 0.75
-
     def test_stream_json_takes_last_block(self, tmp_path: Path) -> None:
         """Earlier stream lines carry partial totals; the result message is last."""
         lines = [
@@ -788,23 +765,6 @@ class TestParseModelUsage:
 
     def test_missing_file(self, tmp_path: Path) -> None:
         assert parse_model_usage(tmp_path / "nope.log") is None
-
-    def test_empty_file(self, tmp_path: Path) -> None:
-        p = _write_stdout(tmp_path / "agent_stdout.log", "")
-        assert parse_model_usage(p) is None
-
-    def test_absent_block(self, tmp_path: Path) -> None:
-        p = _write_stdout(tmp_path / "agent_stdout.log", {"total_cost_usd": 1.0})
-        assert parse_model_usage(p) is None
-
-    def test_malformed_content(self, tmp_path: Path) -> None:
-        p = _write_stdout(tmp_path / "agent_stdout.log", "not json at all {{{")
-        assert parse_model_usage(p) is None
-
-    def test_block_with_no_model_entries(self, tmp_path: Path) -> None:
-        """A block carrying no usable entries must fall back, not bill zero."""
-        p = _write_stdout(tmp_path / "agent_stdout.log", _vendor({"junk": 1}))
-        assert parse_model_usage(p) is None
 
 
 class TestMergeModelUsage:
@@ -977,6 +937,40 @@ class TestReconciliationDisclosure:
         rec = aggregate_report([])["cost_sources"]["reconciliation"]
         assert rec["trace_over_vendor_ratio"] == 0.0
 
+    def test_reconciliation_is_published_per_arm(self) -> None:
+        """The distortion is per-arm, so a blended ratio alone would conceal it.
+
+        Both arms below bill $10 of vendor cost, so the overall ratio sits at 0.5
+        and looks uniform. It is not: the trace under-derives baseline by 4x and
+        mcp_only not at all — exactly the skew that corrupts an arm-to-arm delta
+        while the global number says nothing is wrong.
+        """
+        report = aggregate_report(
+            [
+                _make_cost(
+                    task_id="t1", mode="baseline", cost_usd=10.0, trace_cost_usd=2.5
+                ),
+                _make_cost(
+                    task_id="t2", mode="mcp_only", cost_usd=10.0, trace_cost_usd=7.5
+                ),
+            ]
+        )
+        assert (
+            report["cost_sources"]["reconciliation"]["trace_over_vendor_ratio"] == 0.5
+        )
+        by_mode = report["by_mode"]
+        assert by_mode["baseline"]["reconciliation"]["trace_over_vendor_ratio"] == 0.25
+        assert by_mode["mcp_only"]["reconciliation"]["trace_over_vendor_ratio"] == 0.75
+
+    def test_bucket_reconciliation_ignores_fallback_runs(self) -> None:
+        """A tier-2 bucket has nothing to reconcile: the two figures are one number."""
+        report = aggregate_report(
+            [_make_cost(task_id="t1", mode="baseline", cost_source="trace")]
+        )
+        rec = report["by_mode"]["baseline"]["reconciliation"]
+        assert rec["vendor_cost_usd"] == 0.0
+        assert rec["trace_over_vendor_ratio"] == 0.0
+
 
 class TestConsumerContract:
     """generate_report.py and generate_charts.py read these keys. Do not drop them."""
@@ -996,6 +990,96 @@ class TestConsumerContract:
         assert "total_cost" in report["by_mode"]["hybrid"]
 
 
+# Every block parse_model_usage must refuse to bill. The id names the reason, so a
+# failure report says which shape regressed.
+_UNBILLABLE_PAYLOADS = [
+    pytest.param("", id="empty_file"),
+    pytest.param({"total_cost_usd": 1.0}, id="no_modelUsage_block"),
+    pytest.param("not json at all {{{", id="malformed_content"),
+    # Entries that cannot be read whole. Summing only the ones that parsed would
+    # bill the run short, with nothing in the output saying so.
+    pytest.param(_vendor({"junk": 1}), id="no_usable_model_entries"),
+    pytest.param(
+        _vendor(
+            {
+                "claude-sonnet-4-6": _model_entry(cost=2.0),
+                "claude-haiku-4-5": {"inputTokens": 1000},  # no costUSD
+            },
+            total=3.0,
+        ),
+        id="model_entry_missing_costUSD_would_bill_2_of_3",
+    ),
+    pytest.param(
+        _vendor(
+            {
+                "claude-sonnet-4-6": _model_entry(cost=2.0),
+                "claude-haiku-4-5": "truncated",
+            },
+            total=2.0,
+        ),
+        id="non_dict_model_entry",
+    ),
+    # The checksum itself: the parts must agree with the vendor's own total, and a
+    # block with no usable total cannot be checked at all, so it is rejected rather
+    # than accepted unverified.
+    pytest.param(
+        _vendor({"claude-sonnet-4-6": _model_entry(cost=2.0)}, total=3.0),
+        id="parts_do_not_sum_to_vendor_total",
+    ),
+    pytest.param(
+        _vendor({"claude-sonnet-4-6": _model_entry(cost=2.0)}, total=_OMIT),
+        id="no_total_means_no_checksum",
+    ),
+    pytest.param(
+        _vendor({"claude-sonnet-4-6": _model_entry(cost=2.0)}, total="2.0"),
+        id="non_numeric_total",
+    ),
+    # Numbers json.loads accepts but no one can bill. NaN is the dangerous one:
+    # every comparison against it is False, so it passes the checksum untouched and
+    # then turns the whole report's total into NaN — and cost_report.json into
+    # invalid JSON.
+    pytest.param(
+        '{"modelUsage": {"claude-sonnet-4-6": {"costUSD": NaN}}, '
+        '"total_cost_usd": 2.0}',
+        id="nan_cost",
+    ),
+    pytest.param(
+        '{"modelUsage": {"claude-sonnet-4-6": {"costUSD": 2.0}}, '
+        '"total_cost_usd": NaN}',
+        id="nan_total",
+    ),
+    pytest.param(
+        _vendor({"claude-sonnet-4-6": {"costUSD": True}}, total=1.0),
+        id="bool_cost_would_bill_1_usd",  # bool subclasses int
+    ),
+    pytest.param(
+        _vendor({"claude-sonnet-4-6": {"costUSD": None}}, total=2.0),
+        id="null_cost_would_fold_to_zero",
+    ),
+    # int(float("inf")) raises OverflowError, not ValueError — uncaught it would
+    # escape the per-run fallback and abort the whole batch scan.
+    pytest.param(
+        '{"modelUsage": {"claude-sonnet-4-6": '
+        '{"inputTokens": Infinity, "costUSD": 2.0}}, "total_cost_usd": 2.0}',
+        id="infinite_token_count",
+    ),
+    # Last-wins picks the trailing partial stream block; the checksum catches it.
+    pytest.param(
+        "\n".join(
+            [
+                json.dumps(
+                    _vendor({"claude-sonnet-4-6": _model_entry(cost=3.0)}, total=3.0)
+                ),
+                json.dumps(
+                    _vendor({"claude-sonnet-4-6": _model_entry(cost=0.5)}, total=3.0)
+                ),
+            ]
+        ),
+        id="trailing_partial_stream_block",
+    ),
+]
+
+
 class TestVendorBlockIntegrity:
     """A partially-readable vendor block must be rejected, never billed short.
 
@@ -1009,113 +1093,12 @@ class TestVendorBlockIntegrity:
     per-model records checkable against a checksum rather than merely parseable.
     """
 
-    def test_model_entry_missing_cost_is_rejected(self, tmp_path: Path) -> None:
-        """Summing only the entries that parsed would bill $2.00 of a $3.00 run."""
-        p = _write_stdout(
-            tmp_path / "agent_stdout.log",
-            _vendor(
-                {
-                    "claude-sonnet-4-6": _model_entry(cost=2.0),
-                    "claude-haiku-4-5": {"inputTokens": 1000},  # no costUSD
-                },
-                total=3.0,
-            ),
-        )
-        assert parse_model_usage(p) is None
-
-    def test_non_dict_model_entry_is_rejected(self, tmp_path: Path) -> None:
-        """A truncated entry must not be silently skipped."""
-        p = _write_stdout(
-            tmp_path / "agent_stdout.log",
-            _vendor(
-                {
-                    "claude-sonnet-4-6": _model_entry(cost=2.0),
-                    "claude-haiku-4-5": "truncated",
-                },
-                total=2.0,
-            ),
-        )
-        assert parse_model_usage(p) is None
-
-    def test_block_failing_the_total_cost_checksum_is_rejected(
-        self, tmp_path: Path
+    @pytest.mark.parametrize("payload", _UNBILLABLE_PAYLOADS)
+    def test_unbillable_block_is_rejected(
+        self, tmp_path: Path, payload: object
     ) -> None:
-        """Every entry parses, but they do not add up to the vendor's own total."""
-        p = _write_stdout(
-            tmp_path / "agent_stdout.log",
-            _vendor({"claude-sonnet-4-6": _model_entry(cost=2.0)}, total=3.0),
-        )
-        assert parse_model_usage(p) is None
-
-    def test_block_with_no_total_is_rejected(self, tmp_path: Path) -> None:
-        """No total means no checksum. An unverifiable block is not authoritative.
-
-        Accepting it would bill the sum of whatever happened to parse with nothing
-        able to detect a missing model — the exact silent undercount this gate
-        exists to stop, arrived at by skipping the gate rather than failing it.
-        """
-        p = _write_stdout(
-            tmp_path / "agent_stdout.log",
-            _vendor({"claude-sonnet-4-6": _model_entry(cost=2.0)}, total=_OMIT),
-        )
-        assert parse_model_usage(p) is None
-
-    def test_block_with_non_numeric_total_is_rejected(self, tmp_path: Path) -> None:
-        p = _write_stdout(
-            tmp_path / "agent_stdout.log",
-            _vendor({"claude-sonnet-4-6": _model_entry(cost=2.0)}, total="2.0"),
-        )
-        assert parse_model_usage(p) is None
-
-    def test_nan_cost_is_rejected(self, tmp_path: Path) -> None:
-        """json.loads accepts bare NaN, and every comparison against NaN is False.
-
-        A NaN cost would sail through the checksum untouched (abs(nan - x) > tol is
-        False) and then poison the batch total: one unreadable run turning the whole
-        report's bottom line into NaN, and cost_report.json into invalid JSON.
-        """
-        p = _write_stdout(
-            tmp_path / "agent_stdout.log",
-            '{"modelUsage": {"claude-sonnet-4-6": {"costUSD": NaN}}, '
-            '"total_cost_usd": 2.0}',
-        )
-        assert parse_model_usage(p) is None
-
-    def test_nan_total_is_rejected(self, tmp_path: Path) -> None:
-        p = _write_stdout(
-            tmp_path / "agent_stdout.log",
-            '{"modelUsage": {"claude-sonnet-4-6": {"costUSD": 2.0}}, '
-            '"total_cost_usd": NaN}',
-        )
-        assert parse_model_usage(p) is None
-
-    def test_bool_cost_is_rejected(self, tmp_path: Path) -> None:
-        """bool is a subclass of int, so `True` would otherwise bill as $1.00."""
-        p = _write_stdout(
-            tmp_path / "agent_stdout.log",
-            _vendor({"claude-sonnet-4-6": {"costUSD": True}}, total=1.0),
-        )
-        assert parse_model_usage(p) is None
-
-    def test_null_cost_is_rejected(self, tmp_path: Path) -> None:
-        """An explicit null must not fold into a silent $0.00 for that model."""
-        p = _write_stdout(
-            tmp_path / "agent_stdout.log",
-            _vendor({"claude-sonnet-4-6": {"costUSD": None}}, total=2.0),
-        )
-        assert parse_model_usage(p) is None
-
-    def test_infinite_token_count_is_rejected_not_crashed(self, tmp_path: Path) -> None:
-        """int(float("inf")) raises OverflowError, which is not a ValueError.
-
-        Uncaught, it would escape the per-run fallback and abort the entire batch
-        scan over one malformed log.
-        """
-        p = _write_stdout(
-            tmp_path / "agent_stdout.log",
-            '{"modelUsage": {"claude-sonnet-4-6": '
-            '{"inputTokens": Infinity, "costUSD": 2.0}}, "total_cost_usd": 2.0}',
-        )
+        """Every unreadable shape falls back loudly. None of them bills short."""
+        p = _write_stdout(tmp_path / "agent_stdout.log", payload)
         assert parse_model_usage(p) is None
 
     def test_block_passing_the_checksum_is_accepted(self, tmp_path: Path) -> None:
@@ -1160,42 +1143,6 @@ class TestVendorBlockIntegrity:
             ),
         )
         assert len(parse_model_usage(p).models) == 2
-
-    def test_mixed_flat_and_per_model_shape_is_rejected(self, tmp_path: Path) -> None:
-        """Ambiguous shape: classifying it as flat would bill $0."""
-        p = _write_stdout(
-            tmp_path / "agent_stdout.log",
-            _vendor(
-                {
-                    "inputTokens": 100,
-                    "claude-sonnet-4-6": _model_entry(cost=2.0),
-                },
-                total=2.0,
-            ),
-        )
-        assert parse_model_usage(p) is None
-
-    def test_flat_block_without_cost_is_rejected(self, tmp_path: Path) -> None:
-        p = _write_stdout(
-            tmp_path / "agent_stdout.log",
-            _vendor({"inputTokens": 100}, total=1.25),
-        )
-        assert parse_model_usage(p) is None
-
-    def test_stream_partial_block_after_complete_one_is_rejected(
-        self, tmp_path: Path
-    ) -> None:
-        """Last-wins picks the trailing partial block; the checksum catches it."""
-        lines = [
-            json.dumps(
-                _vendor({"claude-sonnet-4-6": _model_entry(cost=3.0)}, total=3.0)
-            ),
-            json.dumps(
-                _vendor({"claude-sonnet-4-6": _model_entry(cost=0.5)}, total=3.0)
-            ),
-        ]
-        p = _write_stdout(tmp_path / "agent_stdout.log", "\n".join(lines))
-        assert parse_model_usage(p) is None
 
     def test_rejected_block_falls_back_to_trace_not_to_zero(
         self, tmp_path: Path
