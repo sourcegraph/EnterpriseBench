@@ -217,20 +217,36 @@ empty-baseline tasks carried the entire apparent retrieval lift, a delta of
 +0.091 reward; across the 288 correctly paired tasks the difference was
 statistically null.[^csb-parity]
 
-EnterpriseBench's own sandbox construction runs the same risk in the opposite
-direction. `Dockerfile` (baseline) performs a standard local clone of every
-required repository; `Dockerfile.sg_only` (the `mcp_only` mode) ships an empty
-workspace with Sourcegraph MCP mandatory; `Dockerfile.hybrid` clones locally
-and also exposes MCP (`scripts/sandbox/dockerfile_generator.py`). That
-asymmetry is deliberate, an ablation meant to isolate MCP-only capability, but
-it means an `mcp_only`-vs-baseline delta is not an information-parity
-comparison in the sense CodeScaleBench's audit defines: baseline holds
-strictly more local information than `mcp_only` by construction. Hybrid, a
-strict superset of baseline plus MCP, is the parity-matched arm, and §7.2's
-note on mode comparability follows from the same logic. EnterpriseBench does
-not yet run an outcome-blind census of baseline workspace completeness
-comparable to CodeScaleBench's `parity_audit.py`; adding one is the natural
-extension of the calibration check already in place (§6.5).
+EnterpriseBench's sandbox generator describes an analogous asymmetry, but the
+system as run does not implement it, and the distinction matters for how §6
+can be read. `scripts/sandbox/dockerfile_generator.py` emits three images per
+task: `Dockerfile` (baseline) performs a standard local clone of every required
+repository; `Dockerfile.sg_only` ships an empty workspace with Sourcegraph MCP
+mandatory; `Dockerfile.hybrid` clones locally and also exposes MCP. Only the
+first is ever built. `scripts/orchestration/run_task.py` resolves the generated
+Dockerfile at a single call site that is hardcoded to the standard variant; the
+string `sg_only` does not occur anywhere in the runner. The empty-workspace
+image is written to disk on every run and then discarded.
+
+What actually varies across arms is the instruction and the tool endpoint. An
+`mcp_only` or `hybrid` run has the Sourcegraph MCP server configured and a
+retrieval preamble prepended to the task instruction; a `baseline` run has
+neither. Nothing gates the filesystem. An `mcp_only` agent keeps its ordinary
+file-reading and search tools over a fully populated `/workspace`, and the
+`mcp_only` preamble's assertion that local source files are not present in
+`/workspace` is false as run. Mode is therefore enforced by prompt conditioning
+alone, and the instruction-fidelity defect is tracked as a release blocker.
+
+The consequence is that the information-parity argument is a property of the
+design, not of the numbers in §6. The intended reading, in which baseline holds
+strictly more local information than `mcp_only` by construction and hybrid is
+the parity-matched arm, holds only once the runner builds the image the
+generator already produces. Until then an `mcp_only`-vs-baseline delta is not
+an information ablation but a prompt-conditioning contrast, and §7.2's note on
+mode comparability should be read with that substitution in mind.
+EnterpriseBench also does not yet run an outcome-blind census of baseline
+workspace completeness comparable to CodeScaleBench's `parity_audit.py`; adding
+one is the natural extension of the calibration check already in place (§6.5).
 
 ### 3.2 Localization difficulty is the stratifying variable
 
@@ -279,14 +295,16 @@ EnterpriseBench's ten task types (§2.1), score 0% enterprise-complex: they
 measure authoring rather than retrieval.[^csb-leakage] Retrieval-win rate then
 rose as leakage fell, measured on the 113-task paired subset of that census:
 
-Table 1: CodeScaleBench, 113-task paired analysis.
+Table 1: CodeScaleBench, 113-task paired analysis. A retrieval win is a task on
+which the retrieval arm's cost is at most the baseline's. The rate is a cost
+comparison, not an outcome comparison.
 
-| Leakage bucket                 | Retrieval-win rate (CodeScaleBench) |
-| ------------------------------ | ----------------------------------: |
-| (a) exact path leaked          |                                  0% |
-| (b) symbol / directory leaked  |                                  4% |
-| (c) behavioral, greppable      |                                 28% |
-| grep-hard                      |                                 32% |
+| Leakage bucket                 | Retrieval-win rate, cost basis (CodeScaleBench) |
+| ------------------------------ | ----------------------------------------------: |
+| (a) exact path leaked          |                                              0% |
+| (b) symbol / directory leaked  |                                              4% |
+| (c) behavioral, greppable      |                                             28% |
+| grep-hard                      |                                             32% |
 
 The retrieval arm wins more often exactly as the instruction gives away less,
 evidence that leakage rather than tool capability drove that corpus's
@@ -501,15 +519,16 @@ built and run in parallel without collision.
 
 ### 5.3 Cost tracking
 
-Per-run cost is computed from token counts using current Anthropic pricing
-(input/output rates). The 60/40 input/output split observed in early sample
-runs is used as the default token-mix assumption when provider-side counts
-are not directly available; provider counts are preferred when present.
-`scripts/cost_tracker.py` breaks out actual usage into four token classes,
-input, output, cache-write, cache-read, per model, whenever a per-task
-`agent_trace.jsonl` is present, so the 60/40 default applies only to the gap
-where a trace is missing. This accounting is not subagent-inclusive; §3.4
-establishes why that biases the cost figures reported in §6.6.
+Per-run cost is computed from observed token counts using current Anthropic
+pricing. `scripts/cost_tracker.py` reads each per-task `agent_trace.jsonl` and
+breaks actual usage out into four token classes, input, output, cache-write and
+cache-read, per model. No token mix is assumed or imputed. The tracker walks
+only those result directories that contain a trace, so a task whose run produced
+no trace is omitted from the cost totals rather than estimated. Cost coverage is
+therefore a subset of outcome coverage, and a per-arm cost mean is taken over
+whichever tasks yielded traces in that arm rather than over the full run set.
+This accounting is also not subagent-inclusive; §3.4 establishes why that biases
+the cost figures reported in §6.6.
 
 ### 5.4 Run set used in this paper
 

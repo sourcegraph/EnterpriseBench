@@ -27,7 +27,7 @@ make verify-expected-solutions
 
 All four targets must exit zero. The `verify-mix` target may report a
 non-fatal ecosystem-skew warning (Go > 40%) — this is a known limitation
-documented in `paper/paper.md` §6.1 and does not block release, but should
+documented in `paper/paper.md` §7.1 and does not block release, but should
 be ratcheted toward target before each subsequent release.
 
 ### 1.2 Documentation
@@ -92,7 +92,7 @@ results refresh; never hand-edit anything in `paper/figures/`.
 ${PAGER:-less} results/analysis/report.md
 ```
 
-Confirm the headline numbers match `paper/paper.md` §5. If they have drifted,
+Confirm the headline numbers match `paper/paper.md` §6.1. If they have drifted,
 update the paper from the report — the paper trails the analysis pipeline,
 not the other way around.
 
