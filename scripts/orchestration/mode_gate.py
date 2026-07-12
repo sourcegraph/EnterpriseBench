@@ -32,10 +32,6 @@ AGENT_USER = "agent"
 #: denies and the verifier would score a workspace it cannot read.
 VERIFIER_USER = "root"
 
-#: The user that applies the gate. Same value as VERIFIER_USER today, but a
-#: distinct role: "who chmods the tree" is not "who scores it".
-ROOT_USER = "root"
-
 #: Arms whose agent is denied local source. ``hybrid`` is MCP *plus* local by
 #: definition, and ``baseline`` is local-only, so neither is gated.
 GATED_MODES = frozenset({"mcp_only"})
@@ -82,11 +78,10 @@ def verifier_lockdown_commands() -> list[str]:
     """
     assets = " ".join(VERIFIER_ASSETS)
     return [
+        # go-rwx covers test.sh too: root owns it and root reads it regardless of
+        # its own mode bits, so no further chmod of the file itself is needed.
         f"chown -R root:root {assets}",
         f"chmod -R go-rwx {assets}",
-        # Present but unreadable beats absent: test_runner.sh discovers repos and
-        # verifiers by path, so the paths must still resolve for root.
-        "chmod 500 /workspace/test.sh",
         # Agent may still create its own files in /workspace; it may no longer
         # delete or rename anyone else's.
         "chmod +t /workspace",

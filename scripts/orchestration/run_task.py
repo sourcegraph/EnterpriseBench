@@ -63,7 +63,6 @@ from agents.harnesses.claude.mcp.sourcegraph import (
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "orchestration"))
 from mode_gate import (
     AGENT_USER,
-    ROOT_USER,
     VERIFIER_USER,
     IneligibleTask,
     check_eligibility,
@@ -508,36 +507,48 @@ def _assert_agent_readable(container_id: str, paths: list[str]) -> tuple[bool, s
 GATE_CHOWN_TIMEOUT = 900
 
 
+def _apply_lockdown(container_id: str, cmd: str) -> str:
+    """Run one root-owned chown/chmod inside the container.
+
+    Returns "" on success, else a description of the failure. A half-applied
+    lockdown is never silently tolerated by either caller: for the mode gate it
+    means the ablation may not hold, and for the verifier assets it means the
+    root verifier may still be executing agent-writable scripts.
+    """
+    try:
+        res = _docker_exec(
+            container_id,
+            ["bash", "-c", cmd],
+            timeout=GATE_CHOWN_TIMEOUT,
+            user="root",
+        )
+    except subprocess.TimeoutExpired:
+        # A recursive chown over a Kubernetes-sized tree can outlast the default
+        # exec timeout. Report it as a lockdown failure with a usable message
+        # rather than letting it surface as a generic error from the outer
+        # handler — the large-repo tasks this benchmark is built on are exactly
+        # the ones likely to hit it.
+        return f"timed out after {GATE_CHOWN_TIMEOUT}s applying {cmd!r}"
+    if res.returncode != 0:
+        return f"failed to apply {cmd!r}: {res.stderr.strip()}"
+    return ""
+
+
 def _lock_verifier_assets(container_id: str) -> None:
     """Take test.sh, .verifiers, .task and .eb_verify away from the agent.
 
-    Runs in EVERY arm. The verifier executes as root, and ``test_runner.sh``
-    runs every ``.verifiers/*.sh`` it globs — so an agent-writable check script
-    is root code execution, and an agent-writable ``.task/ground_truth.json`` is
-    a forged score. Neither is specific to the gated arm.
+    Runs in EVERY arm, because the verifier runs as root in every arm — see
+    ``mode_gate.verifier_lockdown_commands`` for the escalation and score-forgery
+    vectors this closes.
     """
     for cmd in verifier_lockdown_commands():
-        try:
-            res = _docker_exec(
-                container_id,
-                ["bash", "-c", cmd],
-                timeout=GATE_CHOWN_TIMEOUT,
-                user=ROOT_USER,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError(f"timed out locking verifier assets ({cmd!r})") from exc
-        if res.returncode != 0:
-            # Never silently continue: a half-applied lockdown still leaves the
-            # root verifier executing agent-writable scripts.
-            raise RuntimeError(
-                f"failed to lock verifier assets ({cmd!r}): {res.stderr.strip()}"
-            )
+        err = _apply_lockdown(container_id, cmd)
+        if err:
+            raise RuntimeError(f"verifier lockdown {err}")
     logger.info("Verifier assets locked to root (agent cannot read or replace them)")
 
 
-def _apply_mode_gate(
-    container_id: str, task_data: dict, mode: str
-) -> tuple[bool, str]:
+def _apply_mode_gate(container_id: str, task_data: dict, mode: str) -> tuple[bool, str]:
     """Deny the agent local source access for gated arms, and PROVE it worked.
 
     Returns (ok, error_message). A gate that silently fails to apply would
@@ -557,28 +568,9 @@ def _apply_mode_gate(
         return True, ""
 
     for cmd in lockdown_commands(dirs):
-        try:
-            res = _docker_exec(
-                container_id,
-                ["bash", "-c", cmd],
-                timeout=GATE_CHOWN_TIMEOUT,
-                user=ROOT_USER,
-            )
-        except subprocess.TimeoutExpired:
-            # A recursive chown over a Kubernetes-sized tree can outlast the
-            # default exec timeout. Catch it here so it lands as a mode-gate
-            # failure with a usable message, rather than as a generic error from
-            # the outer handler — the arms most likely to hit this are exactly
-            # the large-repo ones this benchmark is built on.
-            return False, (
-                f"mode gate timed out after {GATE_CHOWN_TIMEOUT}s ({cmd!r}) — "
-                "run is INVALID, not a real score"
-            )
-        if res.returncode != 0:
-            return False, (
-                f"mode gate failed to apply ({cmd!r}): {res.stderr.strip()} — "
-                "run is INVALID, not a real score"
-            )
+        err = _apply_lockdown(container_id, cmd)
+        if err:
+            return False, f"mode gate {err} — run is INVALID, not a real score"
 
     # Prove the denial holds for the UID the agent actually runs as. `find` is
     # run as root so the probe itself can enumerate the tree it just locked.
@@ -587,7 +579,7 @@ def _apply_mode_gate(
             container_id,
             ["bash", "-c", f"find {shlex.quote(repo_dir)} -type f -print -quit"],
             timeout=60,
-            user=ROOT_USER,
+            user="root",
         )
         victim = probe.stdout.strip()
         if not victim:
@@ -1756,7 +1748,6 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         repos = task_data.get("repos", [])
 
         result.task_id = task_id
-
         # Include mode + ablation variant in image tag to prevent cache collisions
         mode_suffix = f"-{config.mode}" if config.mode != "baseline" else ""
         ablation_suffix = (

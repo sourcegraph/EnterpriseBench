@@ -39,6 +39,19 @@ MCP_ONLY_HEADER = (
 HYBRID_HEADER = "# Sourcegraph MCP Tools Available"
 
 
+def _patch_docker_exec_ok():
+    """Patch _docker_exec to report success.
+
+    _setup_container now locks the verifier assets down and raises if any of
+    those chown/chmod calls fails, so the mock has to return a real returncode
+    (a bare MagicMock's attribute is truthy, i.e. a failure).
+    """
+    return patch(
+        "run_task._docker_exec",
+        return_value=MagicMock(returncode=0, stdout="", stderr=""),
+    )
+
+
 @pytest.fixture()
 def task_dir(tmp_path: Path) -> Path:
     """Create a minimal task directory with instruction.md."""
@@ -212,7 +225,7 @@ class TestSetupContainerPassesMode:
     def test_setup_container_passes_mode_to_build(self, task_dir: Path) -> None:
         with patch(
             "run_task._build_instruction_text", return_value=None
-        ) as mock_build, patch("run_task._docker_exec", return_value=MagicMock(returncode=0, stdout="", stderr="")), patch("run_task._docker_cp"):
+        ) as mock_build, _patch_docker_exec_ok(), patch("run_task._docker_cp"):
             from run_task import _setup_container
 
             _setup_container("fake-container", task_dir, {}, mode="hybrid")
@@ -223,7 +236,7 @@ class TestSetupContainerPassesMode:
     def test_setup_container_defaults_to_baseline(self, task_dir: Path) -> None:
         with patch(
             "run_task._build_instruction_text", return_value=None
-        ) as mock_build, patch("run_task._docker_exec", return_value=MagicMock(returncode=0, stdout="", stderr="")), patch("run_task._docker_cp"):
+        ) as mock_build, _patch_docker_exec_ok(), patch("run_task._docker_cp"):
             from run_task import _setup_container
 
             _setup_container("fake-container", task_dir, {})
@@ -236,7 +249,7 @@ class TestSetupContainerPassesMode:
     ) -> None:
         with patch(
             "run_task._build_instruction_text", return_value=None
-        ) as mock_build, patch("run_task._docker_exec", return_value=MagicMock(returncode=0, stdout="", stderr="")), patch("run_task._docker_cp"):
+        ) as mock_build, _patch_docker_exec_ok(), patch("run_task._docker_cp"):
             from run_task import _setup_container
 
             task_data = {"ground_truth": {"require_grounded_citations": True}}
@@ -388,7 +401,7 @@ class TestSetupContainerWritesVerifierMeta:
             ],
         }
         cp_side_effect, writes = _docker_cp_meta_capture()
-        with patch("run_task._docker_exec", return_value=MagicMock(returncode=0, stdout="", stderr="")), patch(
+        with _patch_docker_exec_ok(), patch(
             "run_task._docker_cp", side_effect=cp_side_effect
         ):
             from run_task import _setup_container
@@ -408,7 +421,7 @@ class TestSetupContainerWritesVerifierMeta:
         self, task_dir_with_checks: Path
     ) -> None:
         cp_side_effect, writes = _docker_cp_meta_capture()
-        with patch("run_task._docker_exec", return_value=MagicMock(returncode=0, stdout="", stderr="")), patch(
+        with _patch_docker_exec_ok(), patch(
             "run_task._docker_cp", side_effect=cp_side_effect
         ):
             from run_task import _setup_container
