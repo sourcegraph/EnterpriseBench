@@ -295,29 +295,73 @@ def _extract_paths_from_tool_result(tool_name: str, content: str) -> list[str]:
     return paths
 
 
-def retrieved_files_from_trace(trace_path: Path) -> list[str]:
-    """Parse ``agent_trace.jsonl`` → ordered, first-seen-unique file paths.
+@dataclass(frozen=True)
+class _Step:
+    """One ``tool_use`` block — the unit TTFR counts as a turn.
 
-    Local tools (``Read``/``Grep``/``Glob``) and MCP ``read_file`` contribute
-    their input path; MCP search tools contribute paths scraped from their
-    result payloads. Dedup is on the normalized form; the original string is
-    kept in first-seen order so downstream rank metrics (MRR/MAP/@k) are
-    faithful.
+    ``paths`` holds the step's tool_use *input* paths and is extended in place
+    when the paired ``tool_result`` arrives, so a step owns everything it
+    surfaced. (``frozen`` blocks rebinding the field, not mutating the list.)
     """
-    trace_path = Path(trace_path)
-    if not trace_path.is_file():
-        return []
 
-    files: list[str] = []
-    seen: set[str] = set()
+    ts: float | None
+    tokens: int
+    paths: list[str]
 
-    def _add(path: str) -> None:
-        norm = normalize_path(path)
-        if norm and norm not in seen and _looks_like_file(norm):
-            seen.add(norm)
-            files.append(path.strip())
 
+@dataclass(frozen=True)
+class _TraceWalk:
+    """One pass over ``agent_trace.jsonl``, serving both readers.
+
+    ``ordered_paths`` is every candidate path in *stream* order — what the rank
+    metrics (MRR/MAP/nDCG/@k) need. ``steps`` is the same paths regrouped under
+    the tool_use step that produced them — what TTFR needs. An orphan
+    tool_result (no matching tool_use id) reaches ``ordered_paths`` but no step,
+    since there is no turn to attribute it to.
+    """
+
+    steps: list[_Step]
+    ordered_paths: list[str]
+    t0: float | None
+    any_usage_seen: bool
+
+
+def _walk_trace(trace_path: Path) -> _TraceWalk:
+    """The single JSONL walk. Both retrieval and TTFR read its output.
+
+    One walker means one place knows the four trace shapes (nested Harbor
+    ``assistant``/``user`` messages, flat ``tool_use``/``tool_result`` entries).
+    Two walkers had to be held in lockstep by hand, so a shape taught to one was
+    a silent blind spot in the other.
+    """
+    steps: list[_Step] = []
+    ordered: list[str] = []
     tool_id_to_name: dict[str, str] = {}
+    tid_to_step: dict[str, _Step] = {}
+    # One API call can log several assistant lines (thinking/text/tool_use)
+    # sharing a usage snapshot, so each requestId's tokens count once.
+    seen_request_ids: set[str] = set()
+    t0: float | None = None
+    tokens_cumulative = 0
+    any_usage_seen = False
+
+    def candidates(paths: list[str]) -> list[str]:
+        """Gate junk (flags, grep patterns) out of both consumers at once."""
+        return [p for p in paths
+                if (norm := normalize_path(p)) and _looks_like_file(norm)]
+
+    def open_step(ts: float | None, tid: str, paths: list[str]) -> None:
+        step = _Step(ts=ts, tokens=tokens_cumulative, paths=list(paths))
+        steps.append(step)
+        ordered.extend(paths)
+        if tid:
+            tid_to_step[tid] = step
+
+    def attach(tid: str, paths: list[str]) -> None:
+        ordered.extend(paths)
+        step = tid_to_step.get(tid)
+        if step is not None:
+            step.paths.extend(paths)
 
     for line in trace_path.read_text(errors="replace").splitlines():
         line = line.strip()
@@ -330,53 +374,95 @@ def retrieved_files_from_trace(trace_path: Path) -> list[str]:
         if not isinstance(entry, dict):
             continue
 
+        ts = _parse_timestamp(entry.get("timestamp"))
+        if t0 is None and ts is not None:
+            t0 = ts
+
         msg_type = entry.get("type", "")
 
         if msg_type == "assistant":
             message = entry.get("message", entry)
+            usage = _usage_tokens(
+                message.get("usage") if isinstance(message, Mapping) else None
+            )
+            if usage is not None:
+                request_key = _usage_request_key(entry)
+                if request_key is None or request_key not in seen_request_ids:
+                    any_usage_seen = True
+                    tokens_cumulative += usage
+                    if request_key is not None:
+                        seen_request_ids.add(request_key)
+
             for block in _content_blocks(message):
-                if block.get("type") == "tool_use":
-                    name = block.get("name", "")
-                    tid = block.get("id", "")
-                    if tid and name:
-                        tool_id_to_name[tid] = name
-                    for fp in _extract_paths_from_tool_use(name, block.get("input", {})):
-                        _add(fp)
+                if block.get("type") != "tool_use":
+                    continue
+                name = block.get("name", "")
+                tid = block.get("id", "")
+                if tid and name:
+                    tool_id_to_name[tid] = name
+                open_step(ts, tid, candidates(
+                    _extract_paths_from_tool_use(name, block.get("input", {}))))
 
         elif msg_type == "user":
             message = entry.get("message", entry)
             for block in _content_blocks(message):
-                if block.get("type") == "tool_result":
-                    name = tool_id_to_name.get(block.get("tool_use_id", ""), "")
-                    if name:
-                        for fp in _extract_paths_from_tool_result(
-                            name, _result_text(block.get("content", ""))
-                        ):
-                            _add(fp)
+                if block.get("type") != "tool_result":
+                    continue
+                tid = block.get("tool_use_id", "")
+                name = tool_id_to_name.get(tid, "")
+                if not name:
+                    continue
+                attach(tid, candidates(_extract_paths_from_tool_result(
+                    name, _result_text(block.get("content", "")))))
 
         elif msg_type == "tool_use":
+            # Flat (non-Harbor) transcript shape.
             name = entry.get("tool_name", "") or entry.get("name", "")
             tid = entry.get("id", "")
             if tid and name:
                 tool_id_to_name[tid] = name
-            for fp in _extract_paths_from_tool_use(
-                name, entry.get("input", {}) or entry.get("tool_input", {})
-            ):
-                _add(fp)
+            open_step(ts, tid, candidates(_extract_paths_from_tool_use(
+                name, entry.get("input", {}) or entry.get("tool_input", {}))))
 
         elif msg_type == "tool_result":
             tid = entry.get("tool_use_id", "")
-            name = (
-                entry.get("tool_name", "")
-                or entry.get("name", "")
-                or tool_id_to_name.get(tid, "")
-            )
-            if name:
-                raw = entry.get("content", "") or entry.get("result", "")
-                for fp in _extract_paths_from_tool_result(name, _result_text(raw)):
-                    _add(fp)
+            name = (entry.get("tool_name", "")
+                    or entry.get("name", "")
+                    or tool_id_to_name.get(tid, ""))
+            if not name:
+                continue
+            raw = entry.get("content", "") or entry.get("result", "")
+            attach(tid, candidates(
+                _extract_paths_from_tool_result(name, _result_text(raw))))
 
+    return _TraceWalk(steps=steps, ordered_paths=ordered, t0=t0,
+                      any_usage_seen=any_usage_seen)
+
+
+def _dedup_first_seen(paths: list[str]) -> list[str]:
+    """Dedup on the normalized form, keeping the original string in first-seen
+    order so downstream rank metrics (MRR/MAP/@k) stay faithful."""
+    files: list[str] = []
+    seen: set[str] = set()
+    for path in paths:
+        norm = normalize_path(path)
+        if norm not in seen:
+            seen.add(norm)
+            files.append(path.strip())
     return files
+
+
+def retrieved_files_from_trace(trace_path: Path) -> list[str]:
+    """Parse ``agent_trace.jsonl`` → ordered, first-seen-unique file paths.
+
+    Local tools (``Read``/``Grep``/``Glob``) and MCP ``read_file`` contribute
+    their input path; MCP search tools contribute paths scraped from their
+    result payloads.
+    """
+    trace_path = Path(trace_path)
+    if not trace_path.is_file():
+        return []
+    return _dedup_first_seen(_walk_trace(trace_path).ordered_paths)
 
 
 def _content_blocks(message: Any) -> list[dict[str, Any]]:
@@ -476,6 +562,16 @@ def _path_components(path: str) -> tuple[str, ...]:
     return tuple(c for c in p.strip("/").split("/") if c)
 
 
+def _suffix_match(comps: tuple[str, ...], req_comps: tuple[str, ...]) -> bool:
+    """Do ``req_comps`` form a trailing slice of ``comps``?
+
+    The single definition of "this retrieved path is that required file", so
+    TTFR's notion of *found* cannot drift from recall's notion of *relevant*.
+    """
+    n = len(req_comps)
+    return bool(n) and len(comps) >= n and comps[-n:] == req_comps
+
+
 def _align_retrieved_to_required(
     retrieved: list[str], required: list[str]
 ) -> list[str]:
@@ -497,13 +593,11 @@ def _align_retrieved_to_required(
     seen: set[tuple[str, ...]] = set()
     for path in retrieved:
         comps = _path_components(path)
-        canon = path
+        canon, key = path, comps
         for req_str, req_comps in req_index:
-            n = len(req_comps)
-            if n and len(comps) >= n and comps[-n:] == req_comps:
-                canon = req_str
+            if _suffix_match(comps, req_comps):
+                canon, key = req_str, req_comps
                 break
-        key = _path_components(canon)
         if key and key not in seen:
             seen.add(key)
             aligned.append(canon)
@@ -515,20 +609,15 @@ def _path_matches_required(
 ) -> bool:
     """Does ``path`` count as a hit against the required set?
 
-    Mirrors exactly the two ways a retrieved path ends up counted as
-    relevant downstream: direct ``normalize_path`` equality (the ported IR
-    math's own equality test), or the component-suffix match
-    :func:`_align_retrieved_to_required` performs before that (so TTFR's
-    notion of "found" never disagrees with recall's).
+    The two ways a retrieved path ends up counted as relevant downstream:
+    direct ``normalize_path`` equality (the ported IR math's own equality
+    test), or the :func:`_suffix_match` that :func:`_align_retrieved_to_required`
+    performs before it.
     """
     if normalize_path(path) in required_norm:
         return True
     comps = _path_components(path)
-    for req_comps in required_comps:
-        n = len(req_comps)
-        if n and len(comps) >= n and comps[-n:] == req_comps:
-            return True
-    return False
+    return any(_suffix_match(comps, req) for req in required_comps)
 
 
 def _parse_timestamp(value: Any) -> float | None:
@@ -611,19 +700,36 @@ class TTFRResult:
     coverage: str
 
 
+def _ttfr_from_walk(walk: _TraceWalk, required_files: list[str]) -> TTFRResult:
+    """Scan an already-walked trace for the first step that opens a required
+    file. Each ``tool_use`` block is one turn (1-based); tokens and wall-clock
+    are the running totals as of that step."""
+    if not walk.steps:
+        return TTFRResult(None, None, None, "no_tool_calls")
+
+    required_norm = {normalize_path(f) for f in required_files}
+    required_comps = [_path_components(f) for f in required_files]
+
+    for turn, step in enumerate(walk.steps, 1):
+        if any(_path_matches_required(p, required_norm, required_comps)
+               for p in step.paths):
+            seconds = (round(step.ts - walk.t0, 3)
+                       if step.ts is not None and walk.t0 is not None else None)
+            tokens = step.tokens if walk.any_usage_seen else None
+            return TTFRResult(turn, tokens, seconds, "ok")
+
+    return TTFRResult(None, None, None, "not_found")
+
+
 def compute_ttfr(trace_path: Path, required_files: list[str]) -> TTFRResult:
     """Turns/tokens/seconds spent before the first required file is opened.
 
-    Walks ``agent_trace.jsonl`` once in file order, counting each ``tool_use``
-    block as one turn/step (1-based), accumulating token usage from each
-    assistant message's ``usage`` block, and using the entry's own
-    ``timestamp`` for wall-clock — no CSB-style trajectory.json synthesis or
-    seconds-per-step calibration needed, since EB's trace already carries
-    both natively. A step's candidate files are the union of its tool_use
-    *input* paths (known immediately) and its paired tool_result's scraped
-    paths (known once the result arrives); both pass through the same
-    :func:`_looks_like_file` gate used elsewhere so junk (flags, grep
-    patterns) can't spuriously register a hit.
+    A step's candidate files are the union of its tool_use *input* paths and
+    its paired tool_result's scraped paths, both gated by
+    :func:`_looks_like_file` so junk (flags, grep patterns) can't spuriously
+    register a hit. Wall-clock and tokens come from the trace's own
+    ``timestamp``/``usage`` fields — no CSB-style trajectory.json synthesis or
+    seconds-per-step calibration needed.
 
     Always returns a :class:`TTFRResult` — never a bare ``None`` — so the
     caller can tell an observability gap (``"no_trace"``, ``"no_tool_calls"``)
@@ -634,140 +740,7 @@ def compute_ttfr(trace_path: Path, required_files: list[str]) -> TTFRResult:
         return TTFRResult(None, None, None, "no_trace")
     if not required_files:
         return TTFRResult(None, None, None, "no_ground_truth")
-
-    required_norm = {normalize_path(f) for f in required_files}
-    required_comps = [_path_components(f) for f in required_files]
-
-    t0: float | None = None
-    tokens_cumulative = 0
-    any_usage_seen = False
-    step_index = 0
-    tool_id_to_name: dict[str, str] = {}
-    # step position (index into `steps`) keyed by tool_use_id, so a later
-    # tool_result can attach its scraped paths to the step it belongs to.
-    tid_to_pos: dict[str, int] = {}
-    # requestId values already counted toward tokens_cumulative — see
-    # _usage_request_key: one API call can log several assistant-type
-    # lines (thinking/text/tool_use, even several tool_use blocks) sharing
-    # one usage snapshot, so each requestId's tokens count once, not once
-    # per line.
-    seen_request_ids: set[str] = set()
-    # Each element: [step_index, timestamp|None, tokens_cumulative|None, [raw paths]]
-    steps: list[list[Any]] = []
-
-    for line in trace_path.read_text(errors="replace").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            entry = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(entry, dict):
-            continue
-
-        ts = _parse_timestamp(entry.get("timestamp"))
-        if t0 is None and ts is not None:
-            t0 = ts
-
-        msg_type = entry.get("type", "")
-
-        if msg_type == "assistant":
-            message = entry.get("message", entry)
-            usage_tokens = _usage_tokens(message.get("usage") if isinstance(message, Mapping) else None)
-            if usage_tokens is not None:
-                request_key = _usage_request_key(entry)
-                already_counted = request_key is not None and request_key in seen_request_ids
-                if not already_counted:
-                    any_usage_seen = True
-                    tokens_cumulative += usage_tokens
-                    if request_key is not None:
-                        seen_request_ids.add(request_key)
-
-            for block in _content_blocks(message):
-                if block.get("type") != "tool_use":
-                    continue
-                name = block.get("name", "")
-                tid = block.get("id", "")
-                step_index += 1
-                if tid and name:
-                    tool_id_to_name[tid] = name
-                raw_paths = [
-                    p
-                    for p in _extract_paths_from_tool_use(name, block.get("input", {}))
-                    if _looks_like_file(normalize_path(p))
-                ]
-                steps.append([step_index, ts, tokens_cumulative, raw_paths])
-                if tid:
-                    tid_to_pos[tid] = len(steps) - 1
-
-        elif msg_type == "user":
-            message = entry.get("message", entry)
-            for block in _content_blocks(message):
-                if block.get("type") != "tool_result":
-                    continue
-                tid = block.get("tool_use_id", "")
-                name = tool_id_to_name.get(tid, "")
-                if not name:
-                    continue
-                raw_paths = [
-                    p
-                    for p in _extract_paths_from_tool_result(name, _result_text(block.get("content", "")))
-                    if _looks_like_file(normalize_path(p))
-                ]
-                pos = tid_to_pos.get(tid)
-                if pos is not None and raw_paths:
-                    steps[pos][3].extend(raw_paths)
-
-        elif msg_type == "tool_use":
-            # Flat (non-Harbor) transcript shape — mirrors the equivalent
-            # branch in retrieved_files_from_trace so a trace shape that
-            # yields retrieval signal there isn't a silent TTFR blind spot.
-            name = entry.get("tool_name", "") or entry.get("name", "")
-            tid = entry.get("id", "")
-            step_index += 1
-            if tid and name:
-                tool_id_to_name[tid] = name
-            raw_paths = [
-                p
-                for p in _extract_paths_from_tool_use(
-                    name, entry.get("input", {}) or entry.get("tool_input", {})
-                )
-                if _looks_like_file(normalize_path(p))
-            ]
-            steps.append([step_index, ts, tokens_cumulative, raw_paths])
-            if tid:
-                tid_to_pos[tid] = len(steps) - 1
-
-        elif msg_type == "tool_result":
-            tid = entry.get("tool_use_id", "")
-            name = (
-                entry.get("tool_name", "")
-                or entry.get("name", "")
-                or tool_id_to_name.get(tid, "")
-            )
-            if not name:
-                continue
-            raw = entry.get("content", "") or entry.get("result", "")
-            raw_paths = [
-                p
-                for p in _extract_paths_from_tool_result(name, _result_text(raw))
-                if _looks_like_file(normalize_path(p))
-            ]
-            pos = tid_to_pos.get(tid)
-            if pos is not None and raw_paths:
-                steps[pos][3].extend(raw_paths)
-
-    if step_index == 0:
-        return TTFRResult(None, None, None, "no_tool_calls")
-
-    for s_index, s_ts, s_tokens, s_paths in steps:
-        if any(_path_matches_required(p, required_norm, required_comps) for p in s_paths):
-            ttfr_seconds = round(s_ts - t0, 3) if (s_ts is not None and t0 is not None) else None
-            tokens_val = s_tokens if any_usage_seen else None
-            return TTFRResult(s_index, tokens_val, ttfr_seconds, "ok")
-
-    return TTFRResult(None, None, None, "not_found")
+    return _ttfr_from_walk(_walk_trace(trace_path), required_files)
 
 
 def compute_run_ir_scores(
@@ -788,7 +761,12 @@ def compute_run_ir_scores(
     on the same trace/ground-truth pair, so a caller who only wants recall
     still gets TTFR for free.
     """
-    retrieved_raw = retrieved_files_from_trace(trace_path)
+    trace_path = Path(trace_path)
+    if not trace_path.is_file():
+        return None
+    walk = _walk_trace(trace_path)
+
+    retrieved_raw = _dedup_first_seen(walk.ordered_paths)
     if not retrieved_raw:
         return None
     required = required_files_from_ground_truth(gt_path)
@@ -797,7 +775,7 @@ def compute_run_ir_scores(
 
     retrieved = _align_retrieved_to_required(retrieved_raw, required)
     scores = compute_ir_scores(retrieved, required, task_id, config_name)
-    ttfr = compute_ttfr(trace_path, required)
+    ttfr = _ttfr_from_walk(walk, required)
     return replace(
         scores,
         turns_to_first_relevant=ttfr.turns_to_first_relevant,

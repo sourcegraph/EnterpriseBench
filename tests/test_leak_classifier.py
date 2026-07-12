@@ -61,10 +61,6 @@ def test_classify_bucket_parity(instruction, oracle_files, oracle_symbols, want_
     assert got.bucket == want_bucket
 
 
-def test_selftest_passes():
-    assert lc._selftest() == 0
-
-
 def test_dir_bucket_requires_path_form_not_bare_noun():
     """A bare domain noun ("the escalation service") must NOT trigger DIR --
     only path form ("escalation/") does. High-precision design: avoids

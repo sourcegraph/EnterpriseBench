@@ -231,6 +231,10 @@ def localization_at_k(retrieved: list[str], relevant: set[str], k: int) -> float
     stratum labeling (jn73.2 Gate C) keys on. ``k <= 0`` and an empty
     ``relevant`` set (no rank exists to hit) both yield 0.0, matching
     ``mrr``'s own behavior on an empty relevant set.
+
+    Reported in every ``IRScores`` payload; no gate consumes it yet. (Gate C
+    keys on turns-to-first-relevant, not on this — see
+    ``scripts/validation/stratum_selector.score_gate_c``.)
     """
     if k <= 0:
         return 0.0

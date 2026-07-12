@@ -109,14 +109,9 @@ if __package__ in (None, ""):  # pragma: no cover - script-mode only
     sys.path.insert(0, str(_REPO_ROOT / "lib"))
 
 from eb_metrics.retrieval_extraction import compute_ttfr  # noqa: E402
+from scripts.lib.tasks import find_task_dirs  # noqa: E402
 from scripts.validation import crnt_validator  # noqa: E402
 from scripts.validation import leak_classifier as lc  # noqa: E402
-
-try:
-    import tomllib
-except ImportError:  # pragma: no cover - py<3.11
-    import tomli as tomllib  # type: ignore[no-redef]
-
 
 ARTIFACT_VERSION = "enterprise_v1"
 
@@ -746,31 +741,26 @@ def _declared_repos(task_toml: dict[str, Any]) -> set[str]:
     """The repo identities the baseline actually clones.
 
     Keyed on ``[[repos]].path`` -- the directory the sandbox clones INTO
-    (dockerfile_generator clones to /workspace/{path}) and the same key
-    crnt_validator uses and that ground_truth's ``repo`` tag refers to.
+    (dockerfile_generator clones to /workspace/{path}), which is also the key
+    ground_truth's ``repo`` tag refers to. Keying on the URL basename instead
+    silently diverges whenever a task picks a disambiguating path (docker/cli
+    is cloned to `docker-cli`, aws/aws-cli to `awscli`), which made Gate A
+    compute `missing = {docker-cli} - {cli}` and FAIL 6 tasks whose repos were
+    in fact cloned.
 
-    An earlier version keyed on ``name`` (which no task defines) and fell back to
-    the URL basename, which silently diverges whenever a task deliberately picks
-    a disambiguating path: docker/cli is cloned to `docker-cli`, aws/aws-cli to
-    `awscli`. Gate A then computed `missing = {docker-cli} - {cli}` and FAILED 6
-    tasks whose repos were, in fact, cloned. Falsely shrinking the pool in the
-    very gate under audit -- and biased toward the multi-repo tasks that need
-    disambiguating paths in the first place.
+    ``crnt_validator.extract_repos`` already reads exactly this key, and Gate D
+    scores CRNT off the same parse -- so both gates read one definition of "a
+    declared repo" rather than two that can drift.
     """
-    out: set[str] = set()
-    for r in (task_toml.get("repos") or []):
-        key = r.get("path") or r.get("name") \
-            or r.get("url", "").rstrip("/").split("/")[-1]
-        if key:
-            out.add(key)
-    return out
+    return {r.path for r in crnt_validator.extract_repos(task_toml) if r.path}
 
 
-def _oracle_repos(task_dir: Path, task_toml: dict[str, Any]) -> set[str]:
-    gt = lc.load_ground_truth(task_dir, task_toml)
+def _oracle_repos(ground_truth: dict[str, Any]) -> set[str]:
+    """The repos the oracle files actually live in, off the already-loaded
+    ground truth -- Gate A does not re-read the task to get them."""
     out: set[str] = set()
     for key in ("required_files", "sufficient_files"):
-        for entry in (gt.get(key) or []):
+        for entry in (ground_truth.get(key) or []):
             if isinstance(entry, dict) and entry.get("repo"):
                 out.add(entry["repo"])
     return out
@@ -814,24 +804,30 @@ def score_task(task_dir: Path,
                params: SelectorParams,
                measurements: dict[str, dict[str, Any]] | None = None,
                runs_root: Path | None = None) -> TaskGates | None:
-    task_toml_path = task_dir / "task.toml"
-    if not task_toml_path.is_file():
+    """Score one task against all six gates off a SINGLE read of it.
+
+    ``lc.load_task`` is the one loader: it parses task.toml, instruction.md and
+    the merged ground truth once, and every gate is fed from that parse. No gate
+    re-opens the task behind its own loader -- that costs redundant I/O and, far
+    worse, lets two gates disagree about what the same task says.
+    """
+    if not (task_dir / "task.toml").is_file():
         return None
 
     task_id = task_dir.name
     suite = task_dir.parent.name
+
     try:
-        task_toml = tomllib.loads(task_toml_path.read_text(encoding="utf-8"))
+        oracle = lc.load_task(task_dir)
     except Exception as exc:
         return unloadable_task_gates(task_id, suite, f"unparseable task.toml: {exc}")
-
-    oracle = lc.load_task(task_dir)
     if oracle is None:
         # M2: never a silent skip.
         return unloadable_task_gates(
             task_id, suite, "no instruction+ground_truth oracle could be loaded"
         )
 
+    task_toml = oracle.task_toml
     # The run set is keyed by [task].id, which is NOT the directory name.
     run_key = (task_toml.get("task") or {}).get("id") or task_id
 
@@ -844,9 +840,9 @@ def score_task(task_dir: Path,
     stratum = task_toml.get("difficulty_stratum", "")
 
     gates = {
-        "A": score_gate_a(declared, _oracle_repos(task_dir, task_toml),
+        "A": score_gate_a(declared, _oracle_repos(oracle.ground_truth),
                           has_oracle_files=bool(oracle.oracle_files)),
-        "B": score_gate_b(lc.decide_task_dir(task_dir), params.gate_b_mode,
+        "B": score_gate_b(lc.decide(run_key, oracle), params.gate_b_mode,
                           oracle.oracle_files),
         "C": score_gate_c(m.get("C")),
         "D": score_gate_d(declared, oracle.oracle_files, params.module_granularity,
@@ -863,11 +859,7 @@ def score_corpus(root: Path,
                  measurements: dict[str, dict[str, Any]] | None = None,
                  runs_root: Path | None = None) -> list[TaskGates]:
     out: list[TaskGates] = []
-    for toml_path in sorted(root.rglob("task.toml")):
-        task_dir = toml_path.parent
-        rel = task_dir.relative_to(root) if task_dir.is_relative_to(root) else task_dir
-        if rel.parts and rel.parts[0] in ("mined", "_archived", "strata"):
-            continue
+    for task_dir in find_task_dirs(root):
         scored = score_task(task_dir, params, measurements, runs_root)
         if scored is not None:
             out.append(scored)
@@ -894,17 +886,39 @@ def build_artifact(root: Path,
     )
 
 
+def measure_corpus_ttfr(root: Path, runs_root: Path) -> dict[str, dict[str, Any]]:
+    """Gate C's measurement for every task in the corpus, computed once.
+
+    Gate C reads baseline traces, which depend on neither knob below, so a knob
+    sweep must not re-read them once per combination.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for task_dir in find_task_dirs(root):
+        oracle = lc.load_task(task_dir)
+        if oracle is None:
+            continue
+        run_key = (oracle.task_toml.get("task") or {}).get("id") or task_dir.name
+        out[task_dir.name] = {
+            "C": measure_ttfr(run_key, oracle.oracle_files, runs_root)
+        }
+    return out
+
+
 def _sensitivity(root: Path, runs_root: Path | None) -> int:
     """Print the pool size under all four readings of the two ambiguous knobs.
 
     The acceptance criterion asks for >=50 tasks; whether that is met depends
     on choices the bead leaves open. Printing the band is the honest answer.
     """
+    # Gate C is knob-independent: score the traces once, reuse across the 2x2.
+    measurements = measure_corpus_ttfr(root, runs_root) if runs_root else None
+
     print("Candidate-pool sensitivity (no gate has FAILED; C is partial, E/F pending):\n")
     print(f"  {'gate_b_mode':<12} {'module_granularity':<20} {'pool':>5}")
     for b_mode in ("strict", "ref_impl"):
         for gran in ("top_segment", "parent_dir"):
-            art = build_artifact(root, SelectorParams(b_mode, gran), runs_root=runs_root)
+            art = build_artifact(root, SelectorParams(b_mode, gran),
+                                 measurements=measurements)
             n = len(art.candidate_task_ids())
             flag = "" if n >= 50 else "   <-- BELOW the >=50 acceptance criterion"
             print(f"  {b_mode:<12} {gran:<20} {n:>5}{flag}")

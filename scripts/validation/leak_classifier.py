@@ -42,7 +42,6 @@ Usage:
     python3 scripts/validation/leak_classifier.py <task_dir>          # one task
     python3 scripts/validation/leak_classifier.py --corpus benchmarks/  # batch
     python3 scripts/validation/leak_classifier.py --corpus benchmarks/ --json
-    python3 scripts/validation/leak_classifier.py --selftest
 """
 
 from __future__ import annotations
@@ -55,6 +54,15 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any
+
+# Path setup ONLY in script mode, where the repo root is not yet importable.
+# When imported as `scripts.validation.leak_classifier` (tests, stratum_selector)
+# __package__ is set and we touch nothing: mutating sys.path at import time makes
+# unrelated tests pass or fail depending on collection order.
+if __package__ in (None, ""):  # pragma: no cover - script-mode only
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
+from scripts.lib.tasks import find_task_dirs  # noqa: E402
 
 try:
     import tomllib
@@ -125,21 +133,10 @@ GENERIC_MANIFEST_BASENAMES = frozenset({
 # until then these aliases mark the shared surface explicitly.
 
 
-def strip_repo_slug(path: str) -> str:
-    """Public alias of :func:`_strip_repo_slug`."""
-    return _strip_repo_slug(path)
-
-
-def load_ground_truth(task_dir: "Path", task_toml: dict[str, Any]) -> dict[str, Any]:
-    """Public alias of :func:`_load_ground_truth`."""
-    return _load_ground_truth(task_dir, task_toml)
-
-
 @dataclass(frozen=True)
 class Leak:
     bucket: Bucket
     token: str        # the leaking token; "" for behavioral / grep_hard
-    admit: bool
     # EB addition (not in the CSB reference): the full oracle file path (as
     # given in ground_truth) that triggered an EXACT_PATH/DIR bucket. `token`
     # may be only a basename or a partial two-segment fragment of a longer
@@ -149,6 +146,12 @@ class Leak:
     # overload `token` and risk breaking bucket-classification parity with
     # the CSB reference's self-test.
     source_path: str = ""
+
+    @property
+    def admit(self) -> bool:
+        """A leak admits iff its bucket is not a rejecting one. Derived, not
+        stored, so the two can never be set out of step."""
+        return self.bucket not in REJECT
 
 
 def _distinctive(token: str) -> bool:
@@ -160,7 +163,7 @@ def _distinctive(token: str) -> bool:
     return has_camel or "_" in t or len(t) >= 8
 
 
-def _strip_repo_slug(path: str) -> str:
+def strip_repo_slug(path: str) -> str:
     """Drop a leading `repo--hexhash/` wrapper and any `repo::` prefix."""
     p = path.replace("\\", "/")
     p = re.sub(r"^[^/]+--[0-9a-f]{6,}/", "", p)
@@ -169,7 +172,7 @@ def _strip_repo_slug(path: str) -> str:
 
 def _path_parts(path: str) -> tuple[str, list[str], list[str]]:
     """Return (basename, distinctive-dir-segments, all-segments)."""
-    segs = [s for s in _strip_repo_slug(path).split("/") if s]
+    segs = [s for s in strip_repo_slug(path).split("/") if s]
     basename = segs[-1] if segs else ""
     dirs = [s for s in segs[:-1] if s.lower() not in _GENERIC_DIRS]
     return basename, dirs, segs
@@ -209,16 +212,16 @@ def classify(instruction: str,
         is_generic = (basename in GENERIC_MANIFEST_BASENAMES
                       and oracle_has_non_generic)
         if basename and not is_generic and names(basename):
-            return Leak(Bucket.EXACT_PATH, basename, admit=False, source_path=f)
+            return Leak(Bucket.EXACT_PATH, basename, source_path=f)
         for i in range(len(segs) - 1):
             frag = "/".join(segs[i:i + 2]).lower()
             if frag and frag in ins:
-                return Leak(Bucket.EXACT_PATH, frag, admit=False, source_path=f)
+                return Leak(Bucket.EXACT_PATH, frag, source_path=f)
 
     # 2) distinctive oracle symbol named verbatim
     for sym in (oracle_symbols or []):
         if _distinctive(sym) and names(sym):
-            return Leak(Bucket.SYMBOL, sym, admit=False)
+            return Leak(Bucket.SYMBOL, sym)
 
     # 3) distinctive containing directory, but only when named in PATH form
     #    (`escalation/`), not as a bare domain noun ("the escalation service").
@@ -227,12 +230,12 @@ def classify(instruction: str,
         _basename, dirs, _segs = _path_parts(f)
         for d in dirs:
             if _distinctive(d) and (d.lower() + "/") in ins:
-                return Leak(Bucket.DIR, d, admit=False, source_path=f)
+                return Leak(Bucket.DIR, d, source_path=f)
 
     # 4) no locational leak -> admit; grep_hard if targets are dispersed
     repos = {re.split(r"[/:]", f, 1)[0] for f in oracle_files}
     dispersed = len(oracle_files) >= 3 or len(repos) >= 2
-    return Leak(Bucket.GREP_HARD if dispersed else Bucket.BEHAVIORAL, "", admit=True)
+    return Leak(Bucket.GREP_HARD if dispersed else Bucket.BEHAVIORAL, "")
 
 
 # --- EB task loader (task.toml [ground_truth], NOT expected_solution.json) --
@@ -268,7 +271,7 @@ def _flatten_gt_paths(ground_truth: dict[str, Any]) -> list[str]:
     return out
 
 
-def _load_ground_truth(task_dir: Path, task_toml: dict[str, Any]) -> dict[str, Any]:
+def load_ground_truth(task_dir: Path, task_toml: dict[str, Any]) -> dict[str, Any]:
     """Merge task.toml [ground_truth] with ground_truth.json (toml wins).
 
     Mirrors ``qa_adapter.load_task_inputs``'s merge rule exactly: the
@@ -314,9 +317,18 @@ def _load_waiver_tokens(task_toml: dict[str, Any]) -> set[str]:
 
 @dataclass(frozen=True)
 class TaskOracle:
+    """Everything a gate needs from one task on disk, read exactly once.
+
+    ``ground_truth`` is the merged toml+json table ``oracle_files`` was
+    flattened from. It is carried rather than dropped so a caller that needs the
+    structured entries (Gate A wants each entry's ``repo``) does not have to
+    re-read the task off disk to get them back.
+    """
+
     instruction: str
     oracle_files: list[str]
     task_toml: dict[str, Any] = field(default_factory=dict)
+    ground_truth: dict[str, Any] = field(default_factory=dict)
 
 
 def load_task(task_dir: Path) -> TaskOracle | None:
@@ -333,12 +345,13 @@ def load_task(task_dir: Path) -> TaskOracle | None:
     instr_path = task_dir / "instruction.md"
     instruction = instr_path.read_text(errors="replace") if instr_path.is_file() else ""
 
-    ground_truth = _load_ground_truth(task_dir, task_toml)
+    ground_truth = load_ground_truth(task_dir, task_toml)
     oracle_files = _flatten_gt_paths(ground_truth)
 
     if not instruction or not oracle_files:
         return None
-    return TaskOracle(instruction=instruction, oracle_files=oracle_files, task_toml=task_toml)
+    return TaskOracle(instruction=instruction, oracle_files=oracle_files,
+                      task_toml=task_toml, ground_truth=ground_truth)
 
 
 # --- Gate B decision (Option B: waiver-aware admission) ---------------------
@@ -408,42 +421,15 @@ def decide_task_dir(task_dir: Path) -> GateBResult | None:
     return decide(task_id, oracle)
 
 
-# --- selftest / CLI ---------------------------------------------------------
-
-def _selftest() -> int:
-    cases = [
-        ("Fix the null-deref in cmd/argocd-server/main.go on startup.",
-         ["cmd/argocd-server/main.go"], [], Bucket.EXACT_PATH),
-        ("The retry loop double-counts attempts after a transient failure; "
-         "callers see inflated attempt numbers. Correct the accounting.",
-         ["sg-evals/foo--a1b2c3d4/pkg/backoff/retry.go"], [], Bucket.BEHAVIORAL),
-        ("ParseUpstreamConfig mishandles empty host lists.",
-         ["source/common/config/parser.cc"], ["ParseUpstreamConfig"], Bucket.SYMBOL),
-        ("Requests to the escalation service fan out across the gateway and the "
-         "billing service and lose their trace id somewhere in the chain.",
-         ["gw/trace.go", "billing/ctx.go", "escalation/mw.go"], [], Bucket.GREP_HARD),
-    ]
-    ok = True
-    for ins, files, syms, want in cases:
-        got = classify(ins, files, syms)
-        flag = "ok " if got.bucket == want else "FAIL"
-        ok = ok and got.bucket == want
-        print(f"[{flag}] want={want.value:11} got={got.bucket.value:11} "
-              f"token={got.token!r}")
-    return 0 if ok else 1
-
+# --- CLI --------------------------------------------------------------------
 
 def _run_corpus(root: Path, *, as_json: bool) -> int:
     results: list[GateBResult] = []
     unreadable: list[str] = []
-    for toml_path in sorted(root.rglob("task.toml")):
-        task_dir = toml_path.parent
-        rel = task_dir.relative_to(root) if task_dir.is_relative_to(root) else task_dir
-        if rel.parts and rel.parts[0] in ("mined", "_archived"):
-            continue
+    for task_dir in find_task_dirs(root):
         result = decide_task_dir(task_dir)
         if result is None:
-            unreadable.append(str(rel))
+            unreadable.append(str(task_dir.relative_to(root)))
             continue
         results.append(result)
 
@@ -489,12 +475,9 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("task_dir", nargs="?", help="Single task directory to classify")
     parser.add_argument("--corpus", metavar="ROOT", help="Batch-classify every task.toml under ROOT")
-    parser.add_argument("--selftest", action="store_true", help="Run the bucket self-test")
     parser.add_argument("--json", action="store_true", help="JSON output (--corpus only)")
     args = parser.parse_args(argv)
 
-    if args.selftest:
-        return _selftest()
     if args.corpus:
         return _run_corpus(Path(args.corpus), as_json=args.json)
     if not args.task_dir:
