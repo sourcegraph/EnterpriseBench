@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -61,7 +61,7 @@ class TraceUsage:
     cache_write_tokens: int
     cache_read_tokens: int
     model: str
-    num_turns: int
+    num_requests: int
 
 
 @dataclass(frozen=True)
@@ -82,53 +82,51 @@ class TaskCost:
 # ---------------------------------------------------------------------------
 
 
-def _request_key(entry: dict[str, Any], line_no: int) -> tuple[str, bool]:
-    """Return (key identifying the API request this line belongs to, is_grouped).
+def _request_key(entry: dict[str, Any]) -> str | None:
+    """Return the key identifying the API request a trace line belongs to.
 
     A trace emits one assistant line per content block (thinking / text /
-    tool_use), and every line of a single API request repeats that request's
-    usage snapshot. Grouping by request is what keeps one multi-block turn from
-    being billed two or three times.
+    tool_use), and every line of one API request repeats that request's usage
+    snapshot. Grouping by request is what keeps a multi-block turn from being
+    billed once per block.
 
     ``requestId`` carries the grouping in every assistant line of the current
-    corpus. ``message.id`` is a verified 1:1 stand-in and covers a writer that
-    omits ``requestId``. A line with neither key falls back to its own line
-    number, which bills it exactly once — correct for legacy single-block
-    traces, where each line already is its own request.
+    corpus; ``message.id`` is a verified 1:1 stand-in for a writer that omits
+    it. None means the line announces no request of its own.
     """
 
     rid = entry.get("requestId")
     if isinstance(rid, str) and rid:
-        return rid, True
+        return rid
 
     msg_id = (entry.get("message") or {}).get("id")
     if isinstance(msg_id, str) and msg_id:
-        return msg_id, True
+        return msg_id
 
-    return f"__line_{line_no}__", False
+    return None
 
 
 def parse_trace(trace_path: Path) -> TraceUsage:
     """Read an agent_trace.jsonl and sum token usage once per API request.
 
-    Usage is deduplicated by request (see :func:`_request_key`): summing every
-    assistant line instead counts one request's tokens once per content block,
-    which inflated cost by 1.34x-3.03x by a factor that varied per arm.
+    Usage is deduplicated per request (see :func:`_request_key`); summing every
+    assistant line instead billed one request once per content block.
 
-    Selection within a request is per field, because the fields behave
-    differently: input and cache counts are invariant across a request's lines,
-    so any member carries them; ``output_tokens`` streams upward and is complete
-    only on the final line. Taking the max-output record yields the complete
-    snapshot for both. Max rather than strictly-last also survives a trailing
-    all-zero ``isApiErrorMessage`` record, which would otherwise bill a real
-    request at zero.
+    Within a request, the max-``output_tokens`` record is the one that carries
+    the complete snapshot: input and cache counts are invariant across the
+    request's lines, while ``output_tokens`` streams upward and is final only on
+    the last one. Max rather than last also survives a trailing all-zero
+    ``isApiErrorMessage`` record, which last-wins would bill at zero.
 
-    Note: usage attached to non-assistant lines (sub-agent / Task tool results)
-    is out of scope here and is not counted — see EnterpriseBench-jepu.
+    Usage on non-assistant lines (sub-agent / Task tool results) is not counted
+    — see EnterpriseBench-jepu.
     """
 
-    # request key -> the chosen (most complete) usage snapshot for that request
-    selected: dict[str, dict[str, Any]] = {}
+    # request key -> that request's most complete usage snapshot. A line with no
+    # request key of its own is keyed by line number (an int, so it can never
+    # collide with a requestId) and therefore billed exactly once — correct for
+    # legacy single-block traces, where each line already is its own request.
+    selected: dict[str | int, dict[str, Any]] = {}
     model = ""
     ungrouped_lines = 0
 
@@ -159,8 +157,9 @@ def parse_trace(trace_path: Path) -> TraceUsage:
             if not usage:
                 continue
 
-            key, grouped = _request_key(entry, line_no)
-            if not grouped:
+            key = _request_key(entry)
+            if key is None:
+                key = line_no
                 ungrouped_lines += 1
 
             previous = selected.get(key)
@@ -171,24 +170,24 @@ def parse_trace(trace_path: Path) -> TraceUsage:
 
     if ungrouped_lines:
         logger.warning(
-            "%s: %d assistant line(s) carry neither requestId nor message.id and "
-            "were billed per line. If the trace format dropped those keys, "
-            "per-content-block double-counting is silently back.",
+            "%s: %d assistant line(s) carry neither requestId nor message.id, so "
+            "each was billed as its own request. Correct for legacy single-block "
+            "traces; if the current format dropped those keys, this undercounts "
+            "grouping and cost is inflated again.",
             trace_path,
             ungrouped_lines,
         )
 
+    def total(field: str) -> int:
+        return sum(u.get(field, 0) for u in selected.values())
+
     return TraceUsage(
-        input_tokens=sum(u.get("input_tokens", 0) for u in selected.values()),
-        output_tokens=sum(u.get("output_tokens", 0) for u in selected.values()),
-        cache_write_tokens=sum(
-            u.get("cache_creation_input_tokens", 0) for u in selected.values()
-        ),
-        cache_read_tokens=sum(
-            u.get("cache_read_input_tokens", 0) for u in selected.values()
-        ),
+        input_tokens=total("input_tokens"),
+        output_tokens=total("output_tokens"),
+        cache_write_tokens=total("cache_creation_input_tokens"),
+        cache_read_tokens=total("cache_read_input_tokens"),
         model=model or DEFAULT_MODEL,
-        num_turns=len(selected),
+        num_requests=len(selected),
     )
 
 
@@ -357,23 +356,21 @@ def aggregate_report(costs: list[TaskCost]) -> dict[str, Any]:
             "suite": tc.suite,
             "difficulty": tc.difficulty,
             "model": tc.usage.model,
-            "model_priced": tc.usage.model in PRICING,
             "input_tokens": tc.usage.input_tokens,
             "output_tokens": tc.usage.output_tokens,
             "cache_write_tokens": tc.usage.cache_write_tokens,
             "cache_read_tokens": tc.usage.cache_read_tokens,
-            "num_requests": tc.usage.num_turns,
+            "num_requests": tc.usage.num_requests,
             "cost_usd": tc.cost_usd,
             "agent_duration_seconds": tc.agent_duration_seconds,
         }
         for tc in sorted(costs, key=lambda c: c.task_id)
     ]
 
-    # An unpriced model is billed at DEFAULT_MODEL rates by compute_cost. In the
-    # corpus those models cluster in a single arm, so the substitution skews
-    # arm-to-arm cost deltas, not just absolute cost. Carry the caveat in the
-    # report itself — a warning in a batch log does not reach whoever reads the
-    # JSON.
+    # compute_cost bills an unpriced model at DEFAULT_MODEL rates. Those models
+    # cluster in a single arm, so the substitution skews arm-to-arm cost deltas,
+    # not just absolute cost. The caveat rides in the report itself — a warning
+    # in a batch log does not reach whoever reads the JSON.
     unpriced_models = sorted(
         {tc.usage.model for tc in costs if tc.usage.model not in PRICING}
     )

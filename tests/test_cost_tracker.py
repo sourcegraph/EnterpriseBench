@@ -6,14 +6,12 @@ import json
 import sys
 from pathlib import Path
 
-import pytest
 
 # Make scripts importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from cost_tracker import (
     DEFAULT_MODEL,
-    PRICING,
     TaskCost,
     TraceUsage,
     aggregate_report,
@@ -43,21 +41,35 @@ def _assistant_entry(
     cache_creation: int = 0,
     cache_read: int = 0,
     model: str = "claude-sonnet-4-6",
+    request_id: str | None = None,
+    message_id: str | None = None,
+    block_type: str | None = None,
 ) -> dict:
-    """Build a minimal assistant trace entry."""
-    return {
-        "type": "assistant",
-        "message": {
-            "model": model,
-            "role": "assistant",
-            "usage": {
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "cache_creation_input_tokens": cache_creation,
-                "cache_read_input_tokens": cache_read,
-            },
+    """Build an assistant trace entry — the one wire shape the parser reads.
+
+    The request keys are optional so a single helper covers both trace
+    generations: a legacy line that announces no request of its own, and a
+    content-block line carrying ``requestId`` / ``message.id`` / ``content``.
+    """
+    message: dict = {
+        "model": model,
+        "role": "assistant",
+        "usage": {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cache_creation_input_tokens": cache_creation,
+            "cache_read_input_tokens": cache_read,
         },
     }
+    if message_id is not None:
+        message["id"] = message_id
+    if block_type is not None:
+        message["content"] = [{"type": block_type}]
+
+    entry: dict = {"type": "assistant", "message": message}
+    if request_id is not None:
+        entry["requestId"] = request_id
+    return entry
 
 
 def _block_entry(
@@ -67,33 +79,23 @@ def _block_entry(
     input_tokens: int = 3,
     cache_creation: int = 2686,
     cache_read: int = 14244,
-    model: str = "claude-sonnet-4-6",
-    message_id: str | None = None,
 ) -> dict:
-    """Build an assistant entry shaped like a real EB content-block line.
+    """An assistant entry shaped like a real EB content-block line.
 
     Real traces emit one line per assistant content block (thinking / text /
-    tool_use). Every line of a single API request repeats that request's
-    ``requestId``, ``message.id`` and usage snapshot: input/cache values are
-    identical across the group, while ``output_tokens`` streams upward and is
-    complete only on the group's final line.
+    tool_use). Every line of one API request repeats that request's keys and
+    usage snapshot: input/cache are identical across the group, while
+    ``output_tokens`` streams upward and is complete only on the final line.
     """
-    return {
-        "type": "assistant",
-        "requestId": request_id,
-        "message": {
-            "id": message_id or f"msg_{request_id}",
-            "model": model,
-            "role": "assistant",
-            "content": [{"type": block_type}],
-            "usage": {
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "cache_creation_input_tokens": cache_creation,
-                "cache_read_input_tokens": cache_read,
-            },
-        },
-    }
+    return _assistant_entry(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cache_creation=cache_creation,
+        cache_read=cache_read,
+        request_id=request_id,
+        message_id=f"msg_{request_id}",
+        block_type=block_type,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +115,7 @@ class TestParseTrace:
         assert usage.cache_write_tokens == 0
         assert usage.cache_read_tokens == 0
         assert usage.model == "claude-sonnet-4-6"
-        assert usage.num_turns == 1
+        assert usage.num_requests == 1
 
     def test_multiple_messages_summed(self, tmp_path: Path) -> None:
         trace = _write_trace(
@@ -129,13 +131,13 @@ class TestParseTrace:
         assert usage.output_tokens == 80
         assert usage.cache_write_tokens == 10
         assert usage.cache_read_tokens == 500
-        assert usage.num_turns == 2
+        assert usage.num_requests == 2
 
     def test_empty_trace(self, tmp_path: Path) -> None:
         trace = _write_trace(tmp_path / "agent_trace.jsonl", [])
         usage = parse_trace(trace)
         assert usage.input_tokens == 0
-        assert usage.num_turns == 0
+        assert usage.num_requests == 0
         assert usage.model == DEFAULT_MODEL
 
     def test_malformed_lines_skipped(self, tmp_path: Path) -> None:
@@ -148,7 +150,7 @@ class TestParseTrace:
             )
         usage = parse_trace(path)
         assert usage.input_tokens == 42
-        assert usage.num_turns == 1
+        assert usage.num_requests == 1
 
     def test_non_assistant_entries_ignored(self, tmp_path: Path) -> None:
         trace = _write_trace(
@@ -159,7 +161,7 @@ class TestParseTrace:
             ],
         )
         usage = parse_trace(trace)
-        assert usage.num_turns == 0
+        assert usage.num_requests == 0
 
     def test_model_captured_from_first_assistant(self, tmp_path: Path) -> None:
         trace = _write_trace(
@@ -181,17 +183,14 @@ class TestParseTrace:
 class TestRequestIdDedup:
     """A request's usage snapshot must be billed once, not once per content block.
 
-    Fixtures mirror shapes taken from the real corpus (472 traces). Summing every
-    assistant line inflated cost 1.34x-3.03x, and did so by a factor that varied
-    per arm, distorting MCP-vs-baseline cost deltas as well as absolute cost.
+    Fixtures mirror shapes taken from the real corpus.
     """
 
     def test_streaming_group_billed_once_at_final_output(self, tmp_path: Path) -> None:
-        """Shape: output streams upward across blocks (8 -> 335) on one request.
+        """Output streams upward across blocks (8 -> 335) on one request.
 
-        Guards both failure directions: naive per-line summation triples the
-        input/cache and sums output to 343; first-per-request dedup (the basis
-        jn73.1 took for TTFR) would take output=8 and undercount ~40x.
+        Guards both failure directions: per-line summation triples input/cache
+        and sums output to 343; first-per-request dedup would take output=8.
         """
         trace = _write_trace(
             tmp_path / "agent_trace.jsonl",
@@ -206,13 +205,13 @@ class TestRequestIdDedup:
         assert usage.input_tokens == 3  # counted once, not 6
         assert usage.cache_write_tokens == 2686  # counted once, not 5372
         assert usage.cache_read_tokens == 14244  # counted once, not 28488
-        assert usage.num_turns == 1  # one request, not two lines
+        assert usage.num_requests == 1  # one request, not two lines
 
     def test_replicated_final_group_billed_once(self, tmp_path: Path) -> None:
-        """Shape: the writer repeats the FINAL output on every block line.
+        """The writer may repeat the FINAL output on every block line.
 
-        Real group req_011Cbyfzk4pdJLtrW2usgFcQ spans 7 lines each carrying
-        output_tokens=937. Naive summation bills 6559 output tokens for 937.
+        A real 7-line group each carrying output_tokens=937: per-line summation
+        bills 6559 output tokens for 937.
         """
         trace = _write_trace(
             tmp_path / "agent_trace.jsonl",
@@ -222,7 +221,7 @@ class TestRequestIdDedup:
 
         assert usage.output_tokens == 937  # not 6559
         assert usage.input_tokens == 3  # not 21
-        assert usage.num_turns == 1
+        assert usage.num_requests == 1
 
     def test_group_lines_are_not_contiguous(self, tmp_path: Path) -> None:
         """Real groups are interleaved with user tool_result lines.
@@ -243,7 +242,7 @@ class TestRequestIdDedup:
 
         assert usage.output_tokens == 500
         assert usage.input_tokens == 3
-        assert usage.num_turns == 1
+        assert usage.num_requests == 1
 
     def test_distinct_requests_are_summed(self, tmp_path: Path) -> None:
         """Dedup is per request — separate requests still accumulate."""
@@ -260,7 +259,7 @@ class TestRequestIdDedup:
         assert usage.output_tokens == 350  # 100 + 250
         assert usage.input_tokens == 6  # 3 + 3, one per request
         assert usage.cache_read_tokens == 14244 + 19655
-        assert usage.num_turns == 2
+        assert usage.num_requests == 2
 
     def test_zero_usage_error_record_does_not_erase_group(self, tmp_path: Path) -> None:
         """A trailing all-zero API-error record must not zero out a real group.
@@ -269,52 +268,41 @@ class TestRequestIdDedup:
         the last one: an isApiErrorMessage record carries a truthy all-zero
         usage dict, and last-wins would bill the request at zero.
         """
+        error_record = _block_entry(
+            "req_D",
+            output_tokens=0,
+            input_tokens=0,
+            cache_creation=0,
+            cache_read=0,
+        ) | {"isApiErrorMessage": True}
         trace = _write_trace(
             tmp_path / "agent_trace.jsonl",
-            [
-                _block_entry("req_D", output_tokens=812, block_type="tool_use"),
-                {
-                    "type": "assistant",
-                    "requestId": "req_D",
-                    "isApiErrorMessage": True,
-                    "message": {
-                        "id": "msg_req_D",
-                        "model": "claude-sonnet-4-6",
-                        "role": "assistant",
-                        "usage": {
-                            "input_tokens": 0,
-                            "output_tokens": 0,
-                            "cache_creation_input_tokens": 0,
-                            "cache_read_input_tokens": 0,
-                        },
-                    },
-                },
-            ],
+            [_block_entry("req_D", output_tokens=812), error_record],
         )
         usage = parse_trace(trace)
 
         assert usage.output_tokens == 812
         assert usage.input_tokens == 3
-        assert usage.num_turns == 1
+        assert usage.num_requests == 1
 
     def test_message_id_groups_when_request_id_absent(self, tmp_path: Path) -> None:
         """message.id is the fallback grouping key if a writer drops requestId.
 
-        Verified 1:1 with requestId across all 7651 multi-line groups in the
-        corpus. Without this, a format change that dropped requestId would
-        silently re-arm the per-content-block double-count with a green suite.
+        Without it, a format change that dropped requestId would silently re-arm
+        the per-content-block double-count with a green suite.
         """
-        entries = []
-        for out in (8, 640):
-            e = _block_entry("req_E", output_tokens=out)
-            del e["requestId"]
-            entries.append(e)
-        trace = _write_trace(tmp_path / "agent_trace.jsonl", entries)
+        trace = _write_trace(
+            tmp_path / "agent_trace.jsonl",
+            [
+                _assistant_entry(input_tokens=3, output_tokens=out, message_id="msg_E")
+                for out in (8, 640)
+            ],
+        )
         usage = parse_trace(trace)
 
         assert usage.output_tokens == 640  # not 648
         assert usage.input_tokens == 3  # not 6
-        assert usage.num_turns == 1
+        assert usage.num_requests == 1
 
     def test_legacy_entries_without_any_key_still_counted_per_line(
         self, tmp_path: Path
@@ -335,7 +323,7 @@ class TestRequestIdDedup:
 
         assert usage.input_tokens == 300
         assert usage.output_tokens == 80
-        assert usage.num_turns == 2
+        assert usage.num_requests == 2
 
 
 # ---------------------------------------------------------------------------
@@ -351,7 +339,7 @@ class TestComputeCost:
             cache_write_tokens=0,
             cache_read_tokens=0,
             model="claude-sonnet-4-6",
-            num_turns=5,
+            num_requests=5,
         )
         cost = compute_cost(usage)
         # 1M * $3/M + 1M * $15/M = $18
@@ -364,7 +352,7 @@ class TestComputeCost:
             cache_write_tokens=0,
             cache_read_tokens=0,
             model="claude-opus-4-6",
-            num_turns=3,
+            num_requests=3,
         )
         cost = compute_cost(usage)
         # 1M * $15/M + 1M * $75/M = $90
@@ -377,7 +365,7 @@ class TestComputeCost:
             cache_write_tokens=200_000,
             cache_read_tokens=300_000,
             model="claude-haiku-4-5",
-            num_turns=2,
+            num_requests=2,
         )
         cost = compute_cost(usage)
         expected = (
@@ -392,7 +380,7 @@ class TestComputeCost:
             cache_write_tokens=0,
             cache_read_tokens=0,
             model="claude-sonnet-4-6",
-            num_turns=1,
+            num_requests=1,
         )
         cost_sonnet = compute_cost(usage)
         cost_opus = compute_cost(usage, model="claude-opus-4-6")
@@ -406,7 +394,7 @@ class TestComputeCost:
             cache_write_tokens=0,
             cache_read_tokens=0,
             model="claude-unknown-99",
-            num_turns=1,
+            num_requests=1,
         )
         cost = compute_cost(usage)
         # Should fall back to sonnet pricing
@@ -419,7 +407,7 @@ class TestComputeCost:
             cache_write_tokens=0,
             cache_read_tokens=0,
             model="claude-sonnet-4-6",
-            num_turns=0,
+            num_requests=0,
         )
         assert compute_cost(usage) == 0.0
 
@@ -523,36 +511,38 @@ difficulty = "hard"
 # ---------------------------------------------------------------------------
 
 
-class TestAggregateReport:
-    def _make_cost(
-        self,
-        task_id: str = "task-1",
-        mode: str = "hybrid",
-        suite: str = "customer_escalation",
-        difficulty: str = "medium",
-        input_tokens: int = 1000,
-        output_tokens: int = 500,
-        cost_usd: float = 0.01,
-    ) -> TaskCost:
-        return TaskCost(
-            task_id=task_id,
-            mode=mode,
-            suite=suite,
-            difficulty=difficulty,
-            usage=TraceUsage(
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                cache_write_tokens=0,
-                cache_read_tokens=0,
-                model="claude-sonnet-4-6",
-                num_turns=3,
-            ),
-            cost_usd=cost_usd,
-            agent_duration_seconds=60.0,
-        )
+def _make_cost(
+    task_id: str = "task-1",
+    mode: str = "hybrid",
+    suite: str = "customer_escalation",
+    difficulty: str = "medium",
+    input_tokens: int = 1000,
+    output_tokens: int = 500,
+    cost_usd: float = 0.01,
+    model: str = "claude-sonnet-4-6",
+) -> TaskCost:
+    """Build a TaskCost record for aggregate_report tests."""
+    return TaskCost(
+        task_id=task_id,
+        mode=mode,
+        suite=suite,
+        difficulty=difficulty,
+        usage=TraceUsage(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cache_write_tokens=0,
+            cache_read_tokens=0,
+            model=model,
+            num_requests=3,
+        ),
+        cost_usd=cost_usd,
+        agent_duration_seconds=60.0,
+    )
 
+
+class TestAggregateReport:
     def test_report_structure(self) -> None:
-        costs = [self._make_cost()]
+        costs = [_make_cost()]
         report = aggregate_report(costs)
         assert "generated_at" in report
         assert report["total_tasks"] == 1
@@ -564,9 +554,9 @@ class TestAggregateReport:
 
     def test_mode_breakdown(self) -> None:
         costs = [
-            self._make_cost(task_id="t1", mode="hybrid", cost_usd=1.0),
-            self._make_cost(task_id="t2", mode="hybrid", cost_usd=2.0),
-            self._make_cost(task_id="t3", mode="mcp_only", cost_usd=0.5),
+            _make_cost(task_id="t1", mode="hybrid", cost_usd=1.0),
+            _make_cost(task_id="t2", mode="hybrid", cost_usd=2.0),
+            _make_cost(task_id="t3", mode="mcp_only", cost_usd=0.5),
         ]
         report = aggregate_report(costs)
         assert report["by_mode"]["hybrid"]["count"] == 2
@@ -576,9 +566,9 @@ class TestAggregateReport:
 
     def test_suite_breakdown(self) -> None:
         costs = [
-            self._make_cost(task_id="t1", suite="incident_response"),
-            self._make_cost(task_id="t2", suite="incident_response"),
-            self._make_cost(task_id="t3", suite="feature_delivery"),
+            _make_cost(task_id="t1", suite="incident_response"),
+            _make_cost(task_id="t2", suite="incident_response"),
+            _make_cost(task_id="t3", suite="feature_delivery"),
         ]
         report = aggregate_report(costs)
         assert report["by_suite"]["incident_response"]["count"] == 2
@@ -586,8 +576,8 @@ class TestAggregateReport:
 
     def test_difficulty_breakdown(self) -> None:
         costs = [
-            self._make_cost(task_id="t1", difficulty="easy"),
-            self._make_cost(task_id="t2", difficulty="hard"),
+            _make_cost(task_id="t1", difficulty="easy"),
+            _make_cost(task_id="t2", difficulty="hard"),
         ]
         report = aggregate_report(costs)
         assert "easy" in report["by_difficulty"]
@@ -601,15 +591,15 @@ class TestAggregateReport:
 
     def test_per_task_sorted_by_id(self) -> None:
         costs = [
-            self._make_cost(task_id="z-task"),
-            self._make_cost(task_id="a-task"),
+            _make_cost(task_id="z-task"),
+            _make_cost(task_id="a-task"),
         ]
         report = aggregate_report(costs)
         assert report["per_task"][0]["task_id"] == "a-task"
         assert report["per_task"][1]["task_id"] == "z-task"
 
     def test_per_task_fields(self) -> None:
-        costs = [self._make_cost(input_tokens=999, output_tokens=111)]
+        costs = [_make_cost(input_tokens=999, output_tokens=111)]
         report = aggregate_report(costs)
         entry = report["per_task"][0]
         assert entry["input_tokens"] == 999
@@ -623,55 +613,31 @@ class TestAggregateReport:
 class TestUnpricedModelDisclosure:
     """An unpriced model must be disclosed, never silently billed as sonnet.
 
-    compute_cost falls back to DEFAULT_MODEL pricing for an unknown model. In the
-    real corpus the unpriced models (claude-opus-4-8, claude-fable-5) appear in
-    ONE arm only (condB), so the fallback understates that arm's cost by roughly
-    5x and corrupts arm-to-arm cost deltas — the exact comparison this report
-    exists to support. The report therefore has to carry the caveat with it.
+    compute_cost falls back to DEFAULT_MODEL pricing for an unknown model. The
+    unpriced models cluster in a single arm, so the fallback understates that
+    arm's cost and corrupts the arm-to-arm cost delta — the exact comparison
+    this report exists to support. The report has to carry the caveat with it.
     """
 
-    def _cost(self, task_id: str, model: str, mode: str = "baseline") -> TaskCost:
-        return TaskCost(
-            task_id=task_id,
-            mode=mode,
-            suite="dependency_management",
-            difficulty="medium",
-            usage=TraceUsage(
-                input_tokens=100,
-                output_tokens=50,
-                cache_write_tokens=0,
-                cache_read_tokens=0,
-                model=model,
-                num_turns=1,
-            ),
-            cost_usd=0.01,
-            agent_duration_seconds=1.0,
-        )
-
     def test_all_priced_reports_no_unpriced_models(self) -> None:
-        report = aggregate_report([self._cost("t1", "claude-sonnet-4-6")])
+        report = aggregate_report([_make_cost(task_id="t1")])
         assert report["unpriced_models"] == []
-        assert report["per_task"][0]["model_priced"] is True
 
     def test_unpriced_model_is_surfaced(self) -> None:
         report = aggregate_report(
             [
-                self._cost("t1", "claude-sonnet-4-6", mode="baseline"),
-                self._cost("t2", "claude-opus-4-8", mode="hybrid"),
+                _make_cost(task_id="t1", model="claude-sonnet-4-6"),
+                _make_cost(task_id="t2", model="claude-opus-4-8"),
             ]
         )
         assert report["unpriced_models"] == ["claude-opus-4-8"]
 
-        by_task = {t["task_id"]: t for t in report["per_task"]}
-        assert by_task["t1"]["model_priced"] is True
-        assert by_task["t2"]["model_priced"] is False
-
     def test_unpriced_models_deduped_and_sorted(self) -> None:
         report = aggregate_report(
             [
-                self._cost("t1", "claude-opus-4-8"),
-                self._cost("t2", "claude-fable-5"),
-                self._cost("t3", "claude-opus-4-8"),
+                _make_cost(task_id="t1", model="claude-opus-4-8"),
+                _make_cost(task_id="t2", model="claude-fable-5"),
+                _make_cost(task_id="t3", model="claude-opus-4-8"),
             ]
         )
         assert report["unpriced_models"] == ["claude-fable-5", "claude-opus-4-8"]
