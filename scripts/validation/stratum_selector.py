@@ -34,7 +34,7 @@ An unmeasured gate is not a passing gate. Gate C's history is the cautionary
 tale: this bead's original plan asserted no baseline run existed and would have
 emitted C as uniformly pending -- shipping the stratum with NO difficulty filter
 while looking principled. In fact 109 baseline traces were sitting on disk, and
-once scored they reject 46 tasks as trivially localizable. A gate that quietly
+once scored they reject 49 tasks as trivially localizable. A gate that quietly
 defaults to "fine" is worse than no gate.
 
 So the guard is structural, not advisory:
@@ -242,10 +242,10 @@ class TaskGates:
 
     @property
     def admitted(self) -> bool:
-        """ALL SIX gates pass. A pending gate is not a passing gate, so no task
-        can be admitted until the measurements are run."""
-        return all(self.gates[g].status.passed for g in ALL_GATES if g in self.gates) \
-            and set(self.gates) >= set(ALL_GATES)
+        """ALL SIX gates are PRESENT and pass. A pending gate is not a passing
+        gate, and an absent one is not either -- so no task can be admitted
+        until every measurement has been run and recorded."""
+        return all(g in self.gates and self.gates[g].status.passed for g in ALL_GATES)
 
     @property
     def pending_gates(self) -> list[str]:
@@ -423,11 +423,14 @@ def score_gate_a(declared_repos: set[str], oracle_repos: set[str],
     oracle file lives in a repo that is never cloned, the baseline arm is
     solving blind -- the empty-baseline confound this gate exists to reject.
     """
+    ev: dict[str, Any] = {"declared_repos": sorted(declared_repos),
+                          "oracle_repos": sorted(oracle_repos)}
+
     if not declared_repos:
         return GateEvidence(
             "A", GateStatus.FAIL,
             "task declares no repos: baseline arm would get an empty workspace",
-            {"declared_repos": [], "oracle_repos": sorted(oracle_repos)},
+            ev,
         )
     if has_oracle_files and not oracle_repos:
         # `missing = {} - declared` is empty, so this would otherwise PASS
@@ -438,7 +441,7 @@ def score_gate_a(declared_repos: set[str], oracle_repos: set[str],
             "A", GateStatus.FAIL,
             "oracle files carry no `repo` tag, so parity cannot be verified "
             "(schemas/task.schema.json requires `repo` on every required_files entry)",
-            {"declared_repos": sorted(declared_repos), "oracle_repos": []},
+            ev,
         )
     missing = oracle_repos - declared_repos
     if missing:
@@ -446,15 +449,12 @@ def score_gate_a(declared_repos: set[str], oracle_repos: set[str],
             "A", GateStatus.FAIL,
             f"oracle files live in repo(s) the baseline never clones: "
             f"{', '.join(sorted(missing))}",
-            {"declared_repos": sorted(declared_repos),
-             "oracle_repos": sorted(oracle_repos),
-             "missing_repos": sorted(missing)},
+            {**ev, "missing_repos": sorted(missing)},
         )
     return GateEvidence(
         "A", GateStatus.PASS,
         "baseline clones every repo the oracle files live in",
-        {"declared_repos": sorted(declared_repos),
-         "oracle_repos": sorted(oracle_repos)},
+        ev,
     )
 
 
@@ -469,11 +469,13 @@ def waiver_has_downstream_target(waived_token: str, oracle_files: list[str]) -> 
 
     That is a deterministic check, so it should be checked rather than trusted.
     """
-    norm = lc.strip_repo_slug(waived_token).lower()
-    others = [f for f in oracle_files
-              if lc.strip_repo_slug(f).lower() != norm
-              and not lc.strip_repo_slug(f).lower().endswith("/" + norm)]
-    return bool(others)
+    waived = lc.strip_repo_slug(waived_token).lower()
+
+    def is_the_waived_file(oracle_file: str) -> bool:
+        path = lc.strip_repo_slug(oracle_file).lower()
+        return path == waived or path.endswith("/" + waived)
+
+    return any(not is_the_waived_file(f) for f in oracle_files)
 
 
 def score_gate_b(result: lc.GateBResult | None,
@@ -495,7 +497,6 @@ def score_gate_b(result: lc.GateBResult | None,
         "ref_impl_pass": result.admit,
         "mode": mode,
     }
-    reason = result.reason
     if result.waived:
         sound = waiver_has_downstream_target(result.token, oracle_files or [])
         ev["waiver_has_downstream_target"] = sound
@@ -509,7 +510,7 @@ def score_gate_b(result: lc.GateBResult | None,
                 ev,
             )
     return GateEvidence("B", GateStatus.PASS if passed else GateStatus.FAIL,
-                        reason, ev)
+                        result.reason, ev)
 
 
 def _modules(paths: list[str], granularity: str) -> set[str]:
@@ -597,10 +598,13 @@ def unloadable_task_gates(task_id: str, suite: str, why: str) -> TaskGates:
     loadable oracle cannot satisfy parity, non-leakiness or dispersion, and
     saying so is the only honest scoring.
     """
-    reason = f"task oracle could not be loaded ({why}); gate cannot be evaluated"
-    gates = {g: GateEvidence(g, GateStatus.FAIL, reason) for g in COMPUTABLE_GATES}
-    for g in MEASUREMENT_GATES:
-        gates[g] = _pending(g, f"task oracle could not be loaded ({why})")
+    unloadable = f"task oracle could not be loaded ({why})"
+    gates = {
+        **{g: GateEvidence(g, GateStatus.FAIL,
+                           f"{unloadable}; gate cannot be evaluated")
+           for g in COMPUTABLE_GATES},
+        **{g: _pending(g, unloadable) for g in MEASUREMENT_GATES},
+    }
     return TaskGates(task_id=task_id, suite=suite, gates=gates)
 
 
