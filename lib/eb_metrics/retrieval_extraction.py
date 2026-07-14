@@ -57,9 +57,13 @@ from __future__ import annotations
 
 import json
 import re
-import tomllib
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+
+try:  # tomllib is stdlib from 3.11; lib/pyproject.toml still supports 3.10 via tomli.
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - exercised only on Python 3.10
+    import tomli as tomllib  # type: ignore[no-redef]
 
 from eb_metrics.bash_reads import bash_read_files
 from eb_metrics.ir_metrics import (
@@ -186,17 +190,41 @@ def _repo_dirs(task_dir: Path) -> dict[str, str]:
 
 
 def _resolve_repo_dir(repo: str, repo_dirs: Mapping[str, str]) -> str:
-    """Any name for a repo → the directory it is cloned into.
+    """A *ground-truth* repo name → the directory it is cloned into.
 
     Ground truth names a repo by its clone dir (usually) or by its upstream
     basename (``err-provenance-dual-docker-001`` says ``cli``, cloned as
-    ``docker-cli``); an MCP identifier always carries the upstream basename. A
-    name that already *is* a clone dir wins over the alias map, so an upstream
-    basename colliding with another repo's clone dir cannot hijack it.
+    ``docker-cli``), and nothing in the entry says which. A name that already *is*
+    a clone dir is therefore read as one, in preference to the alias map.
+
+    That rule is for ground truth only — MCP reads resolve through
+    :func:`_mcp_clone_dir`, which must not inherit it. See that function.
     """
     if repo in repo_dirs.values():
         return repo
     return repo_dirs.get(repo, repo)
+
+
+def _mcp_clone_dir(repo: str, repo_dirs: Mapping[str, str]) -> str:
+    """An MCP ``repo`` identifier → the directory that repo is cloned into.
+
+    An MCP identifier always carries the repo's *upstream* basename — it is minted
+    from the ``task.toml`` url by ``derive_mirror_name`` — so it is only ever a
+    *key* of the alias map, never a clone dir belonging to some other repo. The
+    lookup must therefore be the key lookup, plainly.
+
+    Resolving it through :func:`_resolve_repo_dir`'s clone-dir-wins rule instead
+    would misroute the read whenever one repo's upstream basename equals a
+    *different* repo's clone dir — ``org/docker-cli`` cloned as ``other-place``,
+    alongside ``docker/cli`` cloned as ``docker-cli``. A read of the first would
+    be emitted into the second's directory: credit for a file the agent never
+    opened, and no credit for the one it did. Both arms of that are pinned by
+    ``test_mcp_read_is_not_hijacked_by_a_colliding_clone_dir``. No task in the
+    corpus collides today; the resolution is made correct by construction rather
+    than left to depend on that.
+    """
+    name = _mcp_repo_name(repo)
+    return repo_dirs.get(name, name)
 
 
 def _looks_like_file(path: str) -> bool:
@@ -293,11 +321,7 @@ def retrieved_files_from_trace(
             fp = tool_input.get("path", "")
             if fp:
                 repo = tool_input.get("repo")
-                repo_dir = (
-                    _resolve_repo_dir(_mcp_repo_name(repo), repo_dirs)
-                    if isinstance(repo, str)
-                    else ""
-                )
+                repo_dir = _mcp_clone_dir(repo, repo_dirs) if isinstance(repo, str) else ""
                 # Emit where the file actually lives in the sandbox, so an MCP read
                 # is indistinguishable from a local read of the same file — down to
                 # naming, on its face, the repo it came from. The prefix goes on

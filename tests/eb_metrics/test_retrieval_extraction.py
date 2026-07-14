@@ -330,6 +330,46 @@ def test_mcp_read_of_aliased_repo_matches_ground_truth(tmp_path: Path) -> None:
     assert scores.file_recall == 1.0
 
 
+def test_mcp_read_is_not_hijacked_by_a_colliding_clone_dir(tmp_path: Path) -> None:
+    # An MCP identifier is ALWAYS an upstream basename, so it must resolve through
+    # the alias map's KEYS. Resolving it the way ground truth resolves (clone dir
+    # wins, because a GT entry may be named either way) misroutes the read when one
+    # repo's upstream basename equals a DIFFERENT repo's clone dir: here repo A
+    # (github.com/org/docker-cli) is cloned as "other-place", while repo B
+    # (github.com/docker/cli) is cloned as "docker-cli" — so A's upstream name IS
+    # B's clone dir. Both arms of the misroute are silent misscores on the MCP arm
+    # only (a local read carries its /workspace/ path from the sandbox and never
+    # resolves at all), which is the arm asymmetry this whole join exists to remove.
+    # No corpus task collides today; pin it by construction, not by luck of naming.
+    (tmp_path / "task.toml").write_text(
+        '[[repos]]\nurl = "https://github.com/org/docker-cli"\npath = "other-place"\n'
+        '[[repos]]\nurl = "https://github.com/docker/cli"\npath = "docker-cli"\n'
+    )
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [_mcp_read("t1", "https://github.com/org/docker-cli", "some/file.py")],
+    )
+
+    # The agent read repo A. Ground truth wants repo B's same-named file, which the
+    # agent never opened => no credit.
+    gt_other_repo = _write_ground_truth(
+        tmp_path / "ground_truth.json",
+        [{"path": "some/file.py", "repo": "docker-cli"}],
+    )
+    scores = compute_run_ir_scores(trace, gt_other_repo, "t", "mcp_only")
+    assert scores is not None
+    assert scores.file_recall == 0.0, "credited a file the agent never opened"
+
+    # Ground truth wants repo A's file — the one the agent actually read => credit.
+    gt_read_repo = _write_ground_truth(
+        tmp_path / "gt_read_repo.json",
+        [{"path": "some/file.py", "repo": "other-place"}],
+    )
+    scores = compute_run_ir_scores(trace, gt_read_repo, "t", "mcp_only")
+    assert scores is not None
+    assert scores.file_recall == 1.0, "dropped a file the agent actually read"
+
+
 def test_aliased_repo_with_dot_git_url_still_joins(tmp_path: Path) -> None:
     # The alias map keys on the task.toml url, and the MCP identifier is minted
     # from that same url by derive_mirror_name — which drops `.git`. So the alias
