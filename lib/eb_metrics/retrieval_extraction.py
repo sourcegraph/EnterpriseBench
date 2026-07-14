@@ -5,12 +5,11 @@ Two structural readers plus one compute helper, feeding
 
 * :func:`retrieved_files_from_trace` — parse a Claude-Code ``agent_trace.jsonl``
   and recover the ordered, first-seen-unique list of file paths the agent
-  accessed (``Read``/``Grep``/``Glob`` inputs, MCP ``read_file`` inputs — whose
-  repo-relative ``path`` is re-qualified with its ``repo`` so every arm's paths
-  are workspace-relative and comparable — paths scraped from MCP search-result
-  payloads, and — an EB extension beyond the CSB port — the files read by
-  ``Bash`` commands, delegated to :mod:`eb_metrics.bash_reads`, without which
-  the baseline arm's retrieval is largely unobservable).
+  accessed. Sources: ``Read``/``Grep``/``Glob`` inputs; MCP ``read_file`` inputs
+  (whose ``path`` is repo-relative, so it is re-qualified with its ``repo``);
+  paths scraped from MCP search-result payloads; and — an EB extension beyond
+  the CSB port — ``Bash`` reads, delegated to :mod:`eb_metrics.bash_reads`,
+  without which the baseline arm's retrieval is largely unobservable.
 * :func:`required_files_from_ground_truth` — read a task ``ground_truth.json``
   and return its ``required_files`` as the relevant set, each entry qualified
   with the directory its repo is cloned into so the join stays repo-aware.
@@ -67,9 +66,9 @@ except ModuleNotFoundError:  # pragma: no cover - exercised only on Python 3.10
 
 from eb_metrics.bash_reads import bash_read_files
 from eb_metrics.ir_metrics import (
-    WORKSPACE_PREFIXES,
     IRScores,
     compute_ir_scores,
+    is_workspace_qualified,
     normalize_path,
 )
 
@@ -141,18 +140,14 @@ def _mcp_repo_name(repo: str) -> str:
     GitHub MCP's bare ``repo`` name passes through unchanged. Returns ``""`` when
     there is nothing to prefix with.
 
-    This is the repo's *upstream* name, which is not always the directory it is
-    cloned into (``next.js`` is cloned as ``nextjs``); resolve it through
-    :func:`_resolve_repo_dir` to reach the workspace directory.
+    Must invert ``scripts/infra/mirror_naming.derive_mirror_name`` letter for
+    letter — that is what mints an MCP identifier *from* a ``task.toml`` url, and
+    both sides of the join key off this function. Not imported from there because
+    ``lib/`` must not depend on ``scripts/`` (EnterpriseBench-k2d8).
 
-    The grammar is ``scripts/infra/mirror_naming.derive_mirror_name``'s, run
-    backwards: that is what mints an MCP identifier *from* a ``task.toml`` url, so
-    the two must agree letter for letter or the join misses. (Which is why
-    :func:`_repo_dirs` keys the url through this same function rather than a
-    lookalike of it — a url and the identifier minted from it cannot then drift.)
-    mirror_naming is the SSOT for the grammar; it is importable, but only via the
-    ``sys.path`` hack its other callers use, and pointing ``lib/`` at ``scripts/``
-    inverts the layering. EnterpriseBench-k2d8 tracks moving it under ``lib/``.
+    The upstream name is not always the directory the repo is cloned into
+    (``next.js`` → ``nextjs``); resolve through :func:`_resolve_repo_dir` (ground
+    truth) or :func:`_mcp_clone_dir` (MCP reads).
     """
     name = repo.strip().rstrip("/").rsplit("/", 1)[-1]
     return name.removesuffix(".git").split("--", 1)[0]
@@ -161,13 +156,11 @@ def _mcp_repo_name(repo: str) -> str:
 def _repo_dirs(task_dir: Path) -> dict[str, str]:
     """``task.toml`` → {upstream repo basename: workspace clone dir}.
 
-    ``[[repos]]`` declares ``url`` (what an MCP ``repo`` identifier is minted
-    from — so both sides key off :func:`_mcp_repo_name` of it, and cannot drift
-    apart) and ``path`` (the directory the repo is cloned into under
-    ``/workspace/``). The two usually coincide, but 8 repos in the corpus are
-    cloned under a different name (``next.js`` → ``nextjs``, ``cli`` →
-    ``docker-cli``); without this map their MCP reads and their ground truth land
-    on different keys and silently score zero.
+    8 repos in the corpus are cloned under a name other than their upstream one
+    (``next.js`` → ``nextjs``, ``cli`` → ``docker-cli``); without this map their
+    MCP reads and their ground truth land on different keys and silently score
+    zero. Keys go through :func:`_mcp_repo_name` so a url and the MCP identifier
+    minted from it cannot drift apart.
 
     Returns ``{}`` when there is no readable ``task.toml`` — callers then fall
     back to the upstream name, which is correct for every unaliased repo.
@@ -194,11 +187,9 @@ def _resolve_repo_dir(repo: str, repo_dirs: Mapping[str, str]) -> str:
 
     Ground truth names a repo by its clone dir (usually) or by its upstream
     basename (``err-provenance-dual-docker-001`` says ``cli``, cloned as
-    ``docker-cli``), and nothing in the entry says which. A name that already *is*
-    a clone dir is therefore read as one, in preference to the alias map.
-
-    That rule is for ground truth only — MCP reads resolve through
-    :func:`_mcp_clone_dir`, which must not inherit it. See that function.
+    ``docker-cli``), and nothing in the entry says which, so a name that already
+    *is* a clone dir wins over the alias map. MCP identifiers must not inherit
+    that rule — see :func:`_mcp_clone_dir`.
     """
     if repo in repo_dirs.values():
         return repo
@@ -208,20 +199,12 @@ def _resolve_repo_dir(repo: str, repo_dirs: Mapping[str, str]) -> str:
 def _mcp_clone_dir(repo: str, repo_dirs: Mapping[str, str]) -> str:
     """An MCP ``repo`` identifier → the directory that repo is cloned into.
 
-    An MCP identifier always carries the repo's *upstream* basename — it is minted
-    from the ``task.toml`` url by ``derive_mirror_name`` — so it is only ever a
-    *key* of the alias map, never a clone dir belonging to some other repo. The
-    lookup must therefore be the key lookup, plainly.
-
-    Resolving it through :func:`_resolve_repo_dir`'s clone-dir-wins rule instead
-    would misroute the read whenever one repo's upstream basename equals a
-    *different* repo's clone dir — ``org/docker-cli`` cloned as ``other-place``,
-    alongside ``docker/cli`` cloned as ``docker-cli``. A read of the first would
-    be emitted into the second's directory: credit for a file the agent never
-    opened, and no credit for the one it did. Both arms of that are pinned by
-    ``test_mcp_read_is_not_hijacked_by_a_colliding_clone_dir``. No task in the
-    corpus collides today; the resolution is made correct by construction rather
-    than left to depend on that.
+    An MCP identifier always carries the repo's *upstream* basename, so it is only
+    ever a *key* of the alias map. It must not go through :func:`_resolve_repo_dir`'s
+    clone-dir-wins rule: when one repo's upstream basename equals a *different*
+    repo's clone dir (``org/docker-cli`` cloned as ``other-place``, alongside
+    ``docker/cli`` cloned as ``docker-cli``), that rule emits the read into the
+    wrong repo's directory.
     """
     name = _mcp_repo_name(repo)
     return repo_dirs.get(name, name)
@@ -266,12 +249,12 @@ def retrieved_files_from_trace(
     same way a local ``/workspace/<dir>/`` read already is. Omit it and the
     upstream repo name is used, which is right for every unaliased repo.
 
-    Whether an emitted path names its repo is load bearing —
-    :func:`_align_retrieved_to_required` reads it back off the path. Paths from a
-    *tool input* (local read, MCP ``read_file``) are emitted workspace-qualified
-    and so do name it. Paths *scraped from a result payload* are emitted as the
-    payload wrote them, which for MCP search results is repo-relative; qualifying
-    those too needs the repo of each hit, which the scrape regexes do not capture
+    Whether an emitted path names its repo is load bearing:
+    :func:`_align_retrieved_to_required` reads it back off the path. Tool-input
+    paths (local read, MCP ``read_file``) are emitted workspace-qualified and so
+    name it; paths scraped from a result payload are emitted as the payload wrote
+    them, which for MCP search results is repo-relative — qualifying those needs
+    the repo of each hit, which the scrape regexes do not capture
     (EnterpriseBench-jgq1y).
     """
     repo_dirs = repo_dirs or {}
@@ -322,12 +305,9 @@ def retrieved_files_from_trace(
             if fp:
                 repo = tool_input.get("repo")
                 repo_dir = _mcp_clone_dir(repo, repo_dirs) if isinstance(repo, str) else ""
-                # Emit where the file actually lives in the sandbox, so an MCP read
-                # is indistinguishable from a local read of the same file — down to
-                # naming, on its face, the repo it came from. The prefix goes on
-                # unconditionally: a repo dir legitimately repeats as an inner dir
-                # ("tonic/tonic/Cargo.toml"), so skipping it when fp already starts
-                # with the repo name would corrupt exactly those.
+                # Unconditional prefix: a repo dir legitimately repeats as an inner
+                # dir ("tonic/tonic/Cargo.toml"), so a startswith(repo_dir) guard
+                # would corrupt exactly those.
                 _add(f"/workspace/{repo_dir}/{fp.lstrip('/')}" if repo_dir else fp)
 
     def _process_tool_result(tool_name: str, content: str) -> None:
@@ -474,30 +454,18 @@ def _ground_truth_entries(
 def _workspace_path(clone_dir: str | None, path: str) -> str:
     """``(repo, path)`` ground-truth entry → path relative to the workspace root.
 
-    ``path`` follows one of two conventions, both live in the corpus, so qualify
-    it with ``clone_dir`` only when it does not already lead with it:
+    ``path`` is authored either workspace-relative (``repo="otel-go"``,
+    ``path="otel-go/sdk/trace/x.go"``) or repo-relative (``repo="kubernetes"``,
+    ``path="pkg/kubelet/worker.go"``) — both conventions are live in the corpus —
+    so ``clone_dir`` is prefixed only when the path does not already lead with it.
 
-    * already workspace-relative — ``repo="otel-go"``,
-      ``path="otel-go/sdk/trace/x.go"``. The upstream repo (``opentelemetry-go``)
-      has no ``otel-go/`` directory, so that lead can only be the clone dir.
-    * repo-relative — ``repo="kubernetes"``, ``path="pkg/kubelet/worker.go"``
-
-    Known gap: a lead that equals the repo's *own* name is ambiguous, and nothing
-    outside the corpus can resolve it. ``repo="tokio"``, ``path="tokio/Cargo.toml"``
-    may mean the root manifest (lead = clone dir) or the crate manifest (lead =
-    the ``tokio/`` crate dir), and the tokio repo genuinely has both. Same for
-    ``repo="cli"``, ``path="cli/command/x.go"``: docker/cli is cloned as
-    ``docker-cli`` AND has a top-level ``cli/`` dir, so the lead reads equally as
-    a stale alias qualifier or a real directory — here it is the directory, and
-    prefixing (not substituting) is what makes it resolve.
-
-    The path is therefore left as authored, and since the join suffix-matches,
-    credit flows in BOTH directions for this shape: a read of the root manifest is
-    credited against an entry meaning the crate manifest, and a read of the crate
-    manifest against one meaning the root. Recall is unaffected either way, and
-    the error is symmetric across arms, so it does not bias the arm comparison
-    this join exists to protect. Only normalizing the corpus to one convention
-    closes it (EnterpriseBench-y64cp).
+    Known gap (EnterpriseBench-y64cp): a lead equal to the repo's *own* name is
+    ambiguous and nothing outside the corpus resolves it. ``repo="tokio"``,
+    ``path="tokio/Cargo.toml"`` may mean the root manifest (lead = clone dir) or
+    the crate manifest (lead = the ``tokio/`` crate dir), and tokio has both; the
+    join suffix-matches, so a read of either is credited against either. Recall is
+    unaffected and the error is symmetric across arms. Only normalizing the corpus
+    to one convention closes it.
     """
     if not clone_dir:
         return path
@@ -507,12 +475,7 @@ def _workspace_path(clone_dir: str | None, path: str) -> str:
 def _required_paths(
     entries: list[tuple[str | None, str]], repo_dirs: Mapping[str, str]
 ) -> list[str]:
-    """``(repo, path)`` ground-truth entries → workspace-relative required paths.
-
-    Split out so a caller that already holds the parsed entries (see
-    :func:`compute_run_ir_scores`, which needs their repos too) does not have to
-    re-read and re-parse ``ground_truth.json`` to get the paths as well.
-    """
+    """``(repo, path)`` ground-truth entries → workspace-relative required paths."""
     return [
         _workspace_path(_resolve_repo_dir(repo, repo_dirs) if repo else repo, path)
         for repo, path in entries
@@ -541,32 +504,17 @@ def required_files_from_ground_truth(
 
 
 def _path_components(path: str) -> tuple[str, ...]:
-    """Canonicalize a path and split it into components for suffix matching.
+    """Canonicalize with :func:`~eb_metrics.ir_metrics.normalize_path` and split.
 
-    Canonicalization is :func:`~eb_metrics.ir_metrics.normalize_path`'s, not a
-    lookalike of it: align and score must agree on what one path *is*, or a read
-    that aligns onto a required key can still fail to score against it (a
-    ``repo::path`` ground-truth entry, a ``chromium--2d05e315/`` slug, a diff
-    ``a/`` lead — all of which normalize_path folds and a bare split would not).
+    Must be ``normalize_path`` itself, not a lookalike: align and score have to
+    agree on what a path *is*, or a read that aligns onto a required key can still
+    fail to score against it.
     """
     return tuple(c for c in normalize_path(path).split("/") if c)
 
 
-def _names_its_repo(path: str) -> bool:
-    """True when the path is workspace-qualified, so its lead *is* its repo.
-
-    Local ``Read`` inputs and MCP reads (which :func:`retrieved_files_from_trace`
-    rewrites to ``/workspace/<dir>/...``) state their repo as fact. Anything else
-    — a ``cat`` run from inside a clone, a path scraped from a search payload —
-    omits it, so the repo has to be inferred. ``WORKSPACE_PREFIXES`` is the same
-    tuple :func:`~eb_metrics.ir_metrics.normalize_path` strips, so this question
-    cannot be answered differently here than it is there.
-    """
-    return path.strip().startswith(WORKSPACE_PREFIXES)
-
-
 def _align_retrieved_to_required(
-    retrieved: list[str], required: list[str], clone_dirs: Iterable[str] = ()
+    retrieved: list[str], required: list[str], clone_dirs: Iterable[str]
 ) -> list[str]:
     """Canonicalize retrieved paths that match a required path.
 
@@ -578,15 +526,13 @@ def _align_retrieved_to_required(
     (correctly non-relevant). Order is preserved and the result de-duplicated on
     components, for faithful rank metrics.
 
-    Requiring the *whole* required path — repo included — to be the suffix is what
+    The *whole* required path, repo included, must be the suffix, which is what
     keeps the join repo-aware: a read of ``prometheus/pkg/x.go`` does not satisfy
-    a requirement for ``grafana/pkg/x.go``.
-
-    Retrievals that do not name their repo (see :func:`_names_its_repo`) would be
-    zeroed out by that rule, so they fall back to matching a required path's
-    repo-relative remainder instead. ``clone_dirs`` — every directory a repo of
-    this task is cloned into — is what tells the two cases apart; without it every
-    path looks repo-less and wrong-repo reads get credited again.
+    a requirement for ``grafana/pkg/x.go``. Retrievals that do not name their repo
+    (:func:`~eb_metrics.ir_metrics.is_workspace_qualified`) would be zeroed out by
+    that rule, so they fall back to matching a required path's repo-relative
+    remainder; ``clone_dirs`` — every directory a repo of this task is cloned into
+    — is what tells the two cases apart.
     """
     dirs = {d.lower() for d in clone_dirs}
     req_index = [(r, _path_components(r)) for r in required]
@@ -602,7 +548,7 @@ def _align_retrieved_to_required(
         for req_str, req_comps in req_index:
             if req_comps and comps[-len(req_comps):] == req_comps:
                 return req_str
-        if _names_its_repo(path):
+        if is_workspace_qualified(path):
             return None  # it named a repo, and not the required one
         # Repo-relative fallback. The path is written from the repo root, so it
         # must equal the remainder *outright* — a trailing-slice match here would
@@ -641,27 +587,24 @@ def compute_run_ir_scores(
     tool calls, or the task declares no required files. A genuine "opened
     files but none relevant" run yields real ``0.0`` recall and is reported.
 
-    Both sides of the join are keyed on the repo's workspace directory, read
-    from the ``task.toml`` beside ``gt_path`` (see :func:`_repo_dirs`), so a
-    retrieval and a ground-truth entry naming the same repo differently still
-    meet.
+    Both sides of the join are keyed on the repo's workspace clone dir, read from
+    the ``task.toml`` beside ``gt_path`` (see :func:`_repo_dirs`), so a retrieval
+    and a ground-truth entry naming the same repo differently still meet.
     """
     repo_dirs = _repo_dirs(Path(gt_path).parent)
     retrieved_raw = retrieved_files_from_trace(trace_path, repo_dirs)
     if not retrieved_raw:
         return None
 
-    # Parsed once: the paths are the recall target and the repos name the clone
-    # dirs below, and re-reading the file for the second of those would be a
-    # redundant read + JSON parse on every scored pair.
+    # Entries, not required_files_from_ground_truth(): the clone dirs below need
+    # their repos too, and this avoids a second read + parse of the same file.
     entries = _ground_truth_entries(gt_path, include_sufficient=False)
     required = _required_paths(entries, repo_dirs)
     if not required:
         return None
 
-    # Every directory a repo of this task is cloned into: what a retrieved path
-    # must lead with to count as naming its repo. Ground truth also names them,
-    # so the join stays repo-aware for a task that ships no task.toml.
+    # Every directory a repo of this task is cloned into. Ground truth names them
+    # too, so the set is still correct for a task that ships no task.toml.
     clone_dirs = set(repo_dirs.values()) | {
         _resolve_repo_dir(repo, repo_dirs) for repo, _ in entries if repo
     }

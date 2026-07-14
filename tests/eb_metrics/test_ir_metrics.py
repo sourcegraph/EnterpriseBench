@@ -24,7 +24,6 @@ from eb_metrics.ir_metrics import (
     precision_at_k,
     recall_at_k,
 )
-from eb_metrics.retrieval_extraction import _align_retrieved_to_required
 
 
 # ---------------------------------------------------------------------------
@@ -76,33 +75,10 @@ def test_normalize_does_not_conflate_same_path_in_different_repos() -> None:
     assert normalize_path("grafana/pkg/svc/x.go") != normalize_path("prometheus/pkg/svc/x.go")
 
 
-# The two path conventions are reconciled by _align_retrieved_to_required, not
-# by normalize_path guessing at a repo lead. These assert that at the pipeline
-# level — the level that actually scores a run. (Asserting on normalize_path in
-# isolation is what previously produced a confident wrong conclusion about
-# whether a repo-qualified key survives to the join: it does not, on its own.)
-
-
-def test_repo_relative_gt_matches_workspace_read_through_align() -> None:
-    required = ["kubernetes/pkg/kubelet/prober/worker.go"]
-    retrieved = ["/workspace/kubernetes/pkg/kubelet/prober/worker.go"]
-    scores = compute_ir_scores(
-        _align_retrieved_to_required(retrieved, required), required, "t", "baseline"
-    )
-    assert scores.file_recall == 1.0
-
-
-def test_non_code_dir_lead_now_matches_through_align() -> None:
-    # Previously pinned as a known CSB limitation: grafana's repo-relative paths
-    # lead with `public/`, which the old lead-strip ate on the GT side, leaving
-    # the two sides one level apart and silently undercounting recall. Carrying
-    # the repo on both sides and suffix-aligning makes it a hit.
-    required = ["grafana/public/app/plugins/datasource/jaeger/x.ts"]
-    retrieved = ["/workspace/grafana/public/app/plugins/datasource/jaeger/x.ts"]
-    scores = compute_ir_scores(
-        _align_retrieved_to_required(retrieved, required), required, "t", "baseline"
-    )
-    assert scores.file_recall == 1.0
+# normalize_path keeps the repo lead rather than guessing at it, so the two path
+# conventions are reconciled one level up, by the join. That is asserted at the
+# pipeline level in test_retrieval_extraction.py
+# (test_workspace_read_matches_repo_qualified_ground_truth).
 
 
 # ---------------------------------------------------------------------------

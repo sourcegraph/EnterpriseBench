@@ -64,6 +64,15 @@ def _write_ground_truth(path: Path, required: list[dict]) -> Path:
     return path
 
 
+def _write_task_toml(task_dir: Path, *repos: tuple[str, str]) -> Path:
+    """``(url, clone_dir)`` pairs → the ``[[repos]]`` block the alias map reads."""
+    path = task_dir / "task.toml"
+    path.write_text(
+        "".join(f'[[repos]]\nurl = "{url}"\npath = "{clone_dir}"\n' for url, clone_dir in repos)
+    )
+    return path
+
+
 # ---------------------------------------------------------------------------
 # Trace parsing
 # ---------------------------------------------------------------------------
@@ -106,17 +115,14 @@ def test_retrieved_files_local_and_mcp_reads(tmp_path: Path) -> None:
         # Trailing slash must not silently yield "" and drop the qualifier —
         # that would quietly restore the very bug this carries the repo to fix.
         ("github.com/sg-evals/requests--v2.31.0/", "requests"),
-        # _repo_dirs feeds task.toml urls through here, and derive_mirror_name
-        # (which mints the MCP identifier from that same url) drops `.git`. If
-        # this kept it, the url would key "next.js.git" while the identifier said
-        # "next.js" — the repo would silently score 0 on every read.
+        # `.git` must go: derive_mirror_name drops it when minting the identifier,
+        # so keeping it here would key the url "next.js.git" against "next.js".
         ("https://github.com/vercel/next.js.git", "next.js"),
         ("https://github.com/pallets/flask.git/", "flask"),
         # Absent → no prefix to add.
         ("", ""),
-        # A name-less identifier is indistinguishable from a bare "org/repo", so
-        # its last segment is used. Malformed input, no real caller produces it;
-        # pinned so the trailing-slash handling above stays honest about it.
+        # Malformed, no real caller produces it; pinned so the trailing-slash
+        # handling above stays honest about it.
         ("github.com/sg-evals/", "sg-evals"),
     ],
 )
@@ -193,11 +199,9 @@ def test_compute_run_ir_scores_tri_repo_mcp_only_regression(tmp_path: Path) -> N
 
 
 def test_compute_run_ir_scores_mcp_deep_path_still_matches(tmp_path: Path) -> None:
-    # C6 no-regression. These deep-path hits currently match only by accident:
-    # the repo drop left them repo-relative, and normalize_path's lead-strip
-    # happened to bring GT to the same string. Post-fix both sides carry the
-    # repo lead and normalize_path strips it symmetrically, so they must still
-    # match — now via the primary suffix-align path rather than by coincidence.
+    # No-regression: deep-path hits used to match only because the dropped repo
+    # left them repo-relative and the lead-strip brought GT to the same string.
+    # They must still match now that both sides carry the repo lead.
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
         [
@@ -300,17 +304,23 @@ def test_read_from_wrong_repo_is_not_a_hit(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_mcp_read_of_aliased_repo_matches_ground_truth(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://github.com/vercel/next.js",
+        # derive_mirror_name drops `.git` when it mints the identifier, so the
+        # alias map must drop it too or the url keys "next.js.git", never matches
+        # the identifier's "next.js", and the repo silently scores 0.
+        "https://github.com/vercel/next.js.git",
+    ],
+)
+def test_mcp_read_of_aliased_repo_matches_ground_truth(tmp_path: Path, url: str) -> None:
     # refactor-orchestration-tri-babel-001 clones github.com/vercel/next.js into
-    # /workspace/nextjs. The MCP repo identifier is minted from the URL, so it
-    # carries "next.js" while ground truth says "nextjs". Resolving both through
-    # task.toml is what makes them the same key — without it the MCP arm silently
-    # scores 0.0 on every aliased repo while the baseline arm (which reads
-    # /workspace/nextjs/... directly) scores 1.0, re-introducing exactly the arm
-    # distortion this join exists to remove.
-    (tmp_path / "task.toml").write_text(
-        '[[repos]]\nurl = "https://github.com/vercel/next.js"\npath = "nextjs"\n'
-    )
+    # /workspace/nextjs. The MCP identifier is minted from the url, so it carries
+    # "next.js" while ground truth says "nextjs"; only task.toml makes them one
+    # key. Without it the MCP arm scores 0.0 on every aliased repo while baseline
+    # (reading /workspace/nextjs/... directly) scores 1.0.
+    _write_task_toml(tmp_path, (url, "nextjs"))
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
         [
@@ -331,27 +341,23 @@ def test_mcp_read_of_aliased_repo_matches_ground_truth(tmp_path: Path) -> None:
 
 
 def test_mcp_read_is_not_hijacked_by_a_colliding_clone_dir(tmp_path: Path) -> None:
-    # An MCP identifier is ALWAYS an upstream basename, so it must resolve through
-    # the alias map's KEYS. Resolving it the way ground truth resolves (clone dir
-    # wins, because a GT entry may be named either way) misroutes the read when one
-    # repo's upstream basename equals a DIFFERENT repo's clone dir: here repo A
-    # (github.com/org/docker-cli) is cloned as "other-place", while repo B
-    # (github.com/docker/cli) is cloned as "docker-cli" — so A's upstream name IS
-    # B's clone dir. Both arms of the misroute are silent misscores on the MCP arm
-    # only (a local read carries its /workspace/ path from the sandbox and never
-    # resolves at all), which is the arm asymmetry this whole join exists to remove.
-    # No corpus task collides today; pin it by construction, not by luck of naming.
-    (tmp_path / "task.toml").write_text(
-        '[[repos]]\nurl = "https://github.com/org/docker-cli"\npath = "other-place"\n'
-        '[[repos]]\nurl = "https://github.com/docker/cli"\npath = "docker-cli"\n'
+    # An MCP identifier is always an upstream basename, so it resolves by alias-map
+    # KEY. Resolving it the way ground truth does (clone dir wins) misroutes the
+    # read when one repo's upstream basename IS another's clone dir, as here: repo
+    # A (org/docker-cli) clones to "other-place", repo B (docker/cli) clones to
+    # "docker-cli". Both arms of the misroute are MCP-only silent misscores. No
+    # corpus task collides today; pinned by construction, not by luck of naming.
+    _write_task_toml(
+        tmp_path,
+        ("https://github.com/org/docker-cli", "other-place"),
+        ("https://github.com/docker/cli", "docker-cli"),
     )
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
         [_mcp_read("t1", "https://github.com/org/docker-cli", "some/file.py")],
     )
 
-    # The agent read repo A. Ground truth wants repo B's same-named file, which the
-    # agent never opened => no credit.
+    # The agent read repo A. Ground truth wants repo B's same-named file => no credit.
     gt_other_repo = _write_ground_truth(
         tmp_path / "ground_truth.json",
         [{"path": "some/file.py", "repo": "docker-cli"}],
@@ -370,25 +376,30 @@ def test_mcp_read_is_not_hijacked_by_a_colliding_clone_dir(tmp_path: Path) -> No
     assert scores.file_recall == 1.0, "dropped a file the agent actually read"
 
 
-def test_aliased_repo_with_dot_git_url_still_joins(tmp_path: Path) -> None:
-    # The alias map keys on the task.toml url, and the MCP identifier is minted
-    # from that same url by derive_mirror_name — which drops `.git`. So the alias
-    # map must drop it too, or a `.git` url keys "next.js.git", never matches the
-    # identifier's "next.js", and the repo silently scores 0. No corpus url ends
-    # in `.git` today; the schema does not forbid one, and the failure would be
-    # silent, so pin the agreement rather than the current corpus.
-    (tmp_path / "task.toml").write_text(
-        '[[repos]]\nurl = "https://github.com/vercel/next.js.git"\npath = "nextjs"\n'
-    )
+@pytest.mark.parametrize(
+    "required",
+    [
+        "kubernetes/pkg/kubelet/prober/worker.go",
+        # grafana's repo-relative paths lead with `public/`, which the old
+        # lead-strip ate on the GT side — a silent recall undercount, previously
+        # pinned as a known CSB limitation.
+        "grafana/public/app/plugins/datasource/jaeger/x.ts",
+    ],
+)
+def test_workspace_read_matches_repo_qualified_ground_truth(
+    tmp_path: Path, required: str
+) -> None:
+    # The two path conventions (workspace-relative read, repo-qualified GT) are
+    # reconciled by the join, not by normalize_path guessing at a repo lead.
+    repo, _, repo_relative = required.partition("/")
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
-        [_mcp_read("t1", "github.com/sg-evals/next.js--v14.0.0", "packages/next/package.json")],
+        [_assistant_tool_use("t1", "Read", {"file_path": f"/workspace/{required}"})],
     )
     gt = _write_ground_truth(
-        tmp_path / "ground_truth.json",
-        [{"path": "packages/next/package.json", "repo": "nextjs"}],
+        tmp_path / "ground_truth.json", [{"path": repo_relative, "repo": repo}]
     )
-    scores = compute_run_ir_scores(trace, gt, "t", "mcp_only")
+    scores = compute_run_ir_scores(trace, gt, "t", "baseline")
     assert scores is not None
     assert scores.file_recall == 1.0
 
@@ -397,9 +408,7 @@ def test_ground_truth_naming_repo_upstream_matches_workspace_read(tmp_path: Path
     # err-provenance-dual-docker-001 does the reverse: ground truth names the
     # repo "cli" (its upstream name) though the task clones it as "docker-cli".
     # Both sides must still land on the clone dir.
-    (tmp_path / "task.toml").write_text(
-        '[[repos]]\nurl = "https://github.com/docker/cli"\npath = "docker-cli"\n'
-    )
+    _write_task_toml(tmp_path, ("https://github.com/docker/cli", "docker-cli"))
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
         [

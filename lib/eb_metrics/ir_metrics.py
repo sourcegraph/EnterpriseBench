@@ -30,7 +30,7 @@ import re
 from dataclasses import dataclass, field
 
 __all__ = [
-    "WORKSPACE_PREFIXES",
+    "is_workspace_qualified",
     "normalize_path",
     "precision_at_k",
     "recall_at_k",
@@ -47,15 +47,23 @@ __all__ = [
 
 DEFAULT_K_VALUES: tuple[int, ...] = (1, 3, 5, 10)
 
-# The sandbox container root every repo is cloned under. A path carrying one of
-# these prefixes is sandbox-absolute, so the segment that follows it *is* the
-# repo's clone directory — which is why stripping the prefix must not also strip
-# that segment. Single definition; ``retrieval_extraction`` reads it to decide
-# whether a retrieved path states its repo or merely omits it.
-WORKSPACE_PREFIXES: tuple[str, ...] = ("/workspace/", "workspace/")
+# The sandbox container root every repo is cloned under, so the segment that
+# follows one of these prefixes is the repo's clone directory.
+_WORKSPACE_PREFIXES: tuple[str, ...] = ("/workspace/", "workspace/")
 
 # ``name--<6-12 hex>/`` repo-slug prefix used by the sandbox workspace layout.
 _REPO_SLUG_RE = re.compile(r"^[a-zA-Z0-9_.-]+--[a-f0-9]{6,12}/")
+
+
+def is_workspace_qualified(path: str) -> bool:
+    """True when the path is sandbox-absolute, so its leading segment *is* its repo.
+
+    The complement — a path written from inside a clone, or scraped from a search
+    payload — omits the repo, which then has to be inferred. Shared with
+    :mod:`eb_metrics.retrieval_extraction` so that question cannot be answered
+    one way here and another way there.
+    """
+    return path.strip().startswith(_WORKSPACE_PREFIXES)
 
 
 def normalize_path(path: str) -> str:
@@ -80,7 +88,7 @@ def normalize_path(path: str) -> str:
     if "::" in p:
         p = p.replace("::", "/", 1)
     # /workspace/ container prefix (sandbox paths).
-    for prefix in WORKSPACE_PREFIXES:
+    for prefix in _WORKSPACE_PREFIXES:
         if p.startswith(prefix):
             p = p[len(prefix):]
     # Repo-slug prefix: "chromium--2d05e315/third_party/..." → "third_party/...".
