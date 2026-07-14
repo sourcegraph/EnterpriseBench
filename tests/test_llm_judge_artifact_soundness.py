@@ -48,9 +48,15 @@ def _exec_result(returncode: int, stdout: str) -> MagicMock:
 
 def _docker_exec_for(contents: dict[str, str]):
     """Build a _docker_exec side_effect that returns ``contents[path]`` for
-    ``cat <path>`` calls (empty/exit-1 for any path not present)."""
+    ``cat <path>`` calls (empty/exit-1 for any path not present).
 
-    def side_effect(container_id, cmd, timeout=5):
+    Accepts ``user`` because the judge now tries the root-owned answer-artifact
+    snapshot (``cat <snapshot> ... user="root"``) before the live path — this
+    helper stands in for both calls, and ``contents`` is keyed by whichever
+    path (snapshot or live) the caller wants to simulate as present.
+    """
+
+    def side_effect(container_id, cmd, timeout=5, user=None):
         path = cmd[-1]
         if path in contents:
             return _exec_result(0, contents[path])

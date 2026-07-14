@@ -185,6 +185,22 @@ SCORING_WORKDIR = "/opt/eb_scoring"
 SCORING_OUT_DIR = f"{SCORING_WORKDIR}/out"
 SCORING_RESULTS_FILE = f"{SCORING_OUT_DIR}/results.json"
 
+# Scorer-writable scratch dir. Closing SHARED_WRITABLE_ROOTS for the scoring
+# window takes /tmp away from the checks too, and some of that use is
+# legitimate, not agent-controlled: test_runner.sh's own run_verifier() calls
+# `mktemp` for its stderr/stdout capture files and its command-not-found trap,
+# independent of anything a check script does. Pointing TMPDIR here keeps that
+# legitimate need satisfied without reopening the shared roots the seal exists
+# to close.
+SCORING_TMP_DIR = f"{SCORING_WORKDIR}/tmp"
+
+# Root-owned, scorer-unwritable freeze of the agent's answer artifacts, taken
+# right before the checks run. Defense in depth against a checkpoint AFTER this
+# one reading a mutation a check (running agent code, by design) wrote into a
+# candidate path post-snapshot: the LLM judge prefers this frozen copy over the
+# live in-container path whenever it exists.
+SCORING_SNAPSHOT_DIR = f"{SCORING_WORKDIR}/answer_snapshot"
+
 # /workspace during the agent's session: root-owned + sticky, world-writable so
 # the agent can create its own artifacts (it cannot unlink root-owned entries).
 WORKSPACE_MODE_SESSION = "1777"
@@ -193,6 +209,18 @@ WORKSPACE_MODE_SESSION = "1777"
 # code, executing as the scorer, the one shared drop point it could use to plant
 # an answer artifact for a later checkpoint after reading the answer key.
 WORKSPACE_MODE_SCORING = "1755"
+
+# /workspace is not the only shared drop point a scorer-identity write can land
+# on and an agent-identity read can later pick up. These are the other roots a
+# non-root, non-owner identity can write into on a stock image (bead
+# EnterpriseBench-6ca3n, fix-candidate-3's alternative): the classic world-
+# writable scratch dirs, 1777 by default, get the same close/reopen treatment as
+# /workspace. AGENT_HOME_DIR is different in kind — it's agent-OWNED, so the
+# owner bit (which the scorer never has) already blocks the scorer from writing
+# there; only a go+w entry the agent itself left behind is a hole, so it gets a
+# one-way sweep with no reopen (nothing was closed).
+SHARED_WRITABLE_ROOTS = ("/tmp", "/var/tmp", "/dev/shm")
+AGENT_HOME_DIR = "/home/agent"
 
 # Git config for the scoring exec. The repos under /workspace are agent-owned
 # (cloned as USER agent), so git run by the scorer refuses them as "dubious
@@ -666,6 +694,9 @@ def _seal_grading_assets(container_id: str) -> None:
         f"chmod 755 {shlex.quote(SCORING_WORKDIR)}; "
         f"chown root:{shlex.quote(SCORING_GROUP)} {shlex.quote(SCORING_OUT_DIR)}; "
         f"chmod 770 {shlex.quote(SCORING_OUT_DIR)}; "
+        f"mkdir -p {shlex.quote(SCORING_TMP_DIR)}; "
+        f"chown root:{shlex.quote(SCORING_GROUP)} {shlex.quote(SCORING_TMP_DIR)}; "
+        f"chmod 770 {shlex.quote(SCORING_TMP_DIR)}; "
         f"chown root:root {shlex.quote(WORKSPACE_DIR)}; "
         f"chmod {WORKSPACE_MODE_SESSION} {shlex.quote(WORKSPACE_DIR)}; "
         f"for f in {_GRADING_PATHS_SH}; do "
@@ -881,59 +912,104 @@ def _reap_agent_processes(container_id: str) -> None:
     logger.info("Reaped agent processes before scoring (none survived)")
 
 
+def _shell_if(condition: str, *commands: str) -> str:
+    """Shell snippet: run `commands` only if `condition` succeeds. `condition`
+    is the test of an `if`, which bash exempts from `set -e` regardless of what
+    it contains — a failing condition is a skip, not a script abort."""
+    body = " ".join(commands)
+    return f"if {condition}; then {body} fi;"
+
+
+def _shell_guard(flag: str, path: str, *commands: str) -> str:
+    """Shell snippet: run `commands` only if `test flag path` succeeds — e.g.
+    a missing root (`-d`, no /dev/shm on a minimal image) or a candidate the
+    agent never wrote (`-e`) is then a no-op instead of aborting the rest of
+    the script under `set -e`."""
+    return _shell_if(f"[ {flag} {shlex.quote(path)} ]", *commands)
+
+
+def _sweep_go_w_script(root: str) -> str:
+    """Shell snippet: drop the group/other write bit off every entry under
+    `root` that has one, without descending into other mounts (`-xdev`)."""
+    quoted = shlex.quote(root)
+    return (
+        f"find {quoted} -mindepth 1 -xdev "
+        f"\\( -type d -o -type f \\) -perm /go+w -exec chmod go-w {{}} +;"
+    )
+
+
 def _close_workspace_for_scoring(container_id: str) -> None:
-    """Leave the scorer nothing under /workspace to write.
+    """Leave the scorer nothing writable under /workspace or any other shared
+    drop point to write an answer into.
 
     The seal stops planted code from rewriting the grader. On its own it does not
     stop it from writing an *answer*: the checks must read ground_truth.json, so
     code executing as the scorer can read it too, and any scorer-writable path a
     later checkpoint reads back is then a forge vector. Agent-owned is NOT the
     same as scorer-can't-write — the agent picks the modes on its own files and
-    can leave a 0777 directory behind for exactly this purpose.
+    can leave a 0777 directory behind for exactly this purpose. And /workspace is
+    not the only shared writable root: /tmp, /var/tmp and /dev/shm are
+    world-writable on a stock image too, and a check the agent's exfiltrate-and-
+    inject chain planted there survives outside the seal entirely.
 
-    So, for the scoring window: close /workspace itself, and drop the group/other
-    write bit anywhere under it the agent opened one. Owner bits are untouched,
-    so the agent keeps full access to its own tree in a later chain session. The
-    cost is one metadata traversal; only the (rare) offending entries are
-    written, so this is not the `chown -R /workspace` that is too slow to do.
+    So, for the scoring window: close /workspace and each SHARED_WRITABLE_ROOTS
+    entry, and drop the group/other write bit anywhere under them the agent
+    opened one. Owner bits are untouched, so the agent keeps full access to its
+    own tree in a later chain session. AGENT_HOME_DIR gets the interior sweep
+    only — its own mode is owner-controlled (agent-owned), so the scorer was
+    never able to write there via the directory bit; only a go+w entry the agent
+    left inside it is a hole. Each root is `[ -d ]`-guarded so a missing one
+    (e.g. no /dev/shm on a minimal image) does not abort the rest under `set -e`.
 
     Raises:
         RuntimeError: if the lock cannot be applied. Scoring into a workspace the
             grader can write is not a measurement.
     """
-    script = (
-        f"set -e; "
-        f"chmod {WORKSPACE_MODE_SCORING} {shlex.quote(WORKSPACE_DIR)}; "
-        f"find {shlex.quote(WORKSPACE_DIR)} -mindepth 1 -xdev "
-        f"\\( -type d -o -type f \\) -perm /go+w -exec chmod go-w {{}} +"
-    )
+    parts = ["set -e;"]
+    for root in (WORKSPACE_DIR, *SHARED_WRITABLE_ROOTS):
+        parts.append(
+            _shell_guard(
+                "-d",
+                root,
+                f"chmod {WORKSPACE_MODE_SCORING} {shlex.quote(root)};",
+                _sweep_go_w_script(root),
+            )
+        )
+    parts.append(_shell_guard("-d", AGENT_HOME_DIR, _sweep_go_w_script(AGENT_HOME_DIR)))
+    script = " ".join(parts)
     result = _docker_exec(container_id, ["bash", "-c", script], user="root", timeout=300)
     if result.returncode != 0:
         raise RuntimeError(
-            f"failed to close {WORKSPACE_DIR} for scoring: "
+            f"failed to close shared writable roots for scoring: "
             f"{result.stderr.strip() or 'unknown error'}"
         )
 
 
 def _reopen_workspace_for_agent(container_id: str) -> None:
-    """Give the agent back its write access to /workspace after scoring.
+    """Give the agent back its write access to /workspace and the other shared
+    writable roots after scoring.
 
     Chain tasks score between sessions and hand the same container back to the
     agent afterwards (chain_runner), so the scoring lock must not outlive the
     scoring window. Best-effort by design: the score is already computed, and
     failing the run here would throw away a sound measurement over a container
     the caller may be about to discard. Logged loudly, never swallowed.
+
+    AGENT_HOME_DIR is deliberately excluded: its own mode was never changed by
+    the close (only interior go+w entries were swept), so there is nothing to
+    reopen there.
     """
-    result = _docker_exec(
-        container_id,
-        ["chmod", WORKSPACE_MODE_SESSION, WORKSPACE_DIR],
-        user="root",
-    )
+    parts = ["set -e;"]
+    for root in (WORKSPACE_DIR, *SHARED_WRITABLE_ROOTS):
+        parts.append(
+            _shell_guard("-d", root, f"chmod {WORKSPACE_MODE_SESSION} {shlex.quote(root)};")
+        )
+    script = " ".join(parts)
+    result = _docker_exec(container_id, ["bash", "-c", script], user="root")
     if result.returncode != 0:
         logger.error(
-            "failed to reopen %s for the agent after scoring (a chain's next "
-            "session may be unable to write): %s",
-            WORKSPACE_DIR,
+            "failed to reopen shared writable roots for the agent after scoring "
+            "(a chain's next session may be unable to write): %s",
             result.stderr.strip() or "unknown error",
         )
 
@@ -1451,11 +1527,19 @@ def _record_agent_trace(
         )
 
 
-def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
+def _run_scoring(
+    container_id: str, verifier_timeout: int = 600, *, task_dir: Path | None = None
+) -> dict:
     """Run /workspace/test.sh and capture the JSON results.
 
     Refuses to run at all if the grading-asset seal is broken: a verifier the
     agent could have rewritten produces a number, not a measurement.
+
+    ``task_dir`` is None for the existing unit tests that exercise reap/close/
+    exec mechanics with no real task on disk — that's legitimate, not a shim.
+    The one real call site (run_task()) always passes it, which is what turns on
+    the answer-artifact snapshot: without a task_dir there's nothing to derive
+    candidate artifact paths from, so the snapshot is skipped.
     """
     sealed, seal_err = _assert_grading_assets_sealed(container_id)
     if not sealed:
@@ -1482,6 +1566,8 @@ def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
     _reap_agent_processes(container_id)
     _close_workspace_for_scoring(container_id)
     try:
+        if task_dir is not None:
+            _snapshot_answer_artifacts(container_id, task_dir)
         result = _docker_exec(
             container_id,
             [
@@ -1492,6 +1578,7 @@ def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
                 f"PYTHONPATH={shlex.quote(EB_VERIFY_DIR)}:${{PYTHONPATH:-}} "
                 f"HOME={shlex.quote(SCORING_WORKDIR)} "
                 f"EB_RESULTS_FILE={shlex.quote(SCORING_RESULTS_FILE)} "
+                f"TMPDIR={shlex.quote(SCORING_TMP_DIR)} "
                 f"PYTHONSAFEPATH=1 PYTHONDONTWRITEBYTECODE=1 "
                 f"PYTEST_ADDOPTS={shlex.quote('-p no:cacheprovider')} "
                 f"{GIT_SCORING_ENV}; "
@@ -1549,6 +1636,83 @@ def _derive_artifact_candidates(task_dir: Path) -> list[str]:
     return candidates
 
 
+def _snapshot_answer_artifacts(container_id: str, task_dir: Path) -> None:
+    """Freeze the agent's answer artifacts before the checks can mutate them.
+
+    The checks read ground_truth.json (they must, to grade), and execute
+    agent-controlled code by design (pytest conftest.py, git textconv, the
+    agent's own test suite). So a check running as the scorer can, in
+    principle, rewrite a candidate answer path AFTER reading the answer key but
+    BEFORE this checkpoint's own read of it — the seal and the workspace close
+    stop the scorer writing to shared drop points, but the agent's own answer
+    path stays agent-owned and writable by design, and a check runs as the
+    scorer, not the agent, so "agent-owned" doesn't block this particular
+    write. Snapshotting immediately after the reap+close and before the
+    verifier exec pins each existing candidate to a root-owned, scorer-
+    unwritable copy that `_apply_llm_judge` reads instead of the live path.
+
+    Best-effort per candidate: a path that doesn't exist (or fails the symlink
+    check below) is skipped, not an error. A snapshot script failure IS raised
+    (unlike the reopen, nothing has been handed back to the agent yet, so
+    there's no sound-measurement-in-progress to protect by swallowing it) — a
+    silently lost snapshot would degrade the LLM judge back to the live path
+    with no signal that the anti-tamper defense didn't run.
+
+    Every candidate lives under agent-owned /workspace, so the agent can turn
+    one into a symlink pointing anywhere root can read (or make an
+    intermediate path component, e.g. the containing directory, a symlink).
+    `cp -a` does not dereference its source, so copying a symlink recreates
+    the link, and a bare `chmod` on that copy silently retargets the mode
+    change onto whatever the link resolves to instead — both root-privileged
+    operations on a path the agent chose. Each candidate is therefore resolved
+    with `readlink -f` first and required to land on a regular file still
+    under WORKSPACE_DIR; anything else (missing, a symlink escape, a directory)
+    is treated as absent rather than snapshotted.
+    """
+    candidates = _derive_artifact_candidates(task_dir)
+    parts = [
+        "set -e;",
+        # Start from an empty dir every run: a stale higher-index entry from a
+        # prior candidate set (or a re-invocation against the same container)
+        # must not be read back as if it were current.
+        f"rm -rf {shlex.quote(SCORING_SNAPSHOT_DIR)};",
+        f"mkdir -p {shlex.quote(SCORING_SNAPSHOT_DIR)};",
+        f"chmod 700 {shlex.quote(SCORING_SNAPSHOT_DIR)};",
+    ]
+    for index, path in enumerate(candidates):
+        dest = _snapshot_path_for(index)
+        quoted_path = shlex.quote(path)
+        condition = (
+            f"resolved=$(readlink -f -- {quoted_path} 2>/dev/null) && "
+            f'[ -f "$resolved" ] && '
+            f'case "$resolved" in {shlex.quote(WORKSPACE_DIR)}/*) true;; *) false;; esac'
+        )
+        copy_and_seal = (
+            f"cp -a -- {quoted_path} {shlex.quote(dest)} && "
+            f"chown root:root {shlex.quote(dest)} && "
+            f"chmod 400 {shlex.quote(dest)};"
+        )
+        parts.append(_shell_if(condition, copy_and_seal))
+    script = " ".join(parts)
+    result = _docker_exec(container_id, ["bash", "-c", script], user="root", timeout=60)
+    if result.returncode != 0:
+        raise RuntimeError(
+            "failed to snapshot answer artifacts before scoring: "
+            f"{result.stderr.strip() or 'unknown error'}"
+        )
+
+
+def _snapshot_path_for(candidate_index: int) -> str:
+    """Snapshot destination for the Nth path from _derive_artifact_candidates.
+
+    Flattened by index rather than by name: candidate paths are arbitrary
+    /workspace/... locations that may share a basename, and the index is the
+    same in both the snapshot pass and the later judge read since
+    _derive_artifact_candidates is a pure function of task_dir.
+    """
+    return f"{SCORING_SNAPSHOT_DIR}/{candidate_index}"
+
+
 def _apply_llm_judge(
     scores: dict,
     task_dir: Path,
@@ -1592,10 +1756,18 @@ def _apply_llm_judge(
 
     # Extract agent output from container — candidate paths derived from task
     # metadata (canonical answer.json + instruction.md output paths), not from
-    # baked-in repo names.
+    # baked-in repo names. The frozen snapshot (read as root — a trusted op, no
+    # agent code involved) is preferred over the live path: it was taken before
+    # the checks ran, so it can't reflect a later check's mutation of a
+    # candidate path.
     candidates = _derive_artifact_candidates(task_dir)
     agent_output = ""
-    for path in candidates:
+    for index, path in enumerate(candidates):
+        snapshot = _snapshot_path_for(index)
+        result = _docker_exec(container_id, ["cat", snapshot], timeout=5, user="root")
+        if result.returncode == 0 and result.stdout.strip():
+            agent_output = result.stdout.strip()
+            break
         result = _docker_exec(container_id, ["cat", path], timeout=5)
         if result.returncode == 0 and result.stdout.strip():
             agent_output = result.stdout.strip()
@@ -2690,7 +2862,7 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
 
         # --- Phase 5: Score (Tier 1 — deterministic) ---
         t0 = time.monotonic()
-        scores = _run_scoring(container_id, config.verifier_timeout)
+        scores = _run_scoring(container_id, config.verifier_timeout, task_dir=task_dir)
         timings["scoring"] = time.monotonic() - t0
         _route_verifier_infra_error(result, scores)
         _route_integrity_violation(result, scores)

@@ -34,7 +34,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -43,21 +43,30 @@ sys.path.insert(0, str(REPO_ROOT / "scripts" / "orchestration"))
 
 import run_task as rt  # noqa: E402
 from run_task import (  # noqa: E402
+    AGENT_HOME_DIR,
     AGENT_INSTRUCTION,
     AGENT_OUTPUT_DIR,
     GRADING_PATHS,
     GROUND_TRUTH,
     SCORING_GROUP,
     SCORING_RESULTS_FILE,
+    SCORING_SNAPSHOT_DIR,
     SCORING_USER,
     SCORING_WORKDIR,
+    SHARED_WRITABLE_ROOTS,
     WORKSPACE_DIR,
+    WORKSPACE_MODE_SCORING,
     WORKSPACE_MODE_SESSION,
+    _apply_llm_judge,
     _assert_grading_assets_sealed,
     _assert_scoring_identity,
     _chown_to_agent,
+    _close_workspace_for_scoring,
+    _reopen_workspace_for_agent,
     _run_scoring,
     _seal_grading_assets,
+    _snapshot_answer_artifacts,
+    _snapshot_path_for,
 )
 
 
@@ -263,6 +272,18 @@ class TestSealGradingAssets:
             with pytest.raises(RuntimeError, match="seal"):
                 _seal_grading_assets("cid")
 
+    def test_seal_creates_a_scorer_writable_tmp_dir(self) -> None:
+        """Closing SHARED_WRITABLE_ROOTS for the scoring window takes /tmp away
+        from legitimate scorer-side tempfile use too (test_runner.sh's own
+        mktemp calls); TMPDIR needs somewhere the scorer can still write."""
+        with patch.object(rt, "_docker_exec", return_value=_ok()) as exec_:
+            _seal_grading_assets("cid")
+
+        script = exec_.call_args.args[1][2]
+        assert f"mkdir -p {rt.SCORING_TMP_DIR}" in script
+        assert f"chown root:{SCORING_GROUP} {rt.SCORING_TMP_DIR}" in script
+        assert f"chmod 770 {rt.SCORING_TMP_DIR}" in script
+
 
 class TestAssertGradingAssetsSealed:
     def test_clean_seal_passes(self) -> None:
@@ -436,11 +457,14 @@ class TestRunScoringUnderTheSeal:
             "its own files and can leave a 0777 dir behind to be written into"
         )
 
-        assert exec_.call_args_list[-1].args[1] == [
-            "chmod",
-            WORKSPACE_MODE_SESSION,
-            WORKSPACE_DIR,
-        ], "the scoring lock must not outlive scoring — chains reuse the container"
+        reopen_script = exec_.call_args_list[-1].args[1][-1]
+        assert f"chmod {WORKSPACE_MODE_SESSION} {WORKSPACE_DIR}" in reopen_script, (
+            "the scoring lock must not outlive scoring — chains reuse the container"
+        )
+        for root in rt.SHARED_WRITABLE_ROOTS:
+            assert f"chmod {WORKSPACE_MODE_SESSION} {root}" in reopen_script, (
+                f"{root} must be reopened for the agent too, not just /workspace"
+            )
 
     def test_workspace_is_reopened_even_when_scoring_raises(self) -> None:
         """A verifier timeout must not leave a chain's next session locked out."""
@@ -459,7 +483,8 @@ class TestRunScoringUnderTheSeal:
                 with pytest.raises(subprocess.TimeoutExpired):
                     _run_scoring("cid")
 
-        assert calls[-1] == ["chmod", WORKSPACE_MODE_SESSION, WORKSPACE_DIR]
+        reopen_script = calls[-1][-1]
+        assert f"chmod {WORKSPACE_MODE_SESSION} {WORKSPACE_DIR}" in reopen_script
 
     def test_results_file_is_redirected_off_the_closed_workspace(self) -> None:
         """test_runner.sh writes $WORKSPACE/.results.json by default, which the
@@ -470,6 +495,15 @@ class TestRunScoringUnderTheSeal:
 
         runner = (REPO_ROOT / "scripts/sandbox/test_runner.sh").read_text()
         assert 'RESULTS_FILE="${EB_RESULTS_FILE:-$WORKSPACE/.results.json}"' in runner
+
+    def test_tmpdir_is_redirected_off_the_closed_shared_roots(self) -> None:
+        """test_runner.sh's own run_verifier() calls `mktemp` for its stderr/
+        stdout capture and its command-not-found trap — legitimate use that has
+        nothing to do with a check's own logic. Closing /tmp for the scoring
+        window would break that too unless TMPDIR points somewhere the scorer
+        can still write."""
+        script = _scoring_call(_run_scoring_capturing()).args[1][2]
+        assert f"TMPDIR={rt.SCORING_TMP_DIR}" in script
 
     def test_breach_yields_integrity_violation_not_a_rerun(self) -> None:
         """The re-run channel keys off verifier_infra_error. Routing a breach
@@ -485,6 +519,226 @@ class TestRunScoringUnderTheSeal:
         assert scores["all_passed"] is False
         assert "verifier_infra_error" not in scores
         assert scores["integrity_violation"]["reason"] == "grading_assets_tampered"
+
+
+class TestSharedWritableRootsSweep:
+    """/workspace is not the only shared drop point a scorer-identity write can
+    land on and an agent-identity read can later pick up — /tmp, /var/tmp and
+    /dev/shm are world-writable by default too (bead EnterpriseBench-6ca3n,
+    fix-candidate-3's alternative)."""
+
+    def test_close_seals_every_shared_writable_root_not_just_workspace(self) -> None:
+        with patch.object(rt, "_docker_exec", return_value=_ok()) as exec_:
+            _close_workspace_for_scoring("cid")
+
+        script = exec_.call_args.args[1][2]
+        for root in (WORKSPACE_DIR, *SHARED_WRITABLE_ROOTS):
+            assert f"chmod {WORKSPACE_MODE_SCORING} {root}" in script, (
+                f"{root} must be closed for the scoring window like /workspace"
+            )
+            assert f"find {root} -mindepth 1" in script, (
+                f"{root}'s interior go+w entries must be swept like /workspace's"
+            )
+
+    def test_close_guards_each_root_so_a_missing_one_does_not_abort_the_rest(self) -> None:
+        """A minimal image without /dev/shm must not break the /tmp and
+        /var/tmp seal — each root is `[ -d ]`-guarded independently."""
+        with patch.object(rt, "_docker_exec", return_value=_ok()) as exec_:
+            _close_workspace_for_scoring("cid")
+
+        script = exec_.call_args.args[1][2]
+        for root in (WORKSPACE_DIR, *SHARED_WRITABLE_ROOTS, AGENT_HOME_DIR):
+            assert f"if [ -d {root} ]; then" in script, (
+                f"{root} must be guarded so a missing root doesn't abort under set -e"
+            )
+
+    def test_close_sweeps_agent_home_but_never_chmods_its_own_mode(self) -> None:
+        """AGENT_HOME_DIR is agent-owned: the scorer never had the directory-bit
+        write access the other roots' chmod exists to remove, so only a stray
+        go+w entry left inside it is a hole."""
+        with patch.object(rt, "_docker_exec", return_value=_ok()) as exec_:
+            _close_workspace_for_scoring("cid")
+
+        script = exec_.call_args.args[1][2]
+        assert f"find {AGENT_HOME_DIR} -mindepth 1" in script
+        assert f"chmod {WORKSPACE_MODE_SCORING} {AGENT_HOME_DIR}" not in script
+
+    def test_reopen_restores_every_shared_writable_root(self) -> None:
+        with patch.object(rt, "_docker_exec", return_value=_ok()) as exec_:
+            _reopen_workspace_for_agent("cid")
+
+        script = exec_.call_args.args[1][2]
+        for root in (WORKSPACE_DIR, *SHARED_WRITABLE_ROOTS):
+            assert f"chmod {WORKSPACE_MODE_SESSION} {root}" in script
+
+    def test_reopen_does_not_touch_agent_home(self) -> None:
+        """Nothing was closed there (only interior entries were swept), so
+        there is nothing to reopen."""
+        with patch.object(rt, "_docker_exec", return_value=_ok()) as exec_:
+            _reopen_workspace_for_agent("cid")
+
+        script = exec_.call_args.args[1][2]
+        assert AGENT_HOME_DIR not in script
+
+    def test_reopen_failure_is_logged_not_raised(self) -> None:
+        """Best-effort by design: the score is already computed, so a reopen
+        failure must not throw away a sound measurement."""
+        with patch.object(rt, "_docker_exec", return_value=_fail("denied")):
+            _reopen_workspace_for_agent("cid")  # must not raise
+
+
+class TestAnswerArtifactSnapshot:
+    """A check running as the scorer can rewrite a candidate answer path AFTER
+    reading the answer key but BEFORE this checkpoint's own read of it — the
+    agent's own answer path stays agent-writable by design (bead
+    EnterpriseBench-6ca3n). Snapshotting freezes each candidate to a
+    root-owned, scorer-unwritable copy right after the reap+close."""
+
+    def test_creates_a_root_owned_unwritable_snapshot_dir(self, tmp_path: Path) -> None:
+        (tmp_path / "instruction.md").write_text("Do the task.")
+        with patch.object(rt, "_docker_exec", return_value=_ok()) as exec_:
+            _snapshot_answer_artifacts("cid", tmp_path)
+
+        script = exec_.call_args.args[1][2]
+        assert f"mkdir -p {SCORING_SNAPSHOT_DIR}" in script
+        assert f"chmod 700 {SCORING_SNAPSHOT_DIR}" in script
+
+    def test_freezes_every_existing_candidate_at_its_index_path(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "instruction.md").write_text(
+            "Write to `/workspace/BLAST_RADIUS.md`.\n"
+        )
+        with patch.object(rt, "_docker_exec", return_value=_ok()) as exec_:
+            _snapshot_answer_artifacts("cid", tmp_path)
+
+        script = exec_.call_args.args[1][2]
+        candidates = rt._derive_artifact_candidates(tmp_path)
+        assert len(candidates) == 2
+        for index, path in enumerate(candidates):
+            dest = _snapshot_path_for(index)
+            # The candidate is resolved (readlink -f) and containment-checked
+            # against WORKSPACE_DIR before it's ever touched — a symlinked
+            # candidate (or a symlinked parent dir) must not reach `cp`.
+            assert f"readlink -f -- {path}" in script
+            assert f'case "$resolved" in {WORKSPACE_DIR}/*)' in script
+            assert f"cp -a -- {path} {dest}" in script
+            assert f"chown root:root {dest}" in script
+            assert f"chmod 400 {dest}" in script
+
+    def test_close_never_dereferences_a_symlinked_candidate(self, tmp_path: Path) -> None:
+        """A candidate is agent-controlled: turning /workspace/agent_output/
+        answer.json into a symlink to a root-readable file must not let the
+        snapshot (running as root) copy through it or chmod its target."""
+        (tmp_path / "instruction.md").write_text("Do the task.")
+        with patch.object(rt, "_docker_exec", return_value=_ok()) as exec_:
+            _snapshot_answer_artifacts("cid", tmp_path)
+
+        script = exec_.call_args.args[1][2]
+        # The guard requires the RESOLVED path to still live under /workspace —
+        # a symlink escaping outside it fails the case match and is skipped,
+        # the same as a candidate that doesn't exist at all.
+        assert f'case "$resolved" in {WORKSPACE_DIR}/*) true;; *) false;; esac' in script
+
+    def test_snapshot_path_is_stable_across_calls_for_the_same_index(self) -> None:
+        """The judge's later read must resolve the same path the snapshot
+        pass wrote to — both derive it from the candidate's position alone."""
+        assert _snapshot_path_for(0) == _snapshot_path_for(0)
+        assert _snapshot_path_for(0) != _snapshot_path_for(1)
+
+    def test_snapshot_failure_raises(self, tmp_path: Path) -> None:
+        """Unlike the reopen, nothing has been handed back to the agent yet at
+        snapshot time — a lost snapshot must not silently degrade the judge to
+        the live path with no signal that the anti-tamper defense didn't run."""
+        (tmp_path / "instruction.md").write_text("Do the task.")
+        with patch.object(rt, "_docker_exec", return_value=_fail("denied")):
+            with pytest.raises(RuntimeError, match="snapshot"):
+                _snapshot_answer_artifacts("cid", tmp_path)
+
+    def test_snapshot_script_starts_fresh_and_fails_closed(self, tmp_path: Path) -> None:
+        """A stale higher-index entry from a prior candidate set must not be
+        read back as current, and `set -e` must be present so a mid-script
+        failure (e.g. a permissions error on one candidate) surfaces as a
+        non-zero returncode instead of being swallowed by the next `if`."""
+        (tmp_path / "instruction.md").write_text("Do the task.")
+        with patch.object(rt, "_docker_exec", return_value=_ok()) as exec_:
+            _snapshot_answer_artifacts("cid", tmp_path)
+
+        script = exec_.call_args.args[1][2]
+        assert script.startswith("set -e;")
+        assert f"rm -rf {SCORING_SNAPSHOT_DIR}" in script
+
+    def test_run_scoring_snapshots_after_reap_and_close_before_the_verifier_exec(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "instruction.md").write_text("Do the task.")
+        calls: list = []
+
+        def fake_exec(container_id, cmd, **kwargs):
+            calls.append(cmd)
+            if _reap_is(cmd):
+                return _ok(stdout="agent_procs_remaining=0")
+            return _ok(stdout='{"task_score": 0.5}')
+
+        with patch.object(rt, "_assert_grading_assets_sealed", return_value=(True, "")):
+            with patch.object(rt, "_docker_exec", side_effect=fake_exec):
+                _run_scoring("cid", task_dir=tmp_path)
+
+        scripts = [c[-1] for c in calls if c and c[0] == "bash"]
+        reap_idx = next(i for i, s in enumerate(scripts) if "kill -9" in s)
+        snapshot_idx = next(
+            i for i, s in enumerate(scripts) if SCORING_SNAPSHOT_DIR in s
+        )
+        test_idx = next(i for i, s in enumerate(scripts) if rt.TEST_SH in s)
+        assert reap_idx < snapshot_idx < test_idx
+
+    def test_run_scoring_skips_snapshot_when_no_task_dir(self) -> None:
+        """The existing unit tests exercise reap/close/exec mechanics with no
+        real task on disk — task_dir=None must not attempt a snapshot."""
+        exec_ = _run_scoring_capturing()
+        scripts = [
+            c.args[1][-1] for c in exec_.call_args_list
+            if c.args[1] and c.args[1][0] == "bash"
+        ]
+        assert not any(SCORING_SNAPSHOT_DIR in s for s in scripts)
+
+
+class TestJudgePrefersFrozenSnapshotOverLivePath:
+    """The judge must read the pre-scoring snapshot when present — that copy
+    can't reflect a check's later mutation of the live path."""
+
+    def test_judge_reads_snapshot_as_root_before_trying_the_live_path(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "instruction.md").write_text("Do the task.")
+        (tmp_path / "expected_solution.json").write_text(
+            '{"task_id": "t1", "checkpoints": {"cp1": '
+            '{"expected_solution": "x", "evaluation_criteria": []}}}'
+        )
+        snapshot_path = _snapshot_path_for(0)
+
+        def fake_exec(container_id, cmd, timeout=5, user=None):
+            path = cmd[-1]
+            if path == snapshot_path and user == "root":
+                return _ok(stdout='{"answer": "frozen"}')
+            return _fail("no such file", returncode=1)
+
+        scores = {
+            "task_score": 1.0,
+            "checkpoints": [{"name": "cp1", "score": 1.0, "weight": 1.0, "passed": True}],
+        }
+        fake_judge = MagicMock()
+        fake_judge.evaluate_checkpoint.return_value = MagicMock(
+            score=0.5, reasoning="partial"
+        )
+
+        with patch.object(rt, "_docker_exec", side_effect=fake_exec), patch(
+            "eb_verify.judge.LLMJudge", return_value=fake_judge
+        ):
+            out = _apply_llm_judge(scores, tmp_path, "cid", {"task": {}})
+
+        assert "verifier_infra_error" not in out
+        assert out["checkpoints"][0]["judge_score"] == 0.5
 
 
 class TestScoringDoesNotBreakTheChecks:
@@ -1052,6 +1306,178 @@ class TestLingeringAgentProcessCannotInjectAnswer:
             with patch.object(rt, "_docker_exec", side_effect=no_kill):
                 with pytest.raises(RuntimeError, match="survived the pre-scoring reap"):
                     rt._reap_agent_processes(cid)
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+
+@pytest.mark.docker
+class TestSnapshotRefusesASymlinkedCandidate:
+    """A candidate answer path lives under agent-owned /workspace, so an
+    adversarial agent can turn it into a symlink pointing at anything root can
+    read. Without the readlink -f + containment guard, the snapshot (running
+    as root) would `cp -a` the link itself and then `chmod 400` would silently
+    retarget onto whatever it resolves to — disclosing the referent's content
+    through `_apply_llm_judge`'s root-privileged snapshot read, and mutating
+    the referent's mode as a side effect. This drives the real vulnerable shape
+    end-to-end against an actual container, not just the script text."""
+
+    def test_symlinked_answer_json_is_skipped_not_dereferenced(
+        self, tmp_path: Path
+    ) -> None:
+        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+            pytest.skip("docker daemon unavailable")
+
+        (tmp_path / "instruction.md").write_text("Do the task.")
+
+        cid = subprocess.run(
+            ["docker", "run", "-d", "--rm", "python:3.11-slim", "sleep", "300"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        try:
+            subprocess.run(
+                ["docker", "exec", cid, "bash", "-c",
+                 "useradd -m -s /bin/bash agent; "
+                 "mkdir -p /workspace/agent_output /secret; "
+                 "chown -R agent:agent /workspace; "
+                 "echo SECRET_GT_CONTENT > /secret/ground_truth.json; "
+                 "chown root:root /secret/ground_truth.json; "
+                 "chmod 644 /secret/ground_truth.json"],
+                capture_output=True, check=True,
+            )
+            # The agent replaces its own answer artifact with a symlink to a
+            # root-owned file elsewhere — exactly the move this test exists to
+            # block. Real containers seal GROUND_TRUTH with tighter perms; 644
+            # isolates the assertion to the symlink mechanism itself.
+            subprocess.run(
+                ["docker", "exec", "-u", "agent", cid, "ln", "-s",
+                 "/secret/ground_truth.json",
+                 "/workspace/agent_output/answer.json"],
+                capture_output=True, check=True,
+            )
+
+            rt._snapshot_answer_artifacts(cid, tmp_path)
+
+            snapshot_read = subprocess.run(
+                ["docker", "exec", cid, "cat", _snapshot_path_for(0)],
+                capture_output=True, text=True,
+            )
+            assert "SECRET_GT_CONTENT" not in snapshot_read.stdout, (
+                "the snapshot must not contain the symlink target's content — "
+                "the candidate should have been skipped, not dereferenced"
+            )
+
+            mode_after = subprocess.run(
+                ["docker", "exec", cid, "stat", "-c", "%a",
+                 "/secret/ground_truth.json"],
+                capture_output=True, text=True,
+            ).stdout.strip()
+            assert mode_after == "644", (
+                f"the symlink target's mode must be untouched, got {mode_after} "
+                "— chmod must not have followed the link"
+            )
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+
+@pytest.mark.docker
+class TestSharedWritableRootExfiltrationAcrossSessions:
+    """The residual the bead names directly: a scorer-identity write into a
+    persistent drop point OUTSIDE /workspace (e.g. world-writable /tmp) is not
+    torn down between container sessions the way /workspace's contents are
+    not either. 'Session 1' below is the scorer-identity write during scoring;
+    'session 2' is any later agent-identity read of the same container. A grep
+    of chain_runner.py/session.py/milestone.py/branch_manager.py (recorded on
+    the bead) found no code path that literally reuses a Docker container
+    across chain sessions today, so this drives the seal primitives directly
+    rather than through chain_runner — it remains a faithful regression test
+    of the underlying capability the seal removes, matching this file's
+    existing control/fixed pattern.
+    """
+
+    def _build(self) -> str:
+        cid = subprocess.run(
+            ["docker", "run", "-d", "--rm", "python:3.11-slim", "sleep", "300"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        subprocess.run(
+            ["docker", "exec", cid, "bash", "-c",
+             "useradd -m -s /bin/bash agent; "
+             f"groupadd {SCORING_GROUP}; "
+             f"useradd -M -s /bin/bash -g {SCORING_GROUP} {SCORING_USER}; "
+             # _docker_exec's default workdir is /workspace — every real task
+             # image has it (dockerfile_generator); this bare container needs
+             # it created explicitly or the exec itself fails to start.
+             "mkdir -p /workspace"],
+            capture_output=True, check=True,
+        )
+        return cid
+
+    def test_control_scorer_write_to_tmp_persists_and_is_agent_readable(self) -> None:
+        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+            pytest.skip("docker daemon unavailable")
+        cid = self._build()
+        try:
+            # Session 1 (control, no close): a check running as the scorer
+            # leaks the answer key to the classic world-writable scratch dir.
+            write = subprocess.run(
+                ["docker", "exec", "-u", SCORING_USER, cid, "bash", "-c",
+                 "echo CORRECT > /tmp/exfil_control.json"],
+                capture_output=True,
+            )
+            assert write.returncode == 0, (
+                "the control write must succeed — the test proves nothing if "
+                "the vulnerable case does not reproduce"
+            )
+            # Session 2: the agent identity reads it back.
+            read = subprocess.run(
+                ["docker", "exec", "-u", "agent", cid, "cat",
+                 "/tmp/exfil_control.json"],
+                capture_output=True, text=True,
+            )
+            assert "CORRECT" in read.stdout, (
+                "without the fix, the leaked file must be agent-readable in a "
+                "later session"
+            )
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+    def test_fixed_close_denies_the_scorer_write_and_reopen_restores_the_agent(
+        self,
+    ) -> None:
+        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+            pytest.skip("docker daemon unavailable")
+        cid = self._build()
+        try:
+            rt._close_workspace_for_scoring(cid)
+
+            # Session 1 (fixed): the same scorer-identity write is now denied
+            # at write time — nothing lands in the shared drop point at all.
+            write = subprocess.run(
+                ["docker", "exec", "-u", SCORING_USER, cid, "bash", "-c",
+                 "echo CORRECT > /tmp/exfil_fixed.json"],
+                capture_output=True,
+            )
+            assert write.returncode != 0, (
+                "the scorer must not be able to write a new file into /tmp "
+                "once the shared writable roots are closed for scoring"
+            )
+            # Session 2: nothing to read, because nothing was written.
+            read = subprocess.run(
+                ["docker", "exec", cid, "cat", "/tmp/exfil_fixed.json"],
+                capture_output=True,
+            )
+            assert read.returncode != 0
+
+            rt._reopen_workspace_for_agent(cid)
+            agent_write = subprocess.run(
+                ["docker", "exec", "-u", "agent", cid, "bash", "-c",
+                 "echo hi > /tmp/agent_next_session.txt"],
+                capture_output=True,
+            )
+            assert agent_write.returncode == 0, (
+                "reopen must restore the agent's own write access for its next "
+                "session — the lock must not outlive the scoring window"
+            )
         finally:
             subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
 
