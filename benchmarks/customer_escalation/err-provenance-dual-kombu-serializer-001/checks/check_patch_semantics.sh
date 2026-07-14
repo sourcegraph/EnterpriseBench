@@ -12,10 +12,10 @@ if [[ ! -d "$REPO/.git" ]]; then
     exit 0
 fi
 
-DIFF="$(git -C "$REPO" diff HEAD -- 'kombu/serialization.py' 2>/dev/null; git -C "$REPO" diff --cached -- 'kombu/serialization.py' 2>/dev/null)"
+DIFF="$(git -C "$REPO" diff HEAD -- 'kombu/serialization.py' 2>/dev/null)"
 ADDED="$(printf '%s' "$DIFF" | grep '^+' | grep -v '^+++' || true)"
 
-if [[ -z "$(printf '%s' "$ADDED" | tr -d '[:space:]')" ]]; then
+if [[ -z "${ADDED//[[:space:]]/}" ]]; then
     printf '{"score": 0.0, "passed": false, "detail": "no added lines in kombu serialization.py"}\n'
     exit 0
 fi

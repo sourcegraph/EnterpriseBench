@@ -25,7 +25,6 @@ from scripts.validation.build_enterprise_hard_manifest import (
     GATE_D_MIN_MODULES,
     NON_GROUNDING_ARTIFACTS,
     build_entry,
-    crnt_positive,
     score_gate_b,
     score_gate_d,
 )
@@ -90,12 +89,8 @@ def test_manifest_entries_match_regenerated():
         assert (task_dir / "task.toml").is_file(), (
             f"{entry['task_id']}: manifest path {entry['path']} has no task.toml"
         )
-        fresh = build_entry(task_dir)
-        assert fresh["gates"] == entry["gates"], (
-            f"{entry['task_id']}: stored gate evidence is stale vs task.toml on disk"
-        )
-        assert fresh["required_files"] == entry["required_files"], (
-            f"{entry['task_id']}: stored required_files stale vs task.toml"
+        assert build_entry(task_dir) == entry, (
+            f"{entry['task_id']}: stored entry is stale vs task.toml on disk"
         )
 
 
@@ -113,11 +108,6 @@ def test_every_task_is_crnt_positive():
         assert t["crnt_positive"], (
             f"{t['task_id']}: CRNT-negative — a declared repo is decorative"
         )
-        task_dir = PROJECT_ROOT / t["path"]
-        import tomllib
-
-        config = tomllib.loads((task_dir / "task.toml").read_text())
-        assert crnt_positive(config), f"{t['task_id']}: CRNT recomputation disagrees"
 
 
 def test_oracle_dispersed_across_files_and_modules():
@@ -144,26 +134,21 @@ def test_oracle_spans_at_least_two_repos():
 
 
 def test_computable_gates_pass():
-    """A/B/D are properties of the task and must hold at authoring time."""
+    """A/B/D are properties of the task and must hold at authoring time.
+
+    Gate B's evidence is re-derived from instruction.md on disk by
+    test_manifest_entries_match_regenerated, so asserting on it here is an
+    assertion about the source, not about a stored string.
+    """
     for t in _tasks():
         for g in COMPUTABLE_GATES:
             assert t["gates"][g]["status"] == "pass", (
                 f"{t['task_id']}: Gate {g} {t['gates'][g]['status']} — "
                 f"{t['gates'][g]['reason']}"
             )
-
-
-def test_prompt_is_non_leaky():
-    """Gate B must admit (behavioral/grep_hard), recomputed from source."""
-    for t in _tasks():
-        task_dir = PROJECT_ROOT / t["path"]
-        instruction = (task_dir / "instruction.md").read_text()
-        oracle_files = [rf["path"] for rf in t["required_files"]]
-        gate = score_gate_b(instruction, oracle_files)
-        assert gate.status == "pass", (
-            f"{t['task_id']}: instruction leaks the oracle — {gate.reason}"
+        assert t["gates"]["B"]["evidence"]["bucket"] in ("behavioral", "grep_hard"), (
+            f"{t['task_id']}: instruction leaks the oracle"
         )
-        assert gate.evidence["bucket"] in ("behavioral", "grep_hard")
 
 
 # ── Gate C must never be asserted as passed ───────────────────────
@@ -220,6 +205,7 @@ def test_gate_b_flags_basename_leak():
     gate = score_gate_b(
         "The bug is in default.py, look there.",
         ["httpx/_transports/default.py"],
+        {"httpx"},
     )
     assert gate.status == "fail"
     assert gate.evidence["bucket"] == "exact_path"
@@ -229,9 +215,21 @@ def test_gate_b_admits_symptom_only():
     gate = score_gate_b(
         "Requests intermittently fail with 'peer closed connection' behind a proxy.",
         ["httpx/_transports/default.py", "httpcore/_async/http11.py"],
+        {"httpx", "httpcore"},
     )
     assert gate.status == "pass"
     assert gate.evidence["bucket"] == "grep_hard"
+
+
+def test_gate_b_two_files_one_repo_is_behavioral():
+    """The repo set comes from required_files[].repo, not the path prefix."""
+    gate = score_gate_b(
+        "Uploads intermittently truncate under load.",
+        ["src/codec/framed_read.rs", "src/proto/h1/decode.rs"],
+        {"h2"},
+    )
+    assert gate.status == "pass"
+    assert gate.evidence["bucket"] == "behavioral"
 
 
 def test_gate_d_rejects_single_module():

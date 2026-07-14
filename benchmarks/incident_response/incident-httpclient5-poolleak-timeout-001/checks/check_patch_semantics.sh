@@ -12,10 +12,10 @@ if [[ ! -d "$REPO/.git" ]]; then
     exit 0
 fi
 
-DIFF="$(git -C "$REPO" diff HEAD -- 'httpcore5/src/main/java/org/apache/hc/core5/pool/StrictConnPool.java' 'httpcore5/src/main/java/org/apache/hc/core5/pool/LaxConnPool.java' 2>/dev/null; git -C "$REPO" diff --cached -- 'httpcore5/src/main/java/org/apache/hc/core5/pool/StrictConnPool.java' 'httpcore5/src/main/java/org/apache/hc/core5/pool/LaxConnPool.java' 2>/dev/null)"
+DIFF="$(git -C "$REPO" diff HEAD -- 'httpcore5/src/main/java/org/apache/hc/core5/pool/StrictConnPool.java' 'httpcore5/src/main/java/org/apache/hc/core5/pool/LaxConnPool.java' 2>/dev/null)"
 ADDED="$(printf '%s' "$DIFF" | grep '^+' | grep -v '^+++' || true)"
 
-if [[ -z "$(printf '%s' "$ADDED" | tr -d '[:space:]')" ]]; then
+if [[ -z "${ADDED//[[:space:]]/}" ]]; then
     printf '{"score": 0.0, "passed": false, "detail": "no added lines in the connection-pool lease future"}\n'
     exit 0
 fi

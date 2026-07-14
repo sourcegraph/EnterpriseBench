@@ -12,7 +12,7 @@ if [[ ! -d "$REPO/.git" ]]; then
     exit 0
 fi
 
-DIFF="$(git -C "$REPO" diff HEAD -- 'src/proto/h1/decode.rs' 2>/dev/null; git -C "$REPO" diff --cached -- 'src/proto/h1/decode.rs' 2>/dev/null)"
+DIFF="$(git -C "$REPO" diff HEAD -- 'src/proto/h1/decode.rs' 2>/dev/null)"
 ADDED="$(printf '%s' "$DIFF" | grep '^+' | grep -v '^+++' || true)"
 
 # Overflow must be detected: checked arithmetic or an explicit overflow test.

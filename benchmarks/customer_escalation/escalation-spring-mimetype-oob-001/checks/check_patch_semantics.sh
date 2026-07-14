@@ -12,10 +12,10 @@ if [[ ! -d "$REPO/.git" ]]; then
     exit 0
 fi
 
-DIFF="$(git -C "$REPO" diff HEAD -- 'spring-core/src/main/java/org/springframework/util/MimeTypeUtils.java' 2>/dev/null; git -C "$REPO" diff --cached -- 'spring-core/src/main/java/org/springframework/util/MimeTypeUtils.java' 2>/dev/null)"
+DIFF="$(git -C "$REPO" diff HEAD -- 'spring-core/src/main/java/org/springframework/util/MimeTypeUtils.java' 2>/dev/null)"
 ADDED="$(printf '%s' "$DIFF" | grep '^+' | grep -v '^+++' || true)"
 
-if [[ -z "$(printf '%s' "$ADDED" | tr -d '[:space:]')" ]]; then
+if [[ -z "${ADDED//[[:space:]]/}" ]]; then
     printf '{"score": 0.0, "passed": false, "detail": "no added lines in the mime-type parser"}\n'
     exit 0
 fi

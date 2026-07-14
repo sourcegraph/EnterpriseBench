@@ -13,7 +13,7 @@ if [[ ! -d "$REPO/.git" ]]; then
 fi
 
 # Only consider added lines in the big-decimal parser file.
-DIFF="$(git -C "$REPO" diff HEAD -- 'src/main/java/com/fasterxml/jackson/core/io/BigDecimalParser.java' 2>/dev/null; git -C "$REPO" diff --cached -- 'src/main/java/com/fasterxml/jackson/core/io/BigDecimalParser.java' 2>/dev/null)"
+DIFF="$(git -C "$REPO" diff HEAD -- 'src/main/java/com/fasterxml/jackson/core/io/BigDecimalParser.java' 2>/dev/null)"
 ADDED="$(printf '%s' "$DIFF" | grep '^+' | grep -v '^+++' || true)"
 
 if printf '%s' "$ADDED" | grep -q "ArithmeticException"; then

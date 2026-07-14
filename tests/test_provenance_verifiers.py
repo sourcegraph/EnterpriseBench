@@ -28,30 +28,24 @@ VERIFIERS = [
     "checks/check_trigger_conditions.sh",
 ]
 
-# This suite asserts answer-centric invariants (ground-truth answer scores high,
-# a missing answer.json scores low). Those only make sense for tasks whose
-# deliverable is an ANSWER scored by the three verifiers above. The
-# enterprise-hard authored stratum (bead EnterpriseBench-jn73.2.7) adds
-# code_patch provenance tasks whose deliverable is a PATCH: they carry their own
-# check_patch_site/check_patch_semantics verifiers and are covered by
-# tests/test_enterprise_hard_stratum.py, not by this answer-only contract. Scope
-# the fixture to tasks that actually declare the CSB verifiers so a task with a
-# different verifier contract is not swept into an invariant it was never
-# designed to satisfy.
+# These invariants are answer-centric (a ground-truth answer scores high, a
+# missing answer.json scores low), so they only apply to tasks whose deliverable
+# is an ANSWER scored by the three verifiers above. Tasks whose deliverable is a
+# PATCH carry check_patch_site/check_patch_semantics instead and are covered by
+# tests/test_enterprise_hard_stratum.py.
 ERR_PROVENANCE_DIRS = sorted(
     d
     for d in TASK_BASE.glob("err-provenance-*")
     if all((d / v).exists() for v in VERIFIERS)
 )
 
-# Guard against the filter silently emptying the suite (e.g. a directory rename
-# that drops every conforming task): if the glob matched dirs but none declared
-# the CSB verifiers, that is a regression to surface, not a green no-op.
-if not ERR_PROVENANCE_DIRS and any(TASK_BASE.glob("err-provenance-*")):
+# An empty suite is a broken suite, whatever the reason — collecting nothing must
+# never read as green.
+if not ERR_PROVENANCE_DIRS:
     raise RuntimeError(
-        "err-provenance-* tasks exist but none declare the CSB answer verifiers "
-        f"{VERIFIERS}; this suite would collect nothing. Check for a verifier "
-        "rename or a broken task layout."
+        f"no err-provenance-* task declares the CSB answer verifiers {VERIFIERS}; "
+        "this suite would collect nothing. Check for a verifier rename or a "
+        "broken task layout."
     )
 
 

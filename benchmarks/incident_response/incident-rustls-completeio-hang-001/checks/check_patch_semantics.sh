@@ -11,7 +11,7 @@ if [[ ! -d "$REPO/.git" ]]; then
     exit 0
 fi
 
-DIFF="$(git -C "$REPO" diff HEAD -- 'rustls/src/conn.rs' 2>/dev/null; git -C "$REPO" diff --cached -- 'rustls/src/conn.rs' 2>/dev/null)"
+DIFF="$(git -C "$REPO" diff HEAD -- 'rustls/src/conn.rs' 2>/dev/null)"
 ADDED="$(printf '%s' "$DIFF" | grep '^+' | grep -v '^+++' || true)"
 
 # No-progress guard: both wants_write and wants_read tested, and a return/break.

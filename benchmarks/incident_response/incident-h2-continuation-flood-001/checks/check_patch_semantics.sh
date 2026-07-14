@@ -12,7 +12,7 @@ if [[ ! -d "$REPO/.git" ]]; then
     exit 0
 fi
 
-DIFF="$(git -C "$REPO" diff HEAD -- 'src/codec/framed_read.rs' 2>/dev/null; git -C "$REPO" diff --cached -- 'src/codec/framed_read.rs' 2>/dev/null)"
+DIFF="$(git -C "$REPO" diff HEAD -- 'src/codec/framed_read.rs' 2>/dev/null)"
 ADDED="$(printf '%s' "$DIFF" | grep '^+' | grep -v '^+++' || true)"
 
 # A bound on CONTINUATION frames: a max/limit and a per-block count.

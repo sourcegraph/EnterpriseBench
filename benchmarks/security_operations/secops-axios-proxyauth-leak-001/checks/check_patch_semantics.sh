@@ -12,7 +12,7 @@ if [[ ! -d "$REPO/.git" ]]; then
     exit 0
 fi
 
-DIFF="$(git -C "$REPO" diff HEAD -- 'index.js' 2>/dev/null; git -C "$REPO" diff --cached -- 'index.js' 2>/dev/null)"
+DIFF="$(git -C "$REPO" diff HEAD -- 'index.js' 2>/dev/null)"
 ADDED="$(printf '%s' "$DIFF" | grep '^+' | grep -v '^+++' || true)"
 
 # Case-insensitive match for the proxy header being added to the strip set.

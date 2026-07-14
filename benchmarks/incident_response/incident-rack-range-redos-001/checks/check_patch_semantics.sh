@@ -12,7 +12,7 @@ if [[ ! -d "$REPO/.git" ]]; then
     exit 0
 fi
 
-DIFF="$(git -C "$REPO" diff HEAD -- 'lib/rack/utils.rb' 2>/dev/null; git -C "$REPO" diff --cached -- 'lib/rack/utils.rb' 2>/dev/null)"
+DIFF="$(git -C "$REPO" diff HEAD -- 'lib/rack/utils.rb' 2>/dev/null)"
 ADDED="$(printf '%s' "$DIFF" | grep '^+' | grep -v '^+++' || true)"
 REMOVED="$(printf '%s' "$DIFF" | grep '^-' | grep -v '^---' || true)"
 

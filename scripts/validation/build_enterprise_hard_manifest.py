@@ -30,10 +30,10 @@ rather than silently agree with it.
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import re
 import sys
-import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -41,6 +41,14 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 BENCHMARKS = PROJECT_ROOT / "benchmarks"
 MANIFEST = BENCHMARKS / "strata" / "enterprise_hard_authored.json"
+
+# Importable both as a CLI script and as scripts.validation.* under pytest.
+for _p in (PROJECT_ROOT, PROJECT_ROOT / "lib"):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
+
+from eb_verify.plugins import get_validator, list_validators  # noqa: E402
+from scripts.validation.crnt_validator import evaluate_crnt, parse_toml  # noqa: E402
 
 #: Mirrors stratum_selector.GATE_D_MIN_FILES / GATE_D_MIN_MODULES.
 GATE_D_MIN_FILES = 3
@@ -57,19 +65,28 @@ GENERIC_DIRS = frozenset(
     }
 )
 
-#: Validators whose validate() takes no require_grounded_citations kwarg.
-#: runner.validate_artifacts() hard-fails a required artifact whose validator
-#: cannot honor the flag when the task sets it, so the two are mutually exclusive.
-NON_GROUNDING_ARTIFACTS = frozenset(
-    {"code_patch", "config", "runbook", "call_graph", "topological_order",
-     "reproduction_script"}
-)
+def _non_grounding_artifacts() -> frozenset[str]:
+    """Artifact types whose validator cannot honor require_grounded_citations.
+
+    runner.validate_artifacts() hard-fails a required artifact whose validator
+    takes no such kwarg when the task sets the flag, so the two are mutually
+    exclusive. Derived from the live plugin registry with the runner's own rule
+    rather than snapshotted, so a plugin gaining or losing the kwarg cannot leave
+    this stale.
+    """
+    return frozenset(
+        name
+        for name in list_validators()
+        if (v := get_validator(name)) is not None
+        and "require_grounded_citations" not in inspect.signature(v.validate).parameters
+    )
 
 
-def _strip_repo_slug(path: str) -> str:
-    p = path.replace("\\", "/")
-    p = re.sub(r"^[^/]+--[0-9a-f]{6,}/", "", p)
-    return p.split("::")[-1].strip("/")
+NON_GROUNDING_ARTIFACTS = _non_grounding_artifacts()
+
+
+def _normalize(path: str) -> str:
+    return path.replace("\\", "/").strip("/")
 
 
 def _names(instruction: str, word: str) -> bool:
@@ -87,7 +104,7 @@ def _modules(paths: list[str]) -> set[str]:
     """Parent-directory granularity, matching stratum_selector._modules."""
     out: set[str] = set()
     for p in paths:
-        segs = [s for s in _strip_repo_slug(p).split("/") if s]
+        segs = [s for s in _normalize(p).split("/") if s]
         out.add("/".join(segs[:-1]) or ".")
     return out
 
@@ -132,7 +149,9 @@ def score_gate_a(declared: set[str], oracle_repos: set[str]) -> Gate:
     )
 
 
-def score_gate_b(instruction: str, oracle_files: list[str]) -> Gate:
+def score_gate_b(
+    instruction: str, oracle_files: list[str], oracle_repos: set[str]
+) -> Gate:
     """NON-LEAKY: the instruction must not localize the oracle for free.
 
     Deterministic subset of leak_classifier.classify: EXACT_PATH (basename or
@@ -142,7 +161,7 @@ def score_gate_b(instruction: str, oracle_files: list[str]) -> Gate:
     """
     ins = instruction.lower()
     for f in oracle_files:
-        segs = [s for s in _strip_repo_slug(f).split("/") if s]
+        segs = [s for s in _normalize(f).split("/") if s]
         basename = segs[-1] if segs else ""
         if basename and _names(instruction, basename):
             return Gate(
@@ -159,7 +178,7 @@ def score_gate_b(instruction: str, oracle_files: list[str]) -> Gate:
                      "scorer": "authoring_subset"},
                 )
     for f in oracle_files:
-        segs = [s for s in _strip_repo_slug(f).split("/") if s]
+        segs = [s for s in _normalize(f).split("/") if s]
         for d in segs[:-1]:
             if d.lower() not in GENERIC_DIRS and (d.lower() + "/") in ins:
                 return Gate(
@@ -169,9 +188,9 @@ def score_gate_b(instruction: str, oracle_files: list[str]) -> Gate:
                 )
 
     # No locational leak. Dispersed targets make it grep_hard rather than merely
-    # behavioral — the preferred admit bucket.
-    repos = {re.split(r"[/:]", f, 1)[0] for f in oracle_files}
-    dispersed = len(oracle_files) >= 3 or len(repos) >= 2
+    # behavioral — the preferred admit bucket. Oracle paths are repo-relative, so
+    # the repo set comes from required_files[].repo, not from the path's first segment.
+    dispersed = len(oracle_files) >= GATE_D_MIN_FILES or len(oracle_repos) >= 2
     bucket = "grep_hard" if dispersed else "behavioral"
     return Gate(
         "B", "pass", f"no locational leak; bucket={bucket}",
@@ -218,8 +237,7 @@ def gate_c_pending(task_id: str) -> Gate:
     """Gate C is a MEASUREMENT. It is never 'pass' in an authored manifest.
 
     The input contract below is what the downstream calibration bead needs in
-    order to score it; recording it here is what makes 'pending' actionable
-    rather than an excuse.
+    order to score it.
     """
     return Gate(
         "C",
@@ -239,23 +257,8 @@ def gate_c_pending(task_id: str) -> Gate:
     )
 
 
-def crnt_positive(config: dict[str, Any]) -> bool:
-    """Every declared repo is covered by >=1 ground_truth.required_files entry.
-
-    Mirrors scripts/validation/crnt_validator.evaluate_crnt.
-    """
-    repo_paths = {r.get("path", "") for r in config.get("repos", [])}
-    if len(repo_paths) < 2:
-        return False
-    covered = {
-        rf.get("repo", "")
-        for rf in config.get("ground_truth", {}).get("required_files", [])
-    }
-    return all(rp in covered for rp in repo_paths)
-
-
 def build_entry(task_dir: Path) -> dict[str, Any]:
-    config = tomllib.loads((task_dir / "task.toml").read_text())
+    config = parse_toml(task_dir / "task.toml")
     instruction = (task_dir / "instruction.md").read_text()
 
     task = config.get("task", {})
@@ -273,10 +276,10 @@ def build_entry(task_dir: Path) -> dict[str, Any]:
     grounded = bool(gt.get("require_grounded_citations", False))
     conflict = grounded and bool(NON_GROUNDING_ARTIFACTS & set(artifacts))
 
-    is_crnt = crnt_positive(config)
+    is_crnt = evaluate_crnt(config).passes_crnt
     gates = [
         score_gate_a(declared, oracle_repos),
-        score_gate_b(instruction, oracle_files),
+        score_gate_b(instruction, oracle_files, oracle_repos),
         gate_c_pending(task_id),
         score_gate_d(declared, oracle_files, is_crnt, stratum),
     ]
