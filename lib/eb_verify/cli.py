@@ -139,7 +139,23 @@ def cmd_validate_artifact(args: argparse.Namespace) -> int:
         return 1
 
     workspace = Path(args.path)
-    result = validator.validate(workspace)
+    try:
+        result = validator.validate(workspace)
+    except Exception as exc:
+        # A crashing validator is a harness fault, not a verdict on the
+        # artifact — route it exactly like a returned infra_error below.
+        print(f"{args.artifact_type}: INFRA_ERROR (not checked)")
+        print(
+            f"  validator crashed: {type(exc).__name__}: {exc}", file=sys.stderr
+        )
+        return 2
+    if result.infra_error is not None:
+        # No verdict — the harness could not check the artifact. See cmd_run on
+        # exit code 2. Distinct from the unknown-type branch above (rc 1): that
+        # is an operator arg error, the same as cmd_check's unknown checkpoint.
+        print(f"{args.artifact_type}: INFRA_ERROR (not checked)")
+        print(f"  {result.infra_error.detail}", file=sys.stderr)
+        return 2
     status = "VALID" if result.valid else "INVALID"
     print(f"{args.artifact_type}: {status}")
     if result.detail:
