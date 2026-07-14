@@ -1,0 +1,30 @@
+{
+  "task_id": "escalation-netty-gzip-fextra-001",
+  "checkpoints": {
+    "root_cause_identified": {
+      "expected_solution": "The decompression failure does not originate in reactor-netty (the client library the app calls). Enabling automatic decompression makes reactor-netty's HttpClientConfig add an HttpContentDecompressor to the Netty channel pipeline, and that decompressor constructs Netty's JdkZlibDecoder to inflate gzip. At tag netty-4.1.135.Final, JdkZlibDecoder.readGZIPHeader mis-parses the gzip header's optional extra-field length (XLEN): the field `xlen` is initialized to -1 (the 'no extra field' sentinel) and the two length bytes are folded in with `xlen |= xlen1 << 8 | xlen2`. OR-ing into 0xFFFFFFFF leaves xlen == -1, so the `if (xlen != -1)` skip branch never runs and the extra field is never skipped; additionally the bytes are assembled big-endian whereas RFC 1952 XLEN is little-endian. A valid gzip stream carrying FEXTRA therefore corrupts the remainder and raises DecompressionException, even though the JDK decodes it fine. The agent must attribute the throw to netty's gzip inflater (the transitive dependency), explain the sentinel/OR bug and the byte-order error, and describe the wiring: the reactive client inserts the decompressor which constructs the Netty decoder.",
+      "evaluation_criteria": [
+        "Attributes the failure to netty (the transitive/upstream repo), NOT reactor-netty",
+        "Names the gzip inflater/decoder in netty's compression codec as the site where the extra field is mis-parsed",
+        "Explains the defect: xlen starts at the -1 sentinel and is OR-ed (`|=`) rather than assigned, so it stays -1 and the extra field is never skipped; and the byte order is wrong (big-endian vs RFC 1952 little-endian XLEN)",
+        "Explains the wiring: enabling decompression makes reactor-netty add an HttpContentDecompressor that constructs the Netty gzip decoder"
+      ]
+    },
+    "patch_lands_at_fix_site": {
+      "expected_solution": "The agent leaves an uncommitted diff in /workspace/netty that modifies codec/src/main/java/io/netty/handler/codec/compression/JdkZlibDecoder.java at the gzip-header extra-field (XLEN) parsing. A diff that only touches reactor-netty, or that disables decompression in the client, is not the correct site.",
+      "evaluation_criteria": [
+        "git diff in the netty workspace repo shows a modification to JdkZlibDecoder.java",
+        "The change is in netty, not reactor-netty",
+        "No new files; an in-place edit of the existing decoder"
+      ]
+    },
+    "patch_fixes_extra_field": {
+      "expected_solution": "The patch corrects the extra-field length parsing so a gzip stream carrying FEXTRA inflates correctly, matching the upstream fix (netty commit 7a95c6795a...): assign instead of OR-ing (`xlen = xlen2 << 8 | xlen1`) so the low byte (xlen1) and high byte (xlen2) are combined little-endian and the -1 sentinel is overwritten, and reset the sentinel (`xlen = -1`) on the footer/reset path so a reused decoder handles a following member correctly. Equivalent handling that assigns the correctly-ordered length and clears the sentinel is acceptable.",
+      "evaluation_criteria": [
+        "The diff replaces the `xlen |=` OR with an assignment so the -1 sentinel is overwritten",
+        "The two length bytes are combined in little-endian order (low byte first), matching RFC 1952 XLEN",
+        "The fix is scoped to the gzip header extra-field parsing (and its reset), not a blanket change to decompression"
+      ]
+    }
+  }
+}

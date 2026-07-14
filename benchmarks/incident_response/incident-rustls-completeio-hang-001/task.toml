@@ -1,0 +1,89 @@
+# Incident: a synchronous HTTPS client thread spins at 100% CPU and never returns
+# when a peer stalls the TLS connection at just the wrong moment. Root cause is one
+# dependency below the client, in the TLS library's blocking IO-completion loop,
+# which keeps looping even when neither a read nor a write can make progress.
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "rust-sync-tls-client-stack"
+org_scale = true
+verification_modes = ["deterministic", "structural_match"]
+
+[task]
+id = "incident-rustls-completeio-hang-001"
+suite = "incident_response"
+task_type = "incident_investigation"
+difficulty = "hard"
+estimated_duration_minutes = 45
+session_type = "single"
+description = "Trace a synchronous HTTPS client thread that pins a CPU core and never returns, from the client's blocking TLS stream read, through the TLS library's blocking stream adapter, down into the IO-completion loop that spins forever when no read or write can make progress, and patch the real fix site so the loop bails out when progress is impossible."
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/algesten/ureq"
+rev = "2.9.1"
+path = "ureq"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/rustls/rustls"
+rev = "v/0.21.10"
+path = "rustls"
+role = "upstream"
+
+[metadata]
+languages = ["rust"]
+total_loc = 60_000
+dependency_depth = 2
+frameworks = ["ureq", "rustls"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "root_cause_identified"
+weight = 0.40
+verifier = "checks/check_root_cause.sh"
+description = "Agent attributes the hang to the transitive TLS library's blocking IO-completion loop (not the client crate) and explains that the loop can spin without terminating when neither a read nor a write can make progress and the connection is not cleanly closed"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_lands_at_fix_site"
+weight = 0.40
+verifier = "checks/check_patch_site.sh"
+description = "Agent's uncommitted diff modifies the blocking IO-completion routine in the TLS library where the loop fails to terminate on no-progress"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_bails_on_no_progress"
+weight = 0.20
+verifier = "checks/check_patch_semantics.sh"
+description = "The patch makes the completion loop return instead of iterating again when neither a read nor a write is wanted, so a stalled peer can no longer cause an infinite busy loop"
+timeout_seconds = 60
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The application only sees a blocking client request that never returns while a worker thread burns a core. The client wraps the connection as a boxed read-write trait object handed to the TLS library's blocking stream adapter, so the spinning loop is one crate away and reached only through dynamic dispatch. The IO-completion loop that fails to terminate when no progress is possible lives deeper still, inside the TLS connection state machine, invisible to single-repo search and named nowhere in the client's surface."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "rustls/src/conn.rs"
+repo = "rustls"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "rustls/src/stream.rs"
+repo = "rustls"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/rtls.rs"
+repo = "ureq"
+confidence = 0.85
+source = "deterministic"

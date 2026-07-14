@@ -3,9 +3,10 @@
 # Tests 10 representative tasks across 3 tiers: good, partial, empty
 set -uo pipefail
 
-BENCH_DIR="/home/ds/EnterpriseBench/benchmarks"
-LIB_DIR="/home/ds/EnterpriseBench/lib"
-RESULTS_FILE="/home/ds/EnterpriseBench/results/analysis/verifier_testing.md"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BENCH_DIR="$ROOT/benchmarks"
+LIB_DIR="$ROOT/lib"
+RESULTS_FILE="$ROOT/results/analysis/verifier_testing.md"
 TMP_BASE="/tmp/eb_verifier_test_$$"
 
 mkdir -p "$(dirname "$RESULTS_FILE")"

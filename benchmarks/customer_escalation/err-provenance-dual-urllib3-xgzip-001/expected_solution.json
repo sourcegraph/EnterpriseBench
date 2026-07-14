@@ -1,0 +1,30 @@
+{
+  "task_id": "err-provenance-dual-urllib3-xgzip-001",
+  "checkpoints": {
+    "localization": {
+      "expected_solution": "The undecoded body originates in urllib3 (the transport library), NOT in requests (whose resp.json()/resp.text the customer calls). At tag 2.0.7, urllib3's _get_decoder() in src/urllib3/response.py matches only `mode == \"gzip\"` (and br/zstd) before falling through to a DeflateDecoder, and BaseHTTPResponse.CONTENT_DECODERS is `[\"gzip\", \"deflate\"]` (+br/zstd). The vendor advertises Content-Encoding: x-gzip, a legitimate alias for gzip, which matches neither the dispatcher branch nor the recognized-encodings list, so the gzip body is never decompressed. The failure path is: requests HTTPAdapter.send (requests/adapters.py) calls conn.urlopen() into urllib3 -> HTTPConnectionPool.urlopen (src/urllib3/connectionpool.py) builds the response -> _get_decoder/CONTENT_DECODERS (src/urllib3/response.py) skip x-gzip -> Response.content/.text (requests/models.py) hands back the still-compressed bytes. The agent must attribute the defect to urllib3's response decoder and identify both the x-gzip-blind dispatcher and the recognized-encodings list.",
+      "evaluation_criteria": [
+        "Attributes the undecoded body to urllib3 (the transport library / dependency), NOT to requests",
+        "Names urllib3's response decoder (the _get_decoder dispatcher and/or the CONTENT_DECODERS list) as the site that fails to recognize the encoding",
+        "Identifies that the vendor's Content-Encoding is x-gzip and that it is not treated as gzip",
+        "Describes the cross-repo traversal: requests adapter -> urllib3 connection pool / response -> requests Response body attribute"
+      ]
+    },
+    "patch_at_fix_site": {
+      "expected_solution": "The agent leaves an uncommitted diff in /workspace/urllib3 that modifies src/urllib3/response.py at the real fix site: the _get_decoder dispatcher routes x-gzip through the gzip decoder, and x-gzip is added to the CONTENT_DECODERS list, matching upstream commit 5fc48e711b. A diff that only touches requests, or that re-decompresses the body in the integration service, is not the correct site.",
+      "evaluation_criteria": [
+        "git diff in the urllib3 workspace repo shows a modification to src/urllib3/response.py",
+        "The change is in urllib3, not requests",
+        "The change targets the decoder dispatch / recognized-encodings, not an unrelated spot"
+      ]
+    },
+    "patch_semantics": {
+      "expected_solution": "The patch makes x-gzip decode exactly like gzip: it appears in the gzip branch of the decoder dispatcher (e.g. `mode in (\"gzip\", \"x-gzip\")` returning GzipDecoder()) and in the CONTENT_DECODERS list, so the response treats x-gzip as a decodable gzip encoding, exactly as the upstream fix does.",
+      "evaluation_criteria": [
+        "The diff references x-gzip",
+        "x-gzip is routed to gzip decoding (the gzip decoder branch) rather than falling through to deflate",
+        "x-gzip is added to the list of recognized/decodable content-encodings"
+      ]
+    }
+  }
+}

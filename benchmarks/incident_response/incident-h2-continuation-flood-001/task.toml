@@ -1,0 +1,91 @@
+# Incident: an HTTP/2 server melts down (100% CPU, climbing memory, stalled
+# connections) when one client sends a header block that never ends -- a HEADERS
+# frame with END_HEADERS unset followed by an unbounded stream of tiny
+# CONTINUATION frames. Root cause is one dependency below the server crate, in the
+# HTTP/2 frame reader that reassembles header blocks without bounding how many
+# CONTINUATION frames a single block may span.
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "rust-http2-server-stack"
+org_scale = true
+verification_modes = ["deterministic", "structural_match"]
+
+[task]
+id = "incident-h2-continuation-flood-001"
+suite = "incident_response"
+task_type = "incident_investigation"
+difficulty = "hard"
+estimated_duration_minutes = 45
+session_type = "single"
+description = "Trace an HTTP/2 server resource-exhaustion incident from the server crate's connection handshake down into the transitive HTTP/2 library's frame reader, where a header block continued across unboundedly many CONTINUATION frames is reassembled with no per-request cap, and patch the real fix site so an over-long CONTINUATION sequence is rejected."
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/hyperium/hyper"
+rev = "v1.2.0"
+path = "hyper"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/hyperium/h2"
+rev = "v0.4.3"
+path = "h2"
+role = "upstream"
+
+[metadata]
+languages = ["rust"]
+total_loc = 70_000
+dependency_depth = 2
+frameworks = ["hyper", "h2"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "root_cause_identified"
+weight = 0.40
+verifier = "checks/check_root_cause.sh"
+description = "Agent attributes the meltdown to the transitive HTTP/2 library's frame reader (not the server crate) and explains that a header block can be extended across unboundedly many CONTINUATION frames because the reassembler enforces no per-request frame cap"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_lands_at_fix_site"
+weight = 0.40
+verifier = "checks/check_patch_site.sh"
+description = "Agent's uncommitted diff modifies the HTTP/2 frame-reader reassembly routine in the transitive library where CONTINUATION frames are appended to a partial header block"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_bounds_continuation"
+weight = 0.20
+verifier = "checks/check_patch_semantics.sh"
+description = "The patch counts CONTINUATION frames within a single header block and fails the connection once a bound is exceeded, rather than reassembling without limit"
+timeout_seconds = 60
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The operator sees only their server crate's connection API pegging a core and leaking memory on one client; the server crate delegates all HTTP/2 wire handling to a separate library via an opaque handshake/connection future, so the abusive frame sequence is one crate away and named nowhere in the server's surface. The frame reader that reassembles a header block from CONTINUATION frames -- and fails to bound how many it will accept -- lives deeper still, invisible to single-repo search."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "src/codec/framed_read.rs"
+repo = "h2"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/frame/headers.rs"
+repo = "h2"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/proto/h2/server.rs"
+repo = "hyper"
+confidence = 0.85
+source = "deterministic"

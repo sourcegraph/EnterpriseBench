@@ -1,0 +1,38 @@
+{
+  "task_id": "err-provenance-dual-urllib3-xgzip-001",
+  "repo": "psf/requests",
+  "repo_rev": "v2.31.0",
+  "difficulty": "hard",
+  "rationale": "The customer reads resp.json()/resp.text through the requests library and gets undecoded gzip bytes (leading 1f 8b) for one vendor whose responses carry Content-Encoding: x-gzip (a legitimate historical alias for gzip). The decision about whether a response body is decompressed is not made in requests; it is made one repository down, in urllib3's response decoder. At tag 2.0.7, urllib3's _get_decoder() dispatcher matches only the exact string 'gzip' before falling through to a deflate decoder, and BaseHTTPResponse.CONTENT_DECODERS lists only ['gzip', 'deflate'] (+br/zstd). 'x-gzip' matches neither, so the body is never decompressed and the raw gzip bytes propagate back through the requests adapter to resp.content. The real upstream fix is urllib3 commit 5fc48e711b (released in 2.1.0): _get_decoder matches `mode in ('gzip', 'x-gzip')` and 'x-gzip' is added to CONTENT_DECODERS. The requests-side files are the traversal that leads an investigator across the repo boundary: HTTPAdapter.send opens the connection and calls conn.urlopen() into urllib3, and Response.iter_content/.content/.text read the (still-compressed) body back out of the urllib3 response with decode_content.",
+  "required_files": [
+    {
+      "path": "src/urllib3/response.py",
+      "repo": "urllib3",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site. At 2.0.7 `_get_decoder` dispatches on `mode == \"gzip\"` only, and `BaseHTTPResponse.CONTENT_DECODERS = [\"gzip\", \"deflate\"]`; neither recognizes the vendor's `x-gzip` encoding, so the body is returned undecoded. Real upstream fix (commit 5fc48e711b) widens both to include `x-gzip`."
+    },
+    {
+      "path": "src/urllib3/connectionpool.py",
+      "repo": "urllib3",
+      "confidence": 0.80,
+      "source": "curator",
+      "rationale": "HTTPConnectionPool.urlopen() constructs the HTTPResponse and threads the headers / decode_content flag; the urllib3 entry point the requests adapter calls, carrying the un-decoded body up the stack."
+    },
+    {
+      "path": "requests/adapters.py",
+      "repo": "requests",
+      "confidence": 0.90,
+      "source": "deterministic",
+      "rationale": "HTTPAdapter.send() calls conn.urlopen(...) into urllib3 and wraps the returned response; the boundary crossing from requests into the transport library where decoding is decided."
+    },
+    {
+      "path": "requests/models.py",
+      "repo": "requests",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "Response.iter_content / .content / .text read from the urllib3 response with decode_content=True; where the still-compressed bytes become the visible wrong body the customer reports."
+    }
+  ],
+  "sufficient_files": []
+}

@@ -1,0 +1,31 @@
+{
+  "task_id": "escalation-netty-gzip-fextra-001",
+  "repo": "reactor/reactor-netty",
+  "repo_rev": "v1.2.18",
+  "difficulty": "hard",
+  "rationale": "The app only enables .compress(true) on the reactive HTTP client. reactor-netty's HttpClientConfig inserts an HttpContentDecompressor into the Netty channel pipeline, which constructs Netty's JdkZlibDecoder to inflate gzip. At tag netty-4.1.135.Final, JdkZlibDecoder mis-parses the gzip header's optional extra-field length: `xlen` is initialized to the -1 'no extra field' sentinel and the two length bytes are folded in with `xlen |= xlen1 << 8 | xlen2` — OR-ing into 0xFFFFFFFF stays -1, and the bytes are also assembled in the wrong (big-endian) order, whereas RFC 1952 XLEN is little-endian. So a valid gzip stream with FEXTRA never skips the extra field, corrupting the remainder and raising DecompressionException. The real upstream fix (netty commit 7a95c6795a..., 4.1 auto-port of #16951, first released in netty-4.1.136.Final) assigns instead of OR-ing (`xlen = xlen2 << 8 | xlen1`) and resets the sentinel in the footer/reset path. The reactor-netty files are the traversal that leads across the repo boundary: HttpClientConfig wires the decompressor in; HttpClientOperations carries the (attempted) decompressed content to the subscriber.",
+  "required_files": [
+    {
+      "path": "codec/src/main/java/io/netty/handler/codec/compression/JdkZlibDecoder.java",
+      "repo": "netty",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site: gzip header extra-field (XLEN) parsing. `xlen |= xlen1 << 8 | xlen2` OR-ed into the -1 sentinel and wrong byte order means the extra field is never skipped. Real upstream fix commit 7a95c6795a..."
+    },
+    {
+      "path": "reactor-netty-http/src/main/java/reactor/netty/http/client/HttpClientConfig.java",
+      "repo": "reactor-netty",
+      "confidence": 0.90,
+      "source": "deterministic",
+      "rationale": "Boundary: when gzip acceptance is enabled it adds an HttpContentDecompressor to the pipeline (pipeline.addLast(NettyPipeline.HttpDecompressor, ...)), wiring the request/response path into Netty's decompressor that constructs the buggy inflater."
+    },
+    {
+      "path": "reactor-netty-http/src/main/java/reactor/netty/http/client/HttpClientOperations.java",
+      "repo": "reactor-netty",
+      "confidence": 0.80,
+      "source": "curator",
+      "rationale": "Client response operations through which the (attempted) decompressed content flows to the subscriber; part of the reactor-netty-side traversal into the Netty decoder."
+    }
+  ],
+  "sufficient_files": []
+}

@@ -1,0 +1,88 @@
+# Incident: a single crafted Range request header pins a Sinatra worker's CPU at 100%
+# indefinitely; the catastrophic backtracking lives in the Rack utility that parses byte
+# ranges, reached from Sinatra's static-file send path through Rack's file server.
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "sinatra-rack-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "structural_match"]
+
+[task]
+id = "incident-rack-range-redos-001"
+suite = "incident_response"
+task_type = "error_provenance"
+difficulty = "hard"
+estimated_duration_minutes = 40
+session_type = "single"
+description = "Trace a worker-hang (CPU pegged, no exception) triggered by a crafted HTTP Range request header on a file-download endpoint, from Sinatra's static/send-file path through Rack's file server into the Rack utility that parses byte ranges with a catastrophically backtracking regular expression, and patch the real parsing site."
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/sinatra/sinatra"
+rev = "v4.0.0"
+path = "sinatra"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/rack/rack"
+rev = "v3.0.3"
+path = "rack"
+role = "upstream"
+
+[metadata]
+languages = ["ruby"]
+total_loc = 30_000
+dependency_depth = 2
+frameworks = ["sinatra", "rack"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "root_cause_identified"
+weight = 0.40
+verifier = "checks/check_root_cause.sh"
+description = "Agent identifies that the hang originates in Rack's byte-range parsing utility (not Sinatra), names the regular expression that backtracks catastrophically on a crafted Range header, and explains how Sinatra's send-file path reaches it via Rack's file server"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_lands_at_fix_site"
+weight = 0.40
+verifier = "checks/check_patch_site.sh"
+description = "Agent's uncommitted diff modifies Rack's utility module where the byte-range spec is parsed"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_removes_redos"
+weight = 0.20
+verifier = "checks/check_patch_semantics.sh"
+description = "The patch replaces the backtracking range parse with a linear-time split-based parse (or otherwise removes the catastrophic backtracking), matching the upstream fix, rather than adding a length cap at the app layer"
+timeout_seconds = 60
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The Sinatra app only calls send_file on a route; there is no exception and no stack trace, just a worker stuck at 100% CPU. The vulnerable regex is two repositories away: Sinatra's send-file path delegates to Rack's file server, which reads the incoming Range header and passes it to a Rack utility whose byte-range parser applies a nested-quantifier regex that backtracks catastrophically on adversarial input. Nothing in the Sinatra call names ranges or regexes, the file server hop is inside Rack, and the pathological line is a terse utility regex an app-level search never surfaces."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "lib/rack/utils.rb"
+repo = "rack"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/rack/files.rb"
+repo = "rack"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/sinatra/base.rb"
+repo = "sinatra"
+confidence = 0.80
+source = "curator"

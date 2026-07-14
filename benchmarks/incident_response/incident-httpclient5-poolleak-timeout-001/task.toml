@@ -1,0 +1,89 @@
+# Incident: an Apache HttpClient 5 service leaks connections under load until the
+# connection pool is permanently exhausted. The app only configures a connection-
+# request timeout; the leak is two dependency levels below, in the low-level
+# connection-pool lease future's timeout handling in the core library.
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "apache-httpcomponents-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "structural_match"]
+
+[task]
+id = "incident-httpclient5-poolleak-timeout-001"
+suite = "incident_response"
+task_type = "incident_investigation"
+difficulty = "hard"
+estimated_duration_minutes = 45
+session_type = "single"
+description = "Trace a connection-pool exhaustion incident from the high-level HTTP client's connection manager down into the core library's pool lease future, where a lease that times out at the exact moment an entry is handed off drops the entry instead of returning it, and patch the leak at its real origin."
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/apache/httpcomponents-client"
+rev = "rel/v5.6.1"
+path = "httpcomponents-client"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/apache/httpcomponents-core"
+rev = "rel/v5.4.2"
+path = "httpcomponents-core"
+role = "upstream"
+
+[metadata]
+languages = ["java"]
+total_loc = 180_000
+dependency_depth = 2
+frameworks = ["httpclient5", "httpcore5"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "root_cause_identified"
+weight = 0.40
+verifier = "checks/check_root_cause.sh"
+description = "Agent identifies that the leak is in the core library's pool lease future timeout path (an entry delivered concurrently with the timeout is dropped, not released), not in the high-level connection manager the app configures"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_lands_at_fix_site"
+weight = 0.40
+verifier = "checks/check_patch_site.sh"
+description = "Agent's uncommitted diff modifies the core library's connection-pool implementation where the lease future rethrows on timeout"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_recovers_entry"
+weight = 0.20
+verifier = "checks/check_patch_semantics.sh"
+description = "The patch only rethrows the timeout when the cancel actually wins the race, and otherwise recovers the already-delivered entry instead of leaking it"
+timeout_seconds = 60
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The app author only sets a connection-request timeout on a pooling connection manager. That manager delegates every lease to a pool object it holds through an interface, and the concrete pool is chosen at construction time by a concurrency-policy enum, so the throwing code is reached by dynamic dispatch across a repo boundary. The leak is a race inside the lease future's own get(timeout) override in the core library: a timeout and a successful hand-off collide, and the loser is discarded. None of this is visible from the 'timeout waiting for connection from pool' symptom or greppable from the app's configuration call."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "httpcore5/src/main/java/org/apache/hc/core5/pool/StrictConnPool.java"
+repo = "httpcomponents-core"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "httpcore5/src/main/java/org/apache/hc/core5/pool/LaxConnPool.java"
+repo = "httpcomponents-core"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "httpclient5/src/main/java/org/apache/hc/client5/http/impl/io/PoolingHttpClientConnectionManager.java"
+repo = "httpcomponents-client"
+confidence = 0.80
+source = "curator"

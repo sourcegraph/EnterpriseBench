@@ -1,0 +1,31 @@
+{
+  "task_id": "secops-axios-proxyauth-leak-001",
+  "repo": "axios/axios",
+  "repo_rev": "v1.6.7",
+  "difficulty": "hard",
+  "rationale": "The application only passes a proxy option with auth to axios. The leak originates two repositories down, in follow-redirects. At tag v1.15.4, the redirect handler in index.js strips confidential headers on a cross-host / less-secure redirect with `removeMatchingHeaders(/^(?:authorization|cookie)$/i, this._options.headers)` — the Proxy-Authorization header is not in that set, so it survives a cross-host redirect. The real upstream fix (follow-redirects commit c4f847f85176991f95ab9c88af63b1294de8649b, released in 1.15.6) widens the pattern to `/^(?:(?:proxy-)?authorization|cookie)$/i`. axios's Node HTTP adapter (lib/adapters/http.js) synthesizes the Proxy-Authorization header from the proxy option in its setProxy helper and, when redirects are enabled, substitutes follow-redirects (httpFollow/httpsFollow) as the transport in place of the raw Node http/https module; axios's dispatch layer (lib/core/dispatchRequest.js) selects that adapter at request time. The transport substitution is a runtime assignment, not an import an application-level import graph reveals, which is why the leaking line lives in a repo the developer never named.",
+  "required_files": [
+    {
+      "path": "index.js",
+      "repo": "follow-redirects",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site: the cross-host redirect branch strips only /^(?:authorization|cookie)$/i at v1.15.4, omitting Proxy-Authorization, so proxy credentials leak. Real upstream fix (commit c4f847f85176) adds (?:proxy-)? to the stripped pattern."
+    },
+    {
+      "path": "lib/adapters/http.js",
+      "repo": "axios",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "The Node HTTP adapter's setProxy helper synthesizes the Proxy-Authorization header from the proxy option and substitutes follow-redirects as the transport; the hop that carries the credential header into the leaking library."
+    },
+    {
+      "path": "lib/core/dispatchRequest.js",
+      "repo": "axios",
+      "confidence": 0.75,
+      "source": "curator",
+      "rationale": "The request-dispatch layer that selects the configured adapter at request time; the entry into the adapter chain an investigator traverses to reach the transport substitution."
+    }
+  ],
+  "sufficient_files": []
+}

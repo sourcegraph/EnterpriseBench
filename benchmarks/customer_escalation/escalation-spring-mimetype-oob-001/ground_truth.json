@@ -1,0 +1,31 @@
+{
+  "task_id": "escalation-spring-mimetype-oob-001",
+  "repo": "spring-projects/spring-boot",
+  "repo_rev": "v4.0.7",
+  "difficulty": "hard",
+  "rationale": "Spring Boot v4.0.7 pins springFrameworkVersion=7.0.8. A request for '/' is handled by spring-boot's autoconfigured WelcomePageHandlerMapping, whose getAcceptedMediaTypes() reads the request Accept header and calls MediaType.parseMediaTypes(acceptHeader), catching only the checked InvalidMediaTypeException. MediaType.parseMediaType delegates to spring-core's MimeTypeUtils.parseMimeType -> parseMimeTypeInternal, which scans the string and, on a double-quote, tests `mimeType.charAt(nextIndex - 1) != '\\\\'` to see if the quote is escaped. For a value that begins with a quote (e.g. `\"text/html\"` with no ';' section) the scan reaches the quote at nextIndex == 0 and reads charAt(-1), throwing an unchecked java.lang.StringIndexOutOfBoundsException. That is not the checked InvalidMediaTypeException the welcome-page handler catches, so it escapes as a 500. This is a regression introduced by spring-framework commit 41cd6879bd (quoted-pair parsing) and present at tag v7.0.8. The real upstream fix (commit 4d6e88dc988e, after v7.0.8) guards the index: `(nextIndex == 0 || mimeType.charAt(nextIndex - 1) != '\\\\')`, so a leading quote is handled without the out-of-bounds read and the value fails as a normal invalid media type. The spring-web and spring-boot files are the traversal that leads an investigator across the module and repo boundary.",
+  "required_files": [
+    {
+      "path": "spring-core/src/main/java/org/springframework/util/MimeTypeUtils.java",
+      "repo": "spring-framework",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site: parseMimeTypeInternal scans for quotes and does `mimeType.charAt(nextIndex - 1) != '\\\\'`; for a value starting with a quote, nextIndex == 0 makes charAt(-1) throw an unchecked StringIndexOutOfBoundsException instead of the checked InvalidMimeTypeException. Real upstream fix (commit 4d6e88dc988e) guards with `nextIndex == 0 ||`."
+    },
+    {
+      "path": "spring-web/src/main/java/org/springframework/http/MediaType.java",
+      "repo": "spring-framework",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "Hop: parseMediaTypes -> parseMediaType delegates to MimeTypeUtils.parseMimeType and re-wraps InvalidMimeTypeException as InvalidMediaTypeException; the bridge from the Accept-header parse into the core mime-type text parser where the index goes out of bounds."
+    },
+    {
+      "path": "module/spring-boot-webmvc/src/main/java/org/springframework/boot/webmvc/autoconfigure/WelcomePageHandlerMapping.java",
+      "repo": "spring-boot",
+      "confidence": 0.80,
+      "source": "curator",
+      "rationale": "Entry/boundary: the autoconfigured handler for '/' reads the request Accept header in getAcceptedMediaTypes() and calls MediaType.parseMediaTypes(...), catching only the checked InvalidMediaTypeException, so an unchecked index error from the core parser escapes as a 500."
+    }
+  ],
+  "sufficient_files": []
+}

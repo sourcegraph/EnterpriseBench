@@ -1,0 +1,89 @@
+# Security: proxy credentials configured on an HTTP client leak to an arbitrary
+# third-party host after a cross-host redirect; the client library attaches the
+# proxy credential header, but the redirect-following transport it delegates to
+# only strips a narrower set of confidential headers on a cross-host hop.
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "axios-follow-redirects-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "structural_match"]
+
+[task]
+id = "secops-axios-proxyauth-leak-001"
+suite = "security_operations"
+task_type = "error_provenance"
+difficulty = "hard"
+estimated_duration_minutes = 40
+session_type = "single"
+description = "Trace how a proxy credential set on an HTTP client is retained across a cross-host redirect and forwarded to an untrusted host, from the client's request-dispatch layer through its Node transport into the redirect-following library whose confidential-header stripping omits the proxy credential header, and patch the real stripping site."
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/axios/axios"
+rev = "v1.6.7"
+path = "axios"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/follow-redirects/follow-redirects"
+rev = "v1.15.4"
+path = "follow-redirects"
+role = "upstream"
+
+[metadata]
+languages = ["javascript"]
+total_loc = 30_000
+dependency_depth = 2
+frameworks = ["axios", "follow-redirects"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "root_cause_identified"
+weight = 0.40
+verifier = "checks/check_root_cause.sh"
+description = "Agent identifies that the leak originates in the redirect-following library (not the HTTP client), names the confidential-header stripping routine whose cross-host branch omits the proxy credential header, and explains how the client attaches that header and delegates redirect handling to the library"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_lands_at_fix_site"
+weight = 0.40
+verifier = "checks/check_patch_site.sh"
+description = "Agent's uncommitted diff modifies the redirect-following library's entry module where confidential headers are stripped on a cross-host redirect"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_strips_proxy_header"
+weight = 0.20
+verifier = "checks/check_patch_semantics.sh"
+description = "The patch adds the proxy credential header to the set stripped on a cross-host redirect, matching the upstream fix, rather than removing redirect support or handling it in the client"
+timeout_seconds = 60
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "From the application the developer only wrote axios.get(url, {proxy: {...auth}}). The credential header is added inside the client's Node HTTP adapter proxy-configuration helper, but the redirect that leaks it is handled by a separate library the adapter swaps in as its transport. That library's cross-host redirect branch strips a hardcoded set of confidential headers and simply does not include the proxy credential header, so the credential rides along to whatever host the redirect targets. The two repositories are wired by a runtime transport substitution, not a call an import graph reveals, and the leaking line names the wrong header family."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "index.js"
+repo = "follow-redirects"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/adapters/http.js"
+repo = "axios"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/core/dispatchRequest.js"
+repo = "axios"
+confidence = 0.75
+source = "curator"

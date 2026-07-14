@@ -294,3 +294,94 @@ Before submitting a new task:
 - [ ] `tool_access.expected_mcp_benefit` is set with rationale
 - [ ] All verifier scripts use `set -euo pipefail`
 - [ ] No hardcoded secrets or credentials
+
+## Authoring for the tier-1 hard-to-localize class
+
+Most of the corpus is trivially localizable: of the 58 tasks with a measured
+turns-to-first-relevant (TTFR), 46 are solved in a median of 4 turns and exactly
+one reaches tier-1 (>=20 turns). A benchmark whose tasks are all found in four
+turns cannot separate a good context-gathering tool from a bad one -- there is no
+headroom to measure. Tasks in the `enterprise_hard_authored` stratum
+(`benchmarks/strata/enterprise_hard_authored.json`) are written specifically to
+have that headroom.
+
+**Hardness is a property you construct, never a threshold you relax.** If a task
+does not clear a gate, fix the task. Loosening the gate until the count clears a
+target inverts an admission rule into a quota, and the resulting stratum measures
+nothing.
+
+### The five construction rules
+
+1. **Symptom-only prompt.** State what the customer observes -- a log line, an
+   HTTP status, a stack trace, a wrong number on a dashboard. Never name the
+   oracle's files, directories, or symbols. The agent must *find* the code; if the
+   prompt hands over the location, you have measured nothing but reading speed.
+2. **Non-leaky.** No rare token in the prompt may appear verbatim in an oracle
+   path or symbol. This is Gate B, and it is machine-checked: an instruction that
+   names an oracle basename, a two-segment path fragment, or a distinctive oracle
+   directory in path form is rejected.
+3. **Depth >= 2 hops.** The symptom must surface in the repo the customer uses
+   while the root cause lives in a transitive dependency. One-repo tasks are not
+   context-gathering problems.
+4. **Indirection at each hop.** Exception re-wrapping, dynamic dispatch, a plugin
+   or middleware registry, config-driven wiring -- the connective tissue must be
+   something grep cannot follow. A hop that a single `grep` traverses is not a hop.
+5. **Dispersion.** >=3 required files across >=2 modules and >=2 repos (Gate D).
+   A one-file oracle is not an enterprise problem however subtle the file is.
+
+### The grounding rule (this is what kills fabrication)
+
+Pin the dependency **pre-fix at a real released tag**, and make the ground truth
+the **real upstream fix commit**. `required_files` is that commit's changed files
+plus the downstream traversal files that carry an investigator across the repo
+boundary.
+
+This buys three things at once: every oracle path is machine-verifiable at
+authoring time, the task has a golden patch for later verifier calibration, and
+an author who cannot find a real chain *cannot* invent one. Verify with the
+authenticated `gh` CLI before you write a line of TOML:
+
+```bash
+gh api "repos/{owner}/git/ref/tags/{tag}" --jq .ref                  # tag is real
+gh api "repos/{owner}/commits/{sha}" --jq '.files[].filename'        # fix commit is real
+gh api "repos/{owner}/contents/{path}?ref={rev}" --jq .name          # every oracle path resolves
+```
+
+If a chain cannot be verified, **author fewer tasks and say so**. Ten verified
+tasks beat fourteen fabricated ones, and under-delivery is a reportable outcome
+while fabrication is a silent corruption of the benchmark.
+
+### Paths are repo-relative
+
+`ground_truth.required_files[].path` is interpolated straight into
+`gh api repos/{owner}/contents/{path}` by `scripts/verify_gt_paths.py`, so it must
+be **repo-relative** -- `yarl/_url.py`, not `yarl/yarl/_url.py` and not
+workspace-relative. `lib/eb_metrics/retrieval_extraction.py` also assumes this
+form when scoring retrieval recall.
+
+### code_patch is only scored if you score it
+
+`artifacts.optional` is inert metadata: `runner.validate_artifacts()` iterates
+`required` only. So a deliverable moves composition only when it is in
+`artifacts.required`.
+
+More importantly, the `code_patch` validator
+(`lib/eb_verify/plugins/code_patch.py`) is **shape-only** -- it asserts that some
+`/workspace` repo carries an uncommitted diff of reasonable size and does not
+check correctness at all. A task that requires `code_patch` without shipping its
+own `checks/*.sh` asserting the patch lands at the real fix site has an
+**unscored** deliverable. Always pair a required `code_patch` with checks that
+verify both the site and the semantics of the change.
+
+Note also that `require_grounded_citations` must **not** be set on a task that
+requires `code_patch`: that validator takes no such kwarg, and the runner
+hard-fails any required artifact whose validator cannot honor the flag.
+
+### Gate C is a measurement, not a property
+
+Gates A (parity), B (non-leak), and D (dispersion) are computable from the task
+definition and must pass at authoring time. Gate C (hard-to-localize) is measured
+from baseline agent traces and is **never** asserted by an author. A newly
+authored task records `gate_c.status = "pending_measurement"` plus the input
+contract that would score it. *Designed*-tier-1 is not *measured*-tier-1, and
+conflating the two is exactly how an admission rule decays into a quota.

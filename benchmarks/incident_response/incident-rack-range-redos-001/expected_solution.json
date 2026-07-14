@@ -1,0 +1,30 @@
+{
+  "task_id": "incident-rack-range-redos-001",
+  "checkpoints": {
+    "root_cause_identified": {
+      "expected_solution": "The hang does not originate in Sinatra; it is in Rack's byte-range parsing utility (lib/rack/utils.rb). At tag v3.0.3, Rack::Utils.get_byte_ranges parses each comma-separated range segment with `return nil unless range_spec =~ /(\\d*)-(\\d*)/`. A Range header composed of many `0-,` segments drives that nested `\\d*`-`\\d*` match into catastrophic backtracking, so the request thread runs at 100% CPU indefinitely with no exception. The path is: Sinatra's send_file delegates to Rack::Files#serving, which reads the HTTP_RANGE header and calls get_byte_ranges. The agent must attribute the ReDoS to Rack (not Sinatra) and name the backtracking range regex.",
+      "evaluation_criteria": [
+        "Attributes the hang to Rack (the dependency), NOT Sinatra",
+        "Names the byte-range parsing utility in Rack and the nested-quantifier regex that backtracks on the crafted Range header",
+        "Explains that the crafted multi-segment Range value causes catastrophic backtracking (no exception, CPU pegged)",
+        "Explains the traversal: Sinatra send_file -> Rack file server serving -> Rack byte-range utility on the HTTP_RANGE header"
+      ]
+    },
+    "patch_lands_at_fix_site": {
+      "expected_solution": "The agent leaves an uncommitted diff in /workspace/rack that modifies lib/rack/utils.rb at the byte-range parsing routine, matching the upstream fix (rack commit 7a9d76a7, CVE-2022-44570). A diff that only touches sinatra, caps the header length in the app, or rejects Range headers at the route is not the correct site.",
+      "evaluation_criteria": [
+        "git diff in the rack workspace repo shows a modification to lib/rack/utils.rb",
+        "The change is in rack, not sinatra",
+        "No new files; an in-place edit of the existing byte-range parser"
+      ]
+    },
+    "patch_removes_redos": {
+      "expected_solution": "The patch replaces the backtracking regex parse of each range segment with a linear-time, non-backtracking parse, exactly as the upstream fix does: check `range_spec.include?('-')` and then `range_spec.split('-')` instead of matching `/(\\d*)-(\\d*)/`. Equivalent handling that removes the nested-quantifier match so parsing is linear on adversarial input is acceptable; an app-layer length cap or Range rejection is not.",
+      "evaluation_criteria": [
+        "The diff removes or replaces the nested-quantifier range regex",
+        "The replacement parses each segment in linear time (e.g. include?/split rather than a backtracking match)",
+        "The fix is scoped to the byte-range parsing routine, not an app-layer workaround"
+      ]
+    }
+  }
+}

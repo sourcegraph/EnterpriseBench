@@ -1,0 +1,95 @@
+# Escalation: Celery workers crash on startup with a bare KeyError naming a
+# serialization format, after the operator restricts the accepted content types.
+# Root cause is one dependency below Celery, in the messaging library's
+# accept-content preparation, which leaks a raw KeyError for an unregistered name.
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "celery-kombu-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "err-provenance-dual-kombu-serializer-001"
+suite = "customer_escalation"
+task_type = "error_provenance"
+difficulty = "hard"
+estimated_duration_minutes = 40
+session_type = "single"
+description = "Trace an uncaught KeyError raised at Celery worker startup when the accepted content-type list is restricted, from the worker/app consumer wiring down into the messaging library's accept-content preparation, and patch the root cause so an unregistered serializer name surfaces as the library's normal not-installed error."
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/celery/celery"
+rev = "v5.0.5"
+path = "celery"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/celery/kombu"
+rev = "v5.0.2"
+path = "kombu"
+role = "dependency"
+
+[metadata]
+languages = ["python"]
+total_loc = 90_000
+dependency_depth = 2
+frameworks = ["celery", "kombu"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "localization"
+weight = 0.35
+verifier = "checks/check_localization.sh"
+description = "Agent attributes the uncaught KeyError to the messaging library's accept-content preparation (not Celery) and describes the app/worker consumer -> messaging Consumer traversal"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_at_fix_site"
+weight = 0.35
+verifier = "checks/check_patch_site.sh"
+description = "The submitted patch lands in the messaging library's serialization module where the raw KeyError escapes, not in Celery's consumer wiring"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_semantics"
+weight = 0.30
+verifier = "checks/check_patch_semantics.sh"
+description = "The patch catches the lookup failure and re-raises the library's not-installed serializer error instead of a bare KeyError"
+timeout_seconds = 60
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The crash the operator sees is a bare KeyError at Celery worker startup, but Celery never raises it: the worker/app consumer wiring forwards the configured accept-content list across the repo boundary into the messaging library's Consumer, which prepares the accepted content types by subscripting a name-to-type registry with no guard. The failing subscript and the domain error that should replace it live entirely in the dependency, invisible to single-repo search of the Celery codebase; only cross-repo reference resolution connects the startup crash to the preparation helper."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "kombu/serialization.py"
+repo = "kombu"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "kombu/messaging.py"
+repo = "kombu"
+confidence = 0.80
+source = "curator"
+
+[[ground_truth.required_files]]
+path = "celery/app/amqp.py"
+repo = "celery"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "celery/worker/consumer/consumer.py"
+repo = "celery"
+confidence = 0.85
+source = "deterministic"

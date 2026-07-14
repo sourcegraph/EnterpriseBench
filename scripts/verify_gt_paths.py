@@ -12,7 +12,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.tasks import find_task_dirs
 
-BENCHMARKS = Path("/home/ds/EnterpriseBench/benchmarks")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+BENCHMARKS = PROJECT_ROOT / "benchmarks"
 
 # Rate limit: GitHub API allows 5000/hr for authenticated users
 API_CALLS = 0
@@ -296,7 +297,8 @@ def main():
             broken.append(entry)
 
     # Write report
-    out = Path("/home/ds/EnterpriseBench/results/analysis/gt_path_verification.md")
+    out = PROJECT_ROOT / "results/analysis/gt_path_verification.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w") as f:
         f.write("# Ground Truth File Path Verification Report\n\n")
         f.write(f"**Date**: 2026-03-29\n")

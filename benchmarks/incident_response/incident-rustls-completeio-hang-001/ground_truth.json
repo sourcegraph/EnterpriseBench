@@ -1,0 +1,31 @@
+{
+  "task_id": "incident-rustls-completeio-hang-001",
+  "repo": "algesten/ureq",
+  "repo_rev": "2.9.1",
+  "difficulty": "hard",
+  "rationale": "The application only sees ureq's blocking agent.get(url).call() never returning while a worker burns a core. ureq does not run TLS itself: src/rtls.rs wraps the socket as rustls::StreamOwned<ClientConnection, Box<dyn ReadWrite>> and its Read impl delegates read to that owned stream. rustls's blocking stream adapter (rustls/src/stream.rs, Stream::read) calls self.conn.complete_io(self.sock) in a loop. complete_io lives in rustls/src/conn.rs. At tag v/0.21.10 that loop can spin forever: after doing no write (nothing wanted) and no read (nothing wanted), process_new_packets succeeds, and the final `match (eof, until_handshaked, self.is_handshaking())` falls through the `(..) => {}` arm and loops again -- with the connection wanting neither read nor write and not cleanly closed, the loop does no IO yet iterates endlessly, a 100% CPU busy loop (the rustls complete_io infinite-loop DoS, CVE-2024-32650 / RUSTSEC-2024-0336). The real upstream fix is rustls commit ebcb4782f23b4edf9b10a7065d9e8d4362439d9c (\"complete_io: bail out if progress is impossible\", released on the 0.21 line in 0.21.11 and on the 0.22 line in 0.22.4 as commit 5374108df698), which adds `if !self.wants_write() && !self.wants_read() { return Ok((rdlen, wrlen)); }` at the top of the loop. The ureq-side file is the traversal that carries an investigator across the crate boundary through the boxed read-write trait object into rustls's blocking stream and completion loop.",
+  "required_files": [
+    {
+      "path": "rustls/src/conn.rs",
+      "repo": "rustls",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site: complete_io's loop at v/0.21.10 has no early return for the no-progress state (wants neither write nor read, not cleanly closed), so it busy-loops forever. Real upstream fix (commit ebcb4782f23b) adds `if !self.wants_write() && !self.wants_read() { return ... }` at the top of the loop here."
+    },
+    {
+      "path": "rustls/src/stream.rs",
+      "repo": "rustls",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "rustls's blocking Stream adapter: Stream::read calls self.conn.complete_io(self.sock) in a loop; the bridge from the boxed owned stream into the spinning completion loop."
+    },
+    {
+      "path": "src/rtls.rs",
+      "repo": "ureq",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "ureq's rustls integration wraps the socket as StreamOwned<ClientConnection, Box<dyn ReadWrite>> and delegates its Read impl to that owned stream; the client-side entry into the cross-crate hang and the only layer the application's call() touches."
+    }
+  ],
+  "sufficient_files": []
+}

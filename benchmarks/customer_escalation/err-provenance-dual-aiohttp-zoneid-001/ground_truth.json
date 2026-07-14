@@ -1,0 +1,38 @@
+{
+  "task_id": "err-provenance-dual-aiohttp-zoneid-001",
+  "repo": "aio-libs/aiohttp",
+  "repo_rev": "v3.11.11",
+  "difficulty": "hard",
+  "rationale": "The customer's failure surfaces in the aiohttp connector (ClientConnectorError, 'Name or service not known') the moment it tries to resolve an IPv6 link-local host that carries an RFC 6874 zone identifier written as %25 (e.g. fe80::1%25eth0). The connector pulls req.url.raw_host off the yarl URL and passes it to the resolver, but the yarl URL object never decodes the %25 zone separator back to a bare %, so the resolver receives a zone of '25eth0' instead of 'eth0' and getaddrinfo fails. The defect lives one repository down, in yarl: at tag v1.24.2 the host accessor returns the raw IP-literal unchanged for anything that looks like an IP, and _encode_host partitions the authority on '%' rather than '%25', so the encoded zone keeps the leading 25. The real upstream fix is yarl commit ddc827ba1e (#1653, 'Fix IPv6 Zone ID decoding to correctly handle RFC 6874 %25 separator', released in 1.25.0): the host property decodes %25 -> % for IP-literals, and _encode_host partitions on %25 when present and reuses the matched separator when reconstructing the host. The aiohttp-side files are the traversal that leads an investigator across the repo boundary: client_reqrep.update_host stores the host from the URL, and connector._resolve_host / _create_direct_connection read raw_host and call getaddrinfo.",
+  "required_files": [
+    {
+      "path": "yarl/_url.py",
+      "repo": "yarl",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site. At v1.24.2 the `host` cached_property returns the raw IP-literal unchanged (no %25->% decoding) and `_encode_host` does `host.partition(\"%\")`, so an encoded zone %25eth0 keeps its leading 25. Real upstream fix (commit ddc827ba1e) decodes %25->% in `host` and partitions on %25 in `_encode_host`."
+    },
+    {
+      "path": "yarl/_parse.py",
+      "repo": "yarl",
+      "confidence": 0.80,
+      "source": "curator",
+      "rationale": "split_url() extracts the bracketed IPv6 authority during URL parsing and produces the netloc/host that becomes raw_host; the parse-side hop that feeds the un-normalized zone into the URL object."
+    },
+    {
+      "path": "aiohttp/connector.py",
+      "repo": "aiohttp",
+      "confidence": 0.90,
+      "source": "deterministic",
+      "rationale": "_create_direct_connection reads `req.url.raw_host` and _resolve_host passes it to the resolver / getaddrinfo; the frame that raises ClientConnectorError when the mangled zone fails to resolve."
+    },
+    {
+      "path": "aiohttp/client_reqrep.py",
+      "repo": "aiohttp",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "ClientRequest.update_host reads the host off the yarl URL and stores it for the connection; the databind-to-connector hop that carries the URL's host into the request on the aiohttp side."
+    }
+  ],
+  "sufficient_files": []
+}

@@ -21,15 +21,38 @@ from eb_verify.runner import checkpoint_env
 REPO_ROOT = Path(__file__).parent.parent
 TASK_BASE = REPO_ROOT / "benchmarks" / "customer_escalation"
 
-# All error provenance task directories
-ERR_PROVENANCE_DIRS = sorted(TASK_BASE.glob("err-provenance-*"))
-
-# Verifier scripts
+# Verifier scripts — the CSB answer-scoring contract this suite exercises.
 VERIFIERS = [
     "checks/check_error_source.sh",
     "checks/check_error_chain.sh",
     "checks/check_trigger_conditions.sh",
 ]
+
+# This suite asserts answer-centric invariants (ground-truth answer scores high,
+# a missing answer.json scores low). Those only make sense for tasks whose
+# deliverable is an ANSWER scored by the three verifiers above. The
+# enterprise-hard authored stratum (bead EnterpriseBench-jn73.2.7) adds
+# code_patch provenance tasks whose deliverable is a PATCH: they carry their own
+# check_patch_site/check_patch_semantics verifiers and are covered by
+# tests/test_enterprise_hard_stratum.py, not by this answer-only contract. Scope
+# the fixture to tasks that actually declare the CSB verifiers so a task with a
+# different verifier contract is not swept into an invariant it was never
+# designed to satisfy.
+ERR_PROVENANCE_DIRS = sorted(
+    d
+    for d in TASK_BASE.glob("err-provenance-*")
+    if all((d / v).exists() for v in VERIFIERS)
+)
+
+# Guard against the filter silently emptying the suite (e.g. a directory rename
+# that drops every conforming task): if the glob matched dirs but none declared
+# the CSB verifiers, that is a regression to surface, not a green no-op.
+if not ERR_PROVENANCE_DIRS and any(TASK_BASE.glob("err-provenance-*")):
+    raise RuntimeError(
+        "err-provenance-* tasks exist but none declare the CSB answer verifiers "
+        f"{VERIFIERS}; this suite would collect nothing. Check for a verifier "
+        "rename or a broken task layout."
+    )
 
 
 def _run_verifier(

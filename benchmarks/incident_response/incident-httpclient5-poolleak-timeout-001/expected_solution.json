@@ -1,0 +1,30 @@
+{
+  "task_id": "incident-httpclient5-poolleak-timeout-001",
+  "checkpoints": {
+    "root_cause_identified": {
+      "expected_solution": "The leak does not originate in the httpclient5 PoolingHttpClientConnectionManager the app configures. It escapes in httpcore5's connection-pool lease future. At tag rel/v5.4.2, StrictConnPool (and identically LaxConnPool) create the lease as a BasicFuture whose get(long, TimeUnit) override wraps `return super.get(timeout, unit);` in `catch (TimeoutException ex) { cancel(); throw ex; }`. When a bounded-wait lease times out at the same instant the pool delivers an entry into the future, BasicFuture.cancel() returns false because the value is already set, but the override rethrows the TimeoutException regardless and never calls get() to read the delivered entry. The entry has been taken out of the pool (leased count incremented) but handed to no one and never released, so it leaks; the leak rate scales with the connection-request timeout because a longer wait shrinks the race window. The agent must attribute the drop to httpcore5's pool lease future (not the httpclient5 manager) and explain that the manager merely delegates the lease across the repo boundary via the ManagedConnPool interface to a pool chosen by PoolConcurrencyPolicy at construction.",
+      "evaluation_criteria": [
+        "Attributes the leak to httpcore5 (the upstream/transitive core library), NOT httpclient5's connection manager",
+        "Names the connection-pool lease future's timeout handling as the site where the entry is dropped (StrictConnPool / LaxConnPool)",
+        "Explains that on TimeoutException the code calls cancel() and rethrows, so an entry delivered in the same instant (cancel() returns false) is never read and never released",
+        "Explains the traversal: pooling connection manager -> ManagedConnPool interface (concrete pool selected by PoolConcurrencyPolicy) -> the core pool's lease future"
+      ]
+    },
+    "patch_lands_at_fix_site": {
+      "expected_solution": "The agent leaves an uncommitted diff in /workspace/httpcomponents-core that modifies httpcore5/src/main/java/org/apache/hc/core5/pool/StrictConnPool.java (and/or LaxConnPool.java) at the lease future's get(timeout) override. A diff that only touches httpclient5's connection manager, or that adds a connection reaper / disables the timeout in the app, is not the correct site.",
+      "evaluation_criteria": [
+        "git diff in the httpcomponents-core workspace repo shows a modification to StrictConnPool.java or LaxConnPool.java",
+        "The change is in httpcomponents-core, not httpclient5",
+        "No new files; an in-place edit of the existing pool implementation"
+      ]
+    },
+    "patch_recovers_entry": {
+      "expected_solution": "The patch changes the timeout handling so the TimeoutException is only rethrown when cancel() actually wins the race, and otherwise recovers the already-delivered entry by returning super.get(), exactly as the upstream fix does with `if (cancel()) { throw ex; } return super.get();`. Equivalent handling that returns the delivered entry when the cancel loses (rather than dropping it) is acceptable, as long as a genuine timeout still surfaces.",
+      "evaluation_criteria": [
+        "The diff makes the rethrow conditional on the result of cancel()",
+        "When the cancel loses the race the delivered entry is recovered (e.g. return super.get()) instead of dropped",
+        "The fix is scoped to the lease future, not a blanket swallow of the timeout"
+      ]
+    }
+  }
+}

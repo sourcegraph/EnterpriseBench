@@ -28,8 +28,9 @@ except ImportError:
     except ImportError:
         tomllib = None
 
-BENCH_DIR = Path("/home/ds/EnterpriseBench/benchmarks")
-RESULTS_FILE = Path("/home/ds/EnterpriseBench/results/analysis/consistency_audit.md")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+BENCH_DIR = PROJECT_ROOT / "benchmarks"
+RESULTS_FILE = PROJECT_ROOT / "results/analysis/consistency_audit.md"
 ARCHIVED = {"_archived"}
 
 # Collect all active task directories (skip _archived, examples, mined)

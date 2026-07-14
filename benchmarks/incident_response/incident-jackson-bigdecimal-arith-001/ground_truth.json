@@ -1,0 +1,38 @@
+{
+  "task_id": "incident-jackson-bigdecimal-arith-001",
+  "repo": "FasterXML/jackson-databind",
+  "repo_rev": "jackson-databind-2.13.4",
+  "difficulty": "hard",
+  "rationale": "The customer's stack trace ends at ObjectMapper.readValue (jackson-databind) and a JDK BigDecimal constructor, but the uncaught java.lang.ArithmeticException actually escapes two repositories down, in jackson-core's big-decimal text parser. At tag jackson-core-2.13.4 the parse routine catches only NumberFormatException; the recursive big-decimal construction can also throw ArithmeticException on extreme-exponent input, which then propagates unhandled all the way to the ingestion worker. The real fix (jackson-core commit a9e3fddad0, released in 2.14.0) widens the catch in BigDecimalParser.parse to 'ArithmeticException | NumberFormatException' so malformed numeric text is reported as a normal parse error. The databind-side files are the traversal that leads an investigator across the repo boundary: NumberDeserializers.BigDecimalDeserializer calls JsonParser.getDecimalValue(), StdDeserializer._parseBigDecimal is the shared helper, and both route into jackson-core's NumberInput -> BigDecimalParser.",
+  "required_files": [
+    {
+      "path": "src/main/java/com/fasterxml/jackson/core/io/BigDecimalParser.java",
+      "repo": "jackson-core",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site: parse() catches only NumberFormatException at 2.13.4; the recursive big-decimal construction can throw ArithmeticException, which escapes uncaught. Real upstream fix (commit a9e3fddad0) widens the catch here."
+    },
+    {
+      "path": "src/main/java/com/fasterxml/jackson/core/io/NumberInput.java",
+      "repo": "jackson-core",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "parseBigDecimal() is the core number-text helper that hands the field characters to the recursive big-decimal parsing routine; the bridge from the databind accessor into the throwing code."
+    },
+    {
+      "path": "src/main/java/com/fasterxml/jackson/databind/deser/std/NumberDeserializers.java",
+      "repo": "jackson-databind",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "BigDecimalDeserializer.deserialize handles decimal-typed fields and calls JsonParser.getDecimalValue(), crossing from databind into jackson-core's parser."
+    },
+    {
+      "path": "src/main/java/com/fasterxml/jackson/databind/deser/std/StdDeserializer.java",
+      "repo": "jackson-databind",
+      "confidence": 0.80,
+      "source": "curator",
+      "rationale": "Shared _parseBigDecimal helper used by the scalar deserializers; part of the databind-side traversal into the core number parser."
+    }
+  ],
+  "sufficient_files": []
+}

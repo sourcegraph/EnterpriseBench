@@ -1,0 +1,38 @@
+{
+  "task_id": "err-provenance-dual-markupsafe-striptags-001",
+  "repo": "pallets/jinja",
+  "repo_rev": "3.1.2",
+  "difficulty": "hard",
+  "rationale": "A Jinja2 template uses the built-in striptags filter to produce a plain-text preview, but a multi-line HTML opening tag survives into the output. Jinja2 does not strip the tags itself: do_striptags in src/jinja2/filters.py (wired into the filter registry in src/jinja2/defaults.py) calls Markup(str(value)).striptags(), crossing the repo boundary into markupsafe. At tag 2.1.1, markupsafe's striptags in src/markupsafe/__init__.py uses two module-level regexes -- `_strip_comments_re = re.compile(r\"<!--.*?-->\")` and `_strip_tags_re = re.compile(r\"<.*?>\")` -- neither compiled with re.DOTALL, so `.` cannot cross a newline and a tag whose markup spans multiple lines is not matched and not removed. The real upstream fix is markupsafe commit e49d257126d09937b1bf5e2b2173238df729fb13 (released in 2.1.2): both regexes are compiled with re.DOTALL. The jinja2-side files are the traversal that leads an investigator across the repo boundary; _native.py is the markupsafe module that provides escape/soft_str which the jinja2 filter module imports and the Markup sanitizer path is built on.",
+  "required_files": [
+    {
+      "path": "src/markupsafe/__init__.py",
+      "repo": "markupsafe",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site. At 2.1.1 `_strip_comments_re` and `_strip_tags_re` are compiled without re.DOTALL, so `.` stops at a newline and `striptags` leaves multi-line tags in place. Real upstream fix (commit e49d257126d0) adds re.DOTALL to both."
+    },
+    {
+      "path": "src/markupsafe/_native.py",
+      "repo": "markupsafe",
+      "confidence": 0.75,
+      "source": "curator",
+      "rationale": "Defines escape / escape_silent / soft_str; the jinja2 filter module imports escape and soft_str from markupsafe, and the Markup(...).striptags() sanitizer path is built on this escaping module. Adjacent markupsafe module on the boundary."
+    },
+    {
+      "path": "src/jinja2/filters.py",
+      "repo": "jinja",
+      "confidence": 0.90,
+      "source": "deterministic",
+      "rationale": "do_striptags implements the striptags filter and calls Markup(str(value)).striptags(); the boundary crossing from jinja2 into markupsafe. Also imports escape/soft_str from markupsafe."
+    },
+    {
+      "path": "src/jinja2/defaults.py",
+      "repo": "jinja",
+      "confidence": 0.80,
+      "source": "deterministic",
+      "rationale": "Exposes FILTERS (including striptags) as DEFAULT_FILTERS, the template-facing registry that makes the filter callable from every template."
+    }
+  ],
+  "sufficient_files": []
+}

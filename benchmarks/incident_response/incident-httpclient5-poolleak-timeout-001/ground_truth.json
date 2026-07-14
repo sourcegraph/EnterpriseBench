@@ -1,0 +1,31 @@
+{
+  "task_id": "incident-httpclient5-poolleak-timeout-001",
+  "repo": "apache/httpcomponents-client",
+  "repo_rev": "rel/v5.6.1",
+  "difficulty": "hard",
+  "rationale": "The app only configures a PoolingHttpClientConnectionManager (httpclient5) with per-route/total limits and a connection-request timeout. That manager holds a ManagedConnPool selected by a PoolConcurrencyPolicy enum at construction time and delegates every lease to it via the interface, so the concrete pool (httpcore5's StrictConnPool or LaxConnPool) is reached by dynamic dispatch across the repo boundary. At tag rel/v5.4.2 the pool's lease is a BasicFuture whose get(timeout) override does `catch (TimeoutException ex) { cancel(); throw ex; }`. When a bounded-wait lease times out at the same instant an entry is delivered to the future, cancel() returns false (the value was already set) but the code rethrows anyway and never reads the delivered entry, so the leased pool entry is dropped and never released: the leased counter climbs, no caller receives the connection, and the leak rate scales with the timeout. The real upstream fix (commit d29c076d6544, released in httpcore 5.4.x) changes this to `if (cancel()) { throw ex; } return super.get();` in both StrictConnPool and LaxConnPool, so a lease that loses the cancel race recovers the delivered entry. The httpclient5 file is the traversal that leads across the repo boundary: PoolingHttpClientConnectionManager constructs the concrete pool and delegates the lease to it.",
+  "required_files": [
+    {
+      "path": "httpcore5/src/main/java/org/apache/hc/core5/pool/StrictConnPool.java",
+      "repo": "httpcomponents-core",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site: the lease BasicFuture's get(timeout) override does `cancel(); throw ex;` on TimeoutException. When cancel() loses the race (entry already delivered) the entry is discarded and leaked. Real upstream fix commit d29c076d6544 changes it to `if (cancel()) throw ex; return super.get();`."
+    },
+    {
+      "path": "httpcore5/src/main/java/org/apache/hc/core5/pool/LaxConnPool.java",
+      "repo": "httpcomponents-core",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "The other ManagedConnPool implementation, selectable by PoolConcurrencyPolicy.LAX, carries the identical lease-future timeout defect and is fixed in the same commit; which one leaks depends on the manager's configured concurrency policy."
+    },
+    {
+      "path": "httpclient5/src/main/java/org/apache/hc/client5/http/impl/io/PoolingHttpClientConnectionManager.java",
+      "repo": "httpcomponents-client",
+      "confidence": 0.80,
+      "source": "curator",
+      "rationale": "Boundary/traversal: constructs the concrete ManagedConnPool (StrictConnPool or LaxConnPool) from the PoolConcurrencyPolicy and delegates every requestConnection/lease to it through the interface, crossing from httpclient5 into httpcore5's pool where the entry is dropped."
+    }
+  ],
+  "sufficient_files": []
+}

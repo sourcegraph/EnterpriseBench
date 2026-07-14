@@ -1,0 +1,30 @@
+{
+  "task_id": "secops-qs-proto-pollution-tri-001",
+  "checkpoints": {
+    "root_cause_identified": {
+      "expected_solution": "The prototype-pollution sink is not in Express or body-parser; it is in the transitive query-string library qs (lib/parse.js). At tag v6.9.6 the recursive key-expansion routine parseObject rebuilds a bracket-nested object from the innermost segment outward and, in its final branch, executes `obj[cleanRoot] = leaf` with no check that cleanRoot is the special prototype key. A submitted key of foo[__proto__][isAdmin] is expanded so that __proto__ is assigned as a key on a plain object, which mutates Object.prototype for the whole process. The JSON body path uses a different parser and never calls parseObject, which is why only the form-urlencoded path pollutes. The agent must attribute the sink to qs and name parseObject's unguarded assignment.",
+      "evaluation_criteria": [
+        "Attributes the sink to qs (the transitive dependency), NOT Express or body-parser",
+        "Names the recursive key-expansion routine in qs's parse module and the unguarded final assignment of the decoded key onto a plain object",
+        "Explains that no exclusion of the __proto__ key exists at v6.9.6, so the prototype gets polluted",
+        "Explains the two independent paths that reach the sink: body-parser's extended urlencoded parser (dynamic require of qs) and Express's built-in query layer (qs.parse), and why plain import-following from the app does not reach it"
+      ]
+    },
+    "patch_lands_at_fix_site": {
+      "expected_solution": "The agent leaves an uncommitted diff in /workspace/qs that modifies lib/parse.js at the recursive key-expansion routine (parseObject), matching the upstream fix (qs commit 8b4cc14cda94). A diff that only touches express or body-parser, or that changes the route handler / middleware option, is not the correct site.",
+      "evaluation_criteria": [
+        "git diff in the qs workspace repo shows a modification to lib/parse.js",
+        "The change is in qs, not express or body-parser",
+        "No new files; an in-place edit of the existing recursive parse routine"
+      ]
+    },
+    "patch_excludes_prototype_key": {
+      "expected_solution": "The patch prevents the special __proto__ key from being assigned during recursive key expansion, exactly as the upstream fix does with `else if (cleanRoot !== '__proto__')` so the prototype key is ignored like any other absent key. Equivalent handling that skips assigning the prototype key onto the built object is acceptable; a blanket removal of nested parsing or an app-layer sanitizer is not.",
+      "evaluation_criteria": [
+        "The diff references __proto__",
+        "The prototype key is excluded from assignment during key expansion rather than assigned onto the object",
+        "The fix is scoped to the recursive parse routine, not the app handler or the middleware option"
+      ]
+    }
+  }
+}
