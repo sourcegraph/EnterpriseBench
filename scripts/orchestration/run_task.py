@@ -1713,6 +1713,18 @@ def _snapshot_path_for(candidate_index: int) -> str:
     return f"{SCORING_SNAPSHOT_DIR}/{candidate_index}"
 
 
+def _try_cat(container_id: str, path: str, *, user: str | None = None) -> str:
+    """Read `path` in the container; "" on any failure or empty content.
+
+    Shared by _apply_llm_judge's snapshot-then-live candidate probe so the two
+    reads can't drift out of sync on the success/empty check.
+    """
+    result = _docker_exec(container_id, ["cat", path], timeout=5, user=user)
+    if result.returncode == 0 and result.stdout.strip():
+        return result.stdout.strip()
+    return ""
+
+
 def _apply_llm_judge(
     scores: dict,
     task_dir: Path,
@@ -1764,13 +1776,10 @@ def _apply_llm_judge(
     agent_output = ""
     for index, path in enumerate(candidates):
         snapshot = _snapshot_path_for(index)
-        result = _docker_exec(container_id, ["cat", snapshot], timeout=5, user="root")
-        if result.returncode == 0 and result.stdout.strip():
-            agent_output = result.stdout.strip()
-            break
-        result = _docker_exec(container_id, ["cat", path], timeout=5)
-        if result.returncode == 0 and result.stdout.strip():
-            agent_output = result.stdout.strip()
+        agent_output = _try_cat(container_id, snapshot, user="root") or _try_cat(
+            container_id, path
+        )
+        if agent_output:
             break
 
     if not agent_output:
