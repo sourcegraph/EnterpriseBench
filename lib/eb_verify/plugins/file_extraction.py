@@ -139,7 +139,19 @@ def matches(gt_path: str, agent_path: str) -> bool:
     rather than raw strings is what keeps 'httpx/my_config.py' from satisfying a
     ground truth of '.../_config.py'.
     """
-    gt, agent = components(gt_path), components(agent_path)
+    return _matches_parts(components(gt_path), components(agent_path))
+
+
+def _matches_parts(gt: List[str], agent: List[str]) -> bool:
+    """:func:`matches`, over components already split — the form the scoring loop holds.
+
+    Splitting a path is not free: it runs the citation regex over the whole string. The
+    loop in :func:`score_answer` already holds both component lists, so going back
+    through :func:`matches` would re-derive them once per (ground truth, answer) pair —
+    a factor of ``1 + 2*len(gt_paths)`` more regex scans than the answer has paths. On a
+    pathological answer that is a constant factor re-applied to precisely the input the
+    bound on ``_CITATION_SUFFIX_RE`` exists to keep cheap, so the two belong together.
+    """
     if not gt or not agent:
         return False
     shorter, longer = (gt, agent) if len(gt) <= len(agent) else (agent, gt)
@@ -196,7 +208,7 @@ def score_answer(gt_paths: List[str], found: List[str]) -> tuple[set[str], List[
     ambiguous: List[str] = []
     for af in found:
         af_parts = components(af)
-        hits = [gt for gt in gt_paths if matches(gt, af)]
+        hits = [gt for gt in gt_paths if _matches_parts(gt_parts[gt], af_parts)]
         # Ties are impossible: two hits of equal depth would both be a suffix of `af`
         # and therefore the same path, which ground_truth_files rejects. So there is at
         # most one exact hit, and `refined` has a single deepest entry.

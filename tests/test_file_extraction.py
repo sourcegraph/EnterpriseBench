@@ -42,18 +42,22 @@ AFFECTED_TASKS = [
 ALL_KEYS = "source_files,files,error_source.files,code_paths,citations"
 
 
-def run_cli(answer_file, gt_file, keys=ALL_KEYS, argv=None):
-    """Invoke the scorer across its real ``python -m`` CLI boundary."""
+def cli_env(answer_file, gt_file) -> dict:
+    """The environment the scorer reads its two inputs from."""
     env = os.environ.copy()
     env["PYTHONPATH"] = str(LIB_DIR)
     env["ANSWER_FILE"] = str(answer_file)
     env["GT_FILE"] = str(gt_file)
-    proc = subprocess.run(
-        [sys.executable, "-m", "eb_verify.plugins.file_extraction",
-         *(argv if argv is not None else ["--keys", keys])],
-        capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
+    return env
+
+
+def run_cli(answer_file, gt_file, argv=("--keys", ALL_KEYS)):
+    """Invoke the scorer across its real ``python -m`` CLI boundary."""
+    return subprocess.run(
+        [sys.executable, "-m", "eb_verify.plugins.file_extraction", *argv],
+        capture_output=True, text=True,
+        env=cli_env(answer_file, gt_file), cwd=str(REPO_ROOT),
     )
-    return proc
 
 
 def write_json(path: Path, payload) -> Path:
@@ -373,14 +377,11 @@ def test_broken_stdout_is_an_infra_error_not_a_false_zero(tmp_path):
     gt = gt_with(tmp_path, ["httpx/httpx/_config.py"])
     answer = write_json(tmp_path / "answer.json", {"source_files": ["httpx/_config.py"]})
 
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(LIB_DIR)
-    env["ANSWER_FILE"] = str(answer)
-    env["GT_FILE"] = str(gt)
     proc = subprocess.Popen(
         [sys.executable, "-m", "eb_verify.plugins.file_extraction",
          "--keys", "source_files"],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=str(REPO_ROOT),
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        env=cli_env(answer, gt), cwd=str(REPO_ROOT),
     )
     proc.stdout.close()  # the reader goes away, so the write breaks
     stderr = proc.stderr.read().decode()

@@ -37,12 +37,6 @@ FILE_EXTRACTION_CHECKS = sorted(
     if "eb_verify.plugins.file_extraction" in path.read_text(encoding="utf-8")
 )
 
-each_shipped_check = pytest.mark.parametrize(
-    "script",
-    FILE_EXTRACTION_CHECKS,
-    ids=[path.parent.parent.name for path in FILE_EXTRACTION_CHECKS],
-)
-
 # (repo, path) pairs, as required_files entries really are: repo-prefixed paths, as
 # both live ground truths spell them, because the scorer indexes a multi-repo
 # workspace. The two files sit in different repos, so nothing here is ambiguous.
@@ -62,7 +56,7 @@ def test_the_corpus_actually_found_the_scorers_call_sites():
     )
 
 
-def run_shipped_check(script: Path, required_files, answer, tmp_path) -> dict:
+def run_shipped_check(script: Path, answer, tmp_path) -> dict:
     """Score ``answer`` by running the real check script, exactly as the runner does.
 
     ``bash <script>`` with ``cwd=workspace`` and ``checkpoint_env`` mirrors
@@ -74,7 +68,7 @@ def run_shipped_check(script: Path, required_files, answer, tmp_path) -> dict:
     task_dir.mkdir(exist_ok=True)
     (task_dir / "ground_truth.json").write_text(
         json.dumps({"required_files": [
-            {"path": path, "repo": repo} for repo, path in required_files
+            {"path": path, "repo": repo} for repo, path in GT
         ]})
     )
 
@@ -120,7 +114,11 @@ ANSWER_SHAPES = {
 }
 
 
-@each_shipped_check
+@pytest.mark.parametrize(
+    "script",
+    FILE_EXTRACTION_CHECKS,
+    ids=[path.parent.parent.name for path in FILE_EXTRACTION_CHECKS],
+)
 @pytest.mark.parametrize("key", list(ANSWER_SHAPES), ids=list(ANSWER_SHAPES))
 def test_omitted_mandated_keys_zero_a_spec_compliant_answer(script, key, tmp_path):
     """Every key the shipped --keys advertises must actually score.
@@ -136,6 +134,6 @@ def test_omitted_mandated_keys_zero_a_spec_compliant_answer(script, key, tmp_pat
     the earlier `source_files` and right under the later `files`, so it only scores
     if the keys are unioned rather than stopping at the first populated one.
     """
-    payload = run_shipped_check(script, GT, ANSWER_SHAPES[key], tmp_path)
+    payload = run_shipped_check(script, ANSWER_SHAPES[key], tmp_path)
     assert payload["score"] == 1.0, f"--keys is missing {key!r}: {payload['detail']}"
     assert payload["passed"] is True
