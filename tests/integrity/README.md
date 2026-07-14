@@ -15,6 +15,15 @@ The `file_extraction` vectors are the under-credit direction, so they assert the
 correct `1.0` rather than an infra sentinel: `guard_verifier_output` cannot catch
 a scoring bug inside a verifier that ran cleanly and returned valid JSON.
 
+They also **execute the shipped check scripts** — found by scanning
+`benchmarks/*/*/checks/*.sh` for the ones that exec the scorer, then run through
+the runner's own `checkpoint_env` — instead of restating what those scripts pass.
+An earlier draft copied their `--keys` list into a constant here, so the gate
+exercised the scorer's argument *parsing* (never broken) rather than the key list
+the scripts actually ship (the bug), and stayed green when a key was dropped from
+them. The key list therefore appears nowhere in this directory, and the scan picks
+up whatever check scripts adopt the scorer next with no edit here.
+
 ## Vectors × tests
 
 | Vector | Direction | Origin | Test |
@@ -35,8 +44,15 @@ a scoring bug inside a verifier that ran cleanly and returned valid JSON.
 | failed session → final checkpoints score an unworked workspace → free 1.0 | over-credit | 6c9wp | `test_failed_first_session_scores_nothing_and_never_runs_the_checkpoints` |
 | chain aborted mid-way → total computed from the earlier sessions' milestones | over-credit | 6c9wp | `test_mid_chain_failure_does_not_score_from_the_earlier_milestones` |
 | `file_extraction` first-key-wins discards a correct answer | under-credit | ssikq | `test_first_key_wins_discards_a_correct_answer` |
-| `file_extraction` --keys omits harness-mandated `code_paths`/`citations` | under-credit | ssikq | `test_omitted_mandated_keys_zero_a_spec_compliant_answer` |
-| `file_extraction` unstripped `:line`/`#L` citation suffix breaks a match | under-credit | ssikq | `test_unstripped_citation_suffix_breaks_a_match` |
+| `file_extraction` shipped `--keys` omits harness-mandated `code_paths`/`citations` | under-credit | ssikq | `test_omitted_mandated_keys_zero_a_spec_compliant_answer` |
+| `file_extraction` unstripped citation suffix (`:120`, `:120-140`, `:120:5`, `#L`, `?L`) breaks a match | under-credit | ssikq | `test_citation_suffix_does_not_break_a_match` |
+| `file_extraction` ground truth nesting one required path inside another zeroes a perfect answer | under-credit | ssikq | `test_nested_ground_truth_does_not_zero_a_perfect_answer` |
+| the scan above finds no check script at all (vectors pass vacuously) | — | ssikq | `test_the_corpus_actually_found_the_scorers_call_sites` |
+
+The four `file_extraction` rows cover the two check scripts that exec
+`eb_verify.plugins.file_extraction`, and any that adopt it later. They say nothing
+about the ~39 sibling checkpoints that still match files with an inline
+`af.endswith(gt)`; those carry all the same defects and are bead `rmz1x`.
 
 A failed session is **not** a verifier failure, so it routes through a sibling
 channel, `session_failure`, rather than being laundered through

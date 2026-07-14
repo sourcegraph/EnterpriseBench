@@ -33,8 +33,15 @@ AFFECTED_TASKS = [
 ]
 
 
-def run_cli(answer_file, gt_file, keys="source_files,files,error_source.files", argv=None):
-    """Invoke the scorer exactly as the check scripts do."""
+# The scorer's full key surface, deliberately NOT a mirror of any shipped check
+# script's --keys: a restatement exercises this module's parsing rather than the
+# artifact that ships, which is how a dropped key went unnoticed. What the scripts
+# pass is guarded by running the scripts themselves, in tests/integrity/.
+ALL_KEYS = "source_files,files,error_source.files,code_paths,citations"
+
+
+def run_cli(answer_file, gt_file, keys=ALL_KEYS, argv=None):
+    """Invoke the scorer across its real ``python -m`` CLI boundary."""
     env = os.environ.copy()
     env["PYTHONPATH"] = str(LIB_DIR)
     env["ANSWER_FILE"] = str(answer_file)
@@ -142,7 +149,7 @@ def test_code_paths_key_is_scored(tmp_path):
     answer = write_json(tmp_path / "answer.json", {
         "code_paths": [{"path": "/workspace/httpx/httpx/_transports/default.py"}],
     })
-    proc = run_cli(answer, gt, keys="source_files,files,error_source.files,code_paths,citations")
+    proc = run_cli(answer, gt)
     assert score_of(proc) == 1.0, json.loads(proc.stdout)["detail"]
 
 
@@ -158,19 +165,40 @@ def test_citations_key_is_scored(tmp_path):
             "evidence_span": "class HTTPTransport(BaseTransport):",
         }],
     })
-    proc = run_cli(answer, gt, keys="source_files,files,error_source.files,code_paths,citations")
+    proc = run_cli(answer, gt)
     assert score_of(proc) == 1.0, json.loads(proc.stdout)["detail"]
 
 
-def test_citation_line_suffix_is_stripped(tmp_path):
-    """A citation-style path like 'file.py:120' or 'file.py#L120' must still
-    match -- agents commonly cite an exact line alongside the evidence span."""
+@pytest.mark.parametrize("suffix", [
+    ":120",         # a bare line number
+    ":120-140",     # a line range: 'reflector.go:417-418' appears verbatim in results/
+    ":120:5",       # line:column, as grep -n and rg --vimgrep emit it
+    "#L120",        # GitHub blob anchor
+    "#L120-L140",   # GitHub range anchor
+    "#L120-140",    # GitHub range anchor, unprefixed end
+    "?L120-140",    # Sourcegraph range anchor
+])
+def test_citation_line_suffix_is_stripped(tmp_path, suffix):
+    """A citation-style path must still match — agents cite an exact line alongside
+    the evidence span, in whatever style their tool emits. Ranges are not
+    hypothetical: the captured results/ corpus holds 'reflector.go:417-418'. Missing
+    the Sourcegraph anchor specifically would be a mode-correlated scoring bias (see
+    _CITATION_SUFFIX_RE)."""
     gt = gt_with(tmp_path, ["httpx/httpx/_config.py"])
-    for suffix in (":120", "#L120"):
-        answer = write_json(tmp_path / "answer.json",
-                            {"source_files": [f"httpx/_config.py{suffix}"]})
-        proc = run_cli(answer, gt)
-        assert score_of(proc) == 1.0, f"suffix {suffix!r}: {json.loads(proc.stdout)['detail']}"
+    answer = write_json(tmp_path / "answer.json",
+                        {"source_files": [f"httpx/_config.py{suffix}"]})
+    proc = run_cli(answer, gt)
+    assert score_of(proc) == 1.0, f"suffix {suffix!r}: {json.loads(proc.stdout)['detail']}"
+
+
+def test_a_version_like_filename_is_not_mistaken_for_a_citation(tmp_path):
+    """The suffix pattern must not eat part of a legitimate filename. Every
+    alternative is anchored behind a literal ':' / '#L' / '?L', so a name that
+    merely ends in digits and dashes survives."""
+    gt = gt_with(tmp_path, ["repo/report-2024-2025.md"])
+    answer = write_json(tmp_path / "answer.json",
+                        {"source_files": ["repo/report-2024-2025.md"]})
+    assert score_of(run_cli(answer, gt)) == 1.0
 
 
 def test_dotted_key_is_traversed(tmp_path):
@@ -394,17 +422,127 @@ def test_dotdot_is_normalized_away(tmp_path):
     assert score_of(run_cli(answer, gt)) == 1.0
 
 
+# --- a precise answer outranks the ambiguity rule ----------------------------
+#
+# The ambiguity rule must not fire on an answer that names a required file *more*
+# specifically than the ground truth does, which is what happens whenever one
+# required path is a component-suffix of another.
+
+# The ground truth of technical_debt/refactor-orchestration-tri-babel-001, verbatim:
+# repo-relative paths plus a separate `repo` field, so webpack's bare 'package.json'
+# is a component-suffix of the other two. (The tokio task has the same shape with
+# Cargo.toml, and bead rmz1x points 26 more check scripts at this scorer.)
+NESTED_GT = [
+    ("babel", "packages/babel-parser/package.json"),
+    ("webpack", "package.json"),
+    ("nextjs", "packages/next/package.json"),
+]
+
+
+def nested_gt_file(tmp_path: Path) -> Path:
+    return write_json(tmp_path / "ground_truth.json", {"required_files": [
+        {"path": path, "repo": repo} for repo, path in NESTED_GT
+    ]})
+
+
+def test_nested_gt_does_not_zero_a_fully_specified_answer(tmp_path):
+    """Crediting per ground-truth entry, every guess in a perfect answer matched
+    more than one required file — 'package.json' is a tail of the other two — so all
+    three were booked ambiguous: 0/3, the worst possible score for a flawless answer."""
+    gt = nested_gt_file(tmp_path)
+    answer = write_json(tmp_path / "answer.json",
+                        {"source_files": [path for _, path in NESTED_GT]})
+    proc = run_cli(answer, gt)
+    assert score_of(proc) == 1.0, json.loads(proc.stdout)["detail"]
+
+
+def test_nested_gt_scores_the_absolute_shape_the_harness_mandates(tmp_path):
+    """The case that actually ships. run_task.py's appendix tells every agent 'All
+    file paths MUST be absolute and anchored at /workspace/<repo>/...', so the answer
+    is never component-equal to a ground-truth entry — it is strictly longer.
+    Crediting only exact matches would leave this at 1/3, fixing nothing that ships.
+    """
+    gt = nested_gt_file(tmp_path)
+    answer = write_json(tmp_path / "answer.json", {"code_paths": [
+        {"path": f"/workspace/{repo}/{path}"} for repo, path in NESTED_GT
+    ]})
+    proc = run_cli(answer, gt)
+    assert score_of(proc) == 1.0, json.loads(proc.stdout)["detail"]
+
+
+def test_an_abbreviation_cannot_claim_the_deeper_of_two_unequal_matches(tmp_path):
+    """The trap that rules out 'just credit the longest hit'. '_client.py' is a tail
+    of both required files but refines neither, so a longest-hit rule would hand it
+    the deeper one and score 0.5 — a passing grade for a one-word non-answer."""
+    gt = gt_with(tmp_path, ["httpx/_client.py", "httpcore/httpcore/_async/_client.py"])
+    answer = write_json(tmp_path / "answer.json", {"source_files": ["_client.py"]})
+    proc = run_cli(answer, gt)
+    assert score_of(proc) == 0.0, json.loads(proc.stdout)["detail"]
+    assert json.loads(proc.stdout)["passed"] is False
+
+
+def test_an_answer_matching_an_underqualified_gt_entry_exactly_is_credited(tmp_path):
+    """Accepted consequence, stated rather than discovered later: against a ground
+    truth that spells a required file 'package.json', the answer 'package.json' is
+    credited even though a deeper required file shares that tail. The agent named the
+    file exactly as the ground truth names it, and no more specific answer exists for
+    that entry; the under-qualification is the ground truth's defect, not the
+    scorer's (repo-prefixed paths are the documented contract).
+    """
+    gt = gt_with(tmp_path, ["package.json", "packages/next/package.json"])
+    answer = write_json(tmp_path / "answer.json", {"source_files": ["package.json"]})
+    proc = run_cli(answer, gt)
+    assert score_of(proc) == 0.5, json.loads(proc.stdout)["detail"]
+
+
 # --- ground truth is OUR artifact: strict, and never silently shrunk ---------
 
 def test_duplicate_gt_spellings_do_not_distort_the_denominator(tmp_path):
-    """'a/a.py' and './a/a.py' are one required file, not two."""
+    """'a/a.py' and './a/a.py', from the same repo, are one required file, not two."""
     gt = write_json(tmp_path / "ground_truth.json", {"required_files": [
-        {"path": "repo/a/a.py"}, {"path": "./repo/a/a.py"}, {"path": "repo/b/b.py"},
+        {"path": "repo/a/a.py", "repo": "repo"},
+        {"path": "./repo/a/a.py", "repo": "repo"},
+        {"path": "repo/b/b.py", "repo": "repo"},
     ]})
     answer = write_json(tmp_path / "answer.json", {"source_files": ["a/a.py"]})
     proc = run_cli(answer, gt)
     assert score_of(proc) == 0.5, "denominator must be 2 distinct files, not 3"
     assert "1/2" in json.loads(proc.stdout)["detail"]
+
+
+def test_a_required_file_without_a_repo_fails_closed(tmp_path):
+    """`repo` is required by schemas/task.schema.json, but nothing validates
+    ground_truth.json against it, so this module is the last line of defence.
+
+    Without it the collision check below has nothing to adjudicate: two entries that
+    both omit `repo` compare equal, collapse into one, and silently halve the
+    denominator — the same over-credit, arrived at by a missing field instead of a
+    conflicting one.
+    """
+    gt = write_json(tmp_path / "ground_truth.json", {"required_files": [
+        {"path": "package.json"}, {"path": "package.json"},
+    ]})
+    answer = write_json(tmp_path / "answer.json", {"source_files": ["package.json"]})
+    proc = run_cli(answer, gt)
+    assert proc.returncode != 0, "a ground truth missing `repo` must not score"
+    assert INFRA_SENTINEL in json.loads(proc.stdout)["detail"]
+
+
+def test_the_same_path_required_from_two_repos_fails_closed(tmp_path):
+    """Two repos requiring the same relative path are two files, not a duplicate
+    spelling — but a component-suffix matcher cannot tell them apart, and the dedup
+    above would silently collapse them, shrinking the denominator and inflating every
+    agent's score. Our artifact is the wrong one, so it fails closed. (It also keeps
+    ground-truth component lists distinct, which score_answer's crediting relies on.)
+    """
+    gt = write_json(tmp_path / "ground_truth.json", {"required_files": [
+        {"path": "package.json", "repo": "webpack"},
+        {"path": "package.json", "repo": "babel"},
+    ]})
+    answer = write_json(tmp_path / "answer.json", {"source_files": ["package.json"]})
+    proc = run_cli(answer, gt)
+    assert proc.returncode != 0
+    assert INFRA_SENTINEL in json.loads(proc.stdout)["detail"]
 
 
 @pytest.mark.parametrize("required", [

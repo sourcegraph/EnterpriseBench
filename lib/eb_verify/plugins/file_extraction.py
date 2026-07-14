@@ -83,16 +83,29 @@ def emit(score: float, detail: str, *, infra: bool = False) -> int:
     return 2 if infra else 0
 
 
-_CITATION_SUFFIX_RE = re.compile(r"(:\d+|#L\d+)$")
+# Both citation dialects the arms produce: grep/editor style ('_config.py:120',
+# ':120-140' as in the captured 'reflector.go:417-418', ':120:5' from `rg --vimgrep`)
+# and blob anchors ('#L120', '#L120-L140' from GitHub, '?L120-140' from Sourcegraph).
+# Sourcegraph is a first-class arm, so stripping the baseline arm's dialect but not
+# the MCP arm's would be a mode-correlated scoring bias — an MCP regression no agent
+# caused. Over-stripping is not a risk: the match is $-anchored behind a literal ':'
+# or '#L'/'?L', so 'report-2024-2025.md' and 'v1.2-140/file.py' are untouched.
+_CITATION_SUFFIX_RE = re.compile(
+    r"""(?: : | [#?] L )        # grep-style ':120', or a GitHub/Sourcegraph anchor
+        \d+ (?: [:-] L? \d+ )*  # the line, plus any column and range parts
+        $""",
+    re.VERBOSE,
+)
 
 
 def components(path: str) -> List[str]:
     """Path components, with the decorations agents add stripped.
 
     Handles './', '..', a leading '/', backslashes, quotes, whitespace, and a
-    trailing ':<line>' or '#L<line>' citation suffix, so matching compares path
-    structure rather than punctuation. Resolution is lexical (normpath, not
-    realpath) because these paths name files in a repo that need not exist here.
+    trailing line/anchor citation suffix (see :data:`_CITATION_SUFFIX_RE`), so
+    matching compares path structure rather than punctuation. Resolution is lexical
+    (normpath, not realpath) because these paths name files in a repo that need not
+    exist here.
     """
     cleaned = str(path).strip().strip("'\"").replace("\\", "/")
     cleaned = _CITATION_SUFFIX_RE.sub("", cleaned)
@@ -116,24 +129,52 @@ def matches(gt_path: str, agent_path: str) -> bool:
     return longer[-len(shorter):] == shorter
 
 
-def score_answer(gt_paths: List[str], found: List[str]) -> "tuple[set, List[str]]":
+def score_answer(gt_paths: List[str], found: List[str]) -> "tuple[set[str], List[str]]":
     """Which required files the agent identified, and which guesses were ambiguous.
 
-    Credit is per *answer*, and only an answer that picks out exactly one required
-    file earns it: with httpx and httpcore both holding a ``_client.py``, scoring
-    each ground-truth entry independently would let the lone guess "_client.py"
-    claim both and turn a non-answer into full marks. Specificity is demanded only
-    where it distinguishes something — "setup.py" against a lone ground truth of
-    "httpx/setup.py" is unambiguous and scores.
+    Credit is per *answer*, never per ground-truth entry: with httpx and httpcore
+    both holding a ``_client.py``, crediting each entry independently would let the
+    lone guess "_client.py" claim both and turn a non-answer into full marks.
+
+    An answer is credited to the most specific required file it *refines* — one whose
+    path is a component-suffix of the answer's, i.e. the agent named that file at
+    least as precisely as the ground truth spells it. An answer that refines nothing
+    is an abbreviation, and specificity is demanded only where it distinguishes
+    something: it still scores against the one required file it abbreviates
+    ("setup.py" against a lone ground truth of "httpx/setup.py"), and is credited to
+    none when it is a tail shared by several.
+
+    Both halves of the refinement rule are load-bearing:
+
+    * Demanding an exact match instead would credit nothing for the absolute
+      ``/workspace/<repo>/...`` paths run_task.py *mandates* every agent emit, since
+      those are strictly longer than any ground-truth entry.
+    * Crediting the longest hit, with no refinement test, would hand "_client.py" the
+      deeper of ``httpx/_client.py`` and ``httpcore/httpcore/_async/_client.py`` — a
+      passing 0.5 for a one-word non-answer.
+
+    It is refinement that lets a required file be a tail of another (the babel/tokio
+    tasks require a bare "package.json" alongside "packages/babel-parser/package.json")
+    without every guess in a perfect answer looking ambiguous.
+
+    Order-independent, and over-credit is impossible: a matched entry is never "used
+    up", and ``matched`` is a set of ground-truth entries, so recall stays capped at
+    1.0 however many answers point at one file.
     """
-    matched: set = set()
+    matched: set[str] = set()
     ambiguous: List[str] = []
     for af in found:
         hits = [gt for gt in gt_paths if matches(gt, af)]
-        if len(hits) > 1:
-            ambiguous.append(af)
+        depth = len(components(af))
+        # Ties are impossible: two refined entries of equal depth would both be a
+        # suffix of `af` and therefore the same path, which ground_truth_files rejects.
+        refined = [gt for gt in hits if len(components(gt)) <= depth]
+        if refined:
+            matched.add(max(refined, key=lambda gt: len(components(gt))))
+        elif len(hits) == 1:
+            matched.add(hits[0])  # an abbreviation of exactly one required file
         elif hits:
-            matched.add(hits[0])
+            ambiguous.append(af)  # a tail of several: it distinguishes none of them
     return matched, ambiguous
 
 
@@ -173,7 +214,7 @@ def ground_truth_files(gt_file: str) -> List[str]:
         raise HarnessError("ground_truth.json has no required_files to score against")
 
     paths: List[str] = []
-    seen: set = set()
+    seen: dict[tuple[str, ...], str] = {}  # component list -> the repo that declared it
     for i, entry in enumerate(required):
         if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
             raise HarnessError(
@@ -182,12 +223,34 @@ def ground_truth_files(gt_file: str) -> List[str]:
         path = entry["path"].strip()
         if not path:
             raise HarnessError(f"ground_truth.json required_files[{i}] path is empty")
-        # 'a/x.py' and './a/x.py' are one required file: counting both would distort
-        # the denominator, and an answer matching both would look ambiguous below.
+
+        # Two entries with the same components collapse into one required file only
+        # when the same repo declares both — 'a/x.py' and './a/x.py' are one file, and
+        # counting them twice would distort the denominator while making an answer that
+        # matched both look ambiguous below.
+        #
+        # Any other collision fails closed. The same path from two *different* repos is
+        # two files a component-suffix matcher cannot tell apart, and collapsing them
+        # would shrink the denominator and inflate every agent's score. A collision we
+        # cannot even adjudicate — because an entry omitted the 'repo' the task schema
+        # requires — is the same hazard with less evidence, so it gets the same answer.
         key = tuple(components(path))
+        repo = entry.get("repo")
+        if not isinstance(repo, str) or not repo.strip():
+            raise HarnessError(
+                f"ground_truth.json required_files[{i}] ('{path}') has no string 'repo'; "
+                f"it is required to tell same-named files in different repos apart"
+            )
+        repo = repo.strip()
         if key in seen:
+            if seen[key] != repo:
+                raise HarnessError(
+                    f"ground_truth.json requires '{path}' from two different repos "
+                    f"({seen[key]!r} and {repo!r}); a component-suffix matcher cannot "
+                    f"distinguish them — repo-qualify the paths"
+                )
             continue
-        seen.add(key)
+        seen[key] = repo
         paths.append(path)
     return paths
 
@@ -279,9 +342,11 @@ def main(argv: List[str] | None = None) -> int:
     if missed:
         detail += f" (missed: {', '.join(missed)})"
     if ambiguous:
+        # Deduped: one path named under several keys is one ambiguous guess, and
+        # listing it twice makes the detail line misread as two distinct misses.
         detail += (
             f" (ambiguous, matched several required files so credited none: "
-            f"{', '.join(ambiguous)})"
+            f"{', '.join(dict.fromkeys(ambiguous))})"
         )
     return emit(score, detail)
 
