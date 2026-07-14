@@ -188,9 +188,31 @@ Every task is runnable in three controlled tool-access modes:
 | `mcp_only` | Sourcegraph MCP only — no local find/grep on source files  |
 | `hybrid`   | Both local and MCP tools (the realistic developer setting) |
 
-Mode is controlled at sandbox-build time via mode-suffixed Docker image tags
-(`eb-task-mcp_only`, etc.) to prevent build-time collisions during parallel
-runs.
+Mode is enforced by filesystem permissions inside the container, not by the
+prompt and not by the image contents. All three arms run the same image with
+every repository cloned into `/workspace`, and no arm has tools removed from its
+toolset. For `mcp_only`, the repository trees are re-owned to `root` and stripped
+of group and world permissions before the agent starts, so every local read from
+the agent's unprivileged UID fails with `Permission denied`. The kernel does the
+denying rather than an enumerated denylist, so a file-access tool added by a
+later CLI release is gated by construction. Sourcegraph MCP servers are
+configured at container start, for `mcp_only` and `hybrid` only.
+
+Holding the toolset fixed and varying only readability keeps the arm a
+single-factor ablation: `baseline` minus `mcp_only` isolates the loss of local
+code search, not the loss of a shell. (A `--disallowed-tools` denylist was
+rejected for exactly this reason, since it strips Read, Grep, Bash, and subagent
+spawning together.) Verification re-executes as `root`, so checkpoints still read
+the repositories they score against; omitting the repos from the image would have
+blinded the verifier too, scoring some checkpoints zero while awarding others
+full credit for a missing file. The gate is proved after it is applied by
+re-testing readability as the agent user, and a gate that fails to bind aborts
+the run as invalid instead of scoring it. Tasks whose required artifact is a
+`code_patch` cannot be produced without reading local source; they are ineligible
+for `mcp_only` and are excluded from that arm rather than scored near zero, so
+headline comparisons are computed on the subset all three arms can run. The
+mode-suffixed image tags (`eb-task-mcp_only`, etc.) prevent build collisions
+during parallel runs and do not themselves encode the mode.
 
 ### 3.2 Session types
 
