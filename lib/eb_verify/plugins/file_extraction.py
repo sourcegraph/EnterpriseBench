@@ -264,7 +264,11 @@ def load_json(path: str, what: str) -> Any:
     ValueError covers both JSONDecodeError and UnicodeDecodeError; RecursionError
     (deeply nested JSON) is neither that nor an OSError.
     """
-    if not path:
+    if not path or not path.strip():
+        # Empty or whitespace-only: the runner never gave us a real path. That is a
+        # misconfiguration, not the agent writing nothing — os.path.isfile(" ") is
+        # False, so without this a blank env value would masquerade as an absent
+        # answer file (an agent 0.0) instead of infra.
         raise HarnessError(f"{what} path is not set")
     if not os.path.isfile(path):
         raise MissingFile(f"{what} not found at {path}")

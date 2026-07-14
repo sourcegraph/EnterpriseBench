@@ -333,6 +333,25 @@ def test_an_unset_answer_file_is_infra_not_a_zero(tmp_path):
     assert INFRA_SENTINEL in payload["detail"]
 
 
+def test_a_whitespace_only_answer_file_is_infra_not_a_zero(tmp_path):
+    """A blank ANSWER_FILE (' ') is the same misconfiguration as an unset one — the
+    runner gave no real path. os.path.isfile(' ') is False, so without the strip it
+    would masquerade as an absent file (an agent 0.0) instead of infra."""
+    gt = gt_with(tmp_path, ["httpx/httpx/_config.py"])
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(LIB_DIR)
+    env["GT_FILE"] = str(gt)
+    env["ANSWER_FILE"] = "   "
+    proc = subprocess.run(
+        [sys.executable, "-m", "eb_verify.plugins.file_extraction", "--keys", ALL_KEYS],
+        capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
+    )
+    assert proc.returncode != 0, "a whitespace-only ANSWER_FILE must fail closed"
+    payload = json.loads(proc.stdout)
+    assert payload["score"] == 0.0
+    assert INFRA_SENTINEL in payload["detail"]
+
+
 def test_a_path_named_under_two_keys_is_one_ambiguous_guess(tmp_path):
     """agent_files dedups, so the same path under two unioned keys is a single guess:
     it appears once in the ambiguous detail, not read as two distinct misses."""
