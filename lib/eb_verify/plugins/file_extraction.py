@@ -90,9 +90,26 @@ def emit(score: float, detail: str, *, infra: bool = False) -> int:
 # the MCP arm's would be a mode-correlated scoring bias — an MCP regression no agent
 # caused. Over-stripping is not a risk: the match is $-anchored behind a literal ':'
 # or '#L'/'?L', so 'report-2024-2025.md' and 'v1.2-140/file.py' are untouched.
+#
+# The repetition is BOUNDED, and that is a correctness requirement, not tidiness. The
+# pattern has no start anchor, so `re.sub` retries it at every ':' in the string; with
+# an unbounded `(?:[:-]L?\d+)*` each of those O(n) attempts greedily runs to the end and
+# then unwinds the whole loop when `$` fails, which is O(n) work apiece — quadratic
+# overall, and reachable straight from a graded answer.json. Measured on the unbounded
+# form, against 'file.py' + ':1'*n + 'x' (the trailing 'x' is what breaks `$` and forces
+# the unwind): 32KB took 5.7s and ~200KB blows the 120s checkpoint timeout, which
+# runner.py books as a silent agent 0.0 — the exact false zero this module exists to
+# kill. A well-formed citation of the same size matches immediately and hides it, which
+# is how it survived an earlier ReDoS review that only measured matching inputs.
+# Bounding makes each attempt O(1) and the whole scan linear.
+#
+# The bounds cost nothing real: no citation carries a 10-digit line number or 7 range
+# parts. An input past them is not a citation, and it degrades in the module's
+# documented fail-safe direction — it strips a shorter tail (under-strip -> a false
+# miss), never a longer one (over-strip -> a false match).
 _CITATION_SUFFIX_RE = re.compile(
     r"""(?: : | [#?] L )        # grep-style ':120', or a GitHub/Sourcegraph anchor
-        \d+ (?: [:-] L? \d+ )*  # the line, plus any column and range parts
+        \d{1,9} (?: [:-] L? \d{1,9} ){0,6}  # the line, plus column and range parts
         $""",
     re.VERBOSE,
 )
@@ -136,45 +153,66 @@ def score_answer(gt_paths: List[str], found: List[str]) -> tuple[set[str], List[
     both holding a ``_client.py``, crediting each entry independently would let the
     lone guess "_client.py" claim both and turn a non-answer into full marks.
 
-    An answer is credited to the most specific required file it *refines* — one whose
-    path is a component-suffix of the answer's, i.e. the agent named that file at
-    least as precisely as the ground truth spells it. An answer that refines nothing
-    is an abbreviation, and specificity is demanded only where it distinguishes
-    something: it still scores against the one required file it abbreviates
-    ("setup.py" against a lone ground truth of "httpx/setup.py"), and is credited to
-    none when it is a tail shared by several.
+    Each required file an answer matches is one the answer either *refines* — spells at
+    least as precisely as the ground truth does, so the ground truth's components are a
+    suffix of the answer's — or merely *abbreviates*. An answer is read against that
+    split:
 
-    Both halves of the refinement rule are load-bearing:
+    * It names a required file **exactly**: credit that file. Nothing outranks the
+      agent spelling a required path the way ground truth spells it.
+    * It refines some and abbreviates others: it distinguishes none of them, and is
+      credited to none. ``y/a.py`` refines a required "a.py" and abbreviates a required
+      "x/y/a.py", and there is no ground for preferring either reading of it.
+    * It only refines: credit the most specific one. This is what lets a required file
+      be a tail of another (the babel/tokio tasks require a bare "package.json"
+      alongside "packages/babel-parser/package.json") without every guess in a perfect
+      answer looking ambiguous.
+    * It only abbreviates: specificity is demanded only where it distinguishes
+      something, so it still scores against the *one* required file it abbreviates
+      ("setup.py" against a lone ground truth of "httpx/setup.py"), and is credited to
+      none when it is a tail shared by several.
 
-    * Demanding an exact match instead would credit nothing for the absolute
-      ``/workspace/<repo>/...`` paths run_task.py *mandates* every agent emit, since
-      those are strictly longer than any ground-truth entry.
-    * Crediting the longest hit, with no refinement test, would hand "_client.py" the
-      deeper of ``httpx/_client.py`` and ``httpcore/httpcore/_async/_client.py`` — a
-      passing 0.5 for a one-word non-answer.
+    Every other rule considered fails a case that ships:
 
-    It is refinement that lets a required file be a tail of another (the babel/tokio
-    tasks require a bare "package.json" alongside "packages/babel-parser/package.json")
-    without every guess in a perfect answer looking ambiguous.
+    * Exact match alone credits nothing for the absolute ``/workspace/<repo>/...`` paths
+      run_task.py *mandates* every agent emit — the mount component alone makes such an
+      answer strictly longer than the entry it names, so nothing would ever be exact.
+      (Longer than the entry it *names*. It is not longer than every entry, and a ground
+      truth that ends in ``workspace/<repo>/<file>`` abbreviates back into it — a latent
+      false zero, pinned by a test and tracked as EnterpriseBench-d900w.)
+    * Crediting the longest hit, with no refinement test, hands "_client.py" the deeper
+      of ``httpx/_client.py`` and ``httpcore/httpcore/_async/_client.py`` — a passing
+      0.5 for a one-word non-answer.
+    * Preferring the refined hit over the abbreviated one credits ``y/a.py`` to "a.py",
+      which another answer already named exactly, and books the "x/y/a.py" it actually
+      points at as missed.
 
     Order-independent, and over-credit is impossible: a matched entry is never "used
     up", and ``matched`` is a set of ground-truth entries, so recall stays capped at
     1.0 however many answers point at one file.
     """
+    gt_parts = {gt: components(gt) for gt in gt_paths}
     matched: set[str] = set()
     ambiguous: List[str] = []
     for af in found:
+        af_parts = components(af)
         hits = [gt for gt in gt_paths if matches(gt, af)]
-        depth = len(components(af))
-        # Ties are impossible: two refined entries of equal depth would both be a
-        # suffix of `af` and therefore the same path, which ground_truth_files rejects.
-        refined = [gt for gt in hits if len(components(gt)) <= depth]
-        if refined:
-            matched.add(max(refined, key=lambda gt: len(components(gt))))
-        elif len(hits) == 1:
-            matched.add(hits[0])  # an abbreviation of exactly one required file
-        elif hits:
-            ambiguous.append(af)  # a tail of several: it distinguishes none of them
+        # Ties are impossible: two hits of equal depth would both be a suffix of `af`
+        # and therefore the same path, which ground_truth_files rejects. So there is at
+        # most one exact hit, and `refined` has a single deepest entry.
+        refined = [gt for gt in hits if len(gt_parts[gt]) <= len(af_parts)]
+        abbreviated = [gt for gt in hits if len(gt_parts[gt]) > len(af_parts)]
+        exact = next((gt for gt in refined if gt_parts[gt] == af_parts), None)
+        if exact is not None:
+            matched.add(exact)
+        elif refined and abbreviated:
+            ambiguous.append(af)
+        elif refined:
+            matched.add(max(refined, key=lambda gt: len(gt_parts[gt])))
+        elif len(abbreviated) == 1:
+            matched.add(abbreviated[0])
+        elif abbreviated:
+            ambiguous.append(af)
     return matched, ambiguous
 
 

@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,7 @@ import pytest
 # Import the real sentinel rather than re-spelling it: scorer_guard is what greps
 # for it, so a test asserting against its own copy would pass straight through a
 # drift that silently re-books infra failures as agent zeros.
+from eb_verify.plugins.file_extraction import components
 from eb_verify.scorer_guard import INFRA_SENTINEL
 from eb_verify.runner import CheckpointRunner
 from eb_verify.task_parser import parse_task
@@ -69,6 +71,36 @@ def gt_with(tmp_path: Path, paths) -> Path:
 
 def score_of(proc) -> float:
     return json.loads(proc.stdout)["score"]
+
+
+def test_a_pathological_citation_string_does_not_hang_the_scorer():
+    """The citation regex must stay linear in the length of an agent-supplied path.
+
+    ``_CITATION_SUFFIX_RE`` has no start anchor, so ``re.sub`` retries it at every ':'
+    in the string. Unbounded repetition made each of those O(n) attempts run to the end
+    and unwind, i.e. quadratic — 32KB of ':1' took 5.7s, and ~200KB blows the 120s
+    checkpoint timeout, which runner.py books as a silent agent 0.0. That is the false
+    zero this module exists to kill, reachable from a graded answer.json, and it is not
+    only adversarial: a mangled `rg --vimgrep` blob pasted as one string reaches it too.
+
+    The trailing 'x' is the whole point of the vector — it breaks the ``$`` anchor, so
+    the match FAILS and the engine backtracks. A *well-formed* citation of the same
+    length matches immediately and runs fast, which is how an earlier ReDoS review that
+    measured only matching inputs concluded the regex was linear.
+
+    Asserted as a wall-clock ceiling rather than a growth curve so it cannot flake into
+    a false red on a loaded box: the bound is ~3 orders of magnitude above the linear
+    cost and ~2 below the quadratic one, so only a real complexity regression trips it.
+    """
+    payload = "file.py" + (":1" * 20000) + "x"
+    start = time.perf_counter()
+    parts = components(payload)
+    elapsed = time.perf_counter() - start
+    assert elapsed < 1.0, (
+        f"components() took {elapsed:.1f}s — the citation regex is superlinear again"
+    )
+    # Fail-safe: an unstrippable tail stays attached (a false miss), never over-strips.
+    assert parts == [payload]
 
 
 # --- the core bug: GT is repo-prefixed, agents answer repo-relative ----------
@@ -493,6 +525,112 @@ def test_an_answer_matching_an_underqualified_gt_entry_exactly_is_credited(tmp_p
     answer = write_json(tmp_path / "answer.json", {"source_files": ["package.json"]})
     proc = run_cli(answer, gt)
     assert score_of(proc) == 0.5, json.loads(proc.stdout)["detail"]
+
+
+# The two nested required files above are 'a.py' and 'x/y/a.py'. Between them sits a
+# band of answers — deeper than the first, shallower than the second — that refine one
+# and abbreviate the other. Which file such an answer means is not recoverable, so the
+# rule is that it means neither, and says so.
+BETWEEN_GT = ["a.py", "x/y/a.py"]
+
+
+def test_an_answer_between_two_nested_required_files_is_ambiguous(tmp_path):
+    """Deliberate rule, stated rather than left to fall out of branch order.
+
+    'y/a.py' refines the required 'a.py' and abbreviates the required 'x/y/a.py'; it
+    distinguishes neither, so it is credited to neither and is reported. Preferring the
+    refined reading (the earlier rule) silently credited it to 'a.py' — which the other
+    answer already named exactly — and booked the file it actually points at as missed,
+    with an empty `ambiguous` list to say so.
+
+    The alternative of crediting the deepest hit is what
+    test_an_abbreviation_cannot_claim_the_deeper_of_two_unequal_matches rules out, and a
+    global answer-to-file assignment would buy a better number only on an answer shape
+    the harness forbids (see the test below).
+    """
+    gt = gt_with(tmp_path, BETWEEN_GT)
+    answer = write_json(tmp_path / "answer.json", {"source_files": ["a.py", "y/a.py"]})
+    proc = run_cli(answer, gt)
+    payload = json.loads(proc.stdout)
+    assert payload["score"] == 0.5, payload["detail"]
+    assert "ambiguous" in payload["detail"] and "y/a.py" in payload["detail"]
+
+
+def test_a_between_band_answer_alone_is_credited_nothing(tmp_path):
+    """Where the rule above is visible in the *score*, and in which direction.
+
+    Paired with the test above, which pins the same rule where it is not: there, the
+    answer also names "a.py" exactly, and because ``matched`` is a set of required
+    files, crediting "y/a.py" to "a.py" a second time changed no number. The silent
+    miscredit was real but invisible — it showed up only as an empty ``ambiguous``.
+
+    Alone, "y/a.py" is the whole answer, and the old rule paid it 0.5 for a path that
+    names *neither* required file unambiguously: half marks for resolving to "a.py",
+    which the agent never wrote. So the score-visible half of this fix closes an
+    OVER-credit. It does not raise the deeper file's score, and must not — "x/y/a.py"
+    stays missed here, because nothing in the answer unambiguously names it.
+    """
+    gt = gt_with(tmp_path, BETWEEN_GT)
+    answer = write_json(tmp_path / "answer.json", {"source_files": ["y/a.py"]})
+    proc = run_cli(answer, gt)
+    payload = json.loads(proc.stdout)
+    assert payload["score"] == 0.0, payload["detail"]
+    assert "y/a.py" in payload["detail"]
+
+
+def test_the_mandated_absolute_shape_is_not_ambiguous_against_nested_gt(tmp_path):
+    """Why the rule above costs the benchmark nothing on the answer shape that ships.
+
+    run_task.py's appendix mandates '/workspace/<repo>/...' answers. Such an answer
+    carries the mount component plus the repo, so it is strictly deeper than the ground
+    truth entry it names, abbreviates it rather than being abbreviated by it, and the
+    ambiguity clause cannot fire on it. The 0.5 above is reachable only by an
+    under-qualified repo-relative answer, where it is earned.
+
+    Deeper than *its own* entry, note — NOT deeper than every entry, which is a stronger
+    claim and a false one. See the test below for the ground truth shape that breaks it.
+    """
+    gt = gt_with(tmp_path, BETWEEN_GT)
+    answer = write_json(tmp_path / "answer.json", {"source_files": [
+        "/workspace/a/a.py", "/workspace/x/x/y/a.py",
+    ]})
+    proc = run_cli(answer, gt)
+    assert score_of(proc) == 1.0, json.loads(proc.stdout)["detail"]
+
+
+def test_a_gt_path_holding_the_mount_component_zeroes_the_mandated_shape(tmp_path):
+    """A KNOWN, LATENT false zero, pinned here rather than asserted away. Tracked as
+    EnterpriseBench-d900w; NOT fixed in this bead.
+
+    '/workspace/' is a hardcoded universal mount prefix (run_task.py), and components()
+    keeps 'workspace' as an ordinary path component. So a required file whose own path
+    happens to END in 'workspace/<a repo>/<that repo's file>' is a component-suffix of
+    the mandated answer for a DIFFERENT required file, and gets booked as an abbreviated
+    hit. The answer then refines one entry and abbreviates another, the ambiguity clause
+    fires, and a correct, spec-compliant answer is credited nothing:
+
+        gt     = ['config.py', 'src/workspace/app/config.py']
+        answer = ['/workspace/app/config.py']   # the mandated shape, naming 'config.py'
+        => 0/2, ambiguous — where the pre-refinement rule scored 1/2
+
+    The root cause is that matches() is blind to the `repo` field both sides carry: were
+    it honoured, the answer declares repo 'app' and the deeper entry declares repo
+    'src', so they would never be candidates for one another and no ambiguity would
+    arise. That is d900w's subject, and fixing it here would be a silent semantics
+    change to two live 0.40-weight checkpoints inside a bead nobody reviewed for it.
+
+    LATENT, not live: no ground_truth.json in the repo has a 'workspace' path component
+    (verified across benchmarks/**). Repos named 'workspace' are not exotic though —
+    Cargo/npm/pnpm workspaces and Bazel all use the name — so this test exists to make
+    the next task that trips it fail loudly here, not silently in a published score.
+    """
+    gt = gt_with(tmp_path, ["config.py", "src/workspace/app/config.py"])
+    answer = write_json(tmp_path / "answer.json",
+                        {"source_files": ["/workspace/app/config.py"]})
+    proc = run_cli(answer, gt)
+    payload = json.loads(proc.stdout)
+    assert payload["score"] == 0.0, payload["detail"]
+    assert "ambiguous" in payload["detail"]
 
 
 # --- ground truth is OUR artifact: strict, and never silently shrunk ---------

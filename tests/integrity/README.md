@@ -43,16 +43,24 @@ up whatever check scripts adopt the scorer next with no edit here.
 | infra milestone averaged into `chain_result.json` total | both | chc2z | `test_chain_result_json_total_score_is_null_and_exit_is_nonzero` |
 | failed session → final checkpoints score an unworked workspace → free 1.0 | over-credit | 6c9wp | `test_failed_first_session_scores_nothing_and_never_runs_the_checkpoints` |
 | chain aborted mid-way → total computed from the earlier sessions' milestones | over-credit | 6c9wp | `test_mid_chain_failure_does_not_score_from_the_earlier_milestones` |
-| `file_extraction` first-key-wins discards a correct answer | under-credit | ssikq | `test_first_key_wins_discards_a_correct_answer` |
-| `file_extraction` shipped `--keys` omits harness-mandated `code_paths`/`citations` | under-credit | ssikq | `test_omitted_mandated_keys_zero_a_spec_compliant_answer` |
-| `file_extraction` unstripped citation suffix (`:120`, `:120-140`, `:120:5`, `#L`, `?L`) breaks a match | under-credit | ssikq | `test_citation_suffix_does_not_break_a_match` |
-| `file_extraction` ground truth nesting one required path inside another zeroes a perfect answer | under-credit | ssikq | `test_nested_ground_truth_does_not_zero_a_perfect_answer` |
+| `file_extraction` shipped `--keys` drops a key the answer names its files under | under-credit | ssikq | `test_omitted_mandated_keys_zero_a_spec_compliant_answer` |
 | the scan above finds no check script at all (vectors pass vacuously) | — | ssikq | `test_the_corpus_actually_found_the_scorers_call_sites` |
+| this table cites a test the corpus does not contain | false coverage | ssikq | `test_every_test_this_readme_cites_exists` |
+| a row of this table names no test at all | false coverage | ssikq | `test_every_readme_row_names_a_test` |
 
-The four `file_extraction` rows cover the two check scripts that exec
-`eb_verify.plugins.file_extraction`, and any that adopt it later. They say nothing
-about the ~39 sibling checkpoints that still match files with an inline
-`af.endswith(gt)`; those carry all the same defects and are bead `rmz1x`.
+The `file_extraction` row is one case per entry in the shipped `--keys` — including
+the `code_paths` and `citations` that run_task.py's appendix and
+`require_grounded_citations` *mandate* agents answer under — run against every check
+script that execs the scorer. Drop any key from any of them and it goes red. It covers
+the two scripts that exec `eb_verify.plugins.file_extraction` today and any that adopt
+it later; it says nothing about the ~39 sibling checkpoints that still match files with
+an inline `af.endswith(gt)`, which carry all the same defects and are bead `rmz1x`.
+
+What the scorer does with the files once it has them — the citation-suffix dialects, the
+ambiguity and refinement rules, nested ground truth — is unit-tested in
+`tests/test_file_extraction.py`. It belongs there and not here: it costs this gate a
+subprocess per case, and it depends on no shipped artifact, which is the whole
+membership rule for this directory.
 
 A failed session is **not** a verifier failure, so it routes through a sibling
 channel, `session_failure`, rather than being laundered through
