@@ -119,21 +119,14 @@ def test_required_list_is_deduplicated():
 # ------------------------------------------------------------------- edge cases
 
 
-def test_both_empty_is_vacuously_perfect():
-    result = score_file_set([], [])
-    assert result.f1 == 1.0
-    assert result.passed
-
-
-def test_empty_required_with_listed_files_scores_zero():
-    """Nothing to find, yet files were claimed: recall is vacuous (1.0) but
-    precision is 0, so F1 is 0. GT should never be empty in practice —
-    ground-truth loaders fail closed on it — but the math must not reward it."""
-    result = score_file_set(["a/b.py"], [])
-    assert result.recall == 1.0
-    assert result.precision == 0.0
-    assert result.f1 == 0.0
-    assert not result.passed
+def test_empty_required_files_is_rejected_not_scored():
+    """A checkpoint with nothing to find is a task-authoring bug. Scoring it
+    vacuously perfect would hand every agent a free pass, so refuse to produce
+    a number at all — an empty answer against empty GT must not be a 1.0."""
+    with pytest.raises(ValueError, match="no required files"):
+        score_file_set([], [])
+    with pytest.raises(ValueError, match="no required files"):
+        score_file_set(["a/b.py"], [])
 
 
 # ------------------------------------------------------------- matcher-agnostic
@@ -153,25 +146,98 @@ def test_custom_matcher_composes():
     assert result.f1 == 1.0
 
 
+def test_suffix_policy_misses_repo_prefixed_ground_truth():
+    """A directional hole in the historical blob matcher, pinned here because
+    it belongs to the matcher, not the math: a listed path SHORTER than the
+    required path matches nothing. Tracked for the blob adoption (rmz1x)."""
+    result = score_file_set(
+        ["httpx/_config.py"], ["httpx/httpx/_config.py"], match=suffix_match
+    )
+    assert result.f1 == 0.0
+
+
+# ------------------------------------------ a lenient matcher cannot buy credit
+#
+# Credit runs through a 1-to-1 pairing, so a matcher chooses WHICH files are
+# credited, never HOW MANY. These two tests are the load-bearing ones: without
+# the pairing, each exploit below scores a passing 1.0 under the very matcher
+# the shipped checks use (`--policy suffix`).
+
+
+def test_padding_variants_of_one_found_file_cannot_inflate_precision():
+    """Spray, laundered through the suffix matcher: 50 differently-prefixed
+    spellings of the one required file all suffix-match it. Counting each as
+    'relevant' would pin precision at 1.0 and re-open the exploit; the pairing
+    credits the required file exactly once, so the other 50 are pure filler."""
+    required = ["httpx/httpx/_config.py"]
+    listed = required + [f"cand{i}/httpx/httpx/_config.py" for i in range(50)]
+
+    result = score_file_set(listed, required, match=suffix_match)
+
+    assert result.n_matched == 1  # found once, not 51 times
+    assert result.n_listed == 51
+    assert result.recall == 1.0
+    assert result.precision == pytest.approx(1 / 51)
+    assert not result.passed
+
+
+def test_one_vague_guess_cannot_claim_several_required_files():
+    """The ambiguity half: under a basename matcher, `_client.py` names a file
+    in every repo. One guess is worth one file, so recall stays 0.5."""
+
+    def basename_match(agent_path: str, required_path: str) -> bool:
+        return agent_path.rsplit("/", 1)[-1] == required_path.rsplit("/", 1)[-1]
+
+    result = score_file_set(
+        ["anywhere/_client.py"],
+        ["httpx/_client.py", "httpcore/_client.py"],
+        match=basename_match,
+    )
+
+    assert result.n_matched == 1  # not 2
+    assert result.recall == 0.5
+    assert result.precision == 1.0
+    assert result.f1 == pytest.approx(2 / 3)
+
+
+def test_pairing_credits_every_required_file_it_can():
+    """The pairing is maximum, not greedy-first: a specific guess must not be
+    wasted on a file another guess also covers. Both required files are found,
+    even though `_config.py` alone could have absorbed the first."""
+    result = score_file_set(
+        ["httpx/httpx/_config.py", "httpcore/httpcore/_config.py"],
+        ["httpx/httpx/_config.py", "httpcore/httpcore/_config.py"],
+        match=suffix_match,
+    )
+    assert result.n_matched == 2
+    assert result.f1 == 1.0
+
+
 # ------------------------------------------- count-based construction (ssikq)
 
 
 def test_from_counts_matches_pairwise_math():
     """file_extraction.py's score_answer() produces (matched set, ambiguous
-    list), not pairwise hits — it adopts by constructing from counts."""
-    by_counts = FileSetScore(n_required=4, n_matched=3, n_listed=9, n_relevant=3)
+    list), not pairwise hits — it adopts by constructing from counts. Ambiguous
+    guesses are listed but credit nothing, so they cost precision."""
+    by_counts = FileSetScore(n_required=4, n_listed=9, n_matched=3)
     assert by_counts.recall == 0.75
     assert by_counts.precision == pytest.approx(3 / 9)
     assert by_counts.f1 == pytest.approx(6 / 13)
 
 
 def test_incoherent_counts_are_rejected():
-    with pytest.raises(ValueError):
-        FileSetScore(n_required=2, n_matched=3, n_listed=3, n_relevant=3)
-    with pytest.raises(ValueError):
-        FileSetScore(n_required=2, n_matched=2, n_listed=1, n_relevant=2)
-    with pytest.raises(ValueError):
-        FileSetScore(n_required=-1, n_matched=0, n_listed=0, n_relevant=0)
+    # More required files credited than exist.
+    with pytest.raises(ValueError, match="exceeds"):
+        FileSetScore(n_required=2, n_listed=3, n_matched=3)
+    # Credit without listing anything — the shape that fabricated a passing 1.0
+    # out of an empty answer before the counts shared one true-positive total.
+    with pytest.raises(ValueError, match="exceeds"):
+        FileSetScore(n_required=5, n_listed=0, n_matched=5)
+    with pytest.raises(ValueError, match="no required files"):
+        FileSetScore(n_required=0, n_listed=5, n_matched=0)
+    with pytest.raises(ValueError, match="negative"):
+        FileSetScore(n_required=1, n_listed=-1, n_matched=0)
 
 
 # ----------------------------------------------------------------------- detail

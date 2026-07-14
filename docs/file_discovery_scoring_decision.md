@@ -39,7 +39,13 @@ over-listing continuously. Jaccard is a monotone transform of F1
 3×|required_files|). Subsumed by F1: at the pass threshold 0.5, full recall
 passes iff |answer| ≤ 3|GT| — the same bar, but continuous, with no arbitrary
 constant, and a bare cap still gives free credit *inside* the cap for 3×
-enumeration.
+enumeration. The subsumption holds for **every** matcher, not just exact
+equality, because credit is a 1-to-1 pairing (see Semantics). That is a
+precondition, not a freebie: score precision off "listed files matching ≥1
+required file" instead, and a lenient matcher voids the theorem — 51 differently
+-prefixed spellings of one found file each suffix-match it, precision pins at
+1.0, and spray scores 1.0 again. The pairing is what makes F1 strictly stronger
+than the cap rather than weaker.
 
 **(c) Precision-weighted partial credit (R·P^β).** Introduces a tunable β
 with no principled setting.
@@ -57,18 +63,27 @@ Implemented in `eb_verify.scoring.FileSetScore` / `score_file_set`
 
 - Both lists deduplicated by exact string first. Repeating the right answer
   is not spray; repeating filler earns no extra penalty.
-- `recall = |GT matched| / |GT|`; 1.0 when GT is empty (nothing to find).
-- `precision = |agent files matching ≥1 GT| / |agent listed|`; 1.0 when
-  nothing was listed (no false positives — empty answers are punished by
-  recall).
-- `F1 = 2PR/(P+R)`; 0.0 when both are 0.
+- **One true-positive count, `n_matched`, shared by both sides**, computed as a
+  maximum 1-to-1 pairing between listed and required files: a listed file is
+  worth at most one required file however many it matches, and a required file
+  is found at most once however many spellings of it were listed.
+- `recall = n_matched / |GT|`, `precision = n_matched / |listed|`,
+  `F1 = 2PR/(P+R)` (0.0 when both are 0). Precision is vacuously 1.0 when
+  nothing was listed, which cannot leak a pass: recall is then 0, so F1 is 0.
+- Empty `required_files` **raises**. A checkpoint with nothing to find is a
+  task-authoring bug; scoring it vacuously perfect would pass every agent.
 - `passed` stays `score >= 0.5` (`FILE_SET_PASS_THRESHOLD`, inclusive).
 - `detail` exposes found/total, listed count, and P/R/F1.
-- **Matcher-agnostic.** The matcher owns all path semantics; the primitive
-  owns the math. Blob-style call sites pass a pairwise predicate to
-  `score_file_set`; `file_extraction.py`'s refinement rule (per-answer
-  credit, ambiguous guesses) constructs `FileSetScore` from its counts
-  directly. Matcher changes never change what over-listing costs.
+- **Matcher-agnostic — enforced, not assumed.** The matcher owns all path
+  semantics; the primitive owns the math. Because credit runs through the
+  pairing, a matcher decides *which* files are credited but never *how many*: no
+  matcher, however lenient, can make over-listing free, and no vague guess can
+  claim several required files at once. Two independently-counted true-positive
+  totals (one per side) would surrender exactly that guarantee — which is why
+  there is only one. Blob-style call sites pass a pairwise predicate to
+  `score_file_set`; `file_extraction.py`'s refinement rule (per-answer credit,
+  ambiguous guesses) constructs `FileSetScore` from its counts directly, owing
+  the same contract: counts over distinct files, `n_matched` a 1-to-1 pairing.
 
 ## Adoption
 
@@ -76,9 +91,9 @@ Both call-site owners must route through the primitive, or the 28 checkpoints
 stop being comparable:
 
 - **EnterpriseBench-ssikq** — `file_extraction.py` replaces its recall-only
-  score with `FileSetScore(n_required, n_matched, n_listed, n_relevant)`
-  built from `score_answer()`'s output (ambiguous guesses count as listed,
-  not relevant).
+  score with `FileSetScore(n_required, n_listed, n_matched)` built from
+  `score_answer()`'s output. An ambiguous guess counts as listed and credits
+  nothing, so it costs precision — the same bargain the pairing strikes.
 - **EnterpriseBench-rmz1x** — the 26 blob scripts repoint at
   `file_extraction.py`, inheriting the primitive through it.
 

@@ -28,48 +28,66 @@ class FileSetScore:
     nothing for over-listing. Rationale and options considered:
     docs/file_discovery_scoring_decision.md.
 
-    Holds the four counts; precision/recall/F1 are derived. Counts, not paths,
-    because not every matcher is a pairwise predicate — file_extraction.py's
-    refinement rule credits per answer and can leave a guess ambiguous, so that
-    call site constructs from counts while blob-style call sites go through
+    Three counts; precision/recall/F1 are derived. ``n_matched`` is the single
+    true-positive count shared by both — deliberately ONE number, because two
+    independently-counted true-positive totals (one per side) is what let both
+    halves of the answer lie: a vague guess crediting several required files at
+    once inflated recall, and many near-duplicate spellings of one found file
+    all counting as "relevant" inflated precision. Both are ruled out by
+    construction here: ``n_matched`` is a 1-to-1 pairing, so it can never exceed
+    either side's cardinality.
+
+    Counts, not paths, because not every matcher is a pairwise predicate —
+    file_extraction.py's refinement rule credits per answer, so that call site
+    constructs from counts while blob-style call sites go through
     :func:`score_file_set`. Count-constructing callers owe the contract
-    :func:`score_file_set` enforces for them: counts are over DISTINCT files.
+    :func:`score_file_set` enforces for them: counts are over DISTINCT files,
+    and ``n_matched`` is a 1-to-1 pairing (an ambiguous guess is listed, but
+    credits nothing).
     """
 
-    n_required: int  # distinct ground-truth files
-    n_matched: int  # ground-truth files the answer identified
+    n_required: int  # distinct ground-truth files; >= 1
     n_listed: int  # distinct files the agent listed
-    n_relevant: int  # listed files credited against >= 1 ground-truth file
+    n_matched: int  # required files credited, under a 1-to-1 pairing
 
     def __post_init__(self) -> None:
-        if min(self.n_required, self.n_matched, self.n_listed, self.n_relevant) < 0:
+        if min(self.n_listed, self.n_matched) < 0:
             raise ValueError(f"negative count in {self}")
-        if self.n_matched > self.n_required:
-            raise ValueError(f"matched {self.n_matched} > required {self.n_required}")
-        if self.n_relevant > self.n_listed:
-            raise ValueError(f"relevant {self.n_relevant} > listed {self.n_listed}")
+        if self.n_required < 1:
+            # A checkpoint with nothing to find is a task-authoring bug. Scoring
+            # it vacuously perfect would hand every agent a free pass, so refuse
+            # to produce a number at all and let the caller raise an infra error.
+            raise ValueError(f"no required files to score against in {self}")
+        if self.n_matched > min(self.n_required, self.n_listed):
+            # Unreachable from any real pairing: you cannot credit more files
+            # than either side holds. Catches miscounts at the counts-based
+            # call site, which would otherwise fabricate a passing score.
+            raise ValueError(
+                f"matched {self.n_matched} exceeds required {self.n_required} "
+                f"or listed {self.n_listed}"
+            )
 
     @property
     def recall(self) -> float:
-        """Share of required files identified; 1.0 when nothing was required."""
-        if self.n_required == 0:
-            return 1.0
+        """Share of required files found."""
         return self.n_matched / self.n_required
 
     @property
     def precision(self) -> float:
-        """Share of listed files that were relevant; 1.0 when nothing was
-        listed (no false positives — an empty answer is punished by recall)."""
+        """Share of listed files that earned credit. Vacuously 1.0 when nothing
+        was listed — harmless, since an empty answer has recall 0 and so F1 0."""
         if self.n_listed == 0:
             return 1.0
-        return self.n_relevant / self.n_listed
+        return self.n_matched / self.n_listed
 
     @property
     def f1(self) -> float:
         """Harmonic mean of precision and recall; 0.0 when both are 0.
 
-        At the 0.5 pass bar this subsumes the "cap |answer| at 3x |GT|"
-        alternative; see docs/file_discovery_scoring_decision.md.
+        Because precision and recall share one 1-to-1 true-positive count, at
+        the 0.5 pass bar this subsumes the "cap |answer| at 3x |GT|" alternative
+        for EVERY matcher, not just exact equality: full recall passes iff
+        |answer| <= 3|GT|. See docs/file_discovery_scoring_decision.md.
         """
         p, r = self.precision, self.recall
         if p + r == 0:
@@ -89,6 +107,35 @@ class FileSetScore:
         )
 
 
+def _max_pairing(
+    listed: Sequence[str],
+    required: Sequence[str],
+    match: Callable[[str, str], bool],
+) -> int:
+    """Size of a maximum 1-to-1 pairing between listed and required files.
+
+    The true-positive count, and the reason a lenient matcher cannot buy credit:
+    a listed file is worth at most one required file no matter how many it
+    matches, and a required file is found at most once no matter how many
+    spellings of it were listed. Kuhn's augmenting-path algorithm — required
+    sets are a handful of files, so the quadratic is free.
+    """
+    credited_by = [-1] * len(required)  # required index -> listed index, or -1
+
+    def assign(li: int, seen: List[bool]) -> bool:
+        for ri, gt in enumerate(required):
+            if seen[ri] or not match(listed[li], gt):
+                continue
+            seen[ri] = True
+            # Take it if free, else make its current holder step aside.
+            if credited_by[ri] == -1 or assign(credited_by[ri], seen):
+                credited_by[ri] = li
+                return True
+        return False
+
+    return sum(assign(li, [False] * len(required)) for li in range(len(listed)))
+
+
 def score_file_set(
     agent_files: Sequence[str],
     required_files: Sequence[str],
@@ -99,23 +146,25 @@ def score_file_set(
     ``match(agent_path, required_path)`` decides whether one listed file names
     one required file; default is exact string equality. The matcher owns all
     path semantics — normalization, suffix policy, component boundaries — and
-    this function owns the scoring math, so matcher changes (e.g. ssikq's
-    component-suffix rule) never change what over-listing costs.
+    this function owns the scoring math. Credit is awarded through a 1-to-1
+    pairing (:func:`_max_pairing`), so a matcher can decide WHICH files are
+    credited but never HOW MANY: no matcher, however lenient, can make
+    over-listing free. That independence is the whole point of one primitive.
 
     Both lists are deduplicated by exact string first: repeating the right
-    answer is not spray, and repeating filler earns no extra penalty. Distinct
-    spellings of one file are the matcher's/call site's problem, not this
-    function's.
+    answer is not spray, and repeating filler earns no extra penalty. Near-
+    duplicate spellings survive dedup, but the pairing already denies them a
+    second credit, so they only cost precision — as filler should.
+
+    Raises ValueError on empty ``required_files``: a checkpoint with nothing to
+    find is a bug in the task, not a free pass for the agent.
     """
     required = list(dict.fromkeys(required_files))
     listed = list(dict.fromkeys(agent_files))
-    n_matched = sum(1 for gt in required if any(match(af, gt) for af in listed))
-    n_relevant = sum(1 for af in listed if any(match(af, gt) for gt in required))
     return FileSetScore(
         n_required=len(required),
-        n_matched=n_matched,
         n_listed=len(listed),
-        n_relevant=n_relevant,
+        n_matched=_max_pairing(listed, required, match),
     )
 
 
