@@ -39,6 +39,7 @@ import argparse
 import json
 import os
 import posixpath
+import re
 import sys
 from typing import Any, Iterable, List
 
@@ -100,16 +101,21 @@ def emit(score: float, detail: str, *, infra: bool = False) -> int:
     return 2 if infra else 0
 
 
+_CITATION_SUFFIX_RE = re.compile(r"(:\d+|#L\d+)$")
+
+
 def components(path: str) -> List[str]:
     """Split a path into comparable components, tolerating agent formatting.
 
     Normalizes away the decorations agents add ('./', '..', a leading '/',
-    backslashes, surrounding whitespace or quotes) so matching compares path
-    structure rather than punctuation. normpath, not realpath: resolution is
-    lexical because these paths name files in a repo that need not exist here.
-    posixpath, not os.path, so a Windows host does not start emitting backslashes.
+    backslashes, surrounding whitespace or quotes, a trailing ':<line>' or
+    '#L<line>' citation suffix) so matching compares path structure rather
+    than punctuation. normpath, not realpath: resolution is lexical because
+    these paths name files in a repo that need not exist here. posixpath, not
+    os.path, so a Windows host does not start emitting backslashes.
     """
     cleaned = str(path).strip().strip("'\"").replace("\\", "/")
+    cleaned = _CITATION_SUFFIX_RE.sub("", cleaned)
     return [p for p in posixpath.normpath(cleaned).split("/") if p not in ("", ".", "..")]
 
 
@@ -242,25 +248,26 @@ def _lookup(answer: Any, dotted_key: str) -> Any:
 
 
 def agent_files(answer: Any, keys: Iterable[str]) -> List[str]:
-    """Files the agent named, from the first key that yields any.
+    """Files the agent named, unioned across every key.
 
-    Keys are tried in the order given, and an empty value falls through to the
-    next: an agent that writes `"source_files": []` alongside a populated
-    `"files"` meant the latter.
+    Every key is accumulated rather than stopping at the first non-empty one:
+    scoring is recall-only (:func:`score_answer` dedups on the matched ground-
+    truth entry, not the raw guess), so a union cannot over-credit. First-key-
+    wins would instead let a wrong guess under an earlier key discard a fully
+    correct answer sitting under a later, harness-advertised key.
     """
     if not isinstance(answer, dict):
         return []
 
+    found: List[str] = []
     for key in keys:
         value = _lookup(answer, key)
         if isinstance(value, str):
             value = [value]
         if not isinstance(value, list):
             continue
-        paths = [p for p in (_entry_path(e) for e in value) if p]
-        if paths:
-            return paths
-    return []
+        found.extend(p for p in (_entry_path(e) for e in value) if p)
+    return found
 
 
 def build_parser() -> argparse.ArgumentParser:

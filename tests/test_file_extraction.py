@@ -105,12 +105,74 @@ def test_partial_credit_is_fraction_of_gt_found(tmp_path):
 
 # --- answer-shape handling ---------------------------------------------------
 
-def test_first_non_empty_key_wins(tmp_path):
+def test_empty_earlier_key_falls_through_to_later_key(tmp_path):
     """An empty 'source_files' must not shadow a populated later key."""
     gt = gt_with(tmp_path, ["httpx/httpx/_config.py"])
     answer = write_json(tmp_path / "answer.json",
                         {"source_files": [], "files": ["httpx/_config.py"]})
     assert score_of(run_cli(answer, gt)) == 1.0
+
+
+def test_wrong_guess_in_earlier_key_does_not_discard_correct_later_key(tmp_path):
+    """The BUG-1 regression (rejection_reason_addendum): a populated-but-wrong
+    earlier key must not shadow a populated-and-right later key. Keys are
+    unioned, not first-key-wins -- recall-only scoring cannot over-credit from
+    a union, so there is no downside to accumulating across all of them."""
+    gt = gt_with(tmp_path, ["httpx/httpx/_config.py", "httpcore/httpcore/_client.py"])
+    answer = write_json(tmp_path / "answer.json", {
+        "source_files": ["totally/unrelated.py"],
+        "files": ["httpx/_config.py", "httpcore/_client.py"],
+    })
+    proc = run_cli(answer, gt)
+    assert score_of(proc) == 1.0, json.loads(proc.stdout)["detail"]
+
+
+def test_files_split_across_two_populated_keys_union_to_full_credit(tmp_path):
+    """Different required files named under different keys must combine."""
+    gt = gt_with(tmp_path, ["httpx/httpx/_config.py", "httpcore/httpcore/_client.py"])
+    answer = write_json(tmp_path / "answer.json", {
+        "source_files": ["httpx/_config.py"],
+        "files": ["httpcore/_client.py"],
+    })
+    assert score_of(run_cli(answer, gt)) == 1.0
+
+
+def test_code_paths_key_is_scored(tmp_path):
+    """run_task.py's output appendix mandates `code_paths` for every task; an
+    agent that follows it must not be scored 0.0 for using the advertised key."""
+    gt = gt_with(tmp_path, ["httpx/httpx/_transports/default.py"])
+    answer = write_json(tmp_path / "answer.json", {
+        "code_paths": [{"path": "/workspace/httpx/httpx/_transports/default.py"}],
+    })
+    proc = run_cli(answer, gt, keys="source_files,files,error_source.files,code_paths,citations")
+    assert score_of(proc) == 1.0, json.loads(proc.stdout)["detail"]
+
+
+def test_citations_key_is_scored(tmp_path):
+    """task.toml's require_grounded_citations=true mandates a top-level
+    `citations` list of {repo,file,evidence_span} dicts (run_task.py's
+    citations_block). The `file` entry must be scored like any other path."""
+    gt = gt_with(tmp_path, ["httpx/httpx/_transports/default.py"])
+    answer = write_json(tmp_path / "answer.json", {
+        "citations": [{
+            "repo": "httpx",
+            "file": "httpx/_transports/default.py",
+            "evidence_span": "class HTTPTransport(BaseTransport):",
+        }],
+    })
+    proc = run_cli(answer, gt, keys="source_files,files,error_source.files,code_paths,citations")
+    assert score_of(proc) == 1.0, json.loads(proc.stdout)["detail"]
+
+
+def test_citation_line_suffix_is_stripped(tmp_path):
+    """A citation-style path like 'file.py:120' or 'file.py#L120' must still
+    match -- agents commonly cite an exact line alongside the evidence span."""
+    gt = gt_with(tmp_path, ["httpx/httpx/_config.py"])
+    for suffix in (":120", "#L120"):
+        answer = write_json(tmp_path / "answer.json",
+                            {"source_files": [f"httpx/_config.py{suffix}"]})
+        proc = run_cli(answer, gt)
+        assert score_of(proc) == 1.0, f"suffix {suffix!r}: {json.loads(proc.stdout)['detail']}"
 
 
 def test_dotted_key_is_traversed(tmp_path):
@@ -438,3 +500,53 @@ def test_real_checkpoint_discriminates_a_wrong_answer(tmp_path, monkeypatch, tas
 
     assert result.score == 0.0
     assert INFRA_SENTINEL not in result.detail, "a wrong answer is the agent's miss, not infra"
+
+
+# --- the real checkpoint must score the answer shapes the harness mandates ---
+#
+# scripts/orchestration/run_task.py's output_appendix (lines 405-426) puts
+# `code_paths` in every task's instructions unconditionally, and adds a
+# required `citations` list whenever task.toml sets require_grounded_citations
+# = true. An agent that follows those instructions to the letter is the
+# BUG-2 regression: --keys omitted both, so a fully spec-compliant answer
+# scored 0.0 on a 0.40-weight checkpoint.
+
+def code_paths_answer_for(task_dir: str):
+    """The absolute /workspace/<repo>/... shape run_task.py's appendix mandates."""
+    gt = json.loads((REPO_ROOT / task_dir / "ground_truth.json").read_text())
+    return {"code_paths": [{"path": f"/workspace/{f['path']}"} for f in gt["required_files"]]}
+
+
+@pytest.mark.parametrize("task_dir", AFFECTED_TASKS)
+def test_real_checkpoint_scores_a_code_paths_answer(tmp_path, monkeypatch, task_dir):
+    """code_paths is in every task's mandated appendix (run_task.py:418), not
+    just the require_grounded_citations tasks -- must score 1.0 on both."""
+    result = run_error_source_checkpoint(
+        task_dir, code_paths_answer_for(task_dir), tmp_path, monkeypatch
+    )
+    assert result.score == 1.0, result.detail
+    assert result.passed is True
+
+
+def test_real_checkpoint_scores_a_citations_answer_on_the_grounded_citations_task(
+    tmp_path, monkeypatch
+):
+    """err-provenance-tri-httpx-proxy-001 sets require_grounded_citations = true
+    (task.toml), so run_task.py's appendix mandates a top-level `citations` list
+    of {repo, file, evidence_span} dicts. An agent that names every required
+    file only under `citations` -- exactly as instructed -- must score 1.0."""
+    task_dir = "benchmarks/customer_escalation/err-provenance-tri-httpx-proxy-001"
+    gt = json.loads((REPO_ROOT / task_dir / "ground_truth.json").read_text())
+    answer = {
+        "citations": [
+            {
+                "repo": f["path"].split("/")[0],
+                "file": "/".join(f["path"].split("/")[1:]),
+                "evidence_span": "x" * 20,
+            }
+            for f in gt["required_files"]
+        ]
+    }
+    result = run_error_source_checkpoint(task_dir, answer, tmp_path, monkeypatch)
+    assert result.score == 1.0, result.detail
+    assert result.passed is True

@@ -11,6 +11,14 @@ point (`_run_scoring`, `_apply_llm_judge`, `code_patch.validate`). This corpus
 is one closed test per known corruption vector, wired into CI as a named merge
 blocker (`.github/workflows/ci.yml` → "Scoring-integrity corpus").
 
+**Scope note:** the `file_extraction` vectors below (`test_file_extraction_under_credit.py`)
+are not scorer_guard/INFRA_SENTINEL routing vectors — `guard_verifier_output`
+cannot catch a scoring-logic bug inside a verifier that ran cleanly and
+returned valid JSON. They cover the sibling class this corpus's opening
+paragraph also names: under-credit. Each asserts the correct `1.0`, not an
+infra sentinel, on a spec-compliant answer that a buggy verifier previously
+scored as a false zero.
+
 ## Vectors × tests
 
 | Vector | Direction | Origin | Test |
@@ -30,6 +38,9 @@ blocker (`.github/workflows/ci.yml` → "Scoring-integrity corpus").
 | infra milestone averaged into `chain_result.json` total | both | chc2z | `test_chain_result_json_total_score_is_null_and_exit_is_nonzero` |
 | failed session → final checkpoints score an unworked workspace → free 1.0 | over-credit | 6c9wp | `test_failed_first_session_scores_nothing_and_never_runs_the_checkpoints` |
 | chain aborted mid-way → total computed from the earlier sessions' milestones | over-credit | 6c9wp | `test_mid_chain_failure_does_not_score_from_the_earlier_milestones` |
+| `file_extraction` first-key-wins discards a correct answer | under-credit | ssikq | `test_first_key_wins_discards_a_correct_answer` |
+| `file_extraction` --keys omits harness-mandated `code_paths`/`citations` | under-credit | ssikq | `test_omitted_mandated_keys_zero_a_spec_compliant_answer` |
+| `file_extraction` unstripped `:line`/`#L` citation suffix breaks a match | under-credit | ssikq | `test_unstripped_citation_suffix_breaks_a_match` |
 
 A failed session is **not** a verifier failure, so it routes through a sibling
 channel, `session_failure`, rather than being laundered through
