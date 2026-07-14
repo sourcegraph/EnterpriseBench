@@ -12,11 +12,24 @@ Verifies:
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
+
+
+def _exec_ok() -> subprocess.CompletedProcess:
+    """A well-formed _docker_exec result (rc=0).
+
+    A bare MagicMock's .returncode is a truthy mock, which the grading-asset
+    seal correctly reads as a failed chown and raises on (bead
+    EnterpriseBench-8krz5). These tests exercise instruction/meta plumbing, so
+    they hand _setup_container a container that seals cleanly.
+    """
+    return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
 
 # Make scripts importable
 sys.path.insert(
@@ -212,7 +225,7 @@ class TestSetupContainerPassesMode:
     def test_setup_container_passes_mode_to_build(self, task_dir: Path) -> None:
         with patch(
             "run_task._build_instruction_text", return_value=None
-        ) as mock_build, patch("run_task._docker_exec"), patch("run_task._docker_cp"):
+        ) as mock_build, patch("run_task._docker_exec", return_value=_exec_ok()), patch("run_task._docker_cp"):
             from run_task import _setup_container
 
             _setup_container("fake-container", task_dir, {}, mode="hybrid")
@@ -223,7 +236,7 @@ class TestSetupContainerPassesMode:
     def test_setup_container_defaults_to_baseline(self, task_dir: Path) -> None:
         with patch(
             "run_task._build_instruction_text", return_value=None
-        ) as mock_build, patch("run_task._docker_exec"), patch("run_task._docker_cp"):
+        ) as mock_build, patch("run_task._docker_exec", return_value=_exec_ok()), patch("run_task._docker_cp"):
             from run_task import _setup_container
 
             _setup_container("fake-container", task_dir, {})
@@ -236,7 +249,7 @@ class TestSetupContainerPassesMode:
     ) -> None:
         with patch(
             "run_task._build_instruction_text", return_value=None
-        ) as mock_build, patch("run_task._docker_exec"), patch("run_task._docker_cp"):
+        ) as mock_build, patch("run_task._docker_exec", return_value=_exec_ok()), patch("run_task._docker_cp"):
             from run_task import _setup_container
 
             task_data = {"ground_truth": {"require_grounded_citations": True}}
@@ -388,7 +401,7 @@ class TestSetupContainerWritesVerifierMeta:
             ],
         }
         cp_side_effect, writes = _docker_cp_meta_capture()
-        with patch("run_task._docker_exec"), patch(
+        with patch("run_task._docker_exec", return_value=_exec_ok()), patch(
             "run_task._docker_cp", side_effect=cp_side_effect
         ):
             from run_task import _setup_container
@@ -408,7 +421,7 @@ class TestSetupContainerWritesVerifierMeta:
         self, task_dir_with_checks: Path
     ) -> None:
         cp_side_effect, writes = _docker_cp_meta_capture()
-        with patch("run_task._docker_exec"), patch(
+        with patch("run_task._docker_exec", return_value=_exec_ok()), patch(
             "run_task._docker_cp", side_effect=cp_side_effect
         ):
             from run_task import _setup_container

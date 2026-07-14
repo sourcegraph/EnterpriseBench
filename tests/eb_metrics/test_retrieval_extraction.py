@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from eb_metrics.bash_reads import bash_read_files
 from eb_metrics.retrieval_extraction import (
     _mcp_repo_name,
     compute_run_ir_scores,
@@ -538,25 +539,16 @@ def _bash_files(tmp_path: Path, command: str) -> list[str]:
             ["a/first.py", "b/second.py"],
             id="andand-chain",
         ),
-        # Guard: `(` must NOT be a shell operator. Adding it would make the
-        # subshell case below work, at the cost of losing this file — the same
-        # quoted-operator hole this whole function exists to close.
+        # A quoted operator is data even when it is the *whole* argument: the
+        # lexer keeps quoting, so it can never be mistaken for a real operator.
         pytest.param("grep '(' src/handler.go", ["src/handler.go"], id="bare-quoted-paren"),
-        # Known residual holes (EnterpriseBench-fhtm): when a quoted operator is
-        # the *whole* argument, posix lexing strips the quotes and it becomes
-        # indistinguishable from a real operator, so the file arg is lost. Same
-        # root cause costs us subshells. Latent — zero impact on the scored corpus.
-        pytest.param(
-            "grep '|' src/handler.go",
-            ["src/handler.go"],
-            id="bare-quoted-pipe",
-            marks=pytest.mark.xfail(strict=True, reason="EnterpriseBench-fhtm"),
-        ),
+        pytest.param("grep '|' src/handler.go", ["src/handler.go"], id="bare-quoted-pipe"),
+        pytest.param("grep ';' src/handler.go", ["src/handler.go"], id="bare-quoted-semicolon"),
+        # ...and an unquoted paren *is* an operator, so subshells contribute.
         pytest.param(
             "(cat a/first.py; cat b/second.py)",
             ["a/first.py", "b/second.py"],
             id="subshell",
-            marks=pytest.mark.xfail(strict=True, reason="EnterpriseBench-fhtm"),
         ),
         # Unterminated quote: keep the prefix that lexed, emit no mangled path.
         pytest.param("cat 'zerver/models/realms.py", [], id="unbalanced-quote"),
@@ -568,6 +560,199 @@ def test_bash_read_files_survives_shell_metacharacters(
     assert _bash_files(tmp_path, command) == expected
 
 
+# ---------------------------------------------------------------------------
+# Reads hidden from a naive argv[0]-plus-literal-token scan (EnterpriseBench-be50).
+# Every shape here was previously extracted as [] — an *undercount*, and Bash is
+# used by the baseline/hybrid arms but not by mcp_only, so each one biased those
+# arms' recall down relative to MCP. They are the reason this table exists.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        pytest.param("FOO=1 cat src/handler.go", ["src/handler.go"], id="env-prefix"),
+        pytest.param(
+            "FOO=1 BAR=2 cat src/handler.go", ["src/handler.go"], id="env-prefix-multi"
+        ),
+        pytest.param("sudo cat src/handler.go", ["src/handler.go"], id="sudo"),
+        pytest.param("time cat src/handler.go", ["src/handler.go"], id="time-wrapper"),
+        pytest.param("/bin/cat src/handler.go", ["src/handler.go"], id="absolute-path-cmd"),
+        pytest.param("sh -c 'cat src/handler.go'", ["src/handler.go"], id="sh-c"),
+        pytest.param(
+            'bash -c "grep foo src/handler.go"', ["src/handler.go"], id="bash-c-dquoted"
+        ),
+        pytest.param("echo $(cat src/handler.go)", ["src/handler.go"], id="command-subst"),
+        pytest.param(
+            'echo "$(cat src/handler.go)"', ["src/handler.go"], id="command-subst-in-dquotes"
+        ),
+        pytest.param("echo `cat src/handler.go`", ["src/handler.go"], id="backticks"),
+        pytest.param(
+            "find . -name x -exec grep -l foo config/app.yaml \\;",
+            ["config/app.yaml"],
+            id="find-exec-literal-file",
+        ),
+        # Newline is a sub-command separator (EnterpriseBench-2hum). Previously a
+        # leading non-read line swallowed every read after it.
+        pytest.param(
+            "cd /workspace/zulip\ncat zerver/models/realms.py",
+            ["zerver/models/realms.py"],
+            id="newline-after-non-read",
+        ),
+        pytest.param(
+            "cat a/first.py\ncat b/second.py",
+            ["a/first.py", "b/second.py"],
+            id="newline-separated-reads",
+        ),
+        pytest.param(
+            "cd /workspace/zulip && \\\n  cat zerver/models/realms.py",
+            ["zerver/models/realms.py"],
+            id="line-continuation",
+        ),
+        pytest.param(
+            "cat a/first.py\r\ncat b/second.py",
+            ["a/first.py", "b/second.py"],
+            id="crlf-line-endings",
+        ),
+        # A shell keyword occupies argv[0] and hides the command behind it.
+        pytest.param(
+            "if grep -q x a/first.py; then cat b/second.py; fi",
+            ["a/first.py", "b/second.py"],
+            id="if-then-fi",
+        ),
+        pytest.param(
+            "for f in 1 2; do cat a/first.py; done",
+            ["a/first.py"],
+            id="for-do-done",
+        ),
+        pytest.param("! cat a/first.py", ["a/first.py"], id="negation"),
+        pytest.param("{ cat a/first.py; }", ["a/first.py"], id="brace-group"),
+        # ANSI-C quoting: `$'…'` is a quoted string, not a `$` glued to one.
+        pytest.param("cat $'a/first.py'", ["a/first.py"], id="ansi-c-quoting"),
+        pytest.param(
+            "grep -q $'\\t' a/first.py", ["a/first.py"], id="ansi-c-tab-pattern"
+        ),
+        # `--` ends the options. Without it, a dash-shaped pattern reads as one
+        # more flag, `pattern_seen` never flips, and the *file* is swallowed as
+        # the pattern — the file vanishes entirely.
+        pytest.param(
+            "grep -- '--verbose' src/cli.py", ["src/cli.py"], id="end-of-options-dash-pattern"
+        ),
+        pytest.param(
+            "grep -rn -- -foo.py src/handler.go",
+            ["src/handler.go"],
+            id="end-of-options-filename-pattern",
+        ),
+        pytest.param("grep -- pat src/x.py", ["src/x.py"], id="end-of-options-plain-pattern"),
+        pytest.param("cat -- src/normal.py", ["src/normal.py"], id="end-of-options-cat"),
+    ],
+)
+def test_bash_read_files_recovers_hidden_reads(
+    tmp_path: Path, command: str, expected: list[str]
+) -> None:
+    assert _bash_files(tmp_path, command) == expected
+
+
+# ---------------------------------------------------------------------------
+# False positives: text that is *not* a read but looks like a path. Latent on
+# today's corpus (none of them collide with a required file), but each would
+# inflate a Bash arm the moment a trial searched for a filename that happens to
+# be a required file — so they are removed rather than tracked.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        # A here-doc body is content the agent WROTE, not a file it read.
+        pytest.param("cat <<'EOF'\nsrc/fake.py\nEOF", [], id="heredoc-body"),
+        pytest.param("cat <<-EOF\n\tsrc/fake.py\n\tEOF", [], id="heredoc-dash-body"),
+        pytest.param("cat <<< src/fake.py", [], id="here-string"),
+        # A search pattern is not a read, whether it arrives via -e/-f or as
+        # grep's first positional argument.
+        pytest.param("grep -e foo.py src/target.py", ["src/target.py"], id="grep-e-pattern"),
+        pytest.param(
+            "grep -f patterns.txt src/target.py", ["src/target.py"], id="grep-f-patternfile"
+        ),
+        pytest.param("grep utils.py src/target.py", ["src/target.py"], id="grep-positional-pattern"),
+        pytest.param("rg config.py src/target.py", ["src/target.py"], id="rg-positional-pattern"),
+        pytest.param("awk prog.awk src/target.py", ["src/target.py"], id="awk-positional-program"),
+        # A context/count flag takes a *separate* value. Miss that and the value
+        # is mistaken for the pattern, which promotes the real pattern into the
+        # file slot — inventing a read. Found by the corpus A/B, not by reading.
+        pytest.param(
+            "grep -A 3 utils.py src/target.py", ["src/target.py"], id="grep-context-flag-value"
+        ),
+        pytest.param(
+            "grep -m 5 config.py src/target.py", ["src/target.py"], id="grep-maxcount-flag-value"
+        ),
+        pytest.param(
+            "grep -n -A 5 '^lodash@' /workspace/lodash/yarn.lock",
+            ["/workspace/lodash/yarn.lock"],
+            id="grep-context-flag-real-corpus-shape",
+        ),
+        pytest.param(
+            "awk -F , prog.awk src/target.py", ["src/target.py"], id="awk-field-separator-value"
+        ),
+        # ...but with -e supplying the pattern, the first positional IS a file.
+        pytest.param(
+            "grep -e foo src/target.py", ["src/target.py"], id="grep-e-then-positional-is-file"
+        ),
+        # An unquoted `#` starts a comment; paths inside it were never read.
+        pytest.param(
+            "cat src/handler.go  # see also src/other.go",
+            ["src/handler.go"],
+            id="trailing-comment",
+        ),
+    ],
+)
+def test_bash_read_files_rejects_non_reads(
+    tmp_path: Path, command: str, expected: list[str]
+) -> None:
+    assert _bash_files(tmp_path, command) == expected
+
+
+# ---------------------------------------------------------------------------
+# The documented floor: shapes whose file set is decided by the filesystem or by
+# stdin, not by the command text. They are NOT statically recoverable, so they
+# extract to [] — a known, deliberate undercount, not a silent one. Recovering
+# them means reading the command's *output* from the trace (EnterpriseBench-jqyhg).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        pytest.param(
+            "find /workspace -name package.json | xargs grep -l lodash",
+            [],
+            id="xargs-files-from-stdin",
+        ),
+        pytest.param(
+            "grep -l lodash /workspace/jest/packages/*/package.json",
+            [],
+            id="unexpanded-glob",
+        ),
+        pytest.param(
+            "find src -name '*.py' -exec cat {} \\;",
+            [],
+            id="find-exec-placeholder",
+        ),
+        pytest.param(
+            "xargs -I{} grep -l foo {}",
+            [],
+            id="xargs-replace-placeholder",
+        ),
+    ],
+)
+def test_bash_read_files_known_floor(
+    tmp_path: Path, command: str, expected: list[str]
+) -> None:
+    # Asserting [] pins the floor: a future output-recovery pass should turn
+    # these into real files, and this test is where that change announces itself.
+    assert _bash_files(tmp_path, command) == expected
+
+
 def test_bash_redirect_target_still_counted(tmp_path: Path) -> None:
     # Pre-existing false positive, preserved deliberately: an output-redirect
     # target is counted as a read. Fixing it changes scoring on a different
@@ -575,6 +760,77 @@ def test_bash_redirect_target_still_counted(tmp_path: Path) -> None:
     assert _bash_files(tmp_path, "cat src/handler.go > /tmp/out.txt") == [
         "src/handler.go",
         "/tmp/out.txt",
+    ]
+
+
+def test_bash_heredoc_body_excluded_but_redirect_target_kept(tmp_path: Path) -> None:
+    # The two rules meet: the here-doc body is dropped (it was written, not
+    # read) while the redirect target stays counted (EnterpriseBench-qefr).
+    assert _bash_files(tmp_path, "cat <<'EOF' > out.txt\nsrc/fake.py\nEOF") == ["out.txt"]
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        # A substitution glued to literal text makes ONE word whose value the
+        # command text does not contain. Erasing the substitution and keeping
+        # the leftover literal invents a path the agent never opened — the same
+        # class of fabrication as crediting an unexpanded glob, and the exact
+        # thing the module's "no guessing" contract forbids. These are mainstream
+        # idioms, not corner cases.
+        pytest.param('cat "$(pwd)/config.py"', [], id="subst-prefix-quoted"),
+        pytest.param("cat $(pwd)/x.py", [], id="subst-prefix-bare"),
+        pytest.param("cat src/$(basename x).py", [], id="subst-infix"),
+        pytest.param("cat pre$(echo mid)post.py", [], id="subst-middle"),
+        pytest.param("cat `pwd`/x.py", [], id="subst-prefix-backtick"),
+        # ...but a read INSIDE the substitution is still real and still counted.
+        pytest.param("cat $(cat inner.py)/x.py", ["inner.py"], id="subst-inner-read-kept"),
+        # A substitution standing alone is a separate argument, not glued to
+        # anything: the words around it keep their own meaning.
+        pytest.param("echo $(cat x.py)", ["x.py"], id="subst-standalone"),
+        pytest.param("cat $(cmd) file.py", ["file.py"], id="subst-then-real-file"),
+        # Regression the fix buys back: the substitution occupies the pattern
+        # slot, so the file after it is a FILE. Erasing the substitution made
+        # grep read `f.py` as its pattern and the real read vanished.
+        pytest.param("grep $(get_pattern) f.py", ["f.py"], id="subst-as-grep-pattern"),
+    ],
+)
+def test_bash_substitution_adjacent_to_text_is_not_a_file(
+    command: str, expected: list[str]
+) -> None:
+    assert bash_read_files(command) == expected
+
+
+def test_bash_backtick_keeps_non_special_escapes() -> None:
+    # POSIX: inside backquotes a backslash keeps its literal value except before
+    # $, ` or \. Unescaping everything splits one escaped-space filename into
+    # two fabricated reads.
+    assert bash_read_files(r"echo `cat foo.txt\ bar.py`") == ["foo.txt bar.py"]
+
+
+def test_bash_fd_redirect_digits_are_not_files() -> None:
+    # `2>` is a redirect on fd 2, not the file "2"; `>&1` dups fd 1, not "1".
+    # Inert today only because a filter in another module drops extension-less
+    # candidates — bash_read_files promises paths, so it should not emit these.
+    assert bash_read_files("cat a.py 2>/dev/null") == ["a.py", "/dev/null"]
+    assert bash_read_files("cat a.py 2>&1") == ["a.py"]
+
+
+def test_bash_nested_find_exec_is_depth_bounded() -> None:
+    # `find -exec find -exec …` recurses through _program_read_files, which is
+    # the one path that does NOT re-enter bash_read_files — so before the guard
+    # moved there it climbed past _MAX_SUBST_DEPTH to Python's own recursion
+    # limit and raised. Extraction must be *total*: a scoring run reads whatever
+    # commands a model happened to emit, and one RecursionError aborts the whole
+    # batch rescore in iter_run_retrievals, not just the offending trial.
+    command = "find ." + " -exec find ." * 500 + " -exec cat x.py \\;" + " \\;" * 500
+    assert bash_read_files(command) == []  # bounded, and must not raise
+
+
+def test_bash_shallow_find_exec_still_reads() -> None:
+    # The bound must not cost the real shape it guards.
+    assert bash_read_files("find . -name '*.yaml' -exec grep -l db cfg.yaml \\;") == [
+        "cfg.yaml"
     ]
 
 

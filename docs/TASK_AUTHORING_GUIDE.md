@@ -166,6 +166,62 @@ printf '{"score": %s, "passed": %s, "reason": "Found %d/%d items"}\n' \
 - `reason`: human-readable explanation
 - Exit code is always 0 (errors are reported via the JSON)
 
+#### Scoring-integrity rules for check scripts
+
+The runner refuses to invent a verdict a verifier never gave: a score is recorded
+only if the verifier actually reached one. Absence of a verdict routes the task to
+`verifier_infra_error` (a re-run), never to a 0.0 — a false zero is
+indistinguishable from the agent genuinely getting the answer wrong, which
+silently corrupts results. Three rules follow:
+
+**Always print JSON.** A check script that exits without printing a JSON verdict
+is treated as an infra failure, not as a score. Do not rely on the exit code to
+mean pass or fail — the runner no longer reads it that way.
+
+The one exception is the agent's own artifact. Most checks read `answer.json`
+through a command substitution, so under `set -euo pipefail` an answer they
+cannot parse aborts them before their final `printf` — no verdict, and from the
+outside indistinguishable from a verifier that never ran. Treating that as infra
+would hand the agent a re-run for emitting garbage, so the runner checks the
+artifact itself: if `agent_output/answer.json` is not a JSON object, a check that
+dies with a nonzero exit is scored 0.0 and told why. Everything else — a missing
+command, a nonexistent interpreter, a check that exits 0 in silence — is still an
+infra error. An answer that *is* a JSON object is never short-circuited: your
+check does the judging, however wrong the contents.
+
+You do not need to defend against a malformed answer, then. You do still owe the
+reader a verdict for every failure you can describe better than the runner can:
+
+```bash
+if [[ ! -f "$ANSWER_FILE" ]]; then
+  printf '{"score": 0.0, "passed": false, "detail": "no answer.json"}\n'
+  exit 1
+fi
+```
+
+**Probe optional tools with `command -v`, never by running them.** The runner
+installs a `command_not_found_handle` in every verifier shell, so *any* command
+bash cannot find marks the checkpoint as never-run — even one whose failure your
+script recovers from. `command -v` is a bash builtin and does not trip it.
+
+```bash
+if command -v helm >/dev/null 2>&1; then   # correct
+  ...
+else
+  ...                                       # fall back
+fi
+
+if helm version >/dev/null 2>&1; then      # WRONG: a missing helm now
+  ...                                       # fails the whole checkpoint as infra
+fi
+```
+
+**Never swallow an interpreter failure.** `if python3 ... 2>/dev/null` turns "the
+image has no python3" into a clean-looking `{"score": 0.0}`. The runner preflights
+the interpreters your scripts reference and refuses to score when one is missing,
+but write the check as though it will run — do not paper over a broken image with
+a fallback branch that scores the agent.
+
 ### 6. Validate
 
 Run the schema validator to check your task.toml:

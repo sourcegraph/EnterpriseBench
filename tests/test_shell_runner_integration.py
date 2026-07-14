@@ -50,11 +50,21 @@ class TestCrossRepoRunnerScript:
 
 
 def _make_patched_runner(tmp_path: Path, workspace: Path) -> Path:
-    """Create a copy of test_runner.sh with WORKSPACE pointed at tmp workspace."""
-    original = TEST_RUNNER.read_text()
-    patched = original.replace('WORKSPACE="/workspace"', f'WORKSPACE="{workspace}"')
-    runner = tmp_path / "test_runner_patched.sh"
-    runner.write_text(patched)
+    """A wrapper that runs the REAL test_runner.sh against a temp workspace.
+
+    Points the runner at ``workspace`` through the WORKSPACE env var it honours,
+    rather than string-patching a copy of its source. Source-patching silently
+    no-ops the moment the matched line is reworded — the tests then score
+    against the real ``/workspace`` and fail for reasons unrelated to the change
+    that reworded it. This also means the tests exercise the runner that ships,
+    not a mutated copy of it.
+    """
+    runner = tmp_path / "run_test_runner.sh"
+    runner.write_text(
+        "#!/usr/bin/env bash\n"
+        f'export WORKSPACE="{workspace}"\n'
+        f'exec bash "{TEST_RUNNER}" "$@"\n'
+    )
     runner.chmod(runner.stat().st_mode | stat.S_IEXEC)
     return runner
 

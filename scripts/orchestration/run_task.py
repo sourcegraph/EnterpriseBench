@@ -24,7 +24,7 @@ import time
 from typing import Optional
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -104,9 +104,113 @@ class TaskRunConfig:
     min_disk_gb: float = 10.0
 
 
-# Status marker for runs that must not be scored (e.g. MCP pre-flight
-# failure): the run is routed to the infra-error re-run channel.
+# Status marker for runs that must not be scored (e.g. MCP pre-flight failure,
+# a broken grading-asset seal). Whether such a run is re-runnable is decided by
+# failure_class, not by this marker: verifier_infra_error earns a fresh attempt,
+# integrity_violation never does.
 RUN_STATUS_INVALID = "invalid"
+
+# The directory holding both the agent's tree and the grading assets. It must be
+# root-owned so the agent cannot unlink/rename the sealed entries inside it.
+WORKSPACE_DIR = "/workspace"
+
+# The grader, the answer key, and the harness the checks import. The agent under
+# test has no legitimate need for any of them (no task instruction references
+# them), so they are sealed root-only rather than merely read-only: that closes
+# the ground_truth.json read leak as well as the tamper vector.
+VERIFIER_DIR = f"{WORKSPACE_DIR}/.verifiers"
+TASK_DIR = f"{WORKSPACE_DIR}/.task"
+EB_VERIFY_DIR = f"{WORKSPACE_DIR}/.eb_verify"
+TEST_SH = f"{WORKSPACE_DIR}/test.sh"
+GROUND_TRUTH = f"{TASK_DIR}/ground_truth.json"
+GRADING_PATHS = [VERIFIER_DIR, TASK_DIR, EB_VERIFY_DIR, TEST_SH]
+
+# Pre-quoted for the `for f in ...` loops that seal and re-verify these paths.
+_GRADING_PATHS_SH = " ".join(shlex.quote(p) for p in GRADING_PATHS)
+
+# The two things the agent legitimately owns. instruction.md is deliberately NOT
+# a grading asset: the s58f readability gate depends on the agent reading it.
+AGENT_INSTRUCTION = f"{WORKSPACE_DIR}/instruction.md"
+AGENT_OUTPUT_DIR = f"{WORKSPACE_DIR}/agent_output"
+
+# Phases whose scores cannot be trusted. The judge is skipped for these (there
+# is nothing trustworthy left to put a ceiling on), and none of them may be
+# overwritten with phase="complete", success=True at save time. agent_infra_error
+# is scoreable-but-failed, so it blocks the save override without blocking the
+# judge — hence two sets rather than one.
+UNTRUSTED_SCORE_PHASES = frozenset({"verifier_infra_error", "integrity_violation"})
+NON_COMPLETE_PHASES = UNTRUSTED_SCORE_PHASES | {"agent_infra_error"}
+
+# The grader's identity. Scoring must not run as the agent (it would own the
+# grader) and must not run as root either: several checks execute code the agent
+# controls, BY DESIGN — pytest auto-loads a planted /workspace/conftest.py, git
+# runs a .gitattributes-selected textconv driver, and check_test_fails.sh runs
+# the agent's own test suite. A root grader turns any of those into a rewrite of
+# the root-owned seal for a not-yet-run checkpoint, forging the very score the
+# seal exists to protect.
+#
+# So the grading assets are owned by root and *read* by a third identity that
+# runs the checks. It can execute the grader; it cannot modify it. Agent code
+# that executes during scoring therefore gains an unprivileged uid with no path
+# back to the verifiers, the answer key, or the harness.
+SCORING_USER = "ebscorer"
+SCORING_GROUP = "ebscorer"
+SCORING_UID = 2000
+
+# Root-owned, scorer-unwritable cwd for the scoring exec. Ownership alone would
+# not close the hole: the checks shell out to `python3 -c`, whose sys.path[0] is
+# the cwd, so scoring from agent-owned /workspace lets a planted
+# /workspace/json.py hijack the grader. The cwd must stay unwritable by the
+# scoring user too, or planted code would simply hijack the *next* check's
+# import from there.
+SCORING_WORKDIR = "/opt/eb_scoring"
+
+# The one scorer-writable path: test_runner.sh's results file. Deliberately NOT
+# the cwd (see above) and deliberately not under /workspace, which is sealed
+# shut for the scoring window.
+SCORING_OUT_DIR = f"{SCORING_WORKDIR}/out"
+SCORING_RESULTS_FILE = f"{SCORING_OUT_DIR}/results.json"
+
+# /workspace during the agent's session: root-owned + sticky, world-writable so
+# the agent can create its own artifacts (it cannot unlink root-owned entries).
+WORKSPACE_MODE_SESSION = "1777"
+# /workspace during the scoring window: the agent is no longer running, so
+# nothing legitimate creates entries here. Closing the write bit denies planted
+# code, executing as the scorer, the one shared drop point it could use to plant
+# an answer artifact for a later checkpoint after reading the answer key.
+WORKSPACE_MODE_SCORING = "1755"
+
+# Git config for the scoring exec. The repos under /workspace are agent-owned
+# (cloned as USER agent), so git run by the scorer refuses them as "dubious
+# ownership" — which a check like chain-err-flask-import-001's `git diff ...
+# 2>/dev/null || true` silently swallows into a false "no code changes".
+# safe.directory fixes that, but it alone would let the agent's own repo-local
+# config execute code as the scorer (core.fsmonitor / core.hooksPath run
+# commands during `git diff`), which would hand the agent the grader by another
+# door. GIT_CONFIG_* env entries carry `git -c` precedence — above repo-local
+# config — so pinning those two knobs here neutralizes them. Verified: a planted
+# core.fsmonitor payload does not execute under this env.
+_GIT_SCORING_CONFIG = (
+    ("safe.directory", "*"),
+    ("core.fsmonitor", "false"),
+    ("core.hooksPath", "/dev/null"),
+)
+GIT_SCORING_ENV = " ".join(
+    [
+        "GIT_CONFIG_NOSYSTEM=1",
+        f"GIT_CONFIG_COUNT={len(_GIT_SCORING_CONFIG)}",
+        *(
+            f"GIT_CONFIG_KEY_{i}={shlex.quote(key)} "
+            f"GIT_CONFIG_VALUE_{i}={shlex.quote(value)}"
+            for i, (key, value) in enumerate(_GIT_SCORING_CONFIG)
+        ),
+    ]
+)
+
+# Where Claude Code writes session JSONL inside the container. The agent
+# controls this filesystem, so any trace path that claims to sit outside this
+# root is rejected rather than copied out.
+TRACE_ROOT = "/home/agent/.claude/projects"
 
 
 @dataclass
@@ -434,12 +538,41 @@ def _build_instruction_text(
 def _chown_to_agent(container_id: str, paths: list[str]) -> None:
     """chown the given container paths to agent:agent (recursively), as root.
 
+    This is the ONLY sanctioned way to grant the agent ownership of anything in
+    the container, because it is the one place that can refuse: handing the agent
+    the workspace root, a grading asset, or any parent of one puts the grader
+    back in the hands of the party being graded (bead EnterpriseBench-8krz5).
+    Two separate call sites did exactly that before the seal, so the invariant is
+    enforced here rather than trusted to every future caller.
+
     Only paths that exist are chowned (missing ones are skipped, not treated as
     errors — some are created by later steps). A genuine chown failure is logged
     loudly, never silently swallowed: a swallowed failure is what produced
     unreadable instruction.md / .mcp.json files and fake-0 no-op runs
     (bead EnterpriseBench-s58f).
+
+    Raises:
+        ValueError: if any path would grant the agent ownership of a grading
+            asset, or of a directory it could unlink one from.
     """
+    for path in paths:
+        target = PurePosixPath(path)
+        for sealed in GRADING_PATHS:
+            sealed_path = PurePosixPath(sealed)
+            # Refuse the asset itself, anything under it (a single check script,
+            # ground_truth.json), and any ancestor — chowning a parent hands the
+            # agent the write bit it needs to unlink the sealed entry out of it.
+            if (
+                target == sealed_path
+                or target.is_relative_to(sealed_path)
+                or sealed_path.is_relative_to(target)
+            ):
+                raise ValueError(
+                    f"refusing to chown {path} to agent: it is, contains, or sits "
+                    f"inside the sealed grading asset {sealed} — the agent under "
+                    "test must never own the grader (bead EnterpriseBench-8krz5)"
+                )
+
     quoted = " ".join(shlex.quote(p) for p in paths)
     script = (
         f"rc=0; for f in {quoted}; do "
@@ -455,6 +588,342 @@ def _chown_to_agent(container_id: str, paths: list[str]) -> None:
         )
 
 
+def _seal_grading_assets(container_id: str) -> None:
+    """Seal the grading assets: owned by root, read by the scorer, agent locked out.
+
+    The agent under test previously owned its own verifiers, ground truth and
+    harness library, so it could overwrite a check with a forged verdict, read
+    the answer key, or delete the harness to convert a scored 0.0 into a free
+    re-run (beads EnterpriseBench-8krz5, -g5k5s).
+
+    Three parties, three privileges, and no two of them collapse into one:
+
+      root         owns the assets; the only identity that can modify them
+      SCORING_USER runs the checks; reads and executes the assets, writes none
+      agent        no access at all
+
+    That split is what makes the seal survive code execution during scoring:
+    some checks run agent-controlled code by design, so the identity running
+    them is assumed compromised, and the assets must not be writable by it.
+
+    Also hardens /workspace itself and creates the scoring cwd, so the scoring
+    exec never starts in a directory the agent — or the scorer — can write to.
+
+    Raises:
+        RuntimeError: if the seal cannot be applied. An unsealed run is
+            unscoreable, so this fails loud rather than silently producing a
+            number nobody can trust (the s58f masked-chown lesson).
+    """
+    # /workspace becomes root-owned + sticky + world-writable, exactly like /tmp.
+    # Sealing the assets alone is not enough: POSIX governs unlink/rename by the
+    # PARENT directory's write bit, so an agent-owned /workspace lets the agent
+    # move a sealed file aside and drop in a forgery without ever writing to it.
+    # Sticky alone does not close it either — sticky still permits the DIRECTORY's
+    # owner to unlink — so ownership must move to root as well. 1777 keeps the
+    # agent able to create and delete its OWN entries.
+    #
+    # `useradd` is guaranteed present: the image built the agent user with it
+    # (dockerfile_generator). The -u/-g variants fall back to auto-allocated ids
+    # if 2000 is already taken in some base image; _assert_scoring_identity is
+    # what decides whether whatever we ended up with is actually safe.
+    script = (
+        f"set -e; "
+        f"if ! id -u {shlex.quote(SCORING_USER)} >/dev/null 2>&1; then "
+        f"  groupadd -g {SCORING_UID} {shlex.quote(SCORING_GROUP)} 2>/dev/null "
+        f"    || groupadd {shlex.quote(SCORING_GROUP)}; "
+        f"  useradd -u {SCORING_UID} -g {shlex.quote(SCORING_GROUP)} -M -s /bin/bash "
+        f"    {shlex.quote(SCORING_USER)} 2>/dev/null "
+        f"    || useradd -g {shlex.quote(SCORING_GROUP)} -M -s /bin/bash "
+        f"    {shlex.quote(SCORING_USER)}; "
+        f"fi; "
+        f"mkdir -p {shlex.quote(SCORING_OUT_DIR)}; "
+        f"chown root:root {shlex.quote(SCORING_WORKDIR)}; "
+        f"chmod 755 {shlex.quote(SCORING_WORKDIR)}; "
+        f"chown root:{shlex.quote(SCORING_GROUP)} {shlex.quote(SCORING_OUT_DIR)}; "
+        f"chmod 770 {shlex.quote(SCORING_OUT_DIR)}; "
+        f"chown root:root {shlex.quote(WORKSPACE_DIR)}; "
+        f"chmod {WORKSPACE_MODE_SESSION} {shlex.quote(WORKSPACE_DIR)}; "
+        f"for f in {_GRADING_PATHS_SH}; do "
+        f'if [ -e "$f" ]; then chown -R root:{shlex.quote(SCORING_GROUP)} "$f"; '
+        'chmod -R u=rwX,g=rX,o= "$f"; fi; '
+        "done"
+    )
+    result = _docker_exec(container_id, ["bash", "-c", script], user="root")
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"failed to seal grading assets {GRADING_PATHS}: "
+            f"{result.stderr.strip() or 'unknown error'}"
+        )
+    logger.info(
+        "Sealed grading assets root-owned, %s-readable, agent-inaccessible: %s",
+        SCORING_USER,
+        ", ".join(GRADING_PATHS),
+    )
+
+
+def _assert_grading_assets_sealed(container_id: str) -> tuple[bool, str]:
+    """Verify the agent could not have tampered with, or read, the grader.
+
+    Returns (ok, error_message). Checks three independent breaches: a /workspace
+    the agent could unlink/rename the sealed entries out of, any grading path
+    that is not root-owned or is group/other-writable, and a ground truth the
+    agent user can read. Cheap enough to re-run immediately before scoring, which
+    is what makes a reused or hand-modified container fail loud instead of
+    producing a forged score.
+    """
+    # The parent must be root-owned and sticky, else the sealed entries can be
+    # renamed or unlinked wholesale regardless of their own mode.
+    parent = _docker_exec(
+        container_id,
+        ["bash", "-c", f"find {shlex.quote(WORKSPACE_DIR)} -maxdepth 0 "
+                       "\\( ! -user root -o ! -perm -1000 \\) -print"],
+        user="root",
+    )
+    if parent.returncode != 0:
+        return False, (
+            f"could not verify the {WORKSPACE_DIR} seal: "
+            f"{parent.stderr.strip() or 'unknown error'}"
+        )
+    if parent.stdout.strip():
+        return False, (
+            f"{WORKSPACE_DIR} is agent-owned or not sticky — the agent can "
+            "unlink/rename the sealed grading assets out of it"
+        )
+
+    # A MISSING grading asset is a breach, not a pass. _setup_container creates
+    # all four unconditionally, so absence at scoring time means something
+    # removed them. Skipping absent paths would fail OPEN: a deleted test.sh
+    # yields empty verifier output, which guard_verifier_output classifies as a
+    # verifier_infra_error — handing the saboteur the re-run mulligan this seal
+    # exists to deny (bead g5k5s).
+    script = (
+        f"for f in {_GRADING_PATHS_SH}; do "
+        'if [ ! -e "$f" ]; then echo "MISSING:$f"; '
+        'else find "$f" \\( ! -user root -o -perm /go+w \\) -print; fi; '
+        "done"
+    )
+    result = _docker_exec(container_id, ["bash", "-c", script], user="root")
+    if result.returncode != 0:
+        return False, (
+            f"could not verify the grading-asset seal: "
+            f"{result.stderr.strip() or 'unknown error'}"
+        )
+    breached = result.stdout.strip()
+    if breached:
+        return False, (
+            "grading assets are missing, agent-owned, or agent-writable: "
+            + ", ".join(breached.splitlines())
+        )
+
+    if _can_read(container_id, GROUND_TRUTH, user="agent"):
+        return False, f"{GROUND_TRUTH} is readable by the agent user"
+
+    identity_ok, identity_err = _assert_scoring_identity(container_id)
+    if not identity_ok:
+        return False, identity_err
+
+    # The mirror image of the seal: assets the scorer cannot READ score every
+    # checkpoint 0.0 with no crash and no diagnostic — a silent false zero, the
+    # same failure class as the ${1:-.} workspace bug this seal already caused
+    # once. A seal that grades everything 0.0 is not a seal, it is an outage.
+    for path in (TEST_SH, GROUND_TRUTH, VERIFIER_DIR, EB_VERIFY_DIR):
+        if not _can_read(container_id, path, user=SCORING_USER):
+            return False, (
+                f"{path} is not readable by the {SCORING_USER} user — every "
+                "checkpoint would score a false 0.0"
+            )
+
+    return True, ""
+
+
+def _assert_scoring_identity(container_id: str) -> tuple[bool, str]:
+    """Verify the identity that will run the checks cannot rewrite them.
+
+    The seal is only worth the identity that runs against it. Scoring as root
+    voids it outright (root ignores the mode bits it just set), and scoring as
+    the agent hands the grader to the graded. Both were live: the first shipped
+    in the original seal, the second is the bug the seal was written for.
+
+    Returns (ok, error_message).
+    """
+    scoring_user = shlex.quote(SCORING_USER)
+    script = (
+        f"suid=$(id -u {scoring_user} 2>/dev/null) "
+        f'|| {{ echo "the {SCORING_USER} user does not exist"; exit 0; }}; '
+        f'[ "$suid" = "0" ] && echo "the scoring user is root — it can rewrite '
+        f'the sealed grading assets it is grading against"; '
+        f"auid=$(id -u agent 2>/dev/null) || true; "
+        f'[ -n "$auid" ] && [ "$suid" = "$auid" ] '
+        f'&& echo "the scoring user IS the agent user — the graded party owns the grader"; '
+        f"id -nG agent 2>/dev/null | tr ' ' '\\n' | grep -qx {shlex.quote(SCORING_GROUP)} "
+        f'&& echo "the agent belongs to the {SCORING_GROUP} group — it can read the answer key"; '
+        "exit 0"
+    )
+    # workdir="/": who the grader IS is a property of the container, not of the
+    # workspace. Probing from /workspace would make this gate fail closed for a
+    # reason that has nothing to do with the identity it is checking.
+    result = _docker_exec(
+        container_id, ["bash", "-c", script], user="root", workdir="/"
+    )
+    if result.returncode != 0:
+        return False, (
+            f"could not verify the scoring identity: "
+            f"{result.stderr.strip() or 'unknown error'}"
+        )
+    breached = result.stdout.strip()
+    if breached:
+        return False, "unsafe scoring identity: " + "; ".join(breached.splitlines())
+    return True, ""
+
+
+def _reap_agent_processes(container_id: str) -> None:
+    """Kill every agent-owned process before scoring, except PID 1.
+
+    The seal denies the agent USER any write to the grader. It does not, on its
+    own, stop a process the agent LEFT RUNNING. A check that runs agent code as
+    the unprivileged scorer (pytest loading a planted conftest.py) can read the
+    answer key — legitimately, the checks need it — and hand it to a lingering
+    agent-owned daemon (`setsid … &` survives the `docker exec -u agent` that
+    started the session). That daemon still owns the agent's answer files, which
+    the workspace close leaves owner-writable, so it can rewrite the answer a
+    later checkpoint grades. Killing it removes the only identity that can write
+    a checkpoint-read path during the scoring window (the scorer cannot: the
+    answer tree is agent-owned and the workspace is closed).
+
+    PID 1 is the container's `sleep infinity`, itself running as agent; killing
+    it would stop the container mid-score, so it is spared. Enumeration is via
+    /proc so no `ps`/`pgrep` need exist in the image.
+
+    Raises:
+        RuntimeError: if agent processes cannot be enumerated. Scoring beside a
+            live agent process is not a trustworthy measurement, so this fails
+            loud rather than leaving the injection window open.
+
+    Residual (bead EnterpriseBench-8krz5, fix-candidate-3): a single reap pass
+    cannot outrace a respawner rooted at the un-killable PID 1, and it does not
+    touch the answer key an earlier chain session may already have copied to a
+    persistent drop point outside /workspace. The durable boundary is a separate
+    scoring container that never shares a filesystem, or GT, with the agent.
+    """
+    # stat -c %u on /proc/<pid> yields the process's real uid. Two wrinkles:
+    #  - Killing a parent orphans its children onto PID 1, which as `sleep
+    #    infinity` never wait()s, so one pass is not enough AND every process we
+    #    kill becomes a permanent ZOMBIE whose /proc entry still shows agent's
+    #    uid. A zombie cannot write, so it is not a live writer — the scan skips
+    #    state Z (field after the last ')' in /proc/<pid>/stat) or the run would
+    #    fail closed forever on the corpses of the processes it just reaped.
+    #  - So the loop re-kills the live (non-zombie) agent set until a scan finds
+    #    none. A benign orphan clears within a couple of passes; only a genuine
+    #    respawn loop rooted at the un-killable PID 1 survives all of them, and
+    #    that residual (fix-candidate-3) is what the caller fails closed on.
+    script = (
+        "set -u; "
+        "auid=$(id -u agent) || exit 3; "
+        # is_live_agent <pid> -> 0 if a killable agent-owned process
+        "is_live_agent() { "
+        '  [ "$1" = 1 ] && return 1; '
+        '  [ "$(stat -c %u /proc/$1 2>/dev/null)" = "$auid" ] || return 1; '
+        "  st=$(cat /proc/$1/stat 2>/dev/null) || return 1; "
+        '  state=${st##*) }; state=${state%% *}; '
+        '  [ "$state" = Z ] && return 1; '
+        "  return 0; }; "
+        "count_live() { c=0; for d in /proc/[0-9]*; do "
+        "  is_live_agent ${d#/proc/} && c=$((c+1)); done; echo $c; }; "
+        "for attempt in 1 2 3 4 5 6 7 8; do "
+        "  for d in /proc/[0-9]*; do "
+        "    is_live_agent ${d#/proc/} && kill -9 ${d#/proc/} 2>/dev/null || true; "
+        "  done; "
+        '  [ "$(count_live)" = 0 ] && break; '
+        "  sleep 0.2; "
+        "done; "
+        'echo "agent_procs_remaining=$(count_live)"'
+    )
+    result = _docker_exec(container_id, ["bash", "-c", script], user="root", workdir="/")
+    if result.returncode != 0:
+        raise RuntimeError(
+            "could not reap agent processes before scoring: "
+            f"{result.stderr.strip() or 'unknown error'}"
+        )
+    remaining = result.stdout.strip()
+    if remaining != "agent_procs_remaining=0":
+        # A survivor is a live agent-identity writer during scoring — the exact
+        # gap this reap exists to close. Fail closed; do not score beside it.
+        raise RuntimeError(
+            "agent processes survived the pre-scoring reap "
+            f"({remaining or 'unknown'}) — an agent-owned writer is live during "
+            "the scoring window; refusing to score (bead EnterpriseBench-8krz5)"
+        )
+    logger.info("Reaped agent processes before scoring (none survived)")
+
+
+def _close_workspace_for_scoring(container_id: str) -> None:
+    """Leave the scorer nothing under /workspace to write.
+
+    The seal stops planted code from rewriting the grader. On its own it does not
+    stop it from writing an *answer*: the checks must read ground_truth.json, so
+    code executing as the scorer can read it too, and any scorer-writable path a
+    later checkpoint reads back is then a forge vector. Agent-owned is NOT the
+    same as scorer-can't-write — the agent picks the modes on its own files and
+    can leave a 0777 directory behind for exactly this purpose.
+
+    So, for the scoring window: close /workspace itself, and drop the group/other
+    write bit anywhere under it the agent opened one. Owner bits are untouched,
+    so the agent keeps full access to its own tree in a later chain session. The
+    cost is one metadata traversal; only the (rare) offending entries are
+    written, so this is not the `chown -R /workspace` that is too slow to do.
+
+    Raises:
+        RuntimeError: if the lock cannot be applied. Scoring into a workspace the
+            grader can write is not a measurement.
+    """
+    script = (
+        f"set -e; "
+        f"chmod {WORKSPACE_MODE_SCORING} {shlex.quote(WORKSPACE_DIR)}; "
+        f"find {shlex.quote(WORKSPACE_DIR)} -mindepth 1 -xdev "
+        f"\\( -type d -o -type f \\) -perm /go+w -exec chmod go-w {{}} +"
+    )
+    result = _docker_exec(container_id, ["bash", "-c", script], user="root", timeout=300)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"failed to close {WORKSPACE_DIR} for scoring: "
+            f"{result.stderr.strip() or 'unknown error'}"
+        )
+
+
+def _reopen_workspace_for_agent(container_id: str) -> None:
+    """Give the agent back its write access to /workspace after scoring.
+
+    Chain tasks score between sessions and hand the same container back to the
+    agent afterwards (chain_runner), so the scoring lock must not outlive the
+    scoring window. Best-effort by design: the score is already computed, and
+    failing the run here would throw away a sound measurement over a container
+    the caller may be about to discard. Logged loudly, never swallowed.
+    """
+    result = _docker_exec(
+        container_id,
+        ["chmod", WORKSPACE_MODE_SESSION, WORKSPACE_DIR],
+        user="root",
+    )
+    if result.returncode != 0:
+        logger.error(
+            "failed to reopen %s for the agent after scoring (a chain's next "
+            "session may be unable to write): %s",
+            WORKSPACE_DIR,
+            result.stderr.strip() or "unknown error",
+        )
+
+
+def _can_read(container_id: str, path: str, user: str) -> bool:
+    """Whether `user` can read `path` inside the container.
+
+    Three trust gates hinge on this one probe, in opposing directions: the agent
+    MUST be able to read its instruction file, MUST NOT be able to read the
+    answer key, and the scorer MUST be able to read the grader it runs.
+    """
+    check = _docker_exec(container_id, ["test", "-r", path], timeout=30, user=user)
+    return check.returncode == 0
+
+
 def _assert_agent_readable(container_id: str, paths: list[str]) -> tuple[bool, str]:
     """Verify the AGENT user can read each path inside the container.
 
@@ -464,10 +933,7 @@ def _assert_agent_readable(container_id: str, paths: list[str]) -> tuple[bool, s
     (bead EnterpriseBench-s58f).
     """
     for path in paths:
-        check = _docker_exec(
-            container_id, ["test", "-r", path], timeout=30, user="agent"
-        )
-        if check.returncode != 0:
+        if not _can_read(container_id, path, user="agent"):
             return False, (
                 f"agent user cannot read {path} "
                 "(EACCES or missing) — run is INVALID, not a real 0.0 score"
@@ -650,16 +1116,8 @@ def _setup_container(
     # _configure_mcp; agent_output is created by the agent step — both are
     # intentionally omitted here (s58f design intent: don't chown stale
     # leftovers from a reused container).
-    _chown_to_agent(
-        container_id,
-        [
-            "/workspace/instruction.md",
-            "/workspace/.verifiers",
-            "/workspace/.task",
-            "/workspace/.eb_verify",
-            "/workspace/test.sh",
-        ],
-    )
+    _chown_to_agent(container_id, [AGENT_INSTRUCTION])
+    _seal_grading_assets(container_id)
 
 
 def _install_claude_cli(container_id: str) -> bool:
@@ -701,21 +1159,24 @@ def _install_claude_cli(container_id: str) -> bool:
             logger.error("Failed to install Claude Code CLI: %s", result.stderr)
             return False
 
-    # Ensure non-root agent user exists and owns key output dirs.
+    # Ensure the non-root agent user exists and owns its own output dirs.
     # Images built with the updated dockerfile_generator already have the agent
-    # user owning /workspace (USER agent before git clone), so cloned repos are
-    # correctly owned. For older images we still create the user and fix up
-    # output dirs only (never chown -R on /workspace — too slow for large repos).
+    # user owning the cloned repos (USER agent before git clone). For older images
+    # we still create the user and fix up output dirs only — never chown -R on
+    # /workspace, which is both too slow for large repos and would hand the agent
+    # the grading assets sealed inside it.
     _docker_exec(
         container_id,
         [
             "bash",
             "-c",
             "id agent >/dev/null 2>&1 || useradd -m -s /bin/bash agent; "
-            "mkdir -p /workspace/agent_output /workspace/.task /workspace/.verifiers; "
-            "chown -R agent:agent /home/agent /workspace/agent_output /workspace/.task /workspace/.verifiers",
+            f"mkdir -p {shlex.quote(AGENT_OUTPUT_DIR)}",
         ],
     )
+    # Routed through the guarded helper rather than an inline `chown -R` so a
+    # grading asset can never be re-granted to the agent from here again.
+    _chown_to_agent(container_id, ["/home/agent", AGENT_OUTPUT_DIR])
 
     # Final verification
     ver = _docker_exec(container_id, ["claude", "--version"])
@@ -865,21 +1326,158 @@ def _route_verifier_infra_error(result: "TaskRunResult", scores: dict) -> None:
     )
 
 
+def _route_integrity_violation(result: "TaskRunResult", scores: dict) -> None:
+    """Route a broken grading-asset seal to the INVALID (never-scored) channel.
+
+    Deliberately NOT the ``verifier_infra_error`` re-run channel: that channel
+    grants a fresh attempt, which would make sabotaging the harness a free
+    mulligan — exactly the incentive inversion in bead EnterpriseBench-g5k5s.
+    A tampered run is invalid and stays invalid.
+    """
+    violation = scores.get("integrity_violation")
+    if not violation:
+        return
+    result.failure_class = "integrity_violation"
+    result.phase = "integrity_violation"
+    result.status = RUN_STATUS_INVALID
+    result.success = False
+    logger.error(
+        "GRADING ASSET INTEGRITY VIOLATION (%s): %s",
+        violation.get("reason", "?"),
+        violation.get("detail", ""),
+    )
+
+
+def _route_zero_mcp_run(result: "TaskRunResult", mode: str) -> None:
+    """Record MCP usage for an MCP-mode run, and gate ``mcp_only`` on zero calls.
+
+    ``mcp_only`` is enforced only by a prompt preamble — local Read/Grep/Bash
+    stay available in the container. An ``mcp_only`` run that made 0 MCP calls
+    therefore delivered *baseline* tool access under an MCP label; scoring it
+    into the mcp_only mean contaminates every MCP-vs-baseline comparison. Route
+    it to the infra-error re-run channel instead.
+
+    ``hybrid`` grants both toolsets by design, so 0 MCP calls there is a
+    legitimate agent choice, not an infra failure: it is flagged and still
+    scored. Gating it would drop exactly the runs where the agent preferred
+    local tools and bias the hybrid arm upward.
+
+    The gate is zero-vs-nonzero only. It catches a run that used no MCP at all;
+    it does not make the arm clean, since an ``mcp_only`` run that made one MCP
+    call and 300 local ones still passes.
+    """
+    if mode not in ("mcp_only", "hybrid"):
+        return
+
+    mcp_calls = result.tool_usage.get("mcp_tool_calls", 0)
+    result.tool_usage["mcp_used"] = mcp_calls > 0
+
+    if mcp_calls > 0:
+        logger.info("Agent made %d MCP tool calls", mcp_calls)
+        return
+
+    if mode == "hybrid":
+        logger.warning(
+            "mode=hybrid but agent made 0 MCP tool calls — flagged as a "
+            "local-tools run, still scored"
+        )
+        return
+
+    result.status = RUN_STATUS_INVALID
+    result.phase = "agent_infra_error"
+    result.success = False
+
+    if result.failure_class is not None:
+        # An OOM kill, a timeout, a crashed agent or a broken MCP config all
+        # produce 0 MCP calls as a *symptom*. Relabelling the run
+        # infra_mcp_unused would bury the actual cause and send triage chasing
+        # a phantom MCP problem, so keep the more specific classification.
+        logger.info(
+            "mode=mcp_only with 0 MCP tool calls, but the run already failed "
+            "as %s — keeping that classification",
+            result.failure_class,
+        )
+        return
+
+    reason = (
+        "mode=mcp_only but the agent made 0 MCP tool calls: the run had "
+        "baseline tool access under an MCP label, so it is not a valid MCP "
+        "measurement. Recorded as infra error for re-run."
+    )
+    logger.error(reason)
+    result.failure_class = "infra_mcp_unused"
+    result.error = reason
+
+
+def _record_agent_trace(
+    result: "TaskRunResult", container_id: str, output_dir: Path
+) -> None:
+    """Copy the conversation trace and record whether it landed.
+
+    The capture result is what any trace-based audit (retrieval recall, tool
+    telemetry) rests on, so a missing trace has to be visible on the artifacts
+    rather than passing silently.
+    """
+    result.tool_usage["trace_captured"] = _copy_agent_trace(container_id, output_dir)
+    if not result.tool_usage["trace_captured"]:
+        logger.warning(
+            "No agent trace captured — trace-derived metrics for this run are "
+            "unavailable, not zero"
+        )
+
+
 def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
-    """Run /workspace/test.sh and capture the JSON results."""
+    """Run /workspace/test.sh and capture the JSON results.
+
+    Refuses to run at all if the grading-asset seal is broken: a verifier the
+    agent could have rewritten produces a number, not a measurement.
+    """
+    sealed, seal_err = _assert_grading_assets_sealed(container_id)
+    if not sealed:
+        return {
+            "task_score": 0.0,
+            "all_passed": False,
+            "integrity_violation": {
+                "reason": "grading_assets_tampered",
+                "detail": seal_err,
+            },
+        }
+
     logger.info("Running checkpoint verifiers (timeout=%ds)...", verifier_timeout)
 
-    result = _docker_exec(
-        container_id,
-        [
-            "bash",
-            "-c",
-            "export WORKSPACE=/workspace TASK_DIR=/workspace/.task "
-            "PYTHONPATH=/workspace/.eb_verify:${PYTHONPATH:-}; "
-            "bash /workspace/test.sh",
-        ],
-        timeout=verifier_timeout,
-    )
+    # Scoring runs as SCORING_USER from a cwd neither it nor the agent can write.
+    # Not as `agent` (the image ends with `USER agent`, so an exec without -u
+    # would run the grader as the very user it is grading) and not as root: the
+    # checks execute agent-controlled code by design, and a root grader turns
+    # that into a rewrite of the seal. PYTHONSAFEPATH keeps the cwd off
+    # sys.path[0] on py>=3.11; the cwd being unwritable is what holds on older
+    # images. PYTHONDONTWRITEBYTECODE and the pytest cache opt-out keep the
+    # checks from *needing* the write access they no longer have in the
+    # now-closed workspace.
+    _reap_agent_processes(container_id)
+    _close_workspace_for_scoring(container_id)
+    try:
+        result = _docker_exec(
+            container_id,
+            [
+                "bash",
+                "-c",
+                f"export WORKSPACE={shlex.quote(WORKSPACE_DIR)} "
+                f"TASK_DIR={shlex.quote(TASK_DIR)} "
+                f"PYTHONPATH={shlex.quote(EB_VERIFY_DIR)}:${{PYTHONPATH:-}} "
+                f"HOME={shlex.quote(SCORING_WORKDIR)} "
+                f"EB_RESULTS_FILE={shlex.quote(SCORING_RESULTS_FILE)} "
+                f"PYTHONSAFEPATH=1 PYTHONDONTWRITEBYTECODE=1 "
+                f"PYTEST_ADDOPTS={shlex.quote('-p no:cacheprovider')} "
+                f"{GIT_SCORING_ENV}; "
+                f"bash {shlex.quote(TEST_SH)}",
+            ],
+            timeout=verifier_timeout,
+            workdir=SCORING_WORKDIR,
+            user=SCORING_USER,
+        )
+    finally:
+        _reopen_workspace_for_agent(container_id)
 
     # test.sh outputs JSON to stdout, diagnostics to stderr
     if result.stderr:
@@ -1096,12 +1694,16 @@ def _save_results(
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Derived once so the two artifacts below cannot disagree.
+    status = _effective_status(result)
+
     # --- results.json (backward compatible) ---
     results_path = output_dir / "results.json"
     payload = {
         "task_id": result.task_id,
         "success": result.success,
         "phase": result.phase,
+        "status": status,
         "error": result.error,
         "failure_class": result.failure_class,
         "image_tag": result.image_tag,
@@ -1144,6 +1746,7 @@ def _save_results(
         "task_id": result.task_id,
         "success": result.success,
         "phase": result.phase,
+        "status": status,
         "error": result.error,
         "failure_class": result.failure_class,
         "timing": result.timing,
@@ -1460,6 +2063,10 @@ def _extract_tool_usage(output_dir: Path) -> dict:
     if not content.strip():
         return usage
 
+    # Counted on the raw log, before the format branch below: the count must
+    # not depend on --output-format, since the zero-MCP gate reads it.
+    usage["mcp_tool_calls"] = content.count("mcp__sourcegraph__")
+
     # Claude Code --output-format json produces a JSON object on stdout.
     # Try to parse the entire output as JSON first.
     try:
@@ -1492,10 +2099,57 @@ def _extract_tool_usage(output_dir: Path) -> dict:
         except (json.JSONDecodeError, ValueError):
             continue
 
-    # Count MCP tool calls by scanning for mcp__sourcegraph in the raw log
-    usage["mcp_tool_calls"] = content.count("mcp__sourcegraph__")
-
     return usage
+
+
+def _effective_status(result: "TaskRunResult") -> str:
+    """The status to persist: INVALID for any run that failed short of complete.
+
+    An explicitly-set ``status`` wins; otherwise it is derived, because most
+    infra branches (OOM, timeout, build-failed, setup-failed) set only
+    ``phase``/``success`` and reading the raw field would let those runs look
+    scoreable on disk. Deriving means a new failure branch cannot forget to
+    flag its run: there is no allow-list to drift out of sync.
+
+    A run is INVALID unless it succeeded or reached ``phase == "complete"``.
+    The disjunction is what keeps ``dry_run_complete`` non-INVALID — it sets
+    ``success=True`` and is not a failure, though it never scores.
+    """
+    if result.status:
+        return result.status
+    if result.success or result.phase == "complete":
+        return ""
+    return RUN_STATUS_INVALID
+
+
+def _newest_trace_path(find_stdout: str) -> str | None:
+    """Pick the newest trace path from NUL-delimited ``<mtime> <path>`` records.
+
+    Returns None when no well-formed record survives validation. A record is
+    dropped unless its mtime parses as a float and its path sits under
+    ``TRACE_ROOT`` — the container is agent-controlled, so a path that claims to
+    live elsewhere is treated as hostile rather than copied out.
+    """
+    candidates: list[tuple[float, str]] = []
+
+    for record in find_stdout.split("\0"):
+        if not record or " " not in record:
+            continue
+        raw_mtime, path = record.split(" ", 1)
+        try:
+            mtime = float(raw_mtime)
+        except ValueError:
+            logger.warning("Skipping trace record with unparseable mtime")
+            continue
+        if not path.startswith(f"{TRACE_ROOT}/"):
+            logger.warning("Skipping trace path outside %s", TRACE_ROOT)
+            continue
+        candidates.append((mtime, path))
+
+    if not candidates:
+        return None
+
+    return max(candidates, key=lambda candidate: candidate[0])[1]
 
 
 def _copy_agent_trace(container_id: str, output_dir: Path) -> bool:
@@ -1509,19 +2163,19 @@ def _copy_agent_trace(container_id: str, output_dir: Path) -> bool:
     Never raises — failures are logged and the run continues.
     """
     try:
-        # Find JSONL conversation files, sorted newest-first
-        find_result = subprocess.run(
+        # Records are NUL-delimited and ranked in Python, not by `sort -rn`. A
+        # newline is a legal filename character and the agent owns this
+        # filesystem, so newline-framed `-printf '%T@ %p\n'` output lets a
+        # crafted filename emit what looks like a second "<mtime> <path>"
+        # record; a NUL cannot appear in a filename, so it cannot.
+        find_result = _docker_exec(
+            container_id,
             [
-                "docker",
-                "exec",
-                container_id,
                 "bash",
                 "-c",
-                "find /home/agent/.claude/projects -name '*.jsonl' -type f "
-                "2>/dev/null | head -20",
+                f"find {TRACE_ROOT} -name '*.jsonl' -type f "
+                "-printf '%T@ %p\\0' 2>/dev/null",
             ],
-            capture_output=True,
-            text=True,
             timeout=30,
         )
 
@@ -1529,27 +2183,13 @@ def _copy_agent_trace(container_id: str, output_dir: Path) -> bool:
             logger.info("No agent conversation trace found in container")
             return False
 
-        # Take the first (or newest) file
-        trace_files = [
-            f.strip() for f in find_result.stdout.strip().splitlines() if f.strip()
-        ]
-        if not trace_files:
+        trace_path = _newest_trace_path(find_result.stdout)
+        if trace_path is None:
             logger.info("No agent conversation trace found in container")
             return False
 
-        trace_path = trace_files[0]
         dest = str(output_dir / "agent_trace.jsonl")
-
-        cp_result = subprocess.run(
-            ["docker", "cp", f"{container_id}:{trace_path}", dest],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-
-        if cp_result.returncode != 0:
-            logger.warning("Failed to copy agent trace: %s", cp_result.stderr.strip())
-            return False
+        _docker_cp(f"{container_id}:{trace_path}", dest)
 
         logger.info("Copied agent conversation trace to %s", dest)
         return True
@@ -1849,22 +2489,8 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
                     "INVALID, recording as infra error for re-run"
                 )
 
-            # Flag hybrid runs where MCP wasn't used — these don't count
-            # as valid MCP comparison data
-            mcp_calls = result.tool_usage.get("mcp_tool_calls", 0)
-            if config.mode in ("mcp_only", "hybrid") and mcp_calls == 0:
-                logger.warning(
-                    "MCP mode=%s but agent made 0 MCP tool calls — "
-                    "run is not a valid MCP comparison",
-                    config.mode,
-                )
-                result.tool_usage["mcp_used"] = False
-            elif config.mode in ("mcp_only", "hybrid"):
-                result.tool_usage["mcp_used"] = True
-                logger.info("Agent made %d MCP tool calls", mcp_calls)
-
-            # Copy full conversation trace from container
-            _copy_agent_trace(container_id, output_dir)
+            _route_zero_mcp_run(result, config.mode)
+            _record_agent_trace(result, container_id, output_dir)
         else:
             logger.info("No agent command specified, skipping agent phase")
 
@@ -1873,20 +2499,25 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         scores = _run_scoring(container_id, config.verifier_timeout)
         timings["scoring"] = time.monotonic() - t0
         _route_verifier_infra_error(result, scores)
+        _route_integrity_violation(result, scores)
 
         # --- Phase 5b: Score (Tier 2 — LLM curator) ---
-        # Skip the judge if the deterministic stage already flagged an infra
-        # error — the run is already routed to re-run, and the judge would run
-        # against un-guarded scores.
         verification_modes = task_data.get("verification_modes", ["deterministic"])
-        if "llm_curator" in verification_modes and result.phase != "verifier_infra_error":
+        if (
+            "llm_curator" in verification_modes
+            and result.phase not in UNTRUSTED_SCORE_PHASES
+        ):
             scores = _apply_llm_judge(scores, task_dir, container_id, task_data)
             _route_verifier_infra_error(result, scores)
 
         result.scores = scores
 
         # --- Save ---
-        if result.phase not in ("agent_infra_error", "verifier_infra_error"):
+        # Phases flagged *inline* during the agent/scoring stages reach here
+        # without an early return; every other failure has already returned.
+        # Those inline-flagged phases (agent/verifier infra errors, and a broken
+        # grading-asset seal) must never be overwritten with complete/success.
+        if result.phase not in NON_COMPLETE_PHASES:
             result.phase = "complete"
             result.success = True
         result.timing = timings

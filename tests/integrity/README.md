@@ -24,12 +24,25 @@ blocker (`.github/workflows/ci.yml` → "Scoring-integrity corpus").
 | malformed `expected_solution.json` → un-capped grep | over-credit | apfp #3 | `test_malformed_expected_solution_flags_infra` |
 | judge-init failure → un-capped grep | over-credit | apfp #3 | `test_judge_init_failure_flags_infra` |
 | per-checkpoint judge exception → un-capped grep | over-credit | apfp #3 | `test_per_checkpoint_judge_exception_flags_infra` |
+| milestone verifier exit 0 + no verdict → free 1.0 | over-credit | chc2z | `test_exit0_without_json_is_infra_not_a_free_1_0` |
+| milestone verifier exit 1 + no verdict → false 0.0 | under-credit | chc2z | `test_exit1_without_json_is_infra_not_a_false_0_0` |
+| missing / timed-out / unexecutable milestone verifier → 0.0 | under-credit | chc2z | `test_missing_verifier_is_infra_not_a_0_0`, `test_timeout_is_infra_not_a_0_0`, `test_unexecutable_verifier_is_infra_not_a_crash` |
+| infra milestone averaged into `chain_result.json` total | both | chc2z | `test_chain_result_json_total_score_is_null_and_exit_is_nonzero` |
+| failed session → final checkpoints score an unworked workspace → free 1.0 | over-credit | 6c9wp | `test_failed_first_session_scores_nothing_and_never_runs_the_checkpoints` |
+| chain aborted mid-way → total computed from the earlier sessions' milestones | over-credit | 6c9wp | `test_mid_chain_failure_does_not_score_from_the_earlier_milestones` |
+
+A failed session is **not** a verifier failure, so it routes through a sibling
+channel, `session_failure`, rather than being laundered through
+`verifier_infra_error`: same re-run destination, honest cause. Both channels
+independently force `total_score = None` and a nonzero exit, and both are
+reported when both fire.
 
 ### Negative controls (guard must not over-flag)
 
 | Case | Test |
 |---|---|
 | real all-fail 0.0 (verifier ran, agent failed) | `test_genuine_all_fail_zero_passes_through` |
+| healthy chain, every session completed → scores normally | `test_every_session_completing_scores_the_final_checkpoints` |
 | valid partial score | `test_valid_scores_pass_through` |
 | `ImportError` in an error-provenance **task subject** | `test_import_error_in_task_subject_is_not_flagged` |
 | genuinely clean repo (no changes) | `test_clean_repo_no_changes_is_not_infra` |

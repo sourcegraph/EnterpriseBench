@@ -9,13 +9,19 @@
 #   make report            — regenerate the analysis report (markdown)
 #   make paper-figures     — full pipeline + copy figures into paper/figures/
 #   make paper             — alias for paper-figures (paper.md is hand-written)
-#   make test              — run pytest on the verify library
+#   make test              — run the test suite (tests/)
 #   make clean             — remove generated analysis artifacts (NOT raw runs)
 #
 # Phase 8 deliverable: paper-figures is the single command that regenerates
 # every figure used in paper/paper.md from the raw run data under results/.
 
 PYTHON ?= python3
+
+# Where the tests live, and how CI runs them (.github/workflows/ci.yml keeps the
+# same marker filter). Override either on the command line:
+#   make test PYTEST_PATHS=tests/integrity PYTEST_ARGS='-v'
+PYTEST_PATHS ?= tests/
+PYTEST_ARGS  ?= -q -m 'not network and not docker'
 
 ANALYSIS_JSON := results/analysis/score_analysis.json
 CHARTS_DIR    := results/analysis/charts
@@ -81,8 +87,16 @@ paper-figures: charts report ## Regenerate paper figures (full pipeline)
 paper: paper-figures ## Alias: regenerate paper figures (paper.md is hand-written)
 
 .PHONY: test
-test: ## Run pytest on the verify library
-	$(PYTHON) -m pytest lib/eb_verify -q
+test: ## Run the test suite (override PYTEST_PATHS / PYTEST_ARGS)
+	$(if $(strip $(PYTEST_PATHS)),,$(error PYTEST_PATHS is empty; with no paths pytest walks the whole repo root. Name the test directories explicitly))
+	@PYTHONPATH=lib$${PYTHONPATH:+:$$PYTHONPATH} $(PYTHON) -m pytest $(PYTEST_PATHS) $(PYTEST_ARGS); \
+	status=$$?; \
+	if [ $$status -eq 5 ]; then \
+		echo "[test] ERROR: collected 0 tests from '$(strip $(PYTEST_PATHS))'."; \
+		echo "[test] A suite that runs nothing is a failure, not a pass. Check PYTEST_PATHS."; \
+		exit 1; \
+	fi; \
+	exit $$status
 
 .PHONY: clean
 clean: ## Remove generated analysis artifacts (does NOT touch raw runs)

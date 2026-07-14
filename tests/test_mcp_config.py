@@ -626,15 +626,18 @@ class TestChownToAgent:
     def test_chowns_as_root_with_quoted_paths(self) -> None:
         ok = MagicMock(returncode=0, stdout="", stderr="")
 
+        # Both paths are ones the agent legitimately owns. /workspace/.task used
+        # to be in this list, which is precisely the hole the grading-asset seal
+        # closes — _chown_to_agent now refuses it (bead EnterpriseBench-8krz5).
         with patch("run_task.subprocess.run", return_value=ok) as mock_run:
-            _chown_to_agent("cid", ["/workspace/instruction.md", "/workspace/.task"])
+            _chown_to_agent("cid", ["/workspace/instruction.md", "/workspace/.mcp.json"])
 
         cmd = mock_run.call_args.args[0]
         assert cmd[:7] == ["docker", "exec", "-w", "/workspace", "-u", "root", "cid"]
         script = cmd[-1]
         assert "chown -R agent:agent" in script
         assert "/workspace/instruction.md" in script
-        assert "/workspace/.task" in script
+        assert "/workspace/.mcp.json" in script
 
     def test_skips_missing_paths_via_existence_check(self) -> None:
         ok = MagicMock(returncode=0, stdout="", stderr="")

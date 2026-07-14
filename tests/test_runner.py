@@ -113,8 +113,11 @@ class TestRunCheckpointMissingVerifier:
         runner = CheckpointRunner(task=task, task_dir=task_dir, workspace=workspace)
         result = runner.run_checkpoint(cp)
 
+        # A verifier that isn't there never judged the agent — that's an infra
+        # failure, not a 0.0 the agent earned (bead kyo34).
+        assert result.infra_error is not None
+        assert result.infra_error.context["cause"] == "missing_verifier"
         assert result.passed is False
-        assert result.score == 0.0
         assert "not found" in result.detail.lower()
 
 
@@ -180,11 +183,17 @@ class TestRunCheckpointJsonOutput:
 
 
 # ---------------------------------------------------------------------------
-# run_checkpoint — exit code fallback (no JSON)
+# run_checkpoint — there is NO exit-code fallback (bead kyo34)
+#
+# These two tests previously asserted the fallback: `exit 0` scored 1.0 and
+# `exit 1` scored 0.0 for a verifier that emitted no JSON. That WAS the bug —
+# it handed full credit to a verifier that crashed before scoring anything, and
+# blamed the agent for a broken harness. Full no-verdict coverage lives in
+# tests/integrity/test_checkpoint_verdict.py.
 # ---------------------------------------------------------------------------
 
-class TestRunCheckpointExitCodeFallback:
-    def test_exit_0_passes(self, tmp_path):
+class TestRunCheckpointNoExitCodeFallback:
+    def test_exit_0_without_json_is_infra_not_a_pass(self, tmp_path):
         task_dir = tmp_path / "task"
         task_dir.mkdir()
         workspace = tmp_path / "ws"
@@ -199,10 +208,11 @@ class TestRunCheckpointExitCodeFallback:
         runner = CheckpointRunner(task=task, task_dir=task_dir, workspace=workspace)
         result = runner.run_checkpoint(cp)
 
-        assert result.passed is True
-        assert result.score == pytest.approx(1.0)
+        assert result.infra_error is not None
+        assert result.passed is False
+        assert result.score != pytest.approx(1.0)
 
-    def test_exit_1_fails(self, tmp_path):
+    def test_exit_1_without_json_is_infra_not_a_real_zero(self, tmp_path):
         task_dir = tmp_path / "task"
         task_dir.mkdir()
         workspace = tmp_path / "ws"
@@ -217,8 +227,8 @@ class TestRunCheckpointExitCodeFallback:
         runner = CheckpointRunner(task=task, task_dir=task_dir, workspace=workspace)
         result = runner.run_checkpoint(cp)
 
+        assert result.infra_error is not None
         assert result.passed is False
-        assert result.score == pytest.approx(0.0)
 
 
 # ---------------------------------------------------------------------------

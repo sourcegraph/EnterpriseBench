@@ -14,6 +14,10 @@ import argparse
 import json
 import os
 import sys
+import urllib.error
+import urllib.request
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
@@ -96,20 +100,25 @@ def compute_summary(data: dict[str, Any]) -> IndexingSummary:
 
 def format_summary(summary: IndexingSummary) -> str:
     """Format the summary as human-readable text."""
-    lines: list[str] = []
-    lines.append("=== Sourcegraph Indexing Status ===")
-    lines.append("")
-    lines.append(f"Total repos:   {summary.total_repos}")
-    lines.append(f"Indexed:       {summary.indexed_count}")
-    lines.append(f"Pending:       {summary.pending_count}")
-    lines.append("")
-    lines.append("--- Per-Suite Breakdown ---")
-
-    for suite in summary.suites:
-        lines.append(
-            f"  {suite.name}: {suite.indexed}/{suite.total} indexed, {suite.pending} pending"
-        )
-
+    lines = [
+        "=== Sourcegraph Mirror Inventory ===",
+        "",
+        f"Total repos:   {summary.total_repos}",
+        "",
+        "`_indexed` is a PLACEHOLDER written as a literal False by "
+        "generate_sg_index.py.",
+        "It is not a verified signal — a 0 here means 'never checked', NOT "
+        "'not indexed'.",
+        "Run --check-api for real precise-index status.",
+        f"  _indexed=true:  {summary.indexed_count}",
+        f"  _indexed=false: {summary.pending_count}",
+        "",
+        "--- Per-Suite Breakdown (_indexed placeholder) ---",
+    ]
+    lines.extend(
+        f"  {s.name}: {s.indexed}/{s.total} indexed, {s.pending} pending"
+        for s in summary.suites
+    )
     lines.append("")
     return "\n".join(lines)
 
@@ -133,10 +142,222 @@ def format_json(summary: IndexingSummary) -> str:
     return json.dumps(result, indent=2)
 
 
-def check_api_stub() -> None:
-    """Stub for future Sourcegraph API verification."""
-    print("[stub] --check-api: Sourcegraph API verification not yet implemented.")
-    print("[stub] This will verify each repo is indexed on the SG instance.")
+PRECISE = "PRECISE"
+NONE = "NONE"
+ABSENT = "ABSENT"
+UNKNOWN = "UNKNOWN"
+STATUSES = (PRECISE, NONE, ABSENT, UNKNOWN)
+
+DEFAULT_ENDPOINT = "https://demo.sourcegraph.com"
+# sourcegraph.com rejects the stock Python-urllib User-Agent with a 403.
+USER_AGENT = "EnterpriseBench-verify-sg-indexing/1.0"
+REQUEST_TIMEOUT = 20
+# Each repo is an independent round-trip. Run serially, a dead token (every
+# request burning REQUEST_TIMEOUT) takes 133 * 20s ≈ 45 minutes to report
+# UNKNOWN for all of them.
+MAX_CONCURRENT_CHECKS = 8
+
+INDEX_QUERY = """
+query RepoPreciseIndex($name: String!) {
+  repository(name: $name) {
+    name
+    lsifUploads(state: COMPLETED, first: 1) {
+      totalCount
+    }
+  }
+}
+"""
+
+
+@dataclass(frozen=True)
+class RepoIndexStatus:
+    """Precise-index status of one mirror on a Sourcegraph instance.
+
+    UNKNOWN is a first-class outcome, not an error to be smoothed away. Auth
+    failure, transport failure and schema drift all mean "we could not tell" —
+    coercing any of them to NONE would manufacture a "not indexed" finding out
+    of a broken request.
+    """
+
+    name: str
+    status: str
+    detail: str = ""
+
+
+@dataclass(frozen=True)
+class IndexReport:
+    results: tuple[RepoIndexStatus, ...]
+
+    @property
+    def counts(self) -> dict[str, int]:
+        """One entry per status, including the zeroes — a status missing from
+        the table would read as 'not applicable' rather than 'none of these'."""
+        tally = Counter(r.status for r in self.results)
+        return {s: tally[s] for s in STATUSES}
+
+    @property
+    def conclusive(self) -> bool:
+        """False if any repo came back UNKNOWN — the report cannot support a
+        claim about per-repo indexing until every repo resolved.
+
+        An empty result set is also inconclusive, not vacuously true: checking
+        zero repos (a schema drift renaming `sg_name`, say) would otherwise exit
+        0 and read exactly like 'every repo confirmed'. Reporting a false GREEN
+        is the failure this module exists to refuse.
+        """
+        if not self.results:
+            return False
+        return not any(r.status == UNKNOWN for r in self.results)
+
+
+def _http_post(url: str, body: bytes, headers: dict[str, str], timeout: int) -> bytes:
+    """Real transport. Injected as `fetch` so tests never touch the network."""
+    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read()
+
+
+def mirror_names(data: dict[str, Any]) -> list[str]:
+    """Mirror names to query, from the flat `repos` array.
+
+    Keyed on `sg_name` deliberately. The per-suite view carries only *upstream*
+    names (`ansible/ansible`), and querying those would ask the instance about
+    the upstream repo — which is indexed on any public instance — and report a
+    false GREEN for a mirror that may not exist at all.
+    """
+    return [r["sg_name"] for r in data.get("repos", []) if r.get("sg_name")]
+
+
+def check_repo_index(
+    name: str,
+    endpoint: str = DEFAULT_ENDPOINT,
+    token: str | None = None,
+    fetch=_http_post,
+) -> RepoIndexStatus:
+    """Query one repo's precise-index status."""
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": USER_AGENT,
+    }
+    if token:
+        headers["Authorization"] = f"token {token}"
+
+    body = json.dumps({"query": INDEX_QUERY, "variables": {"name": name}}).encode()
+    url = f"{endpoint.rstrip('/')}/.api/graphql"
+
+    try:
+        raw = fetch(url, body, headers, REQUEST_TIMEOUT)
+    except urllib.error.HTTPError as exc:
+        return RepoIndexStatus(name, UNKNOWN, f"HTTP {exc.code}: {exc.reason}")
+    except urllib.error.URLError as exc:
+        return RepoIndexStatus(name, UNKNOWN, f"transport: {exc.reason}")
+    except OSError as exc:  # socket timeouts and friends
+        return RepoIndexStatus(name, UNKNOWN, f"transport: {exc}")
+
+    try:
+        payload = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return RepoIndexStatus(name, UNKNOWN, "malformed response body")
+
+    # Every shape check below funnels to UNKNOWN. ABSENT and NONE are definite
+    # findings about the corpus; neither may be manufactured from a response we
+    # could not read. Only an explicit `repository: null` — the instance
+    # answering "no such repo" — is allowed to mean ABSENT.
+    if not isinstance(payload, dict):
+        return RepoIndexStatus(name, UNKNOWN, "response is not a JSON object")
+
+    if payload.get("errors"):
+        messages = "; ".join(
+            e.get("message", "?") for e in payload["errors"] if isinstance(e, dict)
+        )
+        return RepoIndexStatus(name, UNKNOWN, f"graphql: {messages}")
+
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return RepoIndexStatus(name, UNKNOWN, "no `data` object in response")
+
+    if "repository" not in data:
+        return RepoIndexStatus(name, UNKNOWN, "no `repository` field in response")
+
+    repo = data["repository"]
+    if repo is None:
+        return RepoIndexStatus(name, ABSENT, "repository not found on instance")
+    if not isinstance(repo, dict):
+        return RepoIndexStatus(name, UNKNOWN, "`repository` is not an object")
+
+    uploads_field = repo.get("lsifUploads")
+    if not isinstance(uploads_field, dict):
+        return RepoIndexStatus(name, UNKNOWN, "no `lsifUploads` object in response")
+
+    uploads = uploads_field.get("totalCount")
+    # `bool` is an `int` subclass, and a JSON `true` would sail through as
+    # "1 completed upload(s)" — a false GREEN, the one thing this module refuses.
+    if not isinstance(uploads, int) or isinstance(uploads, bool):
+        return RepoIndexStatus(name, UNKNOWN, "no totalCount in response")
+
+    if uploads > 0:
+        return RepoIndexStatus(name, PRECISE, f"{uploads} completed upload(s)")
+    return RepoIndexStatus(name, NONE, "no completed precise-index uploads")
+
+
+def _check_one(
+    name: str, endpoint: str, token: str | None, fetch
+) -> RepoIndexStatus:
+    """Per-mirror containment. Not a swallow: the failure is *promoted* into the
+    report as UNKNOWN with its cause attached, which makes the report
+    inconclusive and exits non-zero. Unguarded, one bad reply raises out of
+    `pool.map` and every other mirror's status dies with it.
+    """
+    try:
+        return check_repo_index(name, endpoint=endpoint, token=token, fetch=fetch)
+    except Exception as exc:  # noqa: BLE001 — containment is the point
+        return RepoIndexStatus(
+            name, UNKNOWN, f"check failed: {type(exc).__name__}: {exc}"
+        )
+
+
+def check_all(
+    data: dict[str, Any],
+    endpoint: str = DEFAULT_ENDPOINT,
+    token: str | None = None,
+    fetch=_http_post,
+) -> IndexReport:
+    """Check every mirror. `_indexed` in the config is ignored — it is a
+    hardcoded placeholder written by generate_sg_index.py, so reading it back as
+    evidence would be circular.
+
+    Checks run concurrently: `check_repo_index` holds no shared state, and
+    `pool.map` yields in input order, so the report is identical to a serial run.
+    """
+    with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_CHECKS) as pool:
+        results = pool.map(
+            lambda name: _check_one(name, endpoint, token, fetch),
+            mirror_names(data),
+        )
+        return IndexReport(results=tuple(results))
+
+
+def format_index_report(report: IndexReport) -> str:
+    counts = report.counts
+    lines = ["", "=== Precise-Index Status (live) ===", ""]
+    lines.extend(f"{status:9} {counts[status]}" for status in STATUSES)
+    lines.append("")
+    lines.extend(f"  {r.status:9} {r.name}  {r.detail}" for r in report.results)
+    lines.append("")
+
+    if not report.results:
+        lines.append(
+            "INCONCLUSIVE: zero repos were checked. This is not a clean result — "
+            "the mirror list resolved to nothing (schema drift?)."
+        )
+        lines.append("")
+    elif not report.conclusive:
+        lines.append(
+            "INCONCLUSIVE: some repos returned UNKNOWN (auth/transport/schema). "
+            "UNKNOWN is not NONE — do not read this as 'not indexed'."
+        )
+        lines.append("")
+    return "\n".join(lines)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -165,7 +386,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--check-api",
         action="store_true",
-        help="Check indexing status against Sourcegraph API (not yet implemented)",
+        help="Query the Sourcegraph instance for each mirror's precise-index status",
+    )
+    parser.add_argument(
+        "--endpoint",
+        default=os.environ.get("SOURCEGRAPH_URL", DEFAULT_ENDPOINT),
+        help=f"Sourcegraph instance to query (default: {DEFAULT_ENDPOINT})",
+    )
+    parser.add_argument(
+        "--token",
+        default=os.environ.get("SOURCEGRAPH_ACCESS_TOKEN"),
+        help="Access token (default: $SOURCEGRAPH_ACCESS_TOKEN)",
     )
     return parser
 
@@ -179,7 +410,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: Index file not found: {args.index_path}", file=sys.stderr)
         return 1
 
-    data = load_index(args.index_path)
+    try:
+        data = load_index(args.index_path)
+    except json.JSONDecodeError as exc:
+        print(f"Error: malformed JSON in {args.index_path}: {exc}", file=sys.stderr)
+        return 1
+
     summary = compute_summary(data)
 
     if args.output_json:
@@ -188,7 +424,18 @@ def main(argv: list[str] | None = None) -> int:
         print(format_summary(summary))
 
     if args.check_api:
-        check_api_stub()
+        if not args.token:
+            print(
+                "Error: --check-api needs a token (--token or $SOURCEGRAPH_ACCESS_TOKEN). "
+                "Without one every repo resolves to UNKNOWN, which must not be "
+                "mistaken for 'not indexed'.",
+                file=sys.stderr,
+            )
+            return 2
+        report = check_all(data, endpoint=args.endpoint, token=args.token)
+        print(format_index_report(report))
+        if not report.conclusive:
+            return 3
 
     return 0
 

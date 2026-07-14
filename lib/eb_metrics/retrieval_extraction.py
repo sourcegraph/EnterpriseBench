@@ -1,4 +1,4 @@
-"""Extract an agent's retrieved-file set and a task's relevant-file set.
+r"""Extract an agent's retrieved-file set and a task's relevant-file set.
 
 Two structural readers plus one compute helper, feeding
 :mod:`eb_metrics.ir_metrics`:
@@ -8,9 +8,9 @@ Two structural readers plus one compute helper, feeding
   accessed (``Read``/``Grep``/``Glob`` inputs, MCP ``read_file`` inputs — whose
   repo-relative ``path`` is re-qualified with its ``repo`` so every arm's paths
   are workspace-relative and comparable — paths scraped from MCP search-result
-  payloads, and — an EB extension beyond the CSB port — file arguments to shell
-  read-commands like ``cat``/``grep``, without which the baseline arm's
-  retrieval is largely unobservable).
+  payloads, and — an EB extension beyond the CSB port — the files read by
+  ``Bash`` commands, delegated to :mod:`eb_metrics.bash_reads`, without which
+  the baseline arm's retrieval is largely unobservable).
 * :func:`required_files_from_ground_truth` — read a task ``ground_truth.json``
   and return its ``required_files`` as the relevant set, each entry qualified
   with the directory its repo is cloned into so the join stays repo-aware.
@@ -20,24 +20,48 @@ Two structural readers plus one compute helper, feeding
   ``None`` rather than a vacuous ``0.0``/``1.0`` keeps unobserved runs out
   of the retrieval-recall aggregate.
 
+Shell parsing lives next door, split by what each layer decides:
+:mod:`eb_metrics.shell_lex` decides syntax, :mod:`eb_metrics.bash_reads` decides
+which programs and arguments count as a read.
+
 ZFC compliance: parsing is mechanical field extraction and structural
-validation — no semantic classification or learned scoring. The two judgement
-calls stay in code by design: ``_BASH_READ_CMDS`` is policy (which programs
+validation — no semantic classification or learned scoring. The judgement calls
+stay in code by design: :mod:`eb_metrics.bash_reads` is policy (which programs
 count as a retrieval) and ``_looks_like_file`` is a shape filter. A scoring
 primitive a model re-judged per call would not reproduce across rescores, and
 the back-computations depend on that.
+
+Known limitation, an undercount:
+
+* **The Bash floor.** Some commands do not name the files they read: ``xargs``
+  takes them on stdin, a glob (``packages/*/package.json``) is expanded by the
+  filesystem, ``find … -exec cat {} \;`` substitutes whatever find matched, and
+  a path built around a command substitution (``cat "$(pwd)/config.py"``) is
+  finished by another command's output. No lexer can resolve these from the
+  command text — the file set is not *in* the text. They extract to nothing,
+  which understates the Bash-mediated arms.
+
+  The alternative is worse than the floor: erase the substitution and keep the
+  leftover literal and you get ``/config.py``, a path nothing opened. An
+  undercount is a known bias; a fabricated read is a wrong number that looks
+  like a right one.
+
+  The only sound recovery is to read the command's *output* from the trace
+  (the paths grep printed), tracked as EnterpriseBench-jqyhg. Documented rather
+  than papered over: ``test_bash_read_files_known_floor`` and
+  ``test_bash_substitution_adjacent_to_text_is_not_a_file`` pin the shapes, so
+  the day that recovery lands, it announces itself there.
 """
 
 from __future__ import annotations
 
 import json
 import re
-import shlex
 import tomllib
-from itertools import groupby
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from eb_metrics.bash_reads import bash_read_files
 from eb_metrics.ir_metrics import (
     WORKSPACE_PREFIXES,
     IRScores,
@@ -93,35 +117,6 @@ _MCP_SEARCH_TOOLS = frozenset(
 )
 _LOCAL_FILE_TOOLS = frozenset({"Read", "Grep", "Glob"})
 
-# Shell programs that read file contents. Baseline agents open files via these
-# (`cat foo.py`, `grep pat src/x.go`) rather than the structured Read tool, so
-# without this the baseline arm's retrieval is largely unobservable. EB-specific
-# extension beyond the CSB port (which does not parse Bash); path candidates
-# still pass the shared ``_looks_like_file`` gate, so flags and search patterns
-# (no extension) are filtered out.
-_BASH_READ_CMDS = frozenset(
-    {
-        "cat", "head", "tail", "less", "more", "bat", "nl", "view", "cut",
-        "column", "xxd", "od", "strings", "wc", "grep", "egrep", "fgrep",
-        "rg", "ag", "sed", "awk", "diff",
-    }
-)
-# Shell tokens that delimit one sub-command from the next, matched against whole
-# *tokens* from :func:`_tokenize` — never against raw text, which is the whole
-# point of tokenizing first (a ``|`` inside ``grep 'a|b' f.py`` lexes to the word
-# ``a|b``, not to a bare ``|``, so it stays data).
-#
-# Deliberately absent:
-#   ``>`` / ``<``  — not separators, so the target of ``cat a.py > out.txt`` is
-#     counted as a read. A known false positive, kept (EnterpriseBench-qefr).
-#   ``(`` / ``)``  — listing them would let ``(cat a.py)`` contribute a.py, but it
-#     would also make ``grep '(' f.go`` lose f.go: posix lexing strips quotes, so a
-#     quoted bare paren and a real operator are the same token and this set cannot
-#     tell them apart. That trade re-opens the quoted-operator hole this function
-#     exists to close, so subshells stay a false negative (EnterpriseBench-fhtm).
-#   newline        — ``whitespace_split`` never emits one; it could only ever match
-#     a *quoted* newline, i.e. data.
-_SHELL_OPERATORS = frozenset({"|", "||", "&&", "&", ";", ";;"})
 
 _PATH_JSON_RE = re.compile(r'"path"\s*:\s*"([^"]+)"')
 _FILE_JSON_RE = re.compile(r'"file"\s*:\s*"([^"]+)"')
@@ -132,48 +127,6 @@ _GH_URL_IN_TEXT_RE = re.compile(
 _BACKTICK_PATH_RE = re.compile(r"`([a-zA-Z][\w/.-]+/[\w.-]+\.\w{1,5})`")
 _PATH_PREFIX_RE = re.compile(r"(?:^|\n|\\n)Path: ([^\n\\]+\.\w{1,5})")
 _QUERY_PATH_RE = re.compile(r"([a-zA-Z][\w/.-]+/[\w.-]+\.\w{1,5})")
-
-
-def _tokenize(command: str) -> list[str]:
-    """Tokenize a shell command, emitting control operators as their own tokens.
-
-    ``punctuation_chars`` is what lets the caller tell an operator from a search
-    pattern: an unquoted ``|`` becomes a standalone token even unspaced
-    (``cat a.py|grep b``), while a quoted one stays inside its word
-    (``grep 'a|b' a.py``). An unterminated quote yields whatever parsed cleanly
-    before it — this reads someone else's shell, it does not validate it.
-    """
-    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
-    lexer.whitespace_split = True
-    lexer.commenters = ""  # `#` is data here, not a comment (shlex.split parity)
-    tokens: list[str] = []
-    try:
-        tokens.extend(lexer)
-    except ValueError:
-        pass  # unbalanced quote — keep the prefix we did parse
-    return tokens
-
-
-def _bash_read_files(command: str) -> list[str]:
-    """Extract file arguments from shell read-commands in ``command``.
-
-    Tokenizes first, *then* groups the tokens into sub-commands on
-    :data:`_SHELL_OPERATORS`, so a ``|`` inside a quoted grep alternation stays
-    part of the pattern instead of truncating the command and taking its file
-    argument with it. For each sub-command whose program is in
-    :data:`_BASH_READ_CMDS`, yields the non-flag tokens; callers gate each one
-    through ``_looks_like_file`` (via ``_add``), so search patterns and options
-    are dropped. Conservative by construction — a sub-command not led by a known
-    read program contributes nothing (a script being *run* is not a retrieval).
-    """
-    files: list[str] = []
-    for is_operator, group in groupby(_tokenize(command), _SHELL_OPERATORS.__contains__):
-        if is_operator:
-            continue
-        sub = list(group)
-        if sub[0].rsplit("/", 1)[-1] in _BASH_READ_CMDS:
-            files.extend(tok for tok in sub[1:] if not tok.startswith("-"))
-    return files
 
 
 def _mcp_repo_name(repo: str) -> str:
@@ -334,7 +287,7 @@ def retrieved_files_from_trace(
         elif tool_name == "Bash":
             cmd = tool_input.get("command", "")
             if isinstance(cmd, str) and cmd:
-                for fp in _bash_read_files(cmd):
+                for fp in bash_read_files(cmd):
                     _add(fp)
         elif tool_name in _MCP_READ_TOOLS:
             fp = tool_input.get("path", "")

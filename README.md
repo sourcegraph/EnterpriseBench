@@ -1,3 +1,5 @@
+> ⚠️ **WORK IN PROGRESS — RESULTS NOT VALIDATED.** This repository is under active revision. The headline numbers, rescore artifacts, and FINDINGS in `results/` (including the MCP-vs-baseline comparison) are preliminary and NOT yet validated. The retrieval-quality axis is currently quarantined pending methodology fixes, and the arm design is being reworked (MCP vs baseline vs CLI on a curated dataset with build-time image guards). Do not cite these numbers as validated results.
+
 # EnterpriseBench
 
 A benchmark for evaluating how well coding agents understand and navigate code across large, distributed enterprise codebases.

@@ -21,12 +21,14 @@ from pathlib import Path
 from typing import Any, Optional, Protocol, cast
 
 from eb_verify.task_parser import TaskDefinition, Checkpoint
+from eb_verify.scorer_guard import INFRA_SENTINEL
 from eb_verify.scoring import (
     CheckpointResult,
     VerificationResult,
     compute_score,
     write_reward,
 )
+from eb_verify.scorer_guard import InfraError, guard_checkpoint_verdict, no_verdict
 from eb_verify.plugins import ValidationResult, get_validator
 
 logger = logging.getLogger(__name__)
@@ -158,26 +160,56 @@ class CheckpointRunner:
             )
         return resolved
 
+    def _infra_result(
+        self, checkpoint: Checkpoint, error: InfraError
+    ) -> CheckpointResult:
+        """A checkpoint whose verifier never reached a verdict.
+
+        `score` is a placeholder, never a measurement: `run_all` refuses to
+        report a numeric total once any checkpoint carries an infra_error.
+        """
+        logger.error(
+            "Checkpoint %r: verifier did not run (%s) — %s",
+            checkpoint.name,
+            error.cause,
+            error.detail,
+        )
+        return CheckpointResult(
+            name=checkpoint.name,
+            weight=checkpoint.weight,
+            passed=False,
+            score=0.0,
+            detail=error.detail,
+            infra_error=error,
+        )
+
     def run_checkpoint(self, checkpoint: Checkpoint) -> CheckpointResult:
-        """Execute a single checkpoint verifier script and collect results."""
+        """Execute a single checkpoint verifier script and collect results.
+
+        A verifier that does not reach a verdict (missing, escaping task_dir,
+        timing out, crashing, or emitting no parseable score) yields an
+        InfraError — never a fabricated score. See
+        :func:`eb_verify.scorer_guard.guard_checkpoint_verdict`.
+        """
+
+        def did_not_run(
+            cause: str, detail: str, **evidence: object
+        ) -> CheckpointResult:
+            return self._infra_result(
+                checkpoint,
+                no_verdict(
+                    cause, detail, checkpoint=checkpoint.name, evidence=evidence
+                ),
+            )
+
         try:
             verifier_path = self._safe_verifier_path(checkpoint.verifier)
         except ValueError as e:
-            return CheckpointResult(
-                name=checkpoint.name,
-                weight=checkpoint.weight,
-                passed=False,
-                score=0.0,
-                detail=str(e),
-            )
+            return did_not_run("path_escape", str(e))
 
         if not verifier_path.exists():
-            return CheckpointResult(
-                name=checkpoint.name,
-                weight=checkpoint.weight,
-                passed=False,
-                score=0.0,
-                detail=f"Verifier script not found: {verifier_path}",
+            return did_not_run(
+                "missing_verifier", f"Verifier script not found: {verifier_path}"
             )
 
         env = os.environ.copy()
@@ -194,43 +226,36 @@ class CheckpointRunner:
                 cwd=str(self.workspace),
                 env=env,
             )
-
-            # Convention: verifier prints JSON to stdout with {"score": 0.0-1.0, "detail": "..."}
-            # If no JSON, use exit code: 0=pass (1.0), nonzero=fail (0.0)
-            stdout = result.stdout.strip()
-            try:
-                data = json.loads(stdout)
-                score = max(0.0, min(1.0, float(data.get("score", 0.0))))
-                detail = data.get("detail", "")
-                passed = score > 0.0
-            except (json.JSONDecodeError, ValueError):
-                passed = result.returncode == 0
-                score = 1.0 if passed else 0.0
-                detail = stdout or result.stderr.strip()
-
-            return CheckpointResult(
-                name=checkpoint.name,
-                weight=checkpoint.weight,
-                passed=passed,
-                score=score,
-                detail=detail,
-            )
         except subprocess.TimeoutExpired:
-            return CheckpointResult(
-                name=checkpoint.name,
-                weight=checkpoint.weight,
-                passed=False,
-                score=0.0,
-                detail=f"Verifier timed out ({checkpoint.timeout_seconds}s)",
+            # No verdict, and not attributable to the agent: the one verifier
+            # that runs agent-authored code bounds it with its own inner
+            # pytest --timeout, so the checkpoint budget only expires when the
+            # harness itself wedges.
+            return did_not_run(
+                "verifier_timeout",
+                f"Verifier timed out ({checkpoint.timeout_seconds}s)",
+                timeout_seconds=checkpoint.timeout_seconds,
             )
         except Exception as e:
-            return CheckpointResult(
-                name=checkpoint.name,
-                weight=checkpoint.weight,
-                passed=False,
-                score=0.0,
-                detail=f"Error running verifier: {e}",
-            )
+            return did_not_run("exec_error", f"Error running verifier: {e}")
+
+        verdict = guard_checkpoint_verdict(
+            result.stdout,
+            result.returncode,
+            stderr=result.stderr,
+            checkpoint=checkpoint.name,
+        )
+        if isinstance(verdict, InfraError):
+            return self._infra_result(checkpoint, verdict)
+
+        score = float(verdict["score"])  # guard_checkpoint_verdict clamped it
+        return CheckpointResult(
+            name=checkpoint.name,
+            weight=checkpoint.weight,
+            passed=score > 0.0,
+            score=score,
+            detail=verdict.get("detail", ""),
+        )
 
     def _run_judge_checkpoint(
         self, checkpoint: Checkpoint, agent_output: str
@@ -356,19 +381,49 @@ class CheckpointRunner:
 
         # Run checkpoints in order
         checkpoint_results = []
+        # Set once the judge reaches no verdict. The first such failure already
+        # routes the whole run to the re-run channel, so every later judge call
+        # would return a number nobody reads — and a backend outage fails all of
+        # them anyway, at a 120s timeout plus retries each.
+        judge_failure: Optional[str] = None
         for cp in self.task.checkpoints:
             print(f"[runner] Running checkpoint: {cp.name}")
 
             # Tier 1: grep-based verifier
             grep_result = self.run_checkpoint(cp)
+
+            # A verifier that never reached a verdict has no score to cap.
+            # Running the judge here would min() a real judgement against a
+            # placeholder 0.0 and launder the result into a plausible number.
+            if grep_result.infra_error is not None:
+                checkpoint_results.append(grep_result)
+                print(f"[runner]   INFRA {grep_result.detail}")
+                continue
+
             grep_score = grep_result.score
             detail_parts = [grep_result.detail] if grep_result.detail else []
 
             # Tier 2: LLM judge (if active and agent output available)
             final_score = grep_score
             if agent_output and self._judge is not None:
-                judge_score = self._run_judge_checkpoint(cp, agent_output)
-                if judge_score is not None:
+                judge_score = None
+                if judge_failure is None:
+                    try:
+                        judge_score = self._run_judge_checkpoint(cp, agent_output)
+                    except Exception as exc:
+                        logger.warning("LLM judge failed for %s: %s", cp.name, exc)
+                        judge_failure = str(exc)
+
+                if judge_failure is not None:
+                    # No verdict, so the Tier-2 ceiling cannot be applied. Grep
+                    # alone would stand as an un-capped score, so declare the
+                    # infra failure: INFRA_SENTINEL in the detail is what routes
+                    # the run, not the score below.
+                    detail_parts.append(
+                        f"{INFRA_SENTINEL}: LLM judge failed: {judge_failure}"
+                    )
+                    final_score = 0.0
+                elif judge_score is not None:
                     final_score = min(grep_score, judge_score)
                     detail_parts.append(
                         f"grep={grep_score:.2f} judge={judge_score:.2f} final={final_score:.2f}"
@@ -388,15 +443,24 @@ class CheckpointRunner:
         # Validate artifacts
         artifact_results = self.validate_artifacts()
 
-        # Compute score
-        total = compute_score(checkpoint_results)
+        # A checkpoint that never reached a verdict has no score, so the run has
+        # no total: averaging its placeholder against the checkpoints that DID
+        # run yields a plausible number indistinguishable from a real one. Every
+        # failure is in checkpoint_results (and reward.txt); the routed dict
+        # names the first, which is what the re-run channel triages on.
+        infra_errors = [
+            cr.infra_error for cr in checkpoint_results if cr.infra_error is not None
+        ]
+
+        total = 0.0 if infra_errors else compute_score(checkpoint_results)
+        score_gates: list[str] = []
 
         # Grounded-citations gate: when the task demands grounded citations,
         # a required artifact failing validation zeroes the total — otherwise
         # the flag would be a side channel with no effect on the score or
         # exit code. Tasks without the flag keep legacy scoring untouched.
-        score_gates: list[str] = []
-        if self._grounding_required():
+        # Skipped on an invalid run: there is no score for a gate to force down.
+        if not infra_errors and self._grounding_required():
             failed_types = [
                 ar["type"] for ar in artifact_results if not ar["valid"]
             ]
@@ -416,11 +480,20 @@ class CheckpointRunner:
             artifact_results=artifact_results,
             total_score=total,
             score_gates=score_gates,
+            verifier_infra_error=(
+                infra_errors[0].as_verifier_error() if infra_errors else None
+            ),
         )
 
         # Write reward.txt
         reward_path = write_reward(verification, output_path)
-        print(f"[runner] Wrote {reward_path} — total_score={total:.4f}")
+        if infra_errors:
+            print(
+                f"[runner] Wrote {reward_path} — INVALID RUN: "
+                f"{len(infra_errors)} verifier(s) did not run"
+            )
+        else:
+            print(f"[runner] Wrote {reward_path} — total_score={total:.4f}")
 
         return verification
 

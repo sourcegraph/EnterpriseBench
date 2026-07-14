@@ -3,42 +3,81 @@ Between-session milestone verification.
 
 Runs milestone verifiers after each session to produce intermediate scores.
 Milestones are defined per-session in the chain task definition.
+
+Scoring goes through ``eb_verify.scorer_guard`` — the same trust boundary the
+Python checkpoint runner and ``test_runner.sh`` use — so all three runners share
+one definition of "the verifier reached a verdict". A verifier that did not
+reach one yields an :class:`InfraError`, never a number.
 """
 
 import subprocess
 import logging
-import json
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(REPO_ROOT / "lib"))
+from eb_verify.scorer_guard import InfraError, guard_checkpoint_verdict, no_verdict
 
 logger = logging.getLogger(__name__)
+
+_STAGE = "milestone"
 
 
 @dataclass
 class MilestoneResult:
-    """Result of running a single milestone verifier."""
+    """Result of running a single milestone verifier.
+
+    ``score`` is ``None`` exactly when ``infra_error`` is set: the verifier never
+    reached a verdict, so there is no score to record. Callers must not
+    substitute a number for it — a placeholder 0.0 is a false zero that blames
+    the agent for a broken harness, and a placeholder 1.0 is free credit.
+    """
+
     session_number: int
     milestone_name: str
     passed: bool
-    score: float  # 0.0 to 1.0
+    score: Optional[float]  # 0.0 to 1.0; None iff infra_error is set
     message: str = ""
+    infra_error: Optional[InfraError] = None
+
+    def __post_init__(self) -> None:
+        # The aggregators sum `score` unguarded, so an ill-formed result is either a
+        # crash or a laundered placeholder. Neither may be constructible.
+        if (self.score is None) != (self.infra_error is not None):
+            raise ValueError(
+                f"milestone {self.milestone_name!r}: exactly one of score/infra_error "
+                f"must be set — a verifier either reached a verdict or it did not "
+                f"(score={self.score!r}, infra_error={self.infra_error!r})"
+            )
 
 
 @dataclass
 class SessionScore:
     """Aggregate score for a single session's milestones."""
+
     session_number: int
     milestones: list[MilestoneResult] = field(default_factory=list)
 
     @property
-    def total_score(self) -> float:
-        if not self.milestones:
-            return 0.0
+    def total_score(self) -> Optional[float]:
+        """The mean milestone score, or None if any milestone never scored.
+
+        Returning None rather than averaging over the milestones that *did* score
+        is deliberate: a partial mean silently reweights the surviving milestones
+        and reads downstream as a legitimate result.
+        """
+        if not self.milestones or any(m.infra_error for m in self.milestones):
+            return None
         return sum(m.score for m in self.milestones) / len(self.milestones)
 
     @property
     def all_passed(self) -> bool:
-        return all(m.passed for m in self.milestones)
+        return bool(self.milestones) and all(
+            m.passed and m.infra_error is None for m in self.milestones
+        )
 
 
 def run_milestone_verifier(
@@ -50,22 +89,51 @@ def run_milestone_verifier(
 ) -> MilestoneResult:
     """Run a single milestone verifier script.
 
-    The verifier script receives the workspace path as its first argument.
-    It should exit 0 for pass, non-zero for fail.
-    stdout can contain a JSON object with {"score": float, "message": str}.
+    The verifier receives the workspace path as its first argument and MUST print
+    a JSON object carrying a numeric ``score`` in [0.0, 1.0]; ``message`` is
+    optional. Its exit code is read as pass/fail only, never as a score — see
+    ``guard_checkpoint_verdict``, which owns that rule for every runner.
     """
-    logger.info("Running milestone '%s' for session %d: %s",
-                milestone_name, session_number, verifier_path)
+    logger.info(
+        "Running milestone '%s' for session %d: %s",
+        milestone_name,
+        session_number,
+        verifier_path,
+    )
 
-    verifier = Path(verifier_path)
-    if not verifier.exists():
-        logger.warning("Verifier not found: %s", verifier_path)
+    def failed(error: InfraError) -> MilestoneResult:
+        logger.error(
+            "Milestone '%s' did not reach a verdict (%s): %s",
+            milestone_name,
+            error.cause,
+            error.detail,
+        )
         return MilestoneResult(
             session_number=session_number,
             milestone_name=milestone_name,
             passed=False,
-            score=0.0,
-            message="Verifier script not found",
+            score=None,
+            message=error.detail,
+            infra_error=error,
+        )
+
+    def did_not_run(cause: str, detail: str, **evidence: object) -> MilestoneResult:
+        return failed(
+            no_verdict(
+                cause,
+                detail,
+                checkpoint=milestone_name,
+                stage=_STAGE,
+                evidence=evidence,
+            )
+        )
+
+    verifier = Path(verifier_path)
+    if not verifier.exists():
+        return did_not_run(
+            "missing_verifier",
+            f"verifier script not found: {verifier_path}",
+            verifier=str(verifier_path),
         )
 
     try:
@@ -77,32 +145,38 @@ def run_milestone_verifier(
             cwd=workspace_path,
         )
     except subprocess.TimeoutExpired:
-        return MilestoneResult(
-            session_number=session_number,
-            milestone_name=milestone_name,
-            passed=False,
-            score=0.0,
-            message=f"Verifier timed out after {timeout_seconds}s",
+        return did_not_run(
+            "verifier_timeout",
+            f"verifier timed out after {timeout_seconds}s",
+            timeout_seconds=timeout_seconds,
+        )
+    except OSError as exc:
+        # A non-executable or non-ELF verifier raises here. Uncaught, it took the
+        # whole chain down mid-run — a harness bug reported as a crash, not a score.
+        return did_not_run(
+            "exec_error",
+            f"verifier could not be executed: {exc}",
+            verifier=str(verifier_path),
         )
 
-    passed = result.returncode == 0
-    score = 1.0 if passed else 0.0
-    message = ""
-
-    # Try to parse structured output from stdout
-    try:
-        output = json.loads(result.stdout)
-        score = float(output.get("score", score))
-        message = output.get("message", "")
-    except (json.JSONDecodeError, ValueError):
-        message = result.stdout.strip() if result.stdout else result.stderr.strip()
+    verdict = guard_checkpoint_verdict(
+        result.stdout,
+        result.returncode,
+        stderr=result.stderr,
+        checkpoint=milestone_name,
+        stage=_STAGE,
+    )
+    if isinstance(verdict, InfraError):
+        return failed(verdict)
 
     return MilestoneResult(
         session_number=session_number,
         milestone_name=milestone_name,
-        passed=passed,
-        score=score,
-        message=message,
+        # The verifier reached a verdict, so its exit code is a real pass/fail
+        # signal: the real verifiers emit partial credit (e.g. 0.6) with exit 1.
+        passed=result.returncode == 0,
+        score=verdict["score"],
+        message=str(verdict.get("message", "")),
     )
 
 
@@ -135,9 +209,13 @@ def run_session_milestones(
             milestone_name=milestone["name"],
         )
         session_score.milestones.append(result)
-        logger.info("  Milestone '%s': %s (score=%.2f)",
-                     result.milestone_name,
-                     "PASS" if result.passed else "FAIL",
-                     result.score)
+        # An infra result is already logged, with its cause, by run_milestone_verifier.
+        if result.infra_error is None:
+            logger.info(
+                "  Milestone '%s': %s (score=%.2f)",
+                result.milestone_name,
+                "PASS" if result.passed else "FAIL",
+                result.score,
+            )
 
     return session_score

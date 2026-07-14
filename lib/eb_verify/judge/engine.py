@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Optional
 
-from .backends import JudgeBackendError, create_backend
-from .models import CheckpointJudgeInput, CheckpointJudgeResult, normalize_score
+from .backends import create_backend
+from .models import CheckpointJudgeInput, CheckpointJudgeResult, validate_score
 from .prompts import CHECKPOINT_EVAL_PROMPT, CHECKPOINT_EVAL_SYSTEM
 
 
@@ -49,6 +49,14 @@ class LLMJudge:
 
         Returns:
             CheckpointJudgeResult with score, passed, reasoning, evidence.
+
+        Raises:
+            JudgeBackendError: the judge could not be reached or its response
+                could not be parsed.
+            JudgeScoreError: the judge responded, but with a non-score.
+
+        Both mean the judge reached no verdict, so neither may be turned into a
+        number here. The caller routes them to the re-run channel.
         """
         criteria_text = (
             "\n".join(f"- {c}" for c in judge_input.evaluation_criteria)
@@ -65,19 +73,9 @@ class LLMJudge:
             agent_output=judge_input.agent_output[:12000],  # truncate to fit context
         )
 
-        try:
-            response = self._backend.call(CHECKPOINT_EVAL_SYSTEM, user_prompt)
-        except JudgeBackendError as exc:
-            return CheckpointJudgeResult(
-                checkpoint_name=judge_input.checkpoint_name,
-                score=0.0,
-                passed=False,
-                reasoning=f"Judge backend error: {exc}",
-                confidence="low",
-                model=self.model,
-            )
+        response = self._backend.call(CHECKPOINT_EVAL_SYSTEM, user_prompt)
 
-        score = normalize_score(response.get("score", 0.0))
+        score = validate_score(response.get("score"))
         passed = score >= self.pass_threshold
 
         return CheckpointJudgeResult(

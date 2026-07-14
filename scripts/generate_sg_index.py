@@ -343,6 +343,12 @@ def build_index(
             entry["_loc_estimate"] = loc
             entry["_tier"] = compute_tier(loc)
 
+        # PLACEHOLDER, not a measurement. Nothing in this repo has ever produced
+        # or uploaded a precise index, so this is written False for every mirror
+        # unconditionally. Reading it back as "not indexed" is circular — it only
+        # reports this literal. Real status comes from
+        # `verify_sg_indexing.py --check-api`, which queries the instance and
+        # ignores this field.
         entry["_indexed"] = False
         entry["_task_count"] = len(repo_tasks[mid])
 

@@ -18,7 +18,18 @@ Usage:
     print(result.score, result.passed)
 """
 
+from eb_verify.judge.backends import JudgeBackendError
 from eb_verify.judge.engine import LLMJudge
-from eb_verify.judge.models import CheckpointJudgeInput, CheckpointJudgeResult
+from eb_verify.judge.models import (
+    CheckpointJudgeInput,
+    CheckpointJudgeResult,
+    JudgeScoreError,
+)
 
-__all__ = ["LLMJudge", "CheckpointJudgeInput", "CheckpointJudgeResult"]
+__all__ = [
+    "LLMJudge",
+    "CheckpointJudgeInput",
+    "CheckpointJudgeResult",
+    "JudgeBackendError",
+    "JudgeScoreError",
+]

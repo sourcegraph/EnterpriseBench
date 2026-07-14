@@ -68,7 +68,7 @@ be ratcheted toward target before each subsequent release.
 ### 1.6 Test suite
 
 ```bash
-# Verify library tests must be green
+# The full test suite (tests/) must be green
 make test
 ```
 

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "verifier_output.schema.json",
   "title": "EnterpriseBench Verifier Output",
-  "description": "Standardized output contract for all checkpoint verifiers. Verifiers MUST write JSON to stdout. Fallback: exit 0 = {score: 1.0, passed: true}, exit nonzero = {score: 0.0, passed: false}.",
+  "description": "Standardized output contract for all checkpoint verifiers. Verifiers MUST write JSON carrying a numeric 'score' to stdout. There is no exit-code fallback: a verifier that emits no parseable score has not reached a verdict, and its checkpoint is recorded as a verifier_infra_error (routed for re-run), never as a 1.0 or a 0.0.",
   "type": "object",
   "required": ["score", "passed"],
   "properties": {

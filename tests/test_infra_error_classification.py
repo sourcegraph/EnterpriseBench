@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -144,7 +143,25 @@ class TestRunTaskSourceLogic:
 
     def test_phase_guard_prevents_complete_override(self) -> None:
         # The success/complete override must be skipped for any infra-error
-        # phase (agent- or verifier-side), so infra errors route to re-run.
-        assert 'result.phase not in ("agent_infra_error", "verifier_infra_error")' in (
-            self.source
-        )
+        # phase (agent- or verifier-side), so infra errors route to re-run —
+        # and for a grading-asset integrity violation, which must never be
+        # recorded as a completed run (bead EnterpriseBench-8krz5).
+        from run_task import NON_COMPLETE_PHASES
+
+        assert NON_COMPLETE_PHASES == {
+            "agent_infra_error",
+            "verifier_infra_error",
+            "integrity_violation",
+        }
+
+    def test_judge_skipped_when_scores_are_untrusted(self) -> None:
+        # The judge must not run against scores the deterministic stage already
+        # flagged: there is nothing trustworthy left to put a ceiling on. An
+        # agent-side infra error is scoreable-but-failed, so it is NOT in this set.
+        from run_task import NON_COMPLETE_PHASES, UNTRUSTED_SCORE_PHASES
+
+        assert UNTRUSTED_SCORE_PHASES == {
+            "verifier_infra_error",
+            "integrity_violation",
+        }
+        assert UNTRUSTED_SCORE_PHASES < NON_COMPLETE_PHASES

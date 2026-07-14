@@ -15,7 +15,10 @@ fi
 # Check for actual code changes (any modified .py file in flask/src)
 HAS_CODE_CHANGES=0
 if [ -d "$WORKSPACE/flask/.git" ]; then
-    CHANGED_FILES=$(cd "$WORKSPACE/flask" && git diff --name-only HEAD~1 2>/dev/null | grep "\.py$" || true)
+    # --no-textconv/--no-ext-diff: the repo being diffed is the agent's, and a
+    # .gitattributes diff driver would otherwise run agent-chosen code inside the
+    # grader (bead EnterpriseBench-8krz5).
+    CHANGED_FILES=$(cd "$WORKSPACE/flask" && git diff --no-textconv --no-ext-diff --name-only HEAD~1 2>/dev/null | grep "\.py$" || true)
     if [ -n "$CHANGED_FILES" ]; then
         HAS_CODE_CHANGES=1
     fi

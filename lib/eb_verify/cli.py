@@ -5,6 +5,14 @@ Usage:
     python -m eb_verify.cli run <task.toml>
     python -m eb_verify.cli check <checkpoint_name> <task.toml>
     python -m eb_verify.cli validate-artifact <type> <path>
+
+Exit codes for `run` and `check`:
+    0  the agent scored above zero
+    1  the agent scored zero (a real, measured failure)
+    2  no score exists — a verifier never reached a verdict (infra error).
+
+A caller must not fold 2 into 1. They are opposite claims: 1 says the agent
+failed, 2 says the harness did and the run has to be re-run.
 """
 
 from __future__ import annotations
@@ -34,6 +42,15 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     print()
     print(result.summary())
+    # Exit 2 == "this run produced no score", distinct from both 0 (agent passed)
+    # and 1 (agent genuinely failed). A caller that treats nonzero as "agent
+    # failed" would otherwise bank a broken harness as a real 0.0.
+    if result.verifier_infra_error is not None:
+        print(
+            f"VERIFIER INFRA ERROR: {result.verifier_infra_error.get('detail', '')}",
+            file=sys.stderr,
+        )
+        return 2
     return 0 if result.total_score > 0 else 1
 
 
@@ -56,6 +73,12 @@ def cmd_check(args: argparse.Namespace) -> int:
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
+
+    if result.infra_error is not None:
+        # No verdict — there is no score to print. See cmd_run on exit code 2.
+        print(f"{result.name}: INFRA_ERROR (no score)")
+        print(f"  {result.infra_error.detail}", file=sys.stderr)
+        return 2
 
     status = "PASS" if result.passed else "FAIL"
     print(f"{result.name}: {status} (score={result.score:.2f})")

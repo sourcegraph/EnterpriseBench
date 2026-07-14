@@ -36,7 +36,7 @@ from eb_verify.judge.backends import (
     _parse_json,
     create_backend,
 )
-from eb_verify.judge.models import normalize_score
+from eb_verify.judge.models import JudgeScoreError, validate_score
 from eb_verify.judge.prompts import CHECKPOINT_EVAL_SYSTEM
 
 
@@ -74,27 +74,44 @@ class TestParseJson:
 
 
 # ---------------------------------------------------------------------------
-# normalize_score
+# validate_score
 # ---------------------------------------------------------------------------
 
-class TestNormalizeScore:
+class TestValidateScore:
+    @pytest.mark.parametrize("val,expected", [(0.5, 0.5), (1.0, 1.0), (0.0, 0.0), (1, 1.0)])
+    def test_real_scores_pass_through(self, val, expected):
+        assert validate_score(val) == expected
+
+    @pytest.mark.parametrize("val", [1.0 + 1e-9, -1e-9])
+    def test_float_slop_at_the_bounds_is_trimmed(self, val):
+        """A judge's rounding can land a hair outside; that is not a broken judge."""
+        assert validate_score(val) in (0.0, 1.0)
+
     @pytest.mark.parametrize(
-        "val,expected",
+        "val",
         [
-            (0.5, 0.5),
-            (1.0, 1.0),
-            (0.0, 0.0),
-            (1.5, 1.0),   # clamp high
-            (-0.3, 0.0),  # clamp low
-            ("0.5", 0.5),  # numeric string coerces
+            # Over-credit: a clamp turns each of these into a free 1.0.
+            float("nan"),  # min(1.0, nan) is 1.0 in CPython
+            float("inf"),
+            True,          # float(True) == 1.0, i.e. {"score": true}
+            999,
+            1.5,
+            "1.0",         # a string is not a score, even when it parses
+            # Under-credit: a clamp turns each of these into a false 0.0.
+            None,          # judge response carried no "score" key
+            "not a number",
+            -0.3,
+            object(),
         ],
     )
-    def test_in_and_out_of_range(self, val, expected):
-        assert normalize_score(val) == expected
+    def test_non_score_raises(self, val):
+        with pytest.raises(JudgeScoreError):
+            validate_score(val)
 
-    @pytest.mark.parametrize("val", [None, "not a number", object()])
-    def test_non_numeric_returns_zero(self, val):
-        assert normalize_score(val) == 0.0
+    def test_message_names_the_offending_value(self):
+        """Operators triaging a re-run must see what the judge actually said."""
+        with pytest.raises(JudgeScoreError, match="999"):
+            validate_score(999)
 
 
 # ---------------------------------------------------------------------------
@@ -517,30 +534,41 @@ class TestLLMJudgeScoring:
         )
         assert result.passed is True  # pass_threshold defaults to 0.5
 
-    def test_out_of_range_score_is_normalized(self):
-        judge, _ = _make_judge_with_mock_backend({"score": 5.0})
-        result = judge.evaluate_checkpoint(
-            CheckpointJudgeInput(
-                task_id="t", checkpoint_name="cp", agent_output="o", expected_solution="s"
+    @pytest.mark.parametrize("bad", [5.0, float("nan"), True, "1.0"])
+    def test_non_score_response_raises_instead_of_scoring(self, bad):
+        """Over-credit regression: each of these used to clamp to a free 1.0."""
+        judge, _ = _make_judge_with_mock_backend({"score": bad})
+        with pytest.raises(JudgeScoreError):
+            judge.evaluate_checkpoint(
+                CheckpointJudgeInput(
+                    task_id="t", checkpoint_name="cp", agent_output="o", expected_solution="s"
+                )
             )
-        )
-        assert result.score == 1.0
 
-    def test_backend_error_yields_zero_score_not_exception(self):
+    def test_response_without_a_score_raises(self):
+        judge, _ = _make_judge_with_mock_backend({"reasoning": "forgot to score"})
+        with pytest.raises(JudgeScoreError):
+            judge.evaluate_checkpoint(
+                CheckpointJudgeInput(
+                    task_id="t", checkpoint_name="cp", agent_output="o", expected_solution="s"
+                )
+            )
+
+    def test_backend_error_propagates_and_is_never_scored_zero(self):
+        """Under-credit regression: a judge OUTAGE is our failure, not the
+        agent's. It used to be recorded as a legitimate 0.0, which — through
+        min(grep, judge) — zeroed every checkpoint of the run."""
         judge = LLMJudge(model="claude-haiku-4-5-20251001")
         backend = MagicMock()
         backend.call.side_effect = JudgeBackendError("backend exploded")
         judge._backend = backend
 
-        result = judge.evaluate_checkpoint(
-            CheckpointJudgeInput(
-                task_id="t", checkpoint_name="cp", agent_output="o", expected_solution="s"
+        with pytest.raises(JudgeBackendError, match="backend exploded"):
+            judge.evaluate_checkpoint(
+                CheckpointJudgeInput(
+                    task_id="t", checkpoint_name="cp", agent_output="o", expected_solution="s"
+                )
             )
-        )
-        assert result.score == 0.0
-        assert result.passed is False
-        assert result.confidence == "low"
-        assert "Judge backend error" in result.reasoning
 
 
 class TestLLMJudgeInitFailure:

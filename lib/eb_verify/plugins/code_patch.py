@@ -17,8 +17,30 @@ DEFAULT_MAX_DIFF_LINES = 10_000
 DEFAULT_MIN_DIFF_LINES = 1
 
 
+# Every repo this module diffs is the agent's, and a git repo configures its own
+# code execution: .gitattributes picks a diff driver per path, and that driver's
+# textconv / command then names a program git runs while producing the diff. The
+# driver name is the attacker's to choose, so there is no fixed config key the
+# caller could pin to neutralize it — the execution has to be refused at the call
+# site. Scoring is unprivileged (run_task.SCORING_USER), so this is depth rather
+# than the only wall, but it keeps agent code out of the grader's process
+# entirely. --no-ext-diff covers the same trick via diff.external.
+_GIT_NO_EXEC_FLAGS = ("--no-textconv", "--no-ext-diff")
+
+
+def _git_diff_argv(*args: str) -> list[str]:
+    """argv for a ``git diff`` against an agent-controlled repo.
+
+    The one place the no-execute flags are attached, so a new diff call site
+    cannot forget them.
+    """
+    return ["git", "diff", *_GIT_NO_EXEC_FLAGS, *args]
+
+
 def _run_git_diff(args: list[str], repo_path: Path) -> str:
     """Run a ``git diff`` variant and return stdout, or raise DiffProbeError.
+
+    ``args`` are the arguments *after* ``git diff``.
 
     A git subprocess that fails to *run* (missing git, EACCES, corrupt .git,
     I/O error, timeout) or that exits non-zero is an infrastructure failure —
@@ -28,16 +50,16 @@ def _run_git_diff(args: list[str], repo_path: Path) -> str:
     """
     try:
         proc = subprocess.run(
-            ["git", *args],
+            _git_diff_argv(*args),
             capture_output=True, text=True, cwd=str(repo_path), timeout=30,
         )
     except subprocess.TimeoutExpired as exc:
-        raise DiffProbeError(f"git {' '.join(args)} timed out in {repo_path}") from exc
+        raise DiffProbeError(f"git diff {' '.join(args)} timed out in {repo_path}") from exc
     except OSError as exc:
-        raise DiffProbeError(f"git {' '.join(args)} failed to run in {repo_path}: {exc}") from exc
+        raise DiffProbeError(f"git diff {' '.join(args)} failed to run in {repo_path}: {exc}") from exc
     if proc.returncode != 0:
         raise DiffProbeError(
-            f"git {' '.join(args)} exited {proc.returncode} in {repo_path}: "
+            f"git diff {' '.join(args)} exited {proc.returncode} in {repo_path}: "
             f"{proc.stderr.strip()}"
         )
     return proc.stdout
@@ -46,8 +68,8 @@ def _run_git_diff(args: list[str], repo_path: Path) -> str:
 def _get_diff_stat(repo_path: Path) -> Optional[str]:
     """Return combined diff --stat output for a repo, or None if there is no
     diff. Raises :class:`DiffProbeError` if git itself fails."""
-    unstaged = _run_git_diff(["diff", "--stat", "HEAD"], repo_path)
-    staged = _run_git_diff(["diff", "--cached", "--stat"], repo_path)
+    unstaged = _run_git_diff(["--stat", "HEAD"], repo_path)
+    staged = _run_git_diff(["--cached", "--stat"], repo_path)
     combined = (unstaged.strip() + "\n" + staged.strip()).strip()
     return combined if combined else None
 
@@ -55,8 +77,8 @@ def _get_diff_stat(repo_path: Path) -> Optional[str]:
 def _get_diff_lines(repo_path: Path) -> int:
     """Return total number of diff lines (staged + unstaged). Raises
     :class:`DiffProbeError` if git itself fails."""
-    unstaged = _run_git_diff(["diff", "HEAD"], repo_path)
-    staged = _run_git_diff(["diff", "--cached"], repo_path)
+    unstaged = _run_git_diff(["HEAD"], repo_path)
+    staged = _run_git_diff(["--cached"], repo_path)
     return len(unstaged.splitlines()) + len(staged.splitlines())
 
 
@@ -69,14 +91,14 @@ def check_patch_applies(repo_path: Path) -> tuple[bool, str]:
     try:
         # Generate the diff and verify it can apply via --check
         diff_result = subprocess.run(
-            ["git", "diff", "HEAD"],
+            _git_diff_argv("HEAD"),
             capture_output=True, text=True, cwd=str(repo_path), timeout=30,
         )
         diff_text = diff_result.stdout
         if not diff_text.strip():
             # Try staged only
             diff_result = subprocess.run(
-                ["git", "diff", "--cached"],
+                _git_diff_argv("--cached"),
                 capture_output=True, text=True, cwd=str(repo_path), timeout=30,
             )
             diff_text = diff_result.stdout

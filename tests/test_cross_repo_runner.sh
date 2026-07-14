@@ -16,11 +16,25 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "=== Test 1: Missing .verifiers/ directory ==="
-# Patch WORKSPACE in runner
+FAILURES=0
+fail() {
+    echo "  FAIL: $*"
+    FAILURES=$((FAILURES + 1))
+}
+
+# Point the REAL runner at the temp workspace through the WORKSPACE env var it
+# honours. Do not string-patch a copy of its source: that silently no-ops the
+# moment the matched line is reworded, and the suite then scores against the
+# real /workspace and fails for unrelated reasons.
 PATCHED_RUNNER="$TMPDIR/test.sh"
-sed "s|WORKSPACE=\"/workspace\"|WORKSPACE=\"$WORKSPACE\"|g" "$RUNNER" > "$PATCHED_RUNNER"
+cat > "$PATCHED_RUNNER" <<WRAPPER
+#!/usr/bin/env bash
+export WORKSPACE="$WORKSPACE"
+exec bash "$RUNNER" "\$@"
+WRAPPER
 chmod +x "$PATCHED_RUNNER"
+
+echo "=== Test 1: Missing .verifiers/ directory ==="
 
 output=$(bash "$PATCHED_RUNNER" 2>/dev/null)
 exit_code=$?
@@ -28,7 +42,7 @@ exit_code=$?
 if [ "$exit_code" -ne 0 ] && echo "$output" | grep -q '"all_passed": false'; then
     echo "  PASS: Correctly reports failure when no .verifiers/ dir"
 else
-    echo "  FAIL: Expected non-zero exit and all_passed=false"
+    fail "Expected non-zero exit and all_passed=false"
     echo "  Exit code: $exit_code"
     echo "  Output: $output"
 fi
@@ -81,9 +95,6 @@ chmod +x "$WORKSPACE/.verifiers/02-cross-repo-link.sh"
 echo "weight=0.4" > "$WORKSPACE/.verifiers/01-alpha-exists.meta"
 echo "weight=0.6" > "$WORKSPACE/.verifiers/02-cross-repo-link.meta"
 
-# Re-patch and run
-sed "s|WORKSPACE=\"/workspace\"|WORKSPACE=\"$WORKSPACE\"|g" "$RUNNER" > "$PATCHED_RUNNER"
-
 output=$(bash "$PATCHED_RUNNER" 2>"$TMPDIR/stderr.log")
 exit_code=$?
 
@@ -96,14 +107,14 @@ echo ""
 if echo "$output" | python3 -c "import sys, json; d=json.load(sys.stdin); assert 'task_score' in d; assert 'checkpoints' in d; assert len(d['checkpoints'])==2; assert d['all_passed']==False; assert d['checkpoints_passed']==1" 2>/dev/null; then
     echo "  PASS: JSON structure valid, 1/2 passed, all_passed=false"
 else
-    echo "  FAIL: JSON validation failed"
+    fail "JSON validation failed"
 fi
 
 # Validate weighted score (0.4 * 1.0 + 0.6 * 0.0 = 0.4)
 if echo "$output" | python3 -c "import sys, json; d=json.load(sys.stdin); assert abs(d['task_score'] - 0.4) < 0.01, f'Expected 0.4, got {d[\"task_score\"]}'" 2>/dev/null; then
     echo "  PASS: Weighted score correct (0.4)"
 else
-    echo "  FAIL: Weighted score incorrect"
+    fail "Weighted score incorrect"
 fi
 
 # Validate per-checkpoint detail strings are preserved in output.json
@@ -117,20 +128,20 @@ assert by_name['02-cross-repo-link']['detail'] == 'go.mod not found in repo-beta
 " 2>/dev/null; then
     echo "  PASS: Per-checkpoint detail strings preserved"
 else
-    echo "  FAIL: Per-checkpoint detail strings missing or wrong"
+    fail "Per-checkpoint detail strings missing or wrong"
 fi
 
 # Validate repos listed
 if echo "$output" | python3 -c "import sys, json; d=json.load(sys.stdin); assert 'repo-alpha' in d['repos']; assert 'repo-beta' in d['repos']" 2>/dev/null; then
     echo "  PASS: Both repos listed in output"
 else
-    echo "  FAIL: Repos not listed correctly"
+    fail "Repos not listed correctly"
 fi
 
 if [ "$exit_code" -ne 0 ]; then
     echo "  PASS: Non-zero exit code (partial failure)"
 else
-    echo "  FAIL: Expected non-zero exit code"
+    fail "Expected non-zero exit code"
 fi
 
 echo ""
@@ -147,14 +158,14 @@ echo "  Exit code: $exit_code"
 if echo "$output" | python3 -c "import sys, json; d=json.load(sys.stdin); assert d['all_passed']==True; assert d['checkpoints_passed']==2; assert abs(d['task_score'] - 1.0) < 0.01" 2>/dev/null; then
     echo "  PASS: All checkpoints pass, score=1.0"
 else
-    echo "  FAIL: Expected all pass with score 1.0"
+    fail "Expected all pass with score 1.0"
     echo "$output" | python3 -m json.tool 2>/dev/null || echo "$output"
 fi
 
 if [ "$exit_code" -eq 0 ]; then
     echo "  PASS: Zero exit code (all passed)"
 else
-    echo "  FAIL: Expected zero exit code"
+    fail "Expected zero exit code"
 fi
 
 echo ""
@@ -166,7 +177,7 @@ exit_code=$?
 if [ "$exit_code" -eq 0 ] && echo "$output" | python3 -c "import sys, json; d=json.load(sys.stdin); assert d['passed']==True" 2>/dev/null; then
     echo "  PASS: Single checkpoint mode works"
 else
-    echo "  FAIL: Single checkpoint mode broken"
+    fail "Single checkpoint mode broken"
     echo "  Exit: $exit_code, Output: $output"
 fi
 
@@ -179,13 +190,16 @@ exit_code=$?
 if [ "$exit_code" -ne 0 ] && echo "$output" | grep -q "Invalid checkpoint name"; then
     echo "  PASS: Rejects path traversal in checkpoint name"
 else
-    echo "  FAIL: Should reject invalid checkpoint name"
+    fail "Should reject invalid checkpoint name"
     echo "  Exit: $exit_code, Output: $output"
 fi
 
 echo ""
-echo "=== Test 6: Verifier with no JSON output (fallback) ==="
+echo "=== Test 6: Verifier with no JSON output is infra, not a free 1.0 ==="
 
+# Exits 0 but never prints a verdict. The old exit-code fallback scored this a
+# full 1.0 — credit for a verifier that reported nothing. It must now refuse to
+# attest instead.
 cat > "$WORKSPACE/.verifiers/03-plain-exit.sh" << 'VERIFIER'
 #!/usr/bin/env bash
 echo "all good"
@@ -194,13 +208,12 @@ VERIFIER
 chmod +x "$WORKSPACE/.verifiers/03-plain-exit.sh"
 
 output=$(bash "$PATCHED_RUNNER" "03-plain-exit" 2>/dev/null)
-exit_code=$?
 
-if [ "$exit_code" -eq 0 ] && echo "$output" | python3 -c "import sys, json; d=json.load(sys.stdin); assert d['passed']==True; assert d['score']==1.0" 2>/dev/null; then
-    echo "  PASS: Plain-text verifier falls back to exit-code scoring"
+if echo "$output" | python3 -c "import sys, json; d=json.load(sys.stdin); assert d['verifier_ran']==False; assert d['passed']==False; assert d['score']==0.0; assert 'VERIFIER_INFRA_ERROR' in d['detail']" 2>/dev/null; then
+    echo "  PASS: No-JSON verifier is not attested (no fabricated score)"
 else
-    echo "  FAIL: Fallback scoring broken"
-    echo "  Exit: $exit_code, Output: $output"
+    fail "No-JSON verifier should be an infra error, not a score"
+    echo "  Output: $output"
 fi
 
 echo ""
@@ -225,7 +238,7 @@ assert d['checkpoints_total'] == 3, d['checkpoints_total']
 " 2>/dev/null; then
     echo "  PASS: Malicious repo dirname is escaped, no forged fields"
 else
-    echo "  FAIL: Repo dirname injection was not neutralized"
+    fail "Repo dirname injection was not neutralized"
     echo "  Exit: $exit_code, Output: $output"
 fi
 
@@ -257,11 +270,11 @@ assert 'pad' not in d, 'injected key escaped the top-level object'
 by_name = {c['name']: c for c in d['checkpoints']}
 assert '$MALICIOUS_CHECKPOINT' in by_name, 'malicious checkpoint name missing or mangled'
 for c in d['checkpoints']:
-    assert set(c.keys()) == {'name', 'weight', 'score', 'passed', 'detail', 'duration_ms', 'exit_code'}, c.keys()
+    assert set(c.keys()) == {'name', 'weight', 'score', 'passed', 'verifier_ran', 'detail', 'duration_ms', 'exit_code'}, c.keys()
 " 2>/dev/null; then
     echo "  PASS: Malicious checkpoint filename is escaped, no forged fields"
 else
-    echo "  FAIL: Checkpoint filename injection was not neutralized"
+    fail "Checkpoint filename injection was not neutralized"
     echo "  Exit: $exit_code, Output: $output"
 fi
 
@@ -294,7 +307,7 @@ assert by_name['01-alpha-exists']['weight'] == 1.0, by_name['01-alpha-exists']['
 " 2>/dev/null; then
     echo "  PASS: Malformed weight metadata falls back to default, no code execution"
 else
-    echo "  FAIL: Weight metadata injection was not neutralized"
+    fail "Weight metadata injection was not neutralized"
     echo "  Exit: $exit_code, Output: $output"
 fi
 
@@ -305,3 +318,8 @@ echo "weight=0.4" > "$WORKSPACE/.verifiers/01-alpha-exists.meta"
 
 echo ""
 echo "=== All tests complete ==="
+
+if [ "$FAILURES" -ne 0 ]; then
+    echo "=== $FAILURES check(s) FAILED ==="
+    exit 1
+fi
