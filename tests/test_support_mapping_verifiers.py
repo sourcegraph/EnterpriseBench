@@ -15,12 +15,12 @@ Also verifies:
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 from pathlib import Path
 
 import pytest
 
+from eb_verify.runner import checkpoint_env
 
 REPO_ROOT = Path(__file__).parent.parent
 TASK_BASE = REPO_ROOT / "benchmarks" / "customer_escalation"
@@ -49,18 +49,10 @@ def _run_verifier(
     verifier_path = task_dir / verifier
     assert verifier_path.exists(), f"Verifier not found: {verifier_path}"
 
-    env = os.environ.copy()
-    env["WORKSPACE"] = str(workspace)
-    env["TASK_DIR"] = str(task_dir)
-    env["TASK_ID"] = "test"
-    # Mirror CheckpointRunner.run_checkpoint, which is what really execs these in
-    # production: checks that shell out to `python -m eb_verify.…` need the harness
-    # on PYTHONPATH. Absolute, because we run with cwd=workspace — an inherited
-    # relative PYTHONPATH (the suite is run as `PYTHONPATH=lib pytest`) resolves
-    # against that tmp dir and silently fails to import.
-    env["PYTHONPATH"] = os.pathsep.join(
-        p for p in (str(REPO_ROOT / "lib"), env.get("PYTHONPATH", "")) if p
-    )
+    # The runner's own env, not a copy of it: these checks shell out to
+    # `python -m eb_verify.…`, and a hand-rolled PYTHONPATH here would keep
+    # passing after the runner stopped exporting one.
+    env = checkpoint_env(workspace, task_dir, "test")
 
     result = subprocess.run(
         ["bash", str(verifier_path)],

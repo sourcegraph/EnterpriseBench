@@ -37,6 +37,26 @@ logger = logging.getLogger(__name__)
 _LIB_DIR = Path(__file__).resolve().parents[1]
 
 
+def checkpoint_env(workspace: Path, task_dir: Path, task_id: str) -> dict[str, str]:
+    """The environment a checkpoint script runs with.
+
+    One definition, because tests that re-derive it are not a guard on it. The
+    sandbox builds the same keys against its staged copy of the harness
+    (scripts/orchestration/run_task.py). PYTHONPATH is absolute and prepended:
+    checkpoints run with cwd=workspace and exec scorers as `python -m eb_verify.…`,
+    so an inherited relative value would resolve against the workspace and the
+    import would fail.
+    """
+    env = os.environ.copy()
+    env["WORKSPACE"] = str(workspace)
+    env["TASK_DIR"] = str(task_dir)
+    env["TASK_ID"] = task_id
+    env["PYTHONPATH"] = os.pathsep.join(
+        p for p in (str(_LIB_DIR), env.get("PYTHONPATH", "")) if p
+    )
+    return env
+
+
 class _GroundednessCapableValidator(Protocol):
     """An artifact validator whose validate() accepts the groundedness flag.
 
@@ -183,17 +203,7 @@ class CheckpointRunner:
         :func:`eb_verify.scorer_guard.run_verifier_subprocess`, which owns both
         halves of that rule.
         """
-        env = os.environ.copy()
-        env["WORKSPACE"] = str(self.workspace)
-        env["TASK_DIR"] = str(self.task_dir)
-        env["TASK_ID"] = self.task.id
-        # Checkpoint scripts invoke scorers as `python -m eb_verify.…`. In the
-        # sandbox run_task.py stages the harness and exports PYTHONPATH; host-side
-        # this is the only place the checkpoint environment exists, so it has to
-        # happen here or every such scorer dies on ModuleNotFoundError.
-        env["PYTHONPATH"] = os.pathsep.join(
-            p for p in (str(_LIB_DIR), env.get("PYTHONPATH", "")) if p
-        )
+        env = checkpoint_env(self.workspace, self.task_dir, self.task.id)
 
         verdict = run_verifier_subprocess(
             checkpoint.verifier,

@@ -1,36 +1,24 @@
 """file_extraction scorer — did the agent name the right source files?
 
-Run as a ``python -m`` CLI by checkpoint scripts, not through the validator
-registry. ``eb_verify.runner`` puts the package on PYTHONPATH for every
-checkpoint it execs; in the sandbox ``run_task.py`` stages it and does the same.
+A ``python -m`` CLI rather than a registry validator: checkpoint scripts exec it
+directly, and the package reaches PYTHONPATH via ``eb_verify.runner`` (host) or
+``run_task.py`` staging (sandbox).
 
     ANSWER_FILE=... GT_FILE=... python3 -m eb_verify.plugins.file_extraction \
         --keys source_files,files,error_source.files
 
-Scoring: recall over ground truth — the fraction of ``required_files[].path``
-that the agent named. Partial credit; ``passed`` at >= 0.5. An answer only earns
-a required file if it identifies that file and no other (see :func:`score_answer`).
+Scoring is recall over ``required_files[].path``, partial credit, ``passed`` at
+>= 0.5. There is no precision term, so over-listing is free — that is what every
+file-discovery checkpoint in this benchmark already does, and diverging here
+alone would stop the tasks being comparable (bead vdeyx changes it everywhere).
 
-Recall carries no precision term, so over-listing is free: an agent that names
-every plausible file in the repo scores 1.0 without investigating. That is the
-semantics every file-discovery checkpoint in this benchmark already uses, so it
-is left alone here rather than silently diverging in one module — changing it is
-bead vdeyx, and it has to change everywhere at once or the tasks stop being
-comparable.
-
-Two failure modes are deliberately kept apart:
-
-* The *agent* failed (no answer.json, unparseable answer, nothing matched)
-  -> a legitimate ``0.0`` on exit 0.
-* The *harness* failed (ground truth missing, corrupt, or carrying no
-  required_files) -> score 0.0 whose ``detail`` carries
-  :data:`~eb_verify.scorer_guard.INFRA_SENTINEL`, on a nonzero exit.
-
-The distinction is the point of the module: a broken harness must never be
-recorded as an agent scoring zero (beads ssikq/kyo34). JSON always goes to
-stdout, even when exiting nonzero, so ``runner.py``'s json-parse branch wins
-deterministically instead of falling back to fabricating a score from the exit
-code.
+Agent failures (no answer, unparseable answer, nothing matched) score a real 0.0
+and exit 0. Harness failures (ground truth missing, corrupt, or empty) score 0.0
+with :data:`~eb_verify.scorer_guard.INFRA_SENTINEL` in ``detail`` and exit
+nonzero. Keeping the two apart is the point of the module: a broken harness must
+never be recorded as an agent zero (beads ssikq/kyo34). Every exit path prints
+JSON to stdout, failures included, because ``runner.py`` otherwise falls back to
+fabricating a score from the exit code.
 """
 
 from __future__ import annotations
@@ -43,10 +31,9 @@ import re
 import sys
 from typing import Any, Iterable, List
 
-# scorer_guard greps stderr/detail for this exact string to tell "the harness
-# broke" apart from "the agent scored zero". Import it rather than copying it:
-# the two must agree, and a silent drift would book our own infra failures as
-# agent zeros — the bug this module exists to close.
+# Import, never re-spell: scorer_guard greps for this exact string to tell a
+# harness failure apart from an agent zero, and a drift would reintroduce the
+# bug this module closes.
 from eb_verify.scorer_guard import INFRA_SENTINEL
 
 PASS_THRESHOLD = 0.5
@@ -57,13 +44,12 @@ class HarnessError(Exception):
 
 
 class _JsonErrorParser(argparse.ArgumentParser):
-    """An argparse parser that never writes bare usage text to the score channel.
+    """argparse that raises instead of printing usage — every exit must carry JSON.
 
-    Stock argparse answers a bad flag with usage on stderr and ``sys.exit(2)``,
-    and ``--help`` with text on stdout and ``sys.exit(0)`` — which ``runner.py``
-    would read as a non-JSON success and fabricate a 1.0 from. Every exit from
-    this CLI has to carry JSON, so parse failures become HarnessErrors and help
-    is switched off (the module docstring is the usage doc).
+    Stock argparse answers a bad flag with usage on stderr and exit 2, and
+    ``--help`` with text on stdout and exit 0 — which ``runner.py`` reads as a
+    non-JSON success and scores 1.0. So: parse failures become HarnessErrors,
+    and help is off (this docstring is the usage doc).
     """
 
     def error(self, message: str):  # noqa: D102 — argparse hook
@@ -80,18 +66,14 @@ def emit(score: float, detail: str, *, infra: bool = False) -> int:
         "detail": detail,
     }
     try:
-        # Flush inside the guard: print() buffers, so a broken pipe would
-        # otherwise surface as an "Exception ignored" traceback during
-        # interpreter shutdown, long after this function returned cleanly.
         print(json.dumps(verdict))
-        sys.stdout.flush()
+        sys.stdout.flush()  # print() buffers: flush inside the guard, not at exit
     except OSError:
-        # stdout is gone (broken pipe, closed fd), so the verdict cannot reach
-        # the scoring channel. Say so on stderr: runner.py falls back to stderr
-        # for `detail`, and scorer_guard scans it for this sentinel, so an
-        # undeliverable score is re-run rather than booked as a 0.0 the agent
-        # never earned. Point the dead fd at /dev/null first, or the same
-        # BrokenPipeError fires again at shutdown and masks this message.
+        # The verdict cannot reach the scoring channel. runner.py reads stderr as
+        # `detail` when stdout is empty and scorer_guard scans it for the sentinel,
+        # so an undeliverable score gets re-run instead of booked as a 0.0 the agent
+        # never earned. Redirect the dead fd first, or the same BrokenPipeError
+        # fires again at shutdown and masks this message.
         try:
             os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
         except OSError:
@@ -105,14 +87,12 @@ _CITATION_SUFFIX_RE = re.compile(r"(:\d+|#L\d+)$")
 
 
 def components(path: str) -> List[str]:
-    """Split a path into comparable components, tolerating agent formatting.
+    """Path components, with the decorations agents add stripped.
 
-    Normalizes away the decorations agents add ('./', '..', a leading '/',
-    backslashes, surrounding whitespace or quotes, a trailing ':<line>' or
-    '#L<line>' citation suffix) so matching compares path structure rather
-    than punctuation. normpath, not realpath: resolution is lexical because
-    these paths name files in a repo that need not exist here. posixpath, not
-    os.path, so a Windows host does not start emitting backslashes.
+    Handles './', '..', a leading '/', backslashes, quotes, whitespace, and a
+    trailing ':<line>' or '#L<line>' citation suffix, so matching compares path
+    structure rather than punctuation. Resolution is lexical (normpath, not
+    realpath) because these paths name files in a repo that need not exist here.
     """
     cleaned = str(path).strip().strip("'\"").replace("\\", "/")
     cleaned = _CITATION_SUFFIX_RE.sub("", cleaned)
@@ -122,14 +102,12 @@ def components(path: str) -> List[str]:
 def matches(gt_path: str, agent_path: str) -> bool:
     """Does ``agent_path`` name the file that ``gt_path`` names?
 
-    Symmetric path-component suffix match. Ground truth is repo-prefixed
-    ('httpx/httpx/_config.py') because it indexes a multi-repo workspace; an agent
-    working inside /workspace/httpx naturally answers repo-relative
-    ('httpx/_config.py'). Neither is wrong, so either may be the suffix of the other.
-
-    Comparing components (not raw string endswith) is what keeps
-    'httpx/my_config.py' from satisfying a GT of '.../_config.py' — the trap the
-    ~26 sibling check blobs fall into with `af.endswith(gt)`.
+    Symmetric component-suffix match. Ground truth is repo-prefixed
+    ('httpx/httpx/_config.py') because it indexes a multi-repo workspace, while an
+    agent working inside /workspace/httpx answers repo-relative ('httpx/_config.py').
+    Neither is wrong, so either may be the suffix of the other. Comparing components
+    rather than raw strings is what keeps 'httpx/my_config.py' from satisfying a
+    ground truth of '.../_config.py'.
     """
     gt, agent = components(gt_path), components(agent_path)
     if not gt or not agent:
@@ -141,20 +119,12 @@ def matches(gt_path: str, agent_path: str) -> bool:
 def score_answer(gt_paths: List[str], found: List[str]) -> "tuple[set, List[str]]":
     """Which required files the agent identified, and which guesses were ambiguous.
 
-    Credit is per *answer*, not per ground-truth entry, and only an answer that
-    picks out exactly one required file earns it. Scoring each GT entry
-    independently would let one under-specified guess claim several at once: with
-    httpx and httpcore both holding a ``_client.py``, the single answer
-    "_client.py" would otherwise score both repos' files and turn a non-answer
-    into full marks.
-
-    The flip side is that specificity is only demanded where it distinguishes
-    something. "setup.py" against a lone GT of "httpx/setup.py" is unambiguous
-    and scores — the agent named the file; there was no second candidate to tell
-    it apart from. That is why this is an ambiguity rule and not a
-    minimum-path-depth rule: depth is a proxy that both over-credits (two repos
-    sharing a 2-component tail) and under-credits (a repo-root file, whose only
-    natural repo-relative answer is a bare name).
+    Credit is per *answer*, and only an answer that picks out exactly one required
+    file earns it: with httpx and httpcore both holding a ``_client.py``, scoring
+    each ground-truth entry independently would let the lone guess "_client.py"
+    claim both and turn a non-answer into full marks. Specificity is demanded only
+    where it distinguishes something — "setup.py" against a lone ground truth of
+    "httpx/setup.py" is unambiguous and scores.
     """
     matched: set = set()
     ambiguous: List[str] = []
@@ -170,11 +140,10 @@ def score_answer(gt_paths: List[str], found: List[str]) -> "tuple[set, List[str]
 def load_json(path: str, what: str) -> Any:
     """Read a JSON file, or raise HarnessError. Never raises anything else.
 
-    The except clause is deliberately broad: any escaping exception would kill
-    the process before it printed JSON, which is the exact silent-scoring bug
-    this module was written to close. ValueError covers both JSONDecodeError and
-    UnicodeDecodeError (non-UTF-8 bytes); RecursionError (deeply nested JSON) is
-    neither that nor an OSError, and would otherwise escape.
+    An escaping exception would kill the process before it printed JSON, which is
+    the silent-scoring bug this module exists to close. ValueError covers both
+    JSONDecodeError and UnicodeDecodeError; RecursionError (deeply nested JSON) is
+    neither that nor an OSError.
     """
     if not path:
         raise HarnessError(f"{what} path is not set")
@@ -190,11 +159,10 @@ def load_json(path: str, what: str) -> Any:
 def ground_truth_files(gt_file: str) -> List[str]:
     """The distinct required_files[].path entries, in order.
 
-    Strict where :func:`agent_files` is lenient. An agent's answer is untrusted
-    input to be interpreted generously; ground truth is OUR artifact, and a
-    malformed entry means the task is mis-authored. Silently skipping such an
-    entry would quietly shrink the denominator and inflate every agent's score,
-    so anything unexpected fails closed as a harness error instead.
+    Strict where :func:`agent_files` is lenient: an agent's answer is untrusted
+    input to interpret generously, but ground truth is our own artifact, and
+    skipping a malformed entry would shrink the recall denominator and inflate
+    every agent's score. So anything unexpected fails closed.
     """
     gt = load_json(gt_file, "ground_truth.json")
     if not isinstance(gt, dict):
@@ -214,9 +182,8 @@ def ground_truth_files(gt_file: str) -> List[str]:
         path = entry["path"].strip()
         if not path:
             raise HarnessError(f"ground_truth.json required_files[{i}] path is empty")
-        # Two spellings of one file ('a/x.py' and './a/x.py') are one required
-        # file: counting both would distort the recall denominator, and an answer
-        # matching both would look ambiguous to the scorer below.
+        # 'a/x.py' and './a/x.py' are one required file: counting both would distort
+        # the denominator, and an answer matching both would look ambiguous below.
         key = tuple(components(path))
         if key in seen:
             continue
@@ -250,10 +217,9 @@ def _lookup(answer: Any, dotted_key: str) -> Any:
 def agent_files(answer: Any, keys: Iterable[str]) -> List[str]:
     """Files the agent named, unioned across every key.
 
-    Every key is accumulated rather than stopping at the first non-empty one:
-    scoring is recall-only (:func:`score_answer` dedups on the matched ground-
-    truth entry, not the raw guess), so a union cannot over-credit. First-key-
-    wins would instead let a wrong guess under an earlier key discard a fully
+    Union, not first-key-wins: scoring is recall-only and :func:`score_answer`
+    dedups on the matched ground-truth entry, so accumulating cannot over-credit,
+    while stopping at the first non-empty key lets one wrong guess discard a
     correct answer sitting under a later, harness-advertised key.
     """
     if not isinstance(answer, dict):

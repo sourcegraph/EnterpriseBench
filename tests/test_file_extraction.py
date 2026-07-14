@@ -69,9 +69,8 @@ def score_of(proc) -> float:
 def test_repo_prefixed_gt_matches_repo_relative_answer(tmp_path):
     """GT 'httpx/httpx/_config.py' must match an agent's 'httpx/_config.py'.
 
-    This is the whole point of --policy suffix. The ~18 sibling check blobs use
-    `gt in af or af.endswith(gt)`, which does NOT match this case and would keep
-    these tasks near-zero.
+    The sibling check scripts use `gt in af or af.endswith(gt)`, which does not
+    match this case and would keep these tasks near-zero.
     """
     gt = gt_with(tmp_path, ["httpx/httpx/_config.py", "httpcore/httpcore/_async/http11.py"])
     answer = write_json(tmp_path / "answer.json",
@@ -114,10 +113,9 @@ def test_empty_earlier_key_falls_through_to_later_key(tmp_path):
 
 
 def test_wrong_guess_in_earlier_key_does_not_discard_correct_later_key(tmp_path):
-    """The BUG-1 regression (rejection_reason_addendum): a populated-but-wrong
-    earlier key must not shadow a populated-and-right later key. Keys are
-    unioned, not first-key-wins -- recall-only scoring cannot over-credit from
-    a union, so there is no downside to accumulating across all of them."""
+    """A populated-but-wrong earlier key must not shadow a populated-and-right
+    later key: keys are unioned, and recall-only scoring cannot over-credit from
+    a union."""
     gt = gt_with(tmp_path, ["httpx/httpx/_config.py", "httpcore/httpcore/_client.py"])
     answer = write_json(tmp_path / "answer.json", {
         "source_files": ["totally/unrelated.py"],
@@ -254,9 +252,8 @@ def test_broken_ground_truth_fails_closed_as_infra_error(tmp_path, gt_payload):
 
 # --- the module must never exit without printing JSON ------------------------
 #
-# Every case below used to crash or print usage text instead of a verdict. An
-# exit with no JSON on stdout is the original bug wearing a different hat:
-# runner.py falls back to fabricating a score from the exit code.
+# An exit with no JSON on stdout leaves runner.py fabricating a score from the
+# exit code. Each case below crashed or printed usage text instead of a verdict.
 
 def test_non_utf8_ground_truth_is_an_infra_error_not_a_crash(tmp_path):
     gt = tmp_path / "ground_truth.json"
@@ -439,21 +436,17 @@ def test_deeply_nested_gt_is_an_infra_error_not_a_recursion_crash(tmp_path):
 
 # --- end-to-end through the real runner --------------------------------------
 #
-# Driven through CheckpointRunner, not by shelling out to the check script
-# directly: the runner is the real host-side caller, and it is what puts the
-# harness on PYTHONPATH. Invoking the script standalone would pass even if the
-# runner stopped exporting it — which is the missing-module false zero (ssikq)
-# wearing a different hat.
+# Driven through CheckpointRunner rather than by shelling out to the check script:
+# the runner is the real host-side caller and the thing that puts the harness on
+# PYTHONPATH, so a standalone invocation would pass even with that export gone.
 
 def run_error_source_checkpoint(task_dir: str, answer, tmp_path, monkeypatch):
     """Score the real error_source checkpoint of a real task against `answer`.
 
-    PYTHONPATH is scrubbed first. The suite itself is run with PYTHONPATH=lib, and
-    run_checkpoint inherits os.environ — so leaving it set would let the ambient
-    value carry the child process and these tests would still pass if the runner
-    stopped exporting it. Dropping it here is what makes them a real guard. (Safe
-    in-process: eb_verify is already imported, and PYTHONPATH is only read at
-    interpreter startup.)
+    PYTHONPATH is scrubbed first: the suite runs with PYTHONPATH=lib and
+    run_checkpoint inherits os.environ, so an ambient value would carry the child
+    process and these tests would pass with the runner's export removed. (Safe
+    in-process — PYTHONPATH is only read at interpreter startup.)
     """
     monkeypatch.delenv("PYTHONPATH", raising=False)
 
@@ -476,12 +469,10 @@ def correct_answer_for(task_dir: str):
 
 @pytest.mark.parametrize("task_dir", AFFECTED_TASKS)
 def test_real_checkpoint_scores_a_correct_answer(tmp_path, monkeypatch, task_dir):
-    """The regression that would have caught the missing module: before the fix
-    this checkpoint exited 1 with empty stdout and a ModuleNotFoundError, which
-    the runner books as a silent 0.0.
-
-    Also guards the runner's PYTHONPATH export: with it removed, this drops to
-    0.0 with 'No module named eb_verify' (verified by reverting the line)."""
+    """The regression that would have caught the missing module: the checkpoint
+    exited 1 with empty stdout and a ModuleNotFoundError, which the runner books
+    as a silent 0.0. Also guards the runner's PYTHONPATH export — remove it and
+    this drops to 0.0 with 'No module named eb_verify'."""
     result = run_error_source_checkpoint(
         task_dir, correct_answer_for(task_dir), tmp_path, monkeypatch
     )
@@ -504,12 +495,10 @@ def test_real_checkpoint_discriminates_a_wrong_answer(tmp_path, monkeypatch, tas
 
 # --- the real checkpoint must score the answer shapes the harness mandates ---
 #
-# scripts/orchestration/run_task.py's output_appendix (lines 405-426) puts
-# `code_paths` in every task's instructions unconditionally, and adds a
-# required `citations` list whenever task.toml sets require_grounded_citations
-# = true. An agent that follows those instructions to the letter is the
-# BUG-2 regression: --keys omitted both, so a fully spec-compliant answer
-# scored 0.0 on a 0.40-weight checkpoint.
+# run_task.py's output appendix puts `code_paths` in every task's instructions,
+# and adds a required `citations` list whenever task.toml sets
+# require_grounded_citations. An answer that follows those instructions to the
+# letter has to score on a checkpoint carrying 0.40 of the task's weight.
 
 def code_paths_answer_for(task_dir: str):
     """The absolute /workspace/<repo>/... shape run_task.py's appendix mandates."""
@@ -519,8 +508,8 @@ def code_paths_answer_for(task_dir: str):
 
 @pytest.mark.parametrize("task_dir", AFFECTED_TASKS)
 def test_real_checkpoint_scores_a_code_paths_answer(tmp_path, monkeypatch, task_dir):
-    """code_paths is in every task's mandated appendix (run_task.py:418), not
-    just the require_grounded_citations tasks -- must score 1.0 on both."""
+    """code_paths is mandated for every task, not just the
+    require_grounded_citations ones, so it must score on both."""
     result = run_error_source_checkpoint(
         task_dir, code_paths_answer_for(task_dir), tmp_path, monkeypatch
     )

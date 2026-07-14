@@ -11,13 +11,9 @@ point (`_run_scoring`, `_apply_llm_judge`, `code_patch.validate`). This corpus
 is one closed test per known corruption vector, wired into CI as a named merge
 blocker (`.github/workflows/ci.yml` → "Scoring-integrity corpus").
 
-**Scope note:** the `file_extraction` vectors below (`test_file_extraction_under_credit.py`)
-are not scorer_guard/INFRA_SENTINEL routing vectors — `guard_verifier_output`
-cannot catch a scoring-logic bug inside a verifier that ran cleanly and
-returned valid JSON. They cover the sibling class this corpus's opening
-paragraph also names: under-credit. Each asserts the correct `1.0`, not an
-infra sentinel, on a spec-compliant answer that a buggy verifier previously
-scored as a false zero.
+The `file_extraction` vectors are the under-credit direction, so they assert the
+correct `1.0` rather than an infra sentinel: `guard_verifier_output` cannot catch
+a scoring bug inside a verifier that ran cleanly and returned valid JSON.
 
 ## Vectors × tests
 
