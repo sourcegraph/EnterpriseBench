@@ -7,6 +7,7 @@ scoring primitive for file-discovery checkpoints (bead EnterpriseBench-vdeyx).
 
 from __future__ import annotations
 
+import operator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence
@@ -23,16 +24,16 @@ class FileSetScore:
     """Set-F1 verdict over a file-discovery answer.
 
     Every file-discovery checkpoint scores through this one primitive so the 28
-    checkpoints stay comparable (bead vdeyx settles the methodology benchmark-
-    wide). It replaces recall-only scoring, where listing extra files cost
-    nothing and enumerating every plausible file in the repo near-guaranteed
-    full credit without the investigation the checkpoint exists to measure.
+    checkpoints stay comparable; it replaces recall-only scoring, which charged
+    nothing for over-listing. Rationale and options considered:
+    docs/file_discovery_scoring_decision.md.
 
     Holds the four counts; precision/recall/F1 are derived. Counts, not paths,
     because not every matcher is a pairwise predicate — file_extraction.py's
     refinement rule credits per answer and can leave a guess ambiguous, so that
     call site constructs from counts while blob-style call sites go through
-    :func:`score_file_set`.
+    :func:`score_file_set`. Count-constructing callers owe the contract
+    :func:`score_file_set` enforces for them: counts are over DISTINCT files.
     """
 
     n_required: int  # distinct ground-truth files
@@ -40,7 +41,7 @@ class FileSetScore:
     n_listed: int  # distinct files the agent listed
     n_relevant: int  # listed files credited against >= 1 ground-truth file
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if min(self.n_required, self.n_matched, self.n_listed, self.n_relevant) < 0:
             raise ValueError(f"negative count in {self}")
         if self.n_matched > self.n_required:
@@ -67,10 +68,8 @@ class FileSetScore:
     def f1(self) -> float:
         """Harmonic mean of precision and recall; 0.0 when both are 0.
 
-        At the pass threshold this subsumes the "cap |answer| at 3x |GT|"
-        alternative: with full recall, F1 >= 0.5 iff n_listed <= 3*n_required —
-        but continuously, with no arbitrary constant, and still charging for
-        the enumeration a bare cap would wave through.
+        At the 0.5 pass bar this subsumes the "cap |answer| at 3x |GT|"
+        alternative; see docs/file_discovery_scoring_decision.md.
         """
         p, r = self.precision, self.recall
         if p + r == 0:
@@ -82,7 +81,7 @@ class FileSetScore:
         return self.f1 >= FILE_SET_PASS_THRESHOLD
 
     def detail(self) -> str:
-        """Human-readable verdict: found/total, listed count, P/R/F1."""
+        """Human-readable verdict."""
         return (
             f"{self.n_matched}/{self.n_required} required files found, "
             f"{self.n_listed} listed; "
@@ -93,7 +92,7 @@ class FileSetScore:
 def score_file_set(
     agent_files: Sequence[str],
     required_files: Sequence[str],
-    match: Callable[[str, str], bool] | None = None,
+    match: Callable[[str, str], bool] = operator.eq,
 ) -> FileSetScore:
     """Score a file-discovery answer against required files with set-F1.
 
@@ -108,8 +107,6 @@ def score_file_set(
     spellings of one file are the matcher's/call site's problem, not this
     function's.
     """
-    if match is None:
-        match = lambda agent, required: agent == required  # noqa: E731
     required = list(dict.fromkeys(required_files))
     listed = list(dict.fromkeys(agent_files))
     n_matched = sum(1 for gt in required if any(match(af, gt) for af in listed))

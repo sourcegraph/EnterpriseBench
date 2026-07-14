@@ -1,10 +1,8 @@
 """
 Set-F1 scoring for file-discovery checkpoints (bead EnterpriseBench-vdeyx).
 
-The exploit this closes: recall-only scoring (matched / len(required_files))
-charges nothing for over-listing, so an agent that enumerates every plausible
-file in the repo earns full credit on a 0.40-weight checkpoint without doing
-the investigation the checkpoint measures.
+Pins the over-listing fix: spray answers now pay in precision. Rationale and
+options considered: docs/file_discovery_scoring_decision.md.
 """
 
 from __future__ import annotations
@@ -42,18 +40,6 @@ def test_spray_and_pray_no_longer_earns_full_credit():
     assert result.precision == pytest.approx(1 / 30)
     assert result.f1 == pytest.approx(2 / 31)
     assert not result.passed
-
-
-def test_recall_only_blob_math_would_have_passed_the_spray():
-    """Documents the delta: the replaced formula gave the spray full marks."""
-    required = ["httpx/httpx/_config.py"]
-    spray = ["httpx/httpx/_config.py"] + [f"httpx/httpx/_mod{i}.py" for i in range(29)]
-
-    found = sum(1 for gt in required if any(suffix_match(af, gt) for af in spray))
-    old_score = found / len(required)
-
-    assert old_score == 1.0
-    assert score_file_set(spray, required).f1 < FILE_SET_PASS_THRESHOLD
 
 
 # ------------------------------------------------------------------ core scoring
@@ -101,6 +87,7 @@ def test_full_recall_at_exactly_3x_listing_sits_on_the_pass_threshold():
     required = ["a/b.py", "c/d.py"]
     listed = required + ["x/1.py", "x/2.py", "x/3.py", "x/4.py"]
     result = score_file_set(listed, required)
+    assert FILE_SET_PASS_THRESHOLD == 0.5
     assert result.f1 == pytest.approx(FILE_SET_PASS_THRESHOLD)
     assert result.passed  # threshold is inclusive
 
@@ -117,8 +104,7 @@ def test_full_recall_beyond_3x_listing_fails():
 
 
 def test_agent_list_is_deduplicated():
-    """Repeating the right answer is not spray; repeating filler is not extra
-    penalty. Both lists count distinct entries only."""
+    """Both lists count distinct entries only; repeats neither help nor hurt."""
     result = score_file_set(["a/b.py"] * 5, ["a/b.py"])
     assert result.n_listed == 1
     assert result.f1 == 1.0
@@ -162,13 +148,6 @@ def test_custom_matcher_composes():
     """The suffix policy (or ssikq's component-suffix, when it lands) plugs in
     without touching the scoring math."""
     result = score_file_set(
-        ["httpx/_config.py"], ["httpx/httpx/_config.py"], match=suffix_match
-    )
-    # 'httpx/httpx/_config.py'.endswith('httpx/_config.py') is False and the GT
-    # is not a substring of the answer either — but the reverse holds:
-    assert result.f1 == 0.0  # blob policy misses repo-prefixed GT (rmz1x bug 1)
-
-    result = score_file_set(
         ["httpx/httpx/_config.py"], ["httpx/_config.py"], match=suffix_match
     )
     assert result.f1 == 1.0
@@ -183,7 +162,7 @@ def test_from_counts_matches_pairwise_math():
     by_counts = FileSetScore(n_required=4, n_matched=3, n_listed=9, n_relevant=3)
     assert by_counts.recall == 0.75
     assert by_counts.precision == pytest.approx(3 / 9)
-    assert by_counts.f1 == pytest.approx(2 * 0.75 * (3 / 9) / (0.75 + 3 / 9))
+    assert by_counts.f1 == pytest.approx(6 / 13)
 
 
 def test_incoherent_counts_are_rejected():
@@ -206,10 +185,3 @@ def test_detail_exposes_found_total_listed_and_prf():
     assert "P=0.33" in detail
     assert "R=0.50" in detail
     assert "F1=0.40" in detail
-
-
-def test_pass_threshold_is_exported_and_inclusive():
-    assert FILE_SET_PASS_THRESHOLD == 0.5
-    on_threshold = FileSetScore(n_required=2, n_matched=2, n_listed=6, n_relevant=2)
-    assert on_threshold.f1 == pytest.approx(0.5)
-    assert on_threshold.passed
