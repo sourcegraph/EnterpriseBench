@@ -88,76 +88,54 @@ def run_shipped_check(script: Path, required_files, answer, tmp_path) -> dict:
         text=True,
         cwd=str(workspace),
         env=checkpoint_env(workspace, task_dir, "integrity-vector"),
+        timeout=30,  # as every other check-script runner in tests/ does: a hung
+                     # script must fail this gate, not stall CI on it forever
     )
     assert proc.stdout, f"{script.name} printed no verdict at all (stderr: {proc.stderr})"
     return json.loads(proc.stdout)
 
 
-@each_shipped_check
-def test_omitted_mandated_keys_zero_a_spec_compliant_answer(script, tmp_path):
-    """run_task.py's appendix mandates `code_paths` for every task, and
-    require_grounded_citations adds a mandatory `citations` list. An agent that
-    follows those instructions to the letter must not score 0.0 on a 0.40-weight
-    checkpoint because the shipped --keys omitted the key it was told to use."""
-    code_paths_answer = {"code_paths": [{"path": path} for path in ABSOLUTE]}
-    payload = run_shipped_check(script, GT, code_paths_answer, tmp_path)
-    assert payload["score"] == 1.0, f"code_paths: {payload['detail']}"
-
-    citations_answer = {"citations": [
+# One answer shape per key the shipped --keys must carry, so that dropping ANY key
+# from a check script turns this gate red. Derived by mutation, not by reading the
+# scripts: with a vector per key, `sed -i 's/,<key>//'` on a shipped script fails
+# exactly the case that names it.
+#
+# Coverage is the point, not variety. Scorer-internal behaviour (the full citation
+# dialect matrix, the ambiguity rule, the nested-ground-truth case) is exercised at
+# the unit layer in tests/test_file_extraction.py, where it does not cost a
+# merge-blocking gate a subprocess per case and cannot drift from a second copy of
+# the same table. What lives here is only what depends on the shipped artifact.
+#
+# `source_files` carries a citation suffix so that one end-to-end dialect case does
+# cross the real script — the suffix strip and the key list are the two halves of the
+# same false zero.
+ANSWER_SHAPES = {
+    "source_files": {"source_files": [f"{path}:120-140" for path in ABSOLUTE]},
+    "files": {"source_files": ["totally/unrelated.py"], "files": ABSOLUTE},
+    "error_source.files": {"error_source": {"files": ABSOLUTE}},
+    "code_paths": {"code_paths": [{"path": path} for path in ABSOLUTE]},
+    "citations": {"citations": [
         {"repo": repo, "file": path, "evidence_span": "x" * 20} for repo, path in GT
-    ]}
-    payload = run_shipped_check(script, GT, citations_answer, tmp_path)
-    assert payload["score"] == 1.0, f"citations: {payload['detail']}"
+    ]},
+}
 
 
 @each_shipped_check
-def test_first_key_wins_discards_a_correct_answer(script, tmp_path):
-    """A wrong guess under an earlier key must not discard a correct answer under
-    a later one. First-key-wins scored this 0.0 with the full answer in the JSON."""
-    answer = {"source_files": ["totally/unrelated.py"], "files": ABSOLUTE}
-    payload = run_shipped_check(script, GT, answer, tmp_path)
-    assert payload["score"] == 1.0, payload["detail"]
-    assert payload["passed"] is True
+@pytest.mark.parametrize("key", list(ANSWER_SHAPES), ids=list(ANSWER_SHAPES))
+def test_omitted_mandated_keys_zero_a_spec_compliant_answer(script, key, tmp_path):
+    """Every key the shipped --keys advertises must actually score.
 
+    run_task.py's appendix mandates `code_paths` in every task's instructions, and
+    require_grounded_citations adds a mandatory `citations` list, so an agent that
+    followed its instructions to the letter must not be scored 0.0 on a 0.40-weight
+    checkpoint because the check script omitted the key it was told to use. The other
+    three keys are the shapes the scorer promises to accept; a key silently dropped
+    from a script is a false zero for every agent that used it.
 
-@each_shipped_check
-@pytest.mark.parametrize("suffix", [
-    ":120",         # a bare line number
-    ":120-140",     # a line range — observed verbatim in captured results/
-    ":120:5",       # line:column, as grep -n / rg --vimgrep emit it
-    "#L120",        # GitHub blob anchor
-    "#L120-L140",   # GitHub range anchor
-    "?L120-140",    # Sourcegraph range anchor
-])
-def test_citation_suffix_does_not_break_a_match(script, suffix, tmp_path):
-    """Agents cite an exact line alongside the evidence span. Unstripped, the suffix
-    fails the match and zeros a right answer. Every arm's dialect is here: stripping
-    the baseline arm's grep-style citation but not the MCP arm's Sourcegraph anchor
-    would be a mode-correlated scoring bias, an MCP regression no agent caused."""
-    answer = {"source_files": [f"{path}{suffix}" for path in ABSOLUTE]}
-    payload = run_shipped_check(script, GT, answer, tmp_path)
-    assert payload["score"] == 1.0, f"suffix {suffix!r}: {payload['detail']}"
-
-
-@each_shipped_check
-def test_nested_ground_truth_does_not_zero_a_perfect_answer(script, tmp_path):
-    """When one required file's path is a component-suffix of another's, a fully
-    specified answer must still score: the ambiguity rule exists to stop a vague guess
-    claiming several required files, not to punish a precise one. Under the old rule
-    every guess in this perfect, instruction-compliant answer matched more than one
-    required file and was booked 'ambiguous' — 0/3 for a flawless answer.
-
-    The ground truth is technical_debt/refactor-orchestration-tri-babel-001's shape
-    verbatim (the tokio task repeats it with Cargo.toml).
+    The `files` case doubles as the first-key-wins guard: the answer is wrong under
+    the earlier `source_files` and right under the later `files`, so it only scores
+    if the keys are unioned rather than stopping at the first populated one.
     """
-    nested_gt = [
-        ("babel", "packages/babel-parser/package.json"),
-        ("webpack", "package.json"),
-        ("nextjs", "packages/next/package.json"),
-    ]
-    answer = {"code_paths": [
-        {"path": f"/workspace/{repo}/{path}"} for repo, path in nested_gt
-    ]}
-    payload = run_shipped_check(script, nested_gt, answer, tmp_path)
-    assert payload["score"] == 1.0, payload["detail"]
-    assert "ambiguous" not in payload["detail"]
+    payload = run_shipped_check(script, GT, ANSWER_SHAPES[key], tmp_path)
+    assert payload["score"] == 1.0, f"--keys is missing {key!r}: {payload['detail']}"
+    assert payload["passed"] is True

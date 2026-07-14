@@ -5,7 +5,7 @@ directly, and the package reaches PYTHONPATH via ``eb_verify.runner`` (host) or
 ``run_task.py`` staging (sandbox).
 
     ANSWER_FILE=... GT_FILE=... python3 -m eb_verify.plugins.file_extraction \
-        --keys source_files,files,error_source.files
+        --keys source_files,files,error_source.files,code_paths,citations
 
 Scoring is recall over ``required_files[].path``, partial credit, ``passed`` at
 >= 0.5. There is no precision term, so over-listing is free — that is what every
@@ -129,7 +129,7 @@ def matches(gt_path: str, agent_path: str) -> bool:
     return longer[-len(shorter):] == shorter
 
 
-def score_answer(gt_paths: List[str], found: List[str]) -> "tuple[set[str], List[str]]":
+def score_answer(gt_paths: List[str], found: List[str]) -> tuple[set[str], List[str]]:
     """Which required files the agent identified, and which guesses were ambiguous.
 
     Credit is per *answer*, never per ground-truth entry: with httpx and httpcore
@@ -308,8 +308,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--keys",
         required=True,
-        help="Comma-separated answer keys to try, in order. Dotted keys traverse "
-             "nested objects (e.g. error_source.files).",
+        help="Comma-separated answer keys, unioned — every key is read, not just the "
+             "first populated one. Dotted keys traverse nested objects "
+             "(e.g. error_source.files).",
     )
     return parser
 
