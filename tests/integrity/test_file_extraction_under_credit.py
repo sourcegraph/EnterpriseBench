@@ -17,14 +17,24 @@ a check script and these go red.
 from __future__ import annotations
 
 import json
+import os
+import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 # The runner's own env builder, not a copy of it: a hand-rolled PYTHONPATH here
-# would keep passing after the runner stopped exporting one.
-from eb_verify.runner import checkpoint_env
+# would keep passing after the runner stopped exporting one. _LIB_DIR is the runner's
+# own notion of where eb_verify lives — asserting against a copy of it would be the
+# same drift this whole corpus exists to catch.
+from eb_verify.runner import _LIB_DIR, checkpoint_env
+
+# The scorer's OWN argument parser, so shipped_keys() reads --keys exactly as the
+# scorer does — no second, drift-prone parser. HarnessError is what it raises on a
+# malformed invocation.
+from eb_verify.plugins.file_extraction import HarnessError, build_parser
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -89,6 +99,65 @@ def run_shipped_check(script: Path, answer, tmp_path) -> dict:
     return json.loads(proc.stdout)
 
 
+def shipped_keys(script: Path, tmp_path) -> set[str]:
+    """The ``--keys`` a shipped check script actually passes to the scorer.
+
+    Captured from the REAL post-shell-expansion argv via a PATH shim standing in for
+    ``python3``, never parsed from the script text. That is what makes it robust to
+    every shell form a text scan trips on — ``--keys=a,b``, a ``$KEYS`` variable, a
+    line-continuation reformat — because the shim reads argv after the shell is done
+    with it. (An earlier plan to regex the script text was rejected for exactly that
+    fragility.)
+    """
+    module = "eb_verify.plugins.file_extraction"
+    bindir = tmp_path / "shimbin"
+    bindir.mkdir(exist_ok=True)
+    dump = tmp_path / "argv.txt"
+    # A bash shim (never `#!/usr/bin/env python3`, which would re-invoke itself and
+    # recurse). It records argv ONLY for the scorer invocation and delegates every
+    # other python3 call to the real interpreter, so a future adopter that runs python3
+    # for setup before the scorer is not silently swallowed — the corpus auto-adopts
+    # check scripts by content-glob, so this test must survive scripts it has not seen.
+    shim = bindir / "python3"
+    shim.write_text(
+        "#!/usr/bin/env bash\n"
+        'for a in "$@"; do\n'
+        f'  if [ "$a" = {shlex.quote(module)} ]; then\n'
+        f'    printf "%s\\n" "$@" > {shlex.quote(str(dump))}\n'
+        "    exit 0\n"
+        "  fi\n"
+        "done\n"
+        f'exec {shlex.quote(sys.executable)} "$@"\n'
+    )
+    shim.chmod(0o755)
+
+    workspace = tmp_path / "ws"
+    (workspace / "agent_output").mkdir(parents=True, exist_ok=True)
+    task_dir = tmp_path / "task"
+    task_dir.mkdir(exist_ok=True)
+    env = checkpoint_env(workspace, task_dir, "shipped-keys-probe")
+    env["PATH"] = str(bindir) + os.pathsep + env["PATH"]
+
+    subprocess.run(
+        ["bash", str(script)],
+        capture_output=True, text=True, cwd=str(workspace),
+        env=env, timeout=30, check=True,
+    )
+    if not dump.exists():
+        return set()  # the script never invoked the scorer; the caller asserts non-vacuity
+    argv = dump.read_text().splitlines()
+    # Slice to the scorer's own arguments (everything after the module token) and hand
+    # them to the scorer's real parser, so `--keys a,b` and `--keys=a,b` both normalize
+    # the one way the scorer itself normalizes them. The captured argv is already
+    # post-shell-expansion, so a `$KEYS` variable or a line-continuation is long gone.
+    scorer_argv = argv[argv.index(module) + 1:] if module in argv else argv
+    try:
+        raw = build_parser().parse_known_args(scorer_argv)[0].keys or ""
+    except HarnessError:
+        return set()  # no --keys at all; non-vacuity assertion in the test reports it
+    return {k.strip() for k in raw.split(",") if k.strip()}
+
+
 # One answer shape per key the shipped --keys must carry, so that dropping ANY key
 # from a check script turns this gate red. Derived by mutation, not by reading the
 # scripts: with a vector per key, `sed -i 's/,<key>//'` on a shipped script fails
@@ -137,3 +206,50 @@ def test_omitted_mandated_keys_zero_a_spec_compliant_answer(script, key, tmp_pat
     payload = run_shipped_check(script, ANSWER_SHAPES[key], tmp_path)
     assert payload["score"] == 1.0, f"--keys is missing {key!r}: {payload['detail']}"
     assert payload["passed"] is True
+
+
+@pytest.mark.parametrize(
+    "script",
+    FILE_EXTRACTION_CHECKS,
+    ids=[path.parent.parent.name for path in FILE_EXTRACTION_CHECKS],
+)
+def test_every_shipped_key_has_a_covering_vector(script, tmp_path):
+    """A key ADDED to a shipped ``--keys`` must not go uncovered.
+
+    The parametrized test above catches a key REMOVED — its answer shape drops to 0.0.
+    This catches the other direction: a new key with no vector in ``ANSWER_SHAPES``
+    would be a silent false zero for every agent that answered under it, and nothing
+    would notice (adding ``,evidence_files`` to a shipped script left the gate green).
+    Together the two force ``ANSWER_SHAPES`` to equal the shipped key set — one
+    advertised case per shipped entry, no more and no fewer.
+
+    The shipped keys are DISCOVERED BY EXECUTION (``shipped_keys`` captures the real
+    argv), never restated here, so this cannot drift from the artifact the way a copied
+    key list would.
+    """
+    keys = shipped_keys(script, tmp_path)
+    assert keys, f"{script} passed no --keys to the scorer"  # non-vacuity
+    uncovered = keys - set(ANSWER_SHAPES)
+    assert not uncovered, (
+        f"{script.parent.parent.name} ships --keys {sorted(keys)} but ANSWER_SHAPES "
+        f"exercises no answer shape for {sorted(uncovered)}; a dropped or added key "
+        f"would false-zero a spec-compliant answer with no gate catching it"
+    )
+
+
+def test_checkpoint_env_prepends_the_lib_dir_to_pythonpath(tmp_path):
+    """A DIRECT guard on the PYTHONPATH export, not one riding on an import succeeding.
+
+    Every execution-based vector above imports eb_verify via `python -m`, and CI
+    pip-installs lib/, so that import resolves with OR without PYTHONPATH — a change
+    that silently dropped the export from checkpoint_env would ship green through all of
+    them. This asserts the built env dict itself against the runner's own _LIB_DIR, so
+    the export is guarded regardless of how eb_verify happens to be installed. Pure unit
+    check: it never runs on the shipped scorer import path, so it cannot itself become a
+    false-zero source in the sandbox.
+    """
+    env = checkpoint_env(tmp_path / "ws", tmp_path / "task", "probe")
+    first = env["PYTHONPATH"].split(os.pathsep)[0]
+    assert first == str(_LIB_DIR), (
+        f"checkpoint_env must prepend the lib dir to PYTHONPATH; got {env['PYTHONPATH']!r}"
+    )

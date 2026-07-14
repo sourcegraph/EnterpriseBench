@@ -44,17 +44,23 @@ up whatever check scripts adopt the scorer next with no edit here.
 | failed session → final checkpoints score an unworked workspace → free 1.0 | over-credit | 6c9wp | `test_failed_first_session_scores_nothing_and_never_runs_the_checkpoints` |
 | chain aborted mid-way → total computed from the earlier sessions' milestones | over-credit | 6c9wp | `test_mid_chain_failure_does_not_score_from_the_earlier_milestones` |
 | `file_extraction` shipped `--keys` drops a key the answer names its files under | under-credit | ssikq | `test_omitted_mandated_keys_zero_a_spec_compliant_answer` |
+| `file_extraction` shipped `--keys` gains a key no answer shape exercises | under-credit | ssikq | `test_every_shipped_key_has_a_covering_vector` |
 | the scan above finds no check script at all (vectors pass vacuously) | — | ssikq | `test_the_corpus_actually_found_the_scorers_call_sites` |
 | this table cites a test the corpus does not contain | false coverage | ssikq | `test_every_test_this_readme_cites_exists` |
 | a row of this table names no test at all | false coverage | ssikq | `test_every_readme_row_names_a_test` |
 
-The `file_extraction` row is one case per entry in the shipped `--keys` — including
-the `code_paths` and `citations` that run_task.py's appendix and
-`require_grounded_citations` *mandate* agents answer under — run against every check
-script that execs the scorer. Drop any key from any of them and it goes red. It covers
-the two scripts that exec `eb_verify.plugins.file_extraction` today and any that adopt
-it later; it says nothing about the ~39 sibling checkpoints that still match files with
-an inline `af.endswith(gt)`, which carry all the same defects and are bead `rmz1x`.
+The two `file_extraction` `--keys` rows enforce coverage in both directions, so
+`ANSWER_SHAPES` is held equal to the shipped key set — exactly one advertised case per
+shipped entry, no more and no fewer. The *drop* row runs one answer shape per covered
+key against every shipped script (including the `code_paths` and `citations` that
+run_task.py's appendix and `require_grounded_citations` *mandate* agents answer under),
+so removing a key turns its case red. The *add* row discovers the shipped keys by
+executing each script under a `python3` shim that captures the real argv — never by
+restating the list — and fails when a shipped key has no covering shape, so a key added
+with no vector cannot slip through green. Both cover the two scripts that exec
+`eb_verify.plugins.file_extraction` today and any that adopt it later; they say nothing
+about the ~39 sibling checkpoints that still match files with an inline
+`af.endswith(gt)`, which carry all the same defects and are bead `rmz1x`.
 
 What the scorer does with the files once it has them — the citation-suffix dialects, the
 ambiguity and refinement rules, nested ground truth — is unit-tested in

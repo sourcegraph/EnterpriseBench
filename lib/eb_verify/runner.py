@@ -40,12 +40,15 @@ _LIB_DIR = Path(__file__).resolve().parents[1]
 def checkpoint_env(workspace: Path, task_dir: Path, task_id: str) -> dict[str, str]:
     """The environment a checkpoint script runs with.
 
-    One definition, because tests that re-derive it are not a guard on it. The
-    sandbox builds the same keys against its staged copy of the harness
-    (scripts/orchestration/run_task.py). PYTHONPATH is absolute and prepended:
-    checkpoints run with cwd=workspace and exec scorers as `python -m eb_verify.…`,
-    so an inherited relative value would resolve against the workspace and the
-    import would fail.
+    One definition, because tests that re-derive it are not a guard on it. The sandbox
+    stages its own copy of the harness (scripts/orchestration/run_task.py), which
+    exports WORKSPACE, TASK_DIR and PYTHONPATH — but NOT TASK_ID, which only this host
+    builder sets. So a checkpoint that reads TASK_ID sees it on the host and not in the
+    sandbox; no active check script does today (they only document it in a header), so
+    the divergence is latent, but the two envs are not identical and a script must not
+    assume they are. PYTHONPATH is absolute and prepended: checkpoints run with
+    cwd=workspace and exec scorers as `python -m eb_verify.…`, so an inherited relative
+    value would resolve against the workspace and the import would fail.
     """
     env = os.environ.copy()
     env["WORKSPACE"] = str(workspace)

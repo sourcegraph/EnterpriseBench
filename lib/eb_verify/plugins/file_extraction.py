@@ -12,13 +12,18 @@ Scoring is recall over ``required_files[].path``, partial credit, ``passed`` at
 file-discovery checkpoint in this benchmark already does, and diverging here
 alone would stop the tasks being comparable (bead vdeyx changes it everywhere).
 
-Agent failures (no answer, unparseable answer, nothing matched) score a real 0.0
-and exit 0. Harness failures (ground truth missing, corrupt, or empty) score 0.0
-with :data:`~eb_verify.scorer_guard.INFRA_SENTINEL` in ``detail`` and exit
-nonzero. Keeping the two apart is the point of the module: a broken harness must
-never be recorded as an agent zero (beads ssikq/kyo34). Every exit path prints
-JSON to stdout, failures included, because ``runner.py`` otherwise falls back to
-fabricating a score from the exit code.
+Agent failures score a real 0.0 and exit 0: an answer the agent never wrote (the
+file is absent), an answer it wrote badly (unparseable), or one that matched
+nothing. Harness failures score 0.0 with
+:data:`~eb_verify.scorer_guard.INFRA_SENTINEL` in ``detail`` and exit nonzero:
+ground truth missing/corrupt/empty, ``ANSWER_FILE`` unset, or an answer file that
+*exists but cannot be read* — a permission/UID mismatch on a docker-cp'd file
+(beads hktt/pt0n) is our problem, not the agent's, and folding it in with the
+absent-file case is the fail-open zero bead ssikq reopened. Only ``not isfile`` is
+an agent zero; an ``OSError`` on a present file is infra. Keeping the two apart is
+the point of the module: a broken harness must never be recorded as an agent zero
+(beads ssikq/kyo34). Every exit path prints JSON to stdout, failures included,
+because ``runner.py`` otherwise falls back to fabricating a score from the exit code.
 """
 
 from __future__ import annotations
@@ -41,6 +46,26 @@ PASS_THRESHOLD = 0.5
 
 class HarnessError(Exception):
     """The verifier could not run — our bug, never the agent's."""
+
+
+class MissingFile(HarnessError):
+    """The file is simply absent (``not os.path.isfile``).
+
+    A subclass so :func:`main` can tell "the agent produced no answer" (a real 0.0)
+    apart from "the file exists but we could not read it" (infra). For ground truth
+    the distinction is moot — a missing GT is infra either way — so
+    :func:`ground_truth_files` still catches the base class and treats every failure
+    as infra.
+    """
+
+
+class MalformedJson(HarnessError):
+    """The file existed and was readable, but its bytes are not JSON.
+
+    Malformed *agent* output is a real agent zero; malformed *ground truth* is infra.
+    The caller decides which; the type only records that the failure was in the
+    content, not in the IO.
+    """
 
 
 class _JsonErrorParser(argparse.ArgumentParser):
@@ -69,11 +94,13 @@ def emit(score: float, detail: str, *, infra: bool = False) -> int:
         print(json.dumps(verdict))
         sys.stdout.flush()  # print() buffers: flush inside the guard, not at exit
     except OSError:
-        # The verdict cannot reach the scoring channel. runner.py reads stderr as
-        # `detail` when stdout is empty and scorer_guard scans it for the sentinel,
-        # so an undeliverable score gets re-run instead of booked as a 0.0 the agent
-        # never earned. Redirect the dead fd first, or the same BrokenPipeError
-        # fires again at shutdown and masks this message.
+        # The verdict cannot reach the scoring channel — a dead stdout pipe. There is
+        # no host-side rescue today: CheckpointRunner.run_checkpoint reads stderr into
+        # `detail` only for display and never runs scorer_guard, so an empty stdout with
+        # a nonzero exit is booked as a plain 0.0, sentinel or not (that host-path gap is
+        # bead wto43 — not fixed here). We still redirect the dead fd and re-emit the
+        # sentinel to stderr so the failure is legible in the logs, and so the same
+        # BrokenPipeError does not fire again at shutdown and mask this message.
         try:
             os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
         except OSError:
@@ -129,28 +156,22 @@ def components(path: str) -> List[str]:
     return [p for p in posixpath.normpath(cleaned).split("/") if p not in ("", ".", "..")]
 
 
-def matches(gt_path: str, agent_path: str) -> bool:
-    """Does ``agent_path`` name the file that ``gt_path`` names?
+def _matches_parts(gt: List[str], agent: List[str]) -> bool:
+    """Does an answer name the file ground truth names? — over pre-split components.
 
     Symmetric component-suffix match. Ground truth is repo-prefixed
     ('httpx/httpx/_config.py') because it indexes a multi-repo workspace, while an
     agent working inside /workspace/httpx answers repo-relative ('httpx/_config.py').
-    Neither is wrong, so either may be the suffix of the other. Comparing components
-    rather than raw strings is what keeps 'httpx/my_config.py' from satisfying a
-    ground truth of '.../_config.py'.
-    """
-    return _matches_parts(components(gt_path), components(agent_path))
+    Neither is wrong, so either component list may be the suffix of the other. Comparing
+    components rather than raw strings is what keeps 'httpx/my_config.py' from
+    satisfying a ground truth of '.../_config.py'.
 
-
-def _matches_parts(gt: List[str], agent: List[str]) -> bool:
-    """:func:`matches`, over components already split — the form the scoring loop holds.
-
-    Splitting a path is not free: it runs the citation regex over the whole string. The
-    loop in :func:`score_answer` already holds both component lists, so going back
-    through :func:`matches` would re-derive them once per (ground truth, answer) pair —
-    a factor of ``1 + 2*len(gt_paths)`` more regex scans than the answer has paths. On a
-    pathological answer that is a constant factor re-applied to precisely the input the
-    bound on ``_CITATION_SUFFIX_RE`` exists to keep cheap, so the two belong together.
+    Takes components already split because splitting is not free — it runs the citation
+    regex over the whole string. :func:`score_answer` holds both component lists
+    already, and routing back through a str-level entry point would re-derive them once
+    per (ground truth, answer) pair: a factor of ``1 + 2*len(gt_paths)`` more regex
+    scans than the answer has paths, a constant factor re-applied to precisely the input
+    the bound on ``_CITATION_SUFFIX_RE`` exists to keep cheap.
     """
     if not gt or not agent:
         return False
@@ -229,22 +250,33 @@ def score_answer(gt_paths: List[str], found: List[str]) -> tuple[set[str], List[
 
 
 def load_json(path: str, what: str) -> Any:
-    """Read a JSON file, or raise HarnessError. Never raises anything else.
+    """Read a JSON file, or raise a HarnessError subclass. Never raises anything else.
 
-    An escaping exception would kill the process before it printed JSON, which is
-    the silent-scoring bug this module exists to close. ValueError covers both
-    JSONDecodeError and UnicodeDecodeError; RecursionError (deeply nested JSON) is
-    neither that nor an OSError.
+    An escaping exception would kill the process before it printed JSON, which is the
+    silent-scoring bug this module exists to close. The failure is *classified* so a
+    caller can tell an agent fault from an infra fault:
+
+    * unset path -> :class:`HarnessError` (the runner never said where to look — infra)
+    * absent file -> :class:`MissingFile` (the agent wrote nothing — an agent zero)
+    * present but ``OSError`` on read -> :class:`HarnessError` (permission/IO — infra)
+    * unparseable bytes -> :class:`MalformedJson` (bad content — the writer's fault)
+
+    ValueError covers both JSONDecodeError and UnicodeDecodeError; RecursionError
+    (deeply nested JSON) is neither that nor an OSError.
     """
     if not path:
         raise HarnessError(f"{what} path is not set")
+    if not os.path.isfile(path):
+        raise MissingFile(f"{what} not found at {path}")
     try:
-        if not os.path.isfile(path):
-            raise HarnessError(f"{what} not found at {path}")
         with open(path, encoding="utf-8") as fh:
             return json.load(fh)
-    except (OSError, ValueError, RecursionError) as exc:
-        raise HarnessError(f"{what} at {path} is unreadable: {exc}") from exc
+    except (ValueError, RecursionError) as exc:
+        raise MalformedJson(f"{what} at {path} is unreadable: {exc}") from exc
+    except OSError as exc:
+        # The file exists but the read itself failed — a permission/UID mismatch on a
+        # docker-cp'd file, not the agent writing nothing. Infra, so the base class.
+        raise HarnessError(f"{what} at {path} exists but is unreadable: {exc}") from exc
 
 
 def ground_truth_files(gt_file: str) -> List[str]:
@@ -285,6 +317,17 @@ def ground_truth_files(gt_file: str) -> List[str]:
         # cannot even adjudicate — because an entry omitted the 'repo' the task schema
         # requires — is the same hazard with less evidence, so it gets the same answer.
         key = tuple(components(path))
+        if not key:
+            # A non-empty string that normalizes to no components — '.', './', '..',
+            # '/'. _matches_parts returns False whenever either side is empty, so it
+            # can never be matched by anything and would sit in the denominator
+            # forever, silently shrinking every agent's score on a 0.40-weight
+            # checkpoint. 'if not path' above only catches the empty string.
+            raise HarnessError(
+                f"ground_truth.json required_files[{i}] ('{path}') normalizes to no "
+                f"path components; it can never be matched and would distort the "
+                f"recall denominator"
+            )
         repo = entry.get("repo")
         if not isinstance(repo, str) or not repo.strip():
             raise HarnessError(
@@ -346,7 +389,11 @@ def agent_files(answer: Any, keys: Iterable[str]) -> List[str]:
         if not isinstance(value, list):
             continue
         found.extend(p for p in (_entry_path(e) for e in value) if p)
-    return found
+    # Dedup, order-preserving: one path listed under several unioned keys is one guess.
+    # score_answer would otherwise re-split and re-match it once per occurrence (wasted
+    # work on the very input _CITATION_SUFFIX_RE's bound exists to keep cheap) and add
+    # it to `ambiguous` more than once.
+    return list(dict.fromkeys(found))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -375,11 +422,16 @@ def main(argv: List[str] | None = None) -> int:
     except HarnessError as exc:
         return emit(0.0, str(exc), infra=True)
 
-    # Past this point every failure is the agent's, and scores a real 0.0.
+    # An absent or malformed answer is the agent's (a real 0.0); an unset ANSWER_FILE
+    # or a present-but-unreadable file is ours (infra, routed to re-run). The subclass
+    # clauses must precede the base clause — they are HarnessError subclasses, and
+    # Python takes the first match.
     try:
         answer = load_json(os.environ.get("ANSWER_FILE", ""), "answer.json")
-    except HarnessError as exc:
+    except (MissingFile, MalformedJson) as exc:
         return emit(0.0, f"No usable agent answer ({exc})")
+    except HarnessError as exc:
+        return emit(0.0, str(exc), infra=True)
 
     found = agent_files(answer, keys)
     if not found:
@@ -393,11 +445,11 @@ def main(argv: List[str] | None = None) -> int:
     if missed:
         detail += f" (missed: {', '.join(missed)})"
     if ambiguous:
-        # Deduped: one path named under several keys is one ambiguous guess, and
-        # listing it twice makes the detail line misread as two distinct misses.
+        # agent_files already deduped, so each guess appears once — one path named
+        # under several keys is one ambiguous guess, not two distinct misses.
         detail += (
             f" (ambiguous, matched several required files so credited none: "
-            f"{', '.join(dict.fromkeys(ambiguous))})"
+            f"{', '.join(ambiguous)})"
         )
     return emit(score, detail)
 

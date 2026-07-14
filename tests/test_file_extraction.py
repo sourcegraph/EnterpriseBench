@@ -290,6 +290,62 @@ def test_no_matches_is_a_real_zero(tmp_path):
     assert INFRA_SENTINEL not in json.loads(proc.stdout)["detail"]
 
 
+@pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="root bypasses file permission bits, so chmod 000 cannot simulate EACCES",
+)
+def test_a_present_but_unreadable_answer_is_infra_not_a_zero(tmp_path):
+    """A chmod-000 answer.json EXISTS but cannot be read — a UID/permission mismatch on
+    a docker-cp'd file (hktt/pt0n). That is our failure, not the agent's; booking it as
+    a 0.0 is the fail-open bug ssikq reopened. Only a genuinely ABSENT file is an agent
+    zero, so a present-but-unreadable one must carry the sentinel and exit nonzero."""
+    gt = gt_with(tmp_path, ["httpx/httpx/_config.py"])
+    answer = write_json(
+        tmp_path / "answer.json", {"source_files": ["/workspace/httpx/httpx/_config.py"]}
+    )
+    answer.chmod(0o000)
+    try:
+        proc = run_cli(answer, gt)
+    finally:
+        answer.chmod(0o644)  # let pytest's tmp_path cleanup remove it
+    assert proc.returncode != 0, "an unreadable present answer must fail closed"
+    payload = json.loads(proc.stdout)
+    assert payload["score"] == 0.0
+    assert INFRA_SENTINEL in payload["detail"]
+
+
+def test_an_unset_answer_file_is_infra_not_a_zero(tmp_path):
+    """ANSWER_FILE unset is a harness misconfiguration — the runner never told the
+    scorer where to look — not an agent that wrote nothing. It must fail closed, where
+    an absent-but-named file is a real agent 0.0."""
+    gt = gt_with(tmp_path, ["httpx/httpx/_config.py"])
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(LIB_DIR)
+    env["GT_FILE"] = str(gt)
+    env.pop("ANSWER_FILE", None)
+    proc = subprocess.run(
+        [sys.executable, "-m", "eb_verify.plugins.file_extraction", "--keys", ALL_KEYS],
+        capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
+    )
+    assert proc.returncode != 0, "an unset ANSWER_FILE must fail closed"
+    payload = json.loads(proc.stdout)
+    assert payload["score"] == 0.0
+    assert INFRA_SENTINEL in payload["detail"]
+
+
+def test_a_path_named_under_two_keys_is_one_ambiguous_guess(tmp_path):
+    """agent_files dedups, so the same path under two unioned keys is a single guess:
+    it appears once in the ambiguous detail, not read as two distinct misses."""
+    gt = gt_with(tmp_path, ["httpx/httpx/_client.py", "httpcore/httpcore/_client.py"])
+    answer = write_json(tmp_path / "answer.json", {
+        "source_files": ["_client.py"], "files": ["_client.py"],
+    })
+    proc = run_cli(answer, gt)
+    assert score_of(proc) == 0.0
+    ambiguous_part = json.loads(proc.stdout)["detail"].split("credited none:")[1]
+    assert ambiguous_part.count("_client.py") == 1, ambiguous_part
+
+
 @pytest.mark.parametrize("gt_payload", [
     None,                      # file absent
     "{not json",               # corrupt
@@ -371,9 +427,11 @@ def test_cli_misuse_emits_infra_json_and_never_a_fabricated_score(tmp_path, argv
 
 
 def test_broken_stdout_is_an_infra_error_not_a_false_zero(tmp_path):
-    """If the verdict cannot reach stdout, say so on stderr — runner.py reads
-    stderr as `detail` when stdout is empty, and scorer_guard scans it for the
-    sentinel. Otherwise a dead pipe books a 0.0 the agent never earned."""
+    """If the verdict cannot reach stdout, the module must still print the sentinel to
+    stderr and exit nonzero rather than dying with a bare traceback. The host runner
+    books this as a 0.0 today (it does not scan stderr for the sentinel — bead wto43),
+    but a legible sentinel on stderr is what a stderr-aware caller keys off, and it
+    keeps a second BrokenPipeError from masking the message at shutdown."""
     gt = gt_with(tmp_path, ["httpx/httpx/_config.py"])
     answer = write_json(tmp_path / "answer.json", {"source_files": ["httpx/_config.py"]})
 
@@ -697,6 +755,25 @@ def test_malformed_gt_entry_fails_closed(tmp_path, required):
     answer = write_json(tmp_path / "answer.json", {"source_files": ["a/a.py"]})
     proc = run_cli(answer, gt)
     assert proc.returncode != 0
+    assert INFRA_SENTINEL in json.loads(proc.stdout)["detail"]
+
+
+@pytest.mark.parametrize("dotpath", [".", "./", "..", "/", "  .  "])
+def test_a_gt_path_that_normalizes_to_no_components_fails_closed(tmp_path, dotpath):
+    """'.', '/', '..' are non-empty strings that strip to zero path components, so
+    _matches_parts can never match them: they would sit in the recall denominator
+    forever and halve every agent's score on a 0.40-weight checkpoint. The 'if not
+    path' guard only catches the empty string, so this is a distinct hole — a GT
+    authoring slip that must fail closed rather than score."""
+    gt = write_json(tmp_path / "ground_truth.json", {"required_files": [
+        {"path": "httpx/httpx/_config.py", "repo": "httpx"},
+        {"path": dotpath, "repo": "httpcore"},
+    ]})
+    answer = write_json(
+        tmp_path / "answer.json", {"source_files": ["/workspace/httpx/httpx/_config.py"]}
+    )
+    proc = run_cli(answer, gt)
+    assert proc.returncode != 0, f"a GT path ({dotpath!r}) with no components must not score"
     assert INFRA_SENTINEL in json.loads(proc.stdout)["detail"]
 
 
