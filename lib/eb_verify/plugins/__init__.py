@@ -12,11 +12,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Protocol
 
+from eb_verify.scorer_guard import InfraError
+
 
 @dataclass
 class ValidationResult:
     valid: bool
     detail: str = ""
+    # Set when the artifact could not be CHECKED (e.g. its scoring deps failed
+    # to load) — a harness fault, never a verdict on the agent. `valid` is then
+    # a placeholder consumers must branch past before reading it, the same
+    # convention as CheckpointResult.infra_error.
+    infra_error: Optional[InfraError] = None
 
 
 class ArtifactValidator(Protocol):

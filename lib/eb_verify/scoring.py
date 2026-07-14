@@ -79,8 +79,17 @@ class VerificationResult:
             lines.append("")
             lines.append("artifacts:")
             for ar in self.artifact_results:
-                status = "VALID" if ar.get("valid") else "INVALID"
-                lines.append(f"  - {ar.get('type', '?')}: {status}")
+                if ar.get("infra_error"):
+                    # Same rule as the checkpoint INFRA_ERROR line: this
+                    # artifact was never checked, so its valid=False is a
+                    # placeholder and printing INVALID would blame the agent
+                    # for a harness fault.
+                    lines.append(
+                        f"  - {ar.get('type', '?')}: INFRA_ERROR (not checked)"
+                    )
+                else:
+                    status = "VALID" if ar.get("valid") else "INVALID"
+                    lines.append(f"  - {ar.get('type', '?')}: {status}")
                 if ar.get("detail"):
                     lines.append(f"    detail: {ar['detail']}")
         return "\n".join(lines) + "\n"

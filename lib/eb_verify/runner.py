@@ -20,14 +20,18 @@ from pathlib import Path
 from typing import Any, Optional, Protocol, cast
 
 from eb_verify.task_parser import TaskDefinition, Checkpoint
-from eb_verify.scorer_guard import INFRA_SENTINEL
 from eb_verify.scoring import (
     CheckpointResult,
     VerificationResult,
     compute_score,
     write_reward,
 )
-from eb_verify.scorer_guard import InfraError, run_verifier_subprocess
+from eb_verify.scorer_guard import (
+    INFRA_SENTINEL,
+    InfraError,
+    artifact_not_checked,
+    run_verifier_subprocess,
+)
 from eb_verify.plugins import ValidationResult, get_validator
 
 logger = logging.getLogger(__name__)
@@ -248,15 +252,36 @@ class CheckpointRunner:
             and self.task.ground_truth.require_grounded_citations
         )
 
+    def _artifact_not_checked(
+        self, artifact_type: str, cause: str, detail: str
+    ) -> dict:
+        """An artifact the harness could not check — infra, never an agent verdict."""
+        logger.error(
+            "Artifact %r: not checked (%s) — %s", artifact_type, cause, detail
+        )
+        error = artifact_not_checked(cause, detail, artifact_type=artifact_type)
+        return {
+            "type": artifact_type,
+            "valid": False,  # placeholder — consumers branch on infra_error first
+            "detail": detail,
+            "infra_error": error.as_verifier_error(),
+        }
+
     def validate_artifacts(self) -> list[dict]:
         """Validate all required artifacts using plugin validators.
 
         When the task's ground truth sets require_grounded_citations, the flag
-        is forwarded to validators whose validate() declares that keyword.
-        The ArtifactValidator protocol is validate(workspace) only, so
-        inspect.signature is the capability check: a validator that cannot
-        enforce groundedness must fail the artifact explicitly rather than
-        run without the gate the task demands.
+        is forwarded to validators whose validate() declares that keyword
+        (inspect.signature is the capability check — the base ArtifactValidator
+        protocol is validate(workspace) only).
+
+        ``valid: False`` alone always means the AGENT's artifact failed. An
+        artifact the harness could not CHECK — validator unregistered, the
+        validator cannot enforce a gate the task demands, its scoring deps
+        failed to load, or it crashed — additionally carries ``infra_error`` (the
+        :meth:`InfraError.as_verifier_error` dict, so the list stays
+        JSON-serializable); its ``valid: False`` is then a placeholder, not a
+        verdict.
         """
         require_grounded = self._grounding_required()
         results = []
@@ -264,42 +289,66 @@ class CheckpointRunner:
             validator = get_validator(artifact_type)
             if validator is None:
                 results.append(
-                    {
-                        "type": artifact_type,
-                        "valid": False,
-                        "detail": f"No validator registered for type: {artifact_type}",
-                    }
+                    self._artifact_not_checked(
+                        artifact_type,
+                        "validator_unregistered",
+                        f"No validator registered for type: {artifact_type}",
+                    )
                 )
                 continue
-            if require_grounded:
-                params = inspect.signature(validator.validate).parameters
-                if "require_grounded_citations" not in params:
-                    results.append(
-                        {
-                            "type": artifact_type,
-                            "valid": False,
-                            "detail": (
-                                "require_grounded_citations is set but the "
-                                f"'{artifact_type}' validator does not support "
-                                "grounded citations"
-                            ),
-                        }
+            # A validator that raises — any exception, from the signature probe
+            # through validate() itself — must not abort the run and destroy
+            # every OTHER artifact and checkpoint result with it. The crash is
+            # a harness fault, so it is recorded on the infra channel, never
+            # encoded as a valid=False verdict against the agent.
+            try:
+                if require_grounded:
+                    params = inspect.signature(validator.validate).parameters
+                    if "require_grounded_citations" not in params:
+                        # A static harness/task-config mismatch: the task demands a
+                        # gate this validator cannot enforce. No agent output can
+                        # pass it, so scoring the miss would fabricate a 0.0.
+                        results.append(
+                            self._artifact_not_checked(
+                                artifact_type,
+                                "groundedness_unsupported",
+                                (
+                                    "require_grounded_citations is set but the "
+                                    f"'{artifact_type}' validator does not support "
+                                    "grounded citations"
+                                ),
+                            )
+                        )
+                        continue
+                    # The signature probe above verified the kwarg exists; the
+                    # cast records that runtime fact for the type checker.
+                    capable = cast(_GroundednessCapableValidator, validator)
+                    result = capable.validate(
+                        self.workspace, require_grounded_citations=True
                     )
-                    continue
-                # The signature probe above verified the kwarg exists; the
-                # cast records that runtime fact for the type checker (the
-                # base ArtifactValidator protocol is validate(workspace) only).
-                capable = cast(_GroundednessCapableValidator, validator)
-                result = capable.validate(
-                    self.workspace, require_grounded_citations=True
+                else:
+                    result = validator.validate(self.workspace)
+            except Exception as exc:
+                logger.exception("Artifact %r: validator crashed", artifact_type)
+                results.append(
+                    self._artifact_not_checked(
+                        artifact_type,
+                        "artifact_validator_crash",
+                        f"validator for '{artifact_type}' crashed: "
+                        f"{type(exc).__name__}: {exc}",
+                    )
                 )
-            else:
-                result = validator.validate(self.workspace)
+                continue
             results.append(
                 {
                     "type": artifact_type,
                     "valid": result.valid,
                     "detail": result.detail,
+                    "infra_error": (
+                        result.infra_error.as_verifier_error()
+                        if result.infra_error is not None
+                        else None
+                    ),
                 }
             )
         return results
@@ -399,15 +448,32 @@ class CheckpointRunner:
             cr.infra_error for cr in checkpoint_results if cr.infra_error is not None
         ]
 
-        total = 0.0 if infra_errors else compute_score(checkpoint_results)
+        # Artifact-channel infra: a required artifact nobody could CHECK. It is
+        # score-bearing only when the grounding gate would read artifact
+        # validity — there "not checked" is indistinguishable from "bad", so the
+        # run must route to the re-run channel instead of gating to 0.0. On
+        # non-gated runs artifact validity carries no score weight: the
+        # checkpoint total stands and the artifact is simply marked not-checked,
+        # rather than forcing a wasted re-run.
+        grounding_required = self._grounding_required()
+        artifact_infra: list[dict] = []
+        if grounding_required:
+            artifact_infra = [
+                ar["infra_error"] for ar in artifact_results if ar.get("infra_error")
+            ]
+
+        run_invalid = bool(infra_errors) or bool(artifact_infra)
+        total = 0.0 if run_invalid else compute_score(checkpoint_results)
         score_gates: list[str] = []
 
         # Grounded-citations gate: when the task demands grounded citations,
         # a required artifact failing validation zeroes the total — otherwise
         # the flag would be a side channel with no effect on the score or
         # exit code. Tasks without the flag keep legacy scoring untouched.
-        # Skipped on an invalid run: there is no score for a gate to force down.
-        if not infra_errors and self._grounding_required():
+        # Skipped on an invalid run: there is no score for a gate to force
+        # down, and an unchecked artifact's valid=False is a placeholder the
+        # gate must never read as an agent failure.
+        if not run_invalid and grounding_required:
             failed_types = [
                 ar["type"] for ar in artifact_results if not ar["valid"]
             ]
@@ -421,15 +487,22 @@ class CheckpointRunner:
                 print(f"[runner] SCORE GATE: {gate_msg}")
                 total = 0.0
 
+        # Checkpoint infra first: it already invalidates the run on its own,
+        # and it names the earlier failure in the pipeline.
+        if infra_errors:
+            routed_error = infra_errors[0].as_verifier_error()
+        elif artifact_infra:
+            routed_error = artifact_infra[0]
+        else:
+            routed_error = None
+
         verification = VerificationResult(
             task_id=self.task.id,
             checkpoint_results=checkpoint_results,
             artifact_results=artifact_results,
             total_score=total,
             score_gates=score_gates,
-            verifier_infra_error=(
-                infra_errors[0].as_verifier_error() if infra_errors else None
-            ),
+            verifier_infra_error=routed_error,
         )
 
         # Write reward.txt
@@ -438,6 +511,11 @@ class CheckpointRunner:
             print(
                 f"[runner] Wrote {reward_path} — INVALID RUN: "
                 f"{len(infra_errors)} verifier(s) did not run"
+            )
+        elif artifact_infra:
+            print(
+                f"[runner] Wrote {reward_path} — INVALID RUN: "
+                f"{len(artifact_infra)} required artifact(s) could not be checked"
             )
         else:
             print(f"[runner] Wrote {reward_path} — total_score={total:.4f}")

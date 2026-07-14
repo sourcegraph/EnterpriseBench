@@ -313,6 +313,33 @@ def no_verdict(
     )
 
 
+def artifact_not_checked(
+    cause: str,
+    detail: str,
+    *,
+    artifact_type: str,
+) -> InfraError:
+    """Build the :class:`InfraError` for an artifact the harness could not check.
+
+    The artifact-channel sibling of :func:`no_verdict`. An artifact's
+    ``valid=False`` is overloaded: it means both "the agent's artifact is bad"
+    and "no validator could examine it" (unregistered type, scoring deps failed
+    to load). The second is a harness fault, and scoring it against the agent
+    fabricates a 0.0 — same family as the checkpoint no-verdict rule, one level
+    up on the artifact channel.
+
+    ``reason`` is always :data:`NO_VERDICT_REASON` so the re-run channel filters
+    both channels on one key; ``cause`` carries the sub-classification
+    (``validator_unregistered``, ``scoring_deps_unavailable``, ...).
+    """
+    return InfraError(
+        reason=NO_VERDICT_REASON,
+        stage="artifact_validation",
+        detail=detail,
+        context={"cause": cause, "artifact_type": artifact_type},
+    )
+
+
 def guard_checkpoint_verdict(
     stdout: str,
     returncode: int,
