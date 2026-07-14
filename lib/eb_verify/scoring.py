@@ -1,14 +1,125 @@
 """
 Weighted score computation and reward.txt generation.
+
+Also home of :func:`score_file_set` / :class:`FileSetScore`, the benchmark-wide
+scoring primitive for file-discovery checkpoints (bead EnterpriseBench-vdeyx).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional, Sequence
 
 from eb_verify.scorer_guard import InfraError
+
+# Inclusive: a file-set checkpoint passes at F1 >= this. Kept at the historical
+# recall-only pass bar so "passed" keeps meaning "half-right or better".
+FILE_SET_PASS_THRESHOLD = 0.5
+
+
+@dataclass(frozen=True)
+class FileSetScore:
+    """Set-F1 verdict over a file-discovery answer.
+
+    Every file-discovery checkpoint scores through this one primitive so the 28
+    checkpoints stay comparable (bead vdeyx settles the methodology benchmark-
+    wide). It replaces recall-only scoring, where listing extra files cost
+    nothing and enumerating every plausible file in the repo near-guaranteed
+    full credit without the investigation the checkpoint exists to measure.
+
+    Holds the four counts; precision/recall/F1 are derived. Counts, not paths,
+    because not every matcher is a pairwise predicate — file_extraction.py's
+    refinement rule credits per answer and can leave a guess ambiguous, so that
+    call site constructs from counts while blob-style call sites go through
+    :func:`score_file_set`.
+    """
+
+    n_required: int  # distinct ground-truth files
+    n_matched: int  # ground-truth files the answer identified
+    n_listed: int  # distinct files the agent listed
+    n_relevant: int  # listed files credited against >= 1 ground-truth file
+
+    def __post_init__(self):
+        if min(self.n_required, self.n_matched, self.n_listed, self.n_relevant) < 0:
+            raise ValueError(f"negative count in {self}")
+        if self.n_matched > self.n_required:
+            raise ValueError(f"matched {self.n_matched} > required {self.n_required}")
+        if self.n_relevant > self.n_listed:
+            raise ValueError(f"relevant {self.n_relevant} > listed {self.n_listed}")
+
+    @property
+    def recall(self) -> float:
+        """Share of required files identified; 1.0 when nothing was required."""
+        if self.n_required == 0:
+            return 1.0
+        return self.n_matched / self.n_required
+
+    @property
+    def precision(self) -> float:
+        """Share of listed files that were relevant; 1.0 when nothing was
+        listed (no false positives — an empty answer is punished by recall)."""
+        if self.n_listed == 0:
+            return 1.0
+        return self.n_relevant / self.n_listed
+
+    @property
+    def f1(self) -> float:
+        """Harmonic mean of precision and recall; 0.0 when both are 0.
+
+        At the pass threshold this subsumes the "cap |answer| at 3x |GT|"
+        alternative: with full recall, F1 >= 0.5 iff n_listed <= 3*n_required —
+        but continuously, with no arbitrary constant, and still charging for
+        the enumeration a bare cap would wave through.
+        """
+        p, r = self.precision, self.recall
+        if p + r == 0:
+            return 0.0
+        return 2 * p * r / (p + r)
+
+    @property
+    def passed(self) -> bool:
+        return self.f1 >= FILE_SET_PASS_THRESHOLD
+
+    def detail(self) -> str:
+        """Human-readable verdict: found/total, listed count, P/R/F1."""
+        return (
+            f"{self.n_matched}/{self.n_required} required files found, "
+            f"{self.n_listed} listed; "
+            f"P={self.precision:.2f} R={self.recall:.2f} F1={self.f1:.2f}"
+        )
+
+
+def score_file_set(
+    agent_files: Sequence[str],
+    required_files: Sequence[str],
+    match: Callable[[str, str], bool] | None = None,
+) -> FileSetScore:
+    """Score a file-discovery answer against required files with set-F1.
+
+    ``match(agent_path, required_path)`` decides whether one listed file names
+    one required file; default is exact string equality. The matcher owns all
+    path semantics — normalization, suffix policy, component boundaries — and
+    this function owns the scoring math, so matcher changes (e.g. ssikq's
+    component-suffix rule) never change what over-listing costs.
+
+    Both lists are deduplicated by exact string first: repeating the right
+    answer is not spray, and repeating filler earns no extra penalty. Distinct
+    spellings of one file are the matcher's/call site's problem, not this
+    function's.
+    """
+    if match is None:
+        match = lambda agent, required: agent == required  # noqa: E731
+    required = list(dict.fromkeys(required_files))
+    listed = list(dict.fromkeys(agent_files))
+    n_matched = sum(1 for gt in required if any(match(af, gt) for af in listed))
+    n_relevant = sum(1 for af in listed if any(match(af, gt) for gt in required))
+    return FileSetScore(
+        n_required=len(required),
+        n_matched=n_matched,
+        n_listed=len(listed),
+        n_relevant=n_relevant,
+    )
 
 
 @dataclass
