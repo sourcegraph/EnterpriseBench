@@ -48,23 +48,16 @@ class HarnessError(Exception):
     """The verifier could not run — our bug, never the agent's."""
 
 
-class MissingFile(HarnessError):
-    """The file is simply absent (``not os.path.isfile``).
+class AgentFault(HarnessError):
+    """The answer file was absent or its bytes were not JSON — the agent's fault.
 
-    A subclass so :func:`main` can tell "the agent produced no answer" (a real 0.0)
-    apart from "the file exists but we could not read it" (infra). For ground truth
-    the distinction is moot — a missing GT is infra either way — so
-    :func:`ground_truth_files` still catches the base class and treats every failure
-    as infra.
-    """
-
-
-class MalformedJson(HarnessError):
-    """The file existed and was readable, but its bytes are not JSON.
-
-    Malformed *agent* output is a real agent zero; malformed *ground truth* is infra.
-    The caller decides which; the type only records that the failure was in the
-    content, not in the IO.
+    A subclass so :func:`main` can tell "the agent produced no usable answer" (a real
+    0.0) apart from "the runner misconfigured us / the file exists but we could not
+    read it" (infra, the base class). Absent and unparseable are the same verdict here
+    — both an agent zero, both caught together — so they share one type; the specific
+    failure lives in the message, not the class. For ground truth the distinction is
+    moot — a missing or malformed GT is infra either way — so :func:`ground_truth_files`
+    lets everything propagate to the base class and treats every failure as infra.
     """
 
 
@@ -257,9 +250,9 @@ def load_json(path: str, what: str) -> Any:
     caller can tell an agent fault from an infra fault:
 
     * unset path -> :class:`HarnessError` (the runner never said where to look — infra)
-    * absent file -> :class:`MissingFile` (the agent wrote nothing — an agent zero)
+    * absent file -> :class:`AgentFault` (the agent wrote nothing — an agent zero)
     * present but ``OSError`` on read -> :class:`HarnessError` (permission/IO — infra)
-    * unparseable bytes -> :class:`MalformedJson` (bad content — the writer's fault)
+    * unparseable bytes -> :class:`AgentFault` (bad content — the writer's fault)
 
     ValueError covers both JSONDecodeError and UnicodeDecodeError; RecursionError
     (deeply nested JSON) is neither that nor an OSError.
@@ -271,12 +264,12 @@ def load_json(path: str, what: str) -> Any:
         # answer file (an agent 0.0) instead of infra.
         raise HarnessError(f"{what} path is not set")
     if not os.path.isfile(path):
-        raise MissingFile(f"{what} not found at {path}")
+        raise AgentFault(f"{what} not found at {path}")
     try:
         with open(path, encoding="utf-8") as fh:
             return json.load(fh)
     except (ValueError, RecursionError) as exc:
-        raise MalformedJson(f"{what} at {path} is unreadable: {exc}") from exc
+        raise AgentFault(f"{what} at {path} is unreadable: {exc}") from exc
     except OSError as exc:
         # The file exists but the read itself failed — a permission/UID mismatch on a
         # docker-cp'd file, not the agent writing nothing. Infra, so the base class.
@@ -427,12 +420,12 @@ def main(argv: List[str] | None = None) -> int:
         return emit(0.0, str(exc), infra=True)
 
     # An absent or malformed answer is the agent's (a real 0.0); an unset ANSWER_FILE
-    # or a present-but-unreadable file is ours (infra, routed to re-run). The subclass
-    # clauses must precede the base clause — they are HarnessError subclasses, and
-    # Python takes the first match.
+    # or a present-but-unreadable file is ours (infra, routed to re-run). The AgentFault
+    # clause must precede the base clause — it is a HarnessError subclass, and Python
+    # takes the first match.
     try:
         answer = load_json(os.environ.get("ANSWER_FILE", ""), "answer.json")
-    except (MissingFile, MalformedJson) as exc:
+    except AgentFault as exc:
         return emit(0.0, f"No usable agent answer ({exc})")
     except HarnessError as exc:
         return emit(0.0, str(exc), infra=True)

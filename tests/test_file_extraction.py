@@ -314,39 +314,26 @@ def test_a_present_but_unreadable_answer_is_infra_not_a_zero(tmp_path):
     assert INFRA_SENTINEL in payload["detail"]
 
 
-def test_an_unset_answer_file_is_infra_not_a_zero(tmp_path):
-    """ANSWER_FILE unset is a harness misconfiguration — the runner never told the
-    scorer where to look — not an agent that wrote nothing. It must fail closed, where
-    an absent-but-named file is a real agent 0.0."""
+@pytest.mark.parametrize("answer_file_value", [None, "   "], ids=["unset", "whitespace"])
+def test_a_missing_answer_file_path_is_infra_not_a_zero(tmp_path, answer_file_value):
+    """An unset ANSWER_FILE, or a blank one (' '), is a harness misconfiguration — the
+    runner never told the scorer where to look — not an agent that wrote nothing. Both
+    must fail closed. os.path.isfile(' ') is False, so without the strip the blank case
+    would masquerade as an absent file (an agent 0.0) instead of infra. An
+    absent-but-named file is the real agent 0.0, tested separately."""
     gt = gt_with(tmp_path, ["httpx/httpx/_config.py"])
     env = os.environ.copy()
     env["PYTHONPATH"] = str(LIB_DIR)
     env["GT_FILE"] = str(gt)
-    env.pop("ANSWER_FILE", None)
+    if answer_file_value is None:
+        env.pop("ANSWER_FILE", None)
+    else:
+        env["ANSWER_FILE"] = answer_file_value
     proc = subprocess.run(
         [sys.executable, "-m", "eb_verify.plugins.file_extraction", "--keys", ALL_KEYS],
         capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
     )
-    assert proc.returncode != 0, "an unset ANSWER_FILE must fail closed"
-    payload = json.loads(proc.stdout)
-    assert payload["score"] == 0.0
-    assert INFRA_SENTINEL in payload["detail"]
-
-
-def test_a_whitespace_only_answer_file_is_infra_not_a_zero(tmp_path):
-    """A blank ANSWER_FILE (' ') is the same misconfiguration as an unset one — the
-    runner gave no real path. os.path.isfile(' ') is False, so without the strip it
-    would masquerade as an absent file (an agent 0.0) instead of infra."""
-    gt = gt_with(tmp_path, ["httpx/httpx/_config.py"])
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(LIB_DIR)
-    env["GT_FILE"] = str(gt)
-    env["ANSWER_FILE"] = "   "
-    proc = subprocess.run(
-        [sys.executable, "-m", "eb_verify.plugins.file_extraction", "--keys", ALL_KEYS],
-        capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
-    )
-    assert proc.returncode != 0, "a whitespace-only ANSWER_FILE must fail closed"
+    assert proc.returncode != 0, "an unset/blank ANSWER_FILE must fail closed"
     payload = json.loads(proc.stdout)
     assert payload["score"] == 0.0
     assert INFRA_SENTINEL in payload["detail"]
