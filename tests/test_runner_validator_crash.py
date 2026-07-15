@@ -16,9 +16,7 @@ checkpoint total with the artifact reported as ``INFRA_ERROR (not checked)``.
 This file covers the crash cause on all three paths, the two CLI call sites,
 and the two other causes that leave an artifact unchecked — an unregistered
 validator and a validator that cannot enforce a gate the task demands — which
-were plain agent-blaming verdicts before this bead. The channel's remaining
-cause, ``scoring_deps_unavailable``, belongs to the fact_triples plugin's own
-routing and is not exercised here.
+were plain agent-blaming verdicts before this bead.
 """
 
 from __future__ import annotations
@@ -42,6 +40,7 @@ from eb_verify.task_parser import ArtifactSpec, Checkpoint, GroundTruth, TaskDef
 CRASH_TYPE = "crash_test_artifact"
 GROUNDED_CRASH_TYPE = "grounded_crash_test_artifact"
 PROBE_CRASH_TYPE = "probe_crash_test_artifact"
+UNREGISTERED_TYPE = "totally_unregistered_artifact"
 
 # GroundTruth is frozen, so one gated instance serves every test.
 GROUNDED = GroundTruth(require_grounded_citations=True)
@@ -130,52 +129,52 @@ def assert_infra_result(result: dict, cause: str) -> None:
     assert error["artifact_type"] == result["type"]
 
 
-def assert_crash_result(result: dict) -> None:
-    """The shape every crashed-validator artifact result must carry."""
-    assert_infra_result(result, "artifact_validator_crash")
+# Every cause that leaves an artifact unchecked, and where it fails:
+# (artifact_type, ground_truth, cause, detail_substr). The three crash causes
+# cover the guarded block's distinct failure points — plain validate(), the
+# grounded validate(), and the signature probe that precedes it. The two
+# non-crash causes reach the same channel without any validator raising; both
+# were plain agent-blaming verdicts before this bead.
+UNCHECKED_CAUSES = [
+    pytest.param(CRASH_TYPE, None, "artifact_validator_crash", "KeyError", id="crash"),
+    pytest.param(
+        GROUNDED_CRASH_TYPE, GROUNDED, "artifact_validator_crash", "OSError",
+        id="crash-grounded-path",
+    ),
+    pytest.param(
+        PROBE_CRASH_TYPE, GROUNDED, "artifact_validator_crash", "RuntimeError",
+        id="crash-signature-probe",
+    ),
+    pytest.param(UNREGISTERED_TYPE, None, "validator_unregistered", None,
+                 id="unregistered"),
+    # runbook's validate() takes only (workspace) — no groundedness support.
+    pytest.param("runbook", GROUNDED, "groundedness_unsupported", None,
+                 id="groundedness-unsupported"),
+]
 
 
 # ---------------------------------------------------------------------------
-# validate_artifacts: the crash is recorded, not raised
+# validate_artifacts: the fault is recorded, not raised
 # ---------------------------------------------------------------------------
 
 class TestValidateArtifactsGuard:
-    def test_crash_does_not_raise(self, tmp_path, crashing_validators):
-        task = make_task([CRASH_TYPE])
-        runner = CheckpointRunner(task=task, workspace=tmp_path)
-
-        results = runner.validate_artifacts()  # must not raise
-
-        assert len(results) == 1
-
-    def test_crash_is_infra_not_a_verdict(self, tmp_path, crashing_validators):
-        task = make_task([CRASH_TYPE])
-        runner = CheckpointRunner(task=task, workspace=tmp_path)
-
-        (result,) = runner.validate_artifacts()
-
-        assert_crash_result(result)
-        assert "KeyError" in result["detail"]
-
-    def test_crash_under_grounded_path_is_guarded(self, tmp_path, crashing_validators):
-        task = make_task([GROUNDED_CRASH_TYPE], GROUNDED)
+    @pytest.mark.parametrize(
+        "artifact_type, ground_truth, cause, detail_substr", UNCHECKED_CAUSES
+    )
+    def test_unchecked_artifact_is_infra_not_a_verdict(
+        self, tmp_path, crashing_validators, artifact_type, ground_truth,
+        cause, detail_substr,
+    ):
+        """Every cause routes to the infra channel. Reaching the assertions at
+        all is half the point: an unguarded validate() would raise out here."""
+        task = make_task([artifact_type], ground_truth)
         runner = CheckpointRunner(task=task, workspace=tmp_path)
 
         (result,) = runner.validate_artifacts()
 
-        assert_crash_result(result)
-        assert "OSError" in result["detail"]
-
-    def test_crash_in_signature_probe_is_guarded(self, tmp_path, crashing_validators):
-        """The guard covers the whole per-artifact block, including the
-        inspect.signature capability probe on the grounded path."""
-        task = make_task([PROBE_CRASH_TYPE], GROUNDED)
-        runner = CheckpointRunner(task=task, workspace=tmp_path)
-
-        (result,) = runner.validate_artifacts()
-
-        assert_crash_result(result)
-        assert "RuntimeError" in result["detail"]
+        assert_infra_result(result, cause)
+        if detail_substr is not None:
+            assert detail_substr in result["detail"]
 
     def test_other_artifacts_survive_a_crash(self, tmp_path, crashing_validators):
         """The core invariant: one crashing validator must not destroy the
@@ -187,7 +186,7 @@ class TestValidateArtifactsGuard:
         results = runner.validate_artifacts()
 
         by_type = {r["type"]: r for r in results}
-        assert_crash_result(by_type[CRASH_TYPE])
+        assert_infra_result(by_type[CRASH_TYPE], "artifact_validator_crash")
         assert by_type["answer"]["valid"] is True, by_type["answer"]["detail"]
         assert by_type["answer"]["infra_error"] is None
 
@@ -208,33 +207,49 @@ def run_task(tmp_path, artifacts, ground_truth=None):
 
 
 class TestRunAllCrashRouting:
-    def test_non_gated_crash_keeps_checkpoint_total(
-        self, tmp_path, crashing_validators
+    @pytest.mark.parametrize(
+        "artifact_type, cause",
+        [
+            (CRASH_TYPE, "artifact_validator_crash"),
+            (UNREGISTERED_TYPE, "validator_unregistered"),
+        ],
+    )
+    def test_non_gated_keeps_checkpoint_total(
+        self, tmp_path, crashing_validators, artifact_type, cause
     ):
         """Without the grounding gate, artifact validity carries no score
         weight: the checkpoint total stands and the artifact is only marked
         not-checked — the run is recorded, not lost or re-run."""
-        result = run_task(tmp_path, [CRASH_TYPE])
+        result = run_task(tmp_path, [artifact_type])
 
         assert result.verifier_infra_error is None
         assert result.total_score == 1.0
         (artifact,) = result.artifact_results
-        assert_crash_result(artifact)
+        assert_infra_result(artifact, cause)
 
-    def test_gated_crash_routes_to_rerun_channel_not_the_gate(
-        self, tmp_path, crashing_validators
+    @pytest.mark.parametrize(
+        "artifact_type, cause",
+        [
+            (GROUNDED_CRASH_TYPE, "artifact_validator_crash"),
+            (UNREGISTERED_TYPE, "validator_unregistered"),
+            ("runbook", "groundedness_unsupported"),
+        ],
+    )
+    def test_gated_routes_to_rerun_channel_not_the_gate(
+        self, tmp_path, crashing_validators, artifact_type, cause
     ):
         """Under the gate, 'not checked' is indistinguishable from 'bad', so
         the run must be invalidated into the re-run channel — the gate reading
-        the placeholder valid=False would blame the agent for the crash."""
-        result = run_task(tmp_path, [GROUNDED_CRASH_TYPE], GROUNDED)
+        the placeholder valid=False would blame the agent for a harness fault
+        no agent output could have avoided."""
+        result = run_task(tmp_path, [artifact_type], GROUNDED)
 
         assert result.score_gates == []
         assert result.verifier_infra_error is not None
-        assert result.verifier_infra_error["cause"] == "artifact_validator_crash"
+        assert result.verifier_infra_error["cause"] == cause
         # total_score is a placeholder on an invalid run, never a measurement.
         assert result.total_score == 0.0
-        # The checkpoint results survived the crash.
+        # The checkpoint results survived the fault.
         assert result.checkpoint_results[0].score == 1.0
 
     def test_gated_crash_skips_gate_even_with_genuine_failure(
@@ -375,62 +390,3 @@ class TestCliGuards:
         assert rc == 0
 
 
-# ---------------------------------------------------------------------------
-# The channel's other causes: an artifact can also go unchecked without any
-# validator raising. Both reach the channel through _artifact_not_checked, and
-# before this bead both were plain agent-blaming verdicts.
-# ---------------------------------------------------------------------------
-
-UNREGISTERED_TYPE = "totally_unregistered_artifact"
-
-
-class TestNonCrashInfraCauses:
-    def test_unregistered_validator_is_infra_not_a_verdict(self, tmp_path):
-        task = make_task([UNREGISTERED_TYPE])
-        runner = CheckpointRunner(task=task, workspace=tmp_path)
-
-        (result,) = runner.validate_artifacts()
-
-        assert_infra_result(result, "validator_unregistered")
-
-    def test_groundedness_unsupported_is_infra_not_a_verdict(self, tmp_path):
-        # runbook's validate() takes only (workspace) — no groundedness support.
-        task = make_task(["runbook"], GROUNDED)
-        runner = CheckpointRunner(task=task, workspace=tmp_path)
-
-        (result,) = runner.validate_artifacts()
-
-        assert_infra_result(result, "groundedness_unsupported")
-
-    def test_gated_unregistered_routes_to_rerun_not_the_gate(self, tmp_path):
-        """A missing registration is a harness config fault the agent cannot
-        affect. It used to fire the grounding gate and score the run 0.0; it
-        must invalidate into the re-run channel instead."""
-        result = run_task(tmp_path, [UNREGISTERED_TYPE], GROUNDED)
-
-        assert result.score_gates == []
-        assert result.verifier_infra_error is not None
-        assert result.verifier_infra_error["cause"] == "validator_unregistered"
-        # The checkpoint still ran; only the artifact could not be checked.
-        assert result.checkpoint_results[0].score == 1.0
-
-    def test_gated_groundedness_unsupported_routes_to_rerun_not_the_gate(
-        self, tmp_path
-    ):
-        """Likewise a task demanding a gate its validator cannot enforce: no
-        agent output could pass, so scoring the miss would fabricate a 0.0."""
-        result = run_task(tmp_path, ["runbook"], GROUNDED)
-
-        assert result.score_gates == []
-        assert result.verifier_infra_error is not None
-        assert result.verifier_infra_error["cause"] == "groundedness_unsupported"
-
-    def test_non_gated_unregistered_keeps_checkpoint_total(self, tmp_path):
-        """Off the gate, artifact validity carries no score weight: the run is
-        recorded rather than re-run, with the artifact marked not-checked."""
-        result = run_task(tmp_path, [UNREGISTERED_TYPE])
-
-        assert result.verifier_infra_error is None
-        assert result.total_score == 1.0
-        (artifact,) = result.artifact_results
-        assert_infra_result(artifact, "validator_unregistered")

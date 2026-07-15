@@ -19,10 +19,12 @@ from eb_verify.scorer_guard import InfraError
 class ValidationResult:
     valid: bool
     detail: str = ""
-    # Set when the artifact could not be CHECKED (e.g. its scoring deps failed
-    # to load) — a harness fault, never a verdict on the agent. `valid` is then
-    # a placeholder consumers must branch past before reading it, the same
-    # convention as CheckpointResult.infra_error.
+    # Set when the artifact could not be CHECKED — a harness fault, never a
+    # verdict on the agent. `valid` is then a placeholder consumers must branch
+    # past before reading it, the same convention as CheckpointResult.infra_error.
+    # A validator may set this to report a fault it caught itself (its scoring
+    # deps failed to load, say) rather than raising; the callers' guards build
+    # the same channel for one that raises instead.
     infra_error: Optional[InfraError] = None
 
 
@@ -127,9 +129,10 @@ register(TopologicalOrderValidator())
 # The scoring deps must be probed explicitly: fact_triples defers them to its scoring
 # call sites, so importing it cleanly proves only that jsonschema is present. Relying
 # on the ImportError alone once registered a validator that then raised from inside
-# validate() — which runner.py calls unguarded, killing the run instead of recording a
-# clean unscoreable result. Raising here routes a missing dep through the same warning
-# as a missing jsonschema, so there is one "unavailable" path rather than two.
+# validate(), which killed the whole run back when callers invoked it unguarded. The
+# callers guard it now, so that fault is recorded rather than fatal; probing here still
+# routes a missing dep through the same warning as a missing jsonschema, so there is
+# one "unavailable" path rather than two.
 try:
     from eb_verify.fact_coverage import scoring_deps_available
 

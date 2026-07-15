@@ -402,10 +402,10 @@ class FactTriplesValidator:
 
         # Registration probes the deps with find_spec, which resolves without executing,
         # so a present-but-broken install (ABI mismatch, truncated wheel) survives it and
-        # fails here instead. Load the stack behind one guard before scoring: callers
-        # (runner.validate_artifacts, cli) invoke validate() unguarded, so letting this
-        # escape would abort the whole verification run over a dependency fault that is
-        # not the agent's doing.
+        # fails here instead. Load the stack behind one guard before scoring: a dependency
+        # fault is not the agent's doing, so it must not read as a verdict. Callers now
+        # guard validate(), so an escape would be recorded rather than fatal — but it
+        # would land as artifact_validator_crash, losing the dependency cause.
         try:
             load_scoring_deps()
         except ScoringDepsUnavailable as exc:

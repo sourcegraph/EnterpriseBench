@@ -323,14 +323,15 @@ def artifact_not_checked(
 
     The artifact-channel sibling of :func:`no_verdict`. An artifact's
     ``valid=False`` is overloaded: it means both "the agent's artifact is bad"
-    and "no validator could examine it" (unregistered type, scoring deps failed
-    to load). The second is a harness fault, and scoring it against the agent
+    and "no validator could examine it" (unregistered type, the validator
+    crashed). The second is a harness fault, and scoring it against the agent
     fabricates a 0.0 — same family as the checkpoint no-verdict rule, one level
     up on the artifact channel.
 
     ``reason`` is always :data:`NO_VERDICT_REASON` so the re-run channel filters
     both channels on one key; ``cause`` carries the sub-classification
-    (``validator_unregistered``, ``scoring_deps_unavailable``, ...).
+    (``validator_unregistered``, ``groundedness_unsupported``,
+    ``artifact_validator_crash``).
     """
     return InfraError(
         reason=NO_VERDICT_REASON,

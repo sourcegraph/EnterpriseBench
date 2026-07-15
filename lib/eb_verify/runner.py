@@ -277,11 +277,10 @@ class CheckpointRunner:
 
         ``valid: False`` alone always means the AGENT's artifact failed. An
         artifact the harness could not CHECK — validator unregistered, the
-        validator cannot enforce a gate the task demands, its scoring deps
-        failed to load, or it crashed — additionally carries ``infra_error`` (the
-        :meth:`InfraError.as_verifier_error` dict, so the list stays
-        JSON-serializable); its ``valid: False`` is then a placeholder, not a
-        verdict.
+        validator cannot enforce a gate the task demands, or it crashed —
+        additionally carries ``infra_error`` (the
+        :meth:`InfraError.as_verifier_error` dict, so the list stays JSON-
+        serializable); its ``valid: False`` is then a placeholder, not a verdict.
         """
         require_grounded = self._grounding_required()
         results = []
@@ -462,8 +461,21 @@ class CheckpointRunner:
                 ar["infra_error"] for ar in artifact_results if ar.get("infra_error")
             ]
 
-        run_invalid = bool(infra_errors) or bool(artifact_infra)
-        total = 0.0 if run_invalid else compute_score(checkpoint_results)
+        # Route the run once. Checkpoint infra first: it already invalidates the
+        # run on its own, and it names the earlier failure in the pipeline.
+        if infra_errors:
+            routed_error = infra_errors[0].as_verifier_error()
+            invalid_note = f"{len(infra_errors)} verifier(s) did not run"
+        elif artifact_infra:
+            routed_error = artifact_infra[0]
+            invalid_note = (
+                f"{len(artifact_infra)} required artifact(s) could not be checked"
+            )
+        else:
+            routed_error = None
+            invalid_note = None
+
+        total = 0.0 if routed_error else compute_score(checkpoint_results)
         score_gates: list[str] = []
 
         # Grounded-citations gate: when the task demands grounded citations,
@@ -473,7 +485,7 @@ class CheckpointRunner:
         # Skipped on an invalid run: there is no score for a gate to force
         # down, and an unchecked artifact's valid=False is a placeholder the
         # gate must never read as an agent failure.
-        if not run_invalid and grounding_required:
+        if routed_error is None and grounding_required:
             failed_types = [
                 ar["type"] for ar in artifact_results if not ar["valid"]
             ]
@@ -487,15 +499,6 @@ class CheckpointRunner:
                 print(f"[runner] SCORE GATE: {gate_msg}")
                 total = 0.0
 
-        # Checkpoint infra first: it already invalidates the run on its own,
-        # and it names the earlier failure in the pipeline.
-        if infra_errors:
-            routed_error = infra_errors[0].as_verifier_error()
-        elif artifact_infra:
-            routed_error = artifact_infra[0]
-        else:
-            routed_error = None
-
         verification = VerificationResult(
             task_id=self.task.id,
             checkpoint_results=checkpoint_results,
@@ -507,16 +510,8 @@ class CheckpointRunner:
 
         # Write reward.txt
         reward_path = write_reward(verification, output_path)
-        if infra_errors:
-            print(
-                f"[runner] Wrote {reward_path} — INVALID RUN: "
-                f"{len(infra_errors)} verifier(s) did not run"
-            )
-        elif artifact_infra:
-            print(
-                f"[runner] Wrote {reward_path} — INVALID RUN: "
-                f"{len(artifact_infra)} required artifact(s) could not be checked"
-            )
+        if invalid_note:
+            print(f"[runner] Wrote {reward_path} — INVALID RUN: {invalid_note}")
         else:
             print(f"[runner] Wrote {reward_path} — total_score={total:.4f}")
 
