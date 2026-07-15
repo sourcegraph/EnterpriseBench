@@ -1,37 +1,16 @@
 #!/usr/bin/env bash
-# check_localization.sh — the agent must attribute the surviving multi-line tag to
-# markupsafe's strip regexes (NOT jinja2), note the missing DOTALL / newline
-# handling, and describe the jinja2 striptags filter -> Markup.striptags traversal.
+# check_localization.sh — Agent's answer.json names the source files on the failure path across markupsafe and jinja — including the true fix site (src/markupsafe/__init__.py) — scored as recall over ground_truth.json required_files, which the prompt never names.
+#
+# Scored as recall over the oracle paths in ground_truth.json, which
+# instruction.md never names. The old grep looked for symptom keywords the
+# PROMPT ITSELF supplies, so `cp instruction.md agent_output/answer.json` —
+# zero investigation — scored up to 1.00 on this checkpoint (bead jn73.2.7, D1).
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-/workspace}"
 
-ALL_TEXT=""
-# Score ONLY the agent's own deliverable under agent_output/. The harness plants
-# /workspace/instruction.md (the prompt, which contains the symptom keywords) at
-# the workspace root, so scanning it would let a no-op run pass on prompt text.
-if [[ -d "$WORKSPACE/agent_output" ]]; then
-    while IFS= read -r f; do
-                ALL_TEXT="$ALL_TEXT $(head -c 200000 "$f" 2>/dev/null)"
-    done < <(find "$WORKSPACE/agent_output" -maxdepth 2 -type f 2>/dev/null | head -20)
-fi
-LC="$(printf '%s' "$ALL_TEXT" | tr '[:upper:]' '[:lower:]')"
+export ANSWER_FILE="$WORKSPACE/agent_output/answer.json"
+export GT_FILE="$TASK_DIR/ground_truth.json"
 
-FOUND=0
-TOTAL=3
-# (a) attributes to markupsafe's strip regexes
-if printf '%s' "$LC" | grep -q "markupsafe" && printf '%s' "$LC" | grep -Eq "_strip_tags_re|_strip_comments_re|strip.*regex|regex.*strip|__init__\.py"; then
-    FOUND=$((FOUND + 1))
-fi
-# (b) identifies the missing DOTALL / newline handling
-if printf '%s' "$LC" | grep -Eq "dotall|newline|multi.?line|\[\\\\s\\\\s\]|does not match" ; then
-    FOUND=$((FOUND + 1))
-fi
-# (c) describes the jinja2 striptags filter -> Markup.striptags traversal
-if printf '%s' "$LC" | grep -Eq "striptags|do_striptags|filters\.py|default_filters" && printf '%s' "$LC" | grep -Eq "markup\.striptags|markup\(|markupsafe|escaping library"; then
-    FOUND=$((FOUND + 1))
-fi
-
-SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
-PASSED=$([ "$FOUND" -ge 2 ] && echo true || echo false)
-printf '{"score": %s, "passed": %s, "detail": "localization indicators %d/%d (markupsafe-regex-attribution, missing-DOTALL/newline, striptags-filter traversal)"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"
+exec python3 -m eb_verify.plugins.file_extraction \
+    --keys source_files,files,error_source.files,code_paths,citations

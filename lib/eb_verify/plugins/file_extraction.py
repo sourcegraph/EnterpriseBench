@@ -29,7 +29,7 @@ import os
 import posixpath
 import re
 import sys
-from typing import Any, Iterable, List
+from typing import Any, Iterable, List, NoReturn
 
 # Import, never re-spell: scorer_guard greps for this exact string to tell a
 # harness failure apart from an agent zero, and a drift would reintroduce the
@@ -60,7 +60,7 @@ class _JsonErrorParser(argparse.ArgumentParser):
     and help is off (this docstring is the usage doc).
     """
 
-    def error(self, message: str):  # noqa: D102 — argparse hook
+    def error(self, message: str) -> NoReturn:  # noqa: D102 — argparse hook
         raise HarnessError(f"bad verifier invocation: {message}")
 
 

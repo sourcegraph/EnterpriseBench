@@ -1,37 +1,16 @@
 #!/usr/bin/env bash
-# check_root_cause.sh — agent attributes the resource exhaustion to h2's HTTP/2
-# frame reader / header-block reassembly (NOT hyper), identifies the unbounded
-# CONTINUATION handling, and describes the hyper -> h2 traversal.
+# check_root_cause.sh — Agent's answer.json names the source files on the failure path across h2 and hyper — including the true fix site (src/codec/framed_read.rs) — scored as recall over ground_truth.json required_files, which the prompt never names.
+#
+# Scored as recall over the oracle paths in ground_truth.json, which
+# instruction.md never names. The old grep looked for symptom keywords the
+# PROMPT ITSELF supplies, so `cp instruction.md agent_output/answer.json` —
+# zero investigation — scored up to 1.00 on this checkpoint (bead jn73.2.7, D1).
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-/workspace}"
 
-ALL_TEXT=""
-# Score ONLY the agent's own deliverable under agent_output/. The harness plants
-# /workspace/instruction.md (the prompt, which contains the symptom keywords) at
-# the workspace root, so scanning it would let a no-op run pass on prompt text.
-if [[ -d "$WORKSPACE/agent_output" ]]; then
-    while IFS= read -r f; do
-                ALL_TEXT="$ALL_TEXT $(head -c 200000 "$f" 2>/dev/null)"
-    done < <(find "$WORKSPACE/agent_output" -maxdepth 2 -type f 2>/dev/null | head -20)
-fi
-LC="$(printf '%s' "$ALL_TEXT" | tr '[:upper:]' '[:lower:]')"
+export ANSWER_FILE="$WORKSPACE/agent_output/answer.json"
+export GT_FILE="$TASK_DIR/ground_truth.json"
 
-FOUND=0
-TOTAL=3
-# (a) attributes the site to h2's frame reader / header-block reassembly
-if printf '%s' "$LC" | grep -Eq "\bh2\b|h2 crate" && printf '%s' "$LC" | grep -Eq "frame.?read|framed_read|frame reader|header block|reassembl|codec"; then
-    FOUND=$((FOUND + 1))
-fi
-# (b) identifies the unbounded CONTINUATION handling
-if printf '%s' "$LC" | grep -q "continuation" && printf '%s' "$LC" | grep -Eq "unbounded|no (cap|limit|bound)|without (a )?(cap|limit|bound)|not (bounded|limited)|count|flood"; then
-    FOUND=$((FOUND + 1))
-fi
-# (c) describes the hyper -> h2 server traversal
-if printf '%s' "$LC" | grep -q "hyper" && printf '%s' "$LC" | grep -Eq "h2::server|handshake|connection future|end_headers|builder"; then
-    FOUND=$((FOUND + 1))
-fi
-
-SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
-PASSED=$([ "$FOUND" -ge 2 ] && echo true || echo false)
-printf '{"score": %s, "passed": %s, "detail": "root-cause indicators %d/%d (h2-reader-attribution, unbounded-continuation, hyper-h2-traversal)"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"
+exec python3 -m eb_verify.plugins.file_extraction \
+    --keys source_files,files,error_source.files,code_paths,citations

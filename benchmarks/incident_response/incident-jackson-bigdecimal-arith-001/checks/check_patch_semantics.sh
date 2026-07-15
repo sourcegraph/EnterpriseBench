@@ -7,14 +7,12 @@ set -euo pipefail
 WORKSPACE="${WORKSPACE:-/workspace}"
 REPO="$WORKSPACE/jackson-core"
 
-if [[ ! -d "$REPO/.git" ]]; then
-    printf '{"score": 0.0, "passed": false, "detail": "jackson-core workspace repo not found"}\n'
-    exit 0
-fi
-
 # Only consider added lines in the big-decimal parser file.
-DIFF="$(git -C "$REPO" diff HEAD -- 'src/main/java/com/fasterxml/jackson/core/io/BigDecimalParser.java' 2>/dev/null)"
-ADDED="$(printf '%s' "$DIFF" | grep '^+' | grep -v '^+++' || true)"
+# ADDED/REMOVED carry the agent's diff with comments stripped, so a token
+# inside a comment reads as absent: appending one comment line at the fix site
+# used to score 1.0 here (bead jn73.2.7, D2).
+ADDED="$(python3 -m eb_verify.plugins.patch_evidence code \
+    --repo "$REPO" --path src/main/java/com/fasterxml/jackson/core/io/BigDecimalParser.java --lang java --added)"
 
 if printf '%s' "$ADDED" | grep -q "ArithmeticException"; then
     # Reject a bare catch-all that swallows everything (Throwable/Exception with no rethrow as number error)

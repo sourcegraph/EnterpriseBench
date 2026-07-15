@@ -7,13 +7,11 @@ set -euo pipefail
 WORKSPACE="${WORKSPACE:-/workspace}"
 REPO="$WORKSPACE/h2"
 
-if [[ ! -d "$REPO/.git" ]]; then
-    printf '{"score": 0.0, "passed": false, "detail": "h2 workspace repo not found"}\n'
-    exit 0
-fi
-
-DIFF="$(git -C "$REPO" diff HEAD -- 'src/codec/framed_read.rs' 2>/dev/null)"
-ADDED="$(printf '%s' "$DIFF" | grep '^+' | grep -v '^+++' || true)"
+# ADDED/REMOVED carry the agent's diff with comments stripped, so a token
+# inside a comment reads as absent: appending one comment line at the fix site
+# used to score 1.0 here (bead jn73.2.7, D2).
+ADDED="$(python3 -m eb_verify.plugins.patch_evidence code \
+    --repo "$REPO" --path src/codec/framed_read.rs --lang rust --added)"
 
 # A bound on CONTINUATION frames: a max/limit and a per-block count.
 if printf '%s' "$ADDED" | grep -Eiq "continuation" && printf '%s' "$ADDED" | grep -Eq "max_|_max|limit|count|>=|>"; then

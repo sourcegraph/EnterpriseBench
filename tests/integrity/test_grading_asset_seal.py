@@ -606,6 +606,77 @@ class TestAgentCodeExecutionDuringScoring:
             f"the textconv/external-diff hooks: {offenders}"
         )
 
+    def test_patch_evidence_diffs_disable_textconv(self, monkeypatch, tmp_path) -> None:
+        """The same rule, enforced where the check script no longer shows it.
+
+        The test above greps checks/*.sh for the literal "git diff". The
+        enterprise-hard patch checks call ``patch_evidence`` instead, so that
+        grep stopped covering them while still passing — and patch_evidence
+        shipped without the flags, letting a .gitattributes textconv driver
+        forge a fix the agent never wrote (bead jn73.2.7).
+
+        Asserted on the argv actually handed to subprocess, not on the source
+        text: the module builds ``git -C <repo> diff ...``, which no grep for
+        ``["git", "diff"`` would ever match.
+        """
+        from eb_verify.plugins import patch_evidence
+
+        seen: list[list[str]] = []
+
+        class _Proc:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        def _fake_run(argv, **kwargs):
+            seen.append(argv)
+            return _Proc()
+
+        monkeypatch.setattr(patch_evidence.subprocess, "run", _fake_run)
+        repo = tmp_path / "rack"
+        (repo / ".git").mkdir(parents=True)
+
+        patch_evidence._diff(repo, ["lib/rack/utils.rb"])
+        patch_evidence._changed_files(repo)
+
+        assert seen, "no git invocation was captured"
+        for argv in seen:
+            assert "diff" in argv, argv
+            assert "--no-textconv" in argv, (
+                f"patch_evidence ran a diff without --no-textconv: {argv} — an "
+                "agent-configured textconv driver can forge this diff's content"
+            )
+            assert "--no-ext-diff" in argv, (
+                f"patch_evidence ran a diff without --no-ext-diff: {argv} — "
+                "diff.external is the same forgery via another config key"
+            )
+
+    def test_no_module_builds_a_git_diff_argv_outside_agent_git(self) -> None:
+        """agent_git is the one place the flags are attached; keep it that way.
+
+        A tripwire for the *next* module rather than a check on the current two:
+        the rule failed before not because someone disabled it but because a new
+        diff call site was written somewhere the rule was not looking.
+        """
+        sanctioned = {"agent_git.py"}
+        offenders = []
+        for py in (REPO_ROOT / "lib" / "eb_verify").rglob("*.py"):
+            if py.name in sanctioned:
+                continue
+            for i, line in enumerate(py.read_text().splitlines(), 1):
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                if '"diff"' not in stripped and "'diff'" not in stripped:
+                    continue
+                if '"git"' in stripped or "'git'" in stripped:
+                    offenders.append(f"{py.relative_to(REPO_ROOT)}:{i}: {stripped}")
+        assert not offenders, (
+            "these build a git-diff argv outside eb_verify.agent_git, so they "
+            f"can silently miss the no-execute flags: {offenders} — use "
+            "agent_git.git_diff_argv()"
+        )
+
     def test_a_planted_conftest_cannot_reach_the_grader(self) -> None:
         """`cd $WORKSPACE; python3 -m pytest` (check_test_fails.sh) auto-loads a
         planted /workspace/conftest.py — PYTHONSAFEPATH does not stop conftest

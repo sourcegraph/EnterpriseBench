@@ -1,23 +1,13 @@
 #!/usr/bin/env bash
-# check_patch_site.sh — the uncommitted diff must land in yarl's URL module
-# (yarl/_url.py, the real fix site for the zone-id decoding), not only in aiohttp.
+# check_patch_site.sh — the uncommitted diff must land in yarl's URL module (yarl/_url.py, the real fix site for the zone-id decoding), not only in aiohttp.
+#
+# Scored on the diff with comments stripped: appending a comment at the fix site
+# is not a patch, and used to score 1.0 here (bead jn73.2.7, D2).
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-/workspace}"
-REPO="$WORKSPACE/yarl"
-TARGET="yarl/_url.py"
 
-if [[ ! -d "$REPO/.git" ]]; then
-    printf '{"score": 0.0, "passed": false, "detail": "yarl workspace repo not found at %s"}\n' "$REPO"
-    exit 0
-fi
-
-CHANGED="$(git -C "$REPO" diff --name-only HEAD 2>/dev/null)"
-
-if printf '%s\n' "$CHANGED" | grep -Fxq "$TARGET"; then
-    printf '{"score": 1.0, "passed": true, "detail": "diff modifies yarl/_url.py (real fix site for zone-id decoding)"}\n'
-elif [[ -n "${CHANGED//[[:space:]]/}" ]]; then
-    printf '{"score": 0.2, "passed": false, "detail": "yarl has a diff but it does not touch the URL host-encoding fix site"}\n'
-else
-    printf '{"score": 0.0, "passed": false, "detail": "no uncommitted change in yarl"}\n'
-fi
+exec python3 -m eb_verify.plugins.patch_evidence site \
+    --repo "$WORKSPACE/yarl" \
+    --path yarl/_url.py \
+    --lang python

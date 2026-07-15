@@ -1,37 +1,16 @@
 #!/usr/bin/env bash
-# check_root_cause.sh — agent attributes the mis-framing to hyper's HTTP/1 chunked
-# size decoder (NOT reqwest), identifies the unchecked-overflow accumulation, and
-# describes the reqwest -> hyper body traversal.
+# check_root_cause.sh — Agent's answer.json names the source files on the failure path across hyper and reqwest — including the true fix site (src/proto/h1/decode.rs) — scored as recall over ground_truth.json required_files, which the prompt never names.
+#
+# Scored as recall over the oracle paths in ground_truth.json, which
+# instruction.md never names. The old grep looked for symptom keywords the
+# PROMPT ITSELF supplies, so `cp instruction.md agent_output/answer.json` —
+# zero investigation — scored up to 1.00 on this checkpoint (bead jn73.2.7, D1).
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-/workspace}"
 
-ALL_TEXT=""
-# Score ONLY the agent's own deliverable under agent_output/. The harness plants
-# /workspace/instruction.md (the prompt, which contains the symptom keywords) at
-# the workspace root, so scanning it would let a no-op run pass on prompt text.
-if [[ -d "$WORKSPACE/agent_output" ]]; then
-    while IFS= read -r f; do
-                ALL_TEXT="$ALL_TEXT $(head -c 200000 "$f" 2>/dev/null)"
-    done < <(find "$WORKSPACE/agent_output" -maxdepth 2 -type f 2>/dev/null | head -20)
-fi
-LC="$(printf '%s' "$ALL_TEXT" | tr '[:upper:]' '[:lower:]')"
+export ANSWER_FILE="$WORKSPACE/agent_output/answer.json"
+export GT_FILE="$TASK_DIR/ground_truth.json"
 
-FOUND=0
-TOTAL=3
-# (a) attributes the throw site to hyper's HTTP/1 chunked decoder
-if printf '%s' "$LC" | grep -q "hyper" && printf '%s' "$LC" | grep -Eq "chunk.?size|chunked (decoder|size|read|state)|read_size|chunkedstate|decode\.rs"; then
-    FOUND=$((FOUND + 1))
-fi
-# (b) identifies the unchecked overflow of the size accumulator
-if printf '%s' "$LC" | grep -q "overflow" && printf '%s' "$LC" | grep -Eq "u64|checked_mul|checked_add|multiply|accumulat|wrap"; then
-    FOUND=$((FOUND + 1))
-fi
-# (c) describes the reqwest -> hyper body traversal
-if printf '%s' "$LC" | grep -Eq "httpbody|hyper::body|hyper body|body stream|::chunk\(\)|response body"; then
-    FOUND=$((FOUND + 1))
-fi
-
-SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
-PASSED=$([ "$FOUND" -ge 2 ] && echo true || echo false)
-printf '{"score": %s, "passed": %s, "detail": "root-cause indicators %d/%d (hyper-chunk-attribution, overflow, body-traversal)"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"
+exec python3 -m eb_verify.plugins.file_extraction \
+    --keys source_files,files,error_source.files,code_paths,citations
