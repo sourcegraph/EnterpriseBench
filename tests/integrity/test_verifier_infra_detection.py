@@ -662,6 +662,180 @@ def test_a_pretty_printed_verdict_is_still_a_verdict(
     assert cp["score"] == 1.0
 
 
+# --- passed and detail are read at the root too ---------------------------------
+#
+# score is not the only field the result document is built from. "passed" feeds
+# checkpoints_passed and all_passed, and through them the pass-rate reporting in
+# analyze_scores.py and scorer_passed in the trace-quality adapter; "detail" is
+# embedded into the emitted JSON verbatim. Both sat on an unanchored, nesting-blind
+# regex after the score token was hardened against exactly that, so a nested
+# diagnostics.passed — which json.dumps emits with no adversary anywhere — was the
+# only "passed" the reader could find on the 22 corpus verifiers that state a score
+# and no top-level passed (scorer_guard.py:335).
+#
+# These are pinned separately from the score table because they fail in a different
+# DIRECTION. A score the shell cannot read routes to the infra chain: a re-run, a
+# safe escape. A passed the shell cannot read is a recorded false — a wrong data
+# point that is indistinguishable from a real agent failure. So both directions get
+# a vector here, and the over-reject one is what forbids reusing score's
+# duplicate-anywhere rule for these keys.
+
+
+def test_a_nested_passed_does_not_flip_a_zero_checkpoint(
+    tmp_path: Path, real_path: str
+) -> None:
+    """The fabrication direction, on ordinary json.dumps output.
+
+    A verifier that states its score and puts a stage flag in a diagnostics object
+    is not doing anything exotic, and it does not need a top-level "passed" — most
+    of the corpus does not have one. An unanchored read finds the nested flag and
+    credits the checkpoint it was never about.
+    """
+    payload = (
+        '{"score": 0.0, "detail": "assertion failed", '
+        '"diagnostics": {"stage": "compile", "passed": true}}'
+    )
+    result = run_test_runner(tmp_path, {"cp": verifier_printing(payload)}, real_path)
+
+    cp = checkpoint(result, "cp")
+    assert cp["verifier_ran"] is True, "0.0 is a readable score; this IS a verdict"
+    assert cp["score"] == 0.0
+    assert cp["passed"] is False, "diagnostics.passed is not the verdict's passed"
+    assert result["checkpoints_passed"] == 0
+    assert result["all_passed"] is False, (
+        "a 0.0 checkpoint was counted as passing: the pass rate is fabricated"
+    )
+
+
+def test_two_passed_keys_do_not_corrupt_the_result_document(
+    tmp_path: Path, real_path: str
+) -> None:
+    """The same blindness, one field over, taking the whole document with it.
+
+    With a real top-level passed AND a nested one, an unanchored read returns both
+    matches and the unquoted interpolation emits `"passed": false<newline>true`.
+    That fails closed rather than fabricating — the guard routes a malformed
+    document to a re-run — but it costs every other checkpoint in the run too.
+    ``run_test_runner`` parses stdout, so reaching the asserts at all is the pin.
+    """
+    payload = '{"score": 0.0, "passed": false, "diagnostics": {"passed": true}}'
+    result = run_test_runner(tmp_path, {"cp": verifier_printing(payload)}, real_path)
+
+    cp = checkpoint(result, "cp")
+    assert cp["passed"] is False, "the top-level passed is the verdict"
+    assert cp["score"] == 0.0
+
+    guarded = guard_verifier_output(json.dumps(result), returncode=0)
+    assert isinstance(guarded, dict), "a readable 0.0 verdict is not an infra error"
+
+
+def test_a_passed_stated_twice_at_the_root_is_not_stated(
+    tmp_path: Path, real_path: str
+) -> None:
+    """A payload that says passed twice, at the root, has not said it once.
+
+    Valid JSON, and json.loads quietly keeps the last one — but nothing makes the
+    last more the verdict than the first, and no dict can print this, so it comes
+    from a verifier building JSON by hand. Falls back to the recorded false.
+
+    This is the vector that pins "exactly one at depth 1" for the keys read with
+    strict=0. score's duplicate_at_root looks like it covers the same rule and does
+    not: score is read with strict=1, so its duplicate-anywhere gate rejects that
+    payload first and the depth-1 count never decides anything.
+    """
+    payload = '{"score": 1.0, "passed": true, "passed": false}'
+    result = run_test_runner(tmp_path, {"cp": verifier_printing(payload)}, real_path)
+
+    cp = checkpoint(result, "cp")
+    assert cp["score"] == 1.0, "the score is stated once and is not in dispute"
+    assert cp["passed"] is False, "an ambiguous passed must not be read as a pass"
+
+
+def test_a_nested_passed_does_not_reject_a_real_pass(
+    tmp_path: Path, real_path: str
+) -> None:
+    """The over-reject direction — and the vector that forbids score's rule here.
+
+    score treats a duplicate key ANYWHERE as poison, which it can afford because
+    its fail-closed direction is a re-run. Apply that rule to passed and this
+    entirely legitimate payload records passed=false at score=1.0: a fabricated
+    FAIL, the same pass-rate integrity bug as the vector above pointed backwards.
+    Scoping to depth 1 fixes both directions at once; counting globally would only
+    trade one for the other.
+    """
+    payload = (
+        '{"score": 1.0, "passed": true, "detail": "ok", '
+        '"diagnostics": {"stage": "compile", "passed": true}}'
+    )
+    result = run_test_runner(tmp_path, {"cp": verifier_printing(payload)}, real_path)
+
+    cp = checkpoint(result, "cp")
+    assert cp["passed"] is True, "a nested passed must not poison the real one"
+    assert cp["score"] == 1.0
+    assert result["checkpoints_passed"] == 1
+    assert result["all_passed"] is True
+
+
+DETAIL_READ = {
+    # The nested-only shape, mirroring NO_READABLE_SCORE["nested_only"]: the key is
+    # there, but this payload never made it the verdict's detail. Empty is the right
+    # answer — the field is diagnostic, so failing closed costs a debugging aid
+    # rather than a grade, which is why it may fail closed at all.
+    "nested_only": ('{"score": 0.0, "diagnostics": {"detail": "inner"}}', ""),
+    # A nested detail either side of the real one. The mirror pins the rule rather
+    # than the reading order — the vector a "take the first match" reader gets
+    # wrong is the one a last-match reader gets right, and only depth gets both.
+    #
+    # Neither is a first-match read in practice, which is worth spelling out: the
+    # old extraction passed grep -m1 and looked bounded, but -m1 stops after the
+    # first matching LINE, while -o prints EVERY match on it. json.dumps emits one
+    # line, so both of these returned two tokens and corrupted the document. The
+    # flag read as a fix for exactly the bug it did not fix.
+    "nested_before_real": (
+        '{"score": 0.0, "diagnostics": {"detail": "inner"}, "detail": "outer"}',
+        "outer",
+    ),
+    "nested_after_real": (
+        '{"score": 0.0, "detail": "outer", "diagnostics": {"detail": "inner"}}',
+        "outer",
+    ),
+    # The flat value scan that reads the score token stops at a comma, a space or a
+    # brace, so it could not read any of these three at all. They pin the string
+    # branch: a detail is taken as a quoted span, by the same escape rule the walker
+    # already uses to skip strings, not scanned to the next terminator.
+    "comma_and_space": (
+        '{"score": 0.0, "detail": "expected 3, got 4"}',
+        "expected 3, got 4",
+    ),
+    # Stated twice at the root: neither one is the detail, for the same reason
+    # neither of two top-level "passed" keys is the verdict.
+    "duplicate_at_root": ('{"score": 0.0, "detail": "first", "detail": "second"}', ""),
+    "escaped_quote": (r'{"score": 0.0, "detail": "got \"x\""}', 'got "x"'),
+    "brace": ('{"score": 0.0, "detail": "want {a: 1}"}', "want {a: 1}"),
+    "escaped_newline": (r'{"score": 0.0, "detail": "line 1\nline 2"}', "line 1\nline 2"),
+    # A RAW tab, which JSON does not allow inside a string. The verifier that
+    # printed this already emitted invalid JSON; what the runner must not do is
+    # copy it into the document the scorer reads and take the run down with it.
+    # Dropped to empty, and the score beside it still lands.
+    "raw_control_char": ('{"score": 0.0, "detail": "a\tb"}', ""),
+}
+
+
+@pytest.mark.parametrize("shape", sorted(DETAIL_READ))
+def test_detail_is_read_at_the_root_and_survives_verbatim(
+    shape: str, tmp_path: Path, real_path: str
+) -> None:
+    """detail is embedded into the result JSON verbatim, so it has to come back as
+    the exact token the verifier wrote, and from the root — not from whatever
+    nested object happens to carry the same key name."""
+    payload, expected = DETAIL_READ[shape]
+    result = run_test_runner(tmp_path, {"cp": verifier_printing(payload)}, real_path)
+
+    cp = checkpoint(result, "cp")
+    assert cp["detail"] == expected, f"{payload} read detail as {cp['detail']!r}"
+    assert cp["score"] == 0.0, "reading detail must not disturb the score beside it"
+
+
 # --- the mirror image: a bad ANSWER must not be laundered into an infra error --
 #
 # "No verdict" has two causes, and only one of them is the harness's fault. The

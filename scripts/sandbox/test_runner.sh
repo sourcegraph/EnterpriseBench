@@ -28,15 +28,20 @@ now_ms() {
     date +%s%3N 2>/dev/null || date +%s000
 }
 
-# The score a checkpoint actually earned, or the empty string if it earned none:
-# a string, null, NaN, a missing key, an out-of-range or malformed number, a
-# nested-only key, an unclosed root, or a second top-level value all mean "no
-# verdict", which run_verifier routes to the infra chain rather than scoring.
+# Read the value of KEY from the root of a verifier payload, or print nothing if
+# the payload does not state one this can trust:
+#
+#   parse_json_root_value <key> <payload> <strict 0|1> <number|literal|string>
+#
+# Every field the result document is built from comes through here. A regex cannot
+# see nesting, and each field this reads sits beside agent-echoed text and verifier
+# diagnostics that carry the same key names, so "find the key" is never the same
+# question as "find the value the verifier attested".
 #
 # A single LC_ALL=C awk pass walks the payload byte by byte, skipping string
 # literals so a brace — or an escaped \"score\" — inside a string cannot move the
-# nesting depth or forge a key. A score is credited only when the payload is one
-# closed root value carrying exactly one "score" key, at the root's own level:
+# nesting depth or forge a key. A value is read only when the payload is one closed
+# root OBJECT carrying exactly one such key, at the level of the root itself:
 #
 #   nested-only key   {"detail": {"score": 1.0}}   a regex cannot see nesting, and
 #                                                  reads the 1.0 as the verdict
@@ -49,47 +54,92 @@ now_ms() {
 #                                                  (OOM, SIGKILL, full disk) never
 #                                                  finished saying what it meant
 #
-# All four are payloads no verifier that reached a verdict can emit, so each
-# fails CLOSED to the infra chain — a re-run, never a grade. The value is then
-# held to the JSON number grammar (anchored, so "1.0abc" cannot coerce to 1.0)
-# and to the [0, 1] range (which also catches 1e400, whose strtod is +inf).
+# All four are payloads no verifier that reached a verdict can emit, so each fails
+# CLOSED. What that COSTS differs per key, which is what the strict knob is for and
+# why the callers, not this function, decide it. strict=1 additionally poisons the
+# read on a duplicate of the key at ANY depth.
 #
-# What this is NOT is a full JSON validator, and it does not claim to be one: it
-# is a structural scanner looking for one key. It can still credit a payload
-# json.loads would reject — {"detail": "gap is 3" x 5" wide", "score": 0.3} has
-# an unescaped quote in detail, yet the score key after the comma is real and is
-# credited as 0.3. That is fine: the malformation is confined to a value the
-# score does not depend on, and the credited number is the one the verifier
-# actually wrote.
-#
-# What it must NOT do is read a "score" key in a position JSON would not allow,
-# because that is where a score gets forged. {"detail": "x""score": 1.0} is a
-# scoreless verdict with the agent text run straight into a fake key; the two
-# strings abut with no comma, which valid JSON never does. The key-position
-# check in the walker (a key follows only "{" or ",") rejects it, so an agent
-# cannot inject a score the verifier never attested. The line to hold is not
-# "well-formed JSON" but "the score key sits where a key may sit" — enough that
-# the credited score is one the verifier wrote, never one smuggled beside it.
-#
-# LC_ALL=C is load-bearing twice. mawk (Debian's default, and the task images')
-# is byte-based, but gawk under a UTF-8 locale makes substr()/length()
-# character-based, and one multibyte byte in a detail string would then desync the
-# walk against the byte stream and void the string-skipping. It also fixes
-# strtod's separator: under a comma locale "1.5" + 0 is 1, so the range check
-# would wave a 1.5 through. JSON's separator is always a period.
-#
-# The exponent branch of the grammar is not decoration: json.dumps emits 1e-05 for
+# The value is then held to the grammar named by kind — all three anchored, so
+# "1.0abc" cannot coerce to 1.0 and a quoted "true" is not the literal. number is
+# additionally range-checked to [0, 1] (which also catches 1e400, whose strtod is
+# +inf); its exponent branch is not decoration, since json.dumps emits 1e-05 for
 # any small float, and the 1e-6 tolerance mirrors eb_verify.scorer_guard's
-# _SCORE_EPSILON so the shell and the guard admit exactly the same values. The
-# matched token is printed verbatim, never coerced through "+ 0", so it stays a
-# byte-faithful JSON number.
-parse_score() {
-    printf '%s' "$1" | LC_ALL=C awk '
+# _SCORE_EPSILON so the shell and the guard admit exactly the same values. Matched
+# tokens are printed verbatim, never coerced through "+ 0", so a number stays a
+# byte-faithful JSON number and a string keeps its escapes.
+#
+# What this is NOT is a full JSON validator, and it does not claim to be one: it is
+# a structural scanner looking for one key. It can still credit a payload
+# json.loads would reject — {"detail": "gap is 3" x 5" wide", "score": 0.3} has an
+# unescaped quote in detail, yet the score key after the comma is real and is
+# credited as 0.3. That is fine: the malformation is confined to a value the score
+# does not depend on, and the credited number is the one the verifier actually
+# wrote. (The string kind is held to more than this — see its grammar below.)
+#
+# What it must NOT do is read a key in a position JSON would not allow, because
+# that is where a score gets forged. {"detail": "x""score": 1.0} is a scoreless
+# verdict with the agent text run straight into a fake key; the two strings abut
+# with no comma, which valid JSON never does. The key-position check in the walker
+# (a key follows only "{" or ",") rejects it, so an agent cannot inject a score the
+# verifier never attested. The line to hold is not "well-formed JSON" but "the key
+# sits where a key may sit" — enough that the value read is one the verifier wrote,
+# never one smuggled beside it.
+#
+# LC_ALL=C is load-bearing twice. mawk (Debian's default, and the task images') is
+# byte-based, but gawk under a UTF-8 locale makes substr()/length()
+# character-based, and one multibyte byte in a detail string would then desync the
+# walk against the byte stream and void the string-skipping. It also fixes strtod's
+# separator: under a comma locale "1.5" + 0 is 1, so the range check would wave a
+# 1.5 through. JSON's separator is always a period.
+parse_json_root_value() {
+    printf '%s' "$2" | LC_ALL=C awk -v key="$1" -v strict="$3" -v kind="$4" '
+    # The value of the key found at depth 1, or "" if it has none this can read.
+    # Both branches only have to FIND the token; the grammar in END decides
+    # whether it is one. Uses buf/n as globals rather than parameters — awk copies
+    # a scalar argument, and copying the whole payload per key would undo the care
+    # the walk above takes to stay linear on a megabyte of detail.
+    function value_at(v,   start, w, d) {
+        while (v <= n && substr(buf, v, 1) ~ /[ \t\r\n]/) v++
+        if (substr(buf, v, 1) != "\"") {
+            # Flat scan to the next terminator, deliberately NOT re-walking
+            # strings or containers. Anything that is not a bare token — [0.5],
+            # {"a":1} — comes back garbled and the grammar throws it away, so the
+            # sloppier scan can only narrow what is credited, never widen it.
+            #
+            # The quote is deliberately NOT in the stop set, and it is
+            # load-bearing in the opposite direction from how it reads.
+            # {"score":1.0"passed":true} is a verifier that dropped a comma;
+            # scanning THROUGH the quote yields 1.0"passed":true, which the number
+            # grammar refuses, and the malformed payload fails closed. Add the
+            # quote here and the token truncates to a clean 1.0 — the same payload
+            # is then awarded FULL MARKS. Tightening the scan loosens the verdict,
+            # so it stays loose on purpose; NO_READABLE_SCORE["glued_token"] pins it.
+            start = v
+            while (v <= n && substr(buf, v, 1) !~ /[]},\t\r\n ]/) v++
+            return substr(buf, start, v - start)
+        }
+        # A quote-led value is taken as a quoted span under the same escape rule
+        # the walk uses to skip strings, keeping its own quotes. That is what makes
+        # detail readable at all — the flat scan stops at the first comma or space,
+        # which most real detail strings contain. It is provably neutral for the
+        # number and literal grammars: both are anchored, and a token that still
+        # carries its quotes matches neither.
+        w = v + 1
+        while (w <= n) {
+            d = substr(buf, w, 1)
+            if (d == "\\") { w += 2; continue }
+            if (d == "\"") break
+            w++
+        }
+        if (w > n) return ""   # unterminated; the root cannot have closed either
+        return substr(buf, v, w - v + 1)
+    }
     { buf = buf $0 "\n" }
     END {
         n = length(buf)
+        klen = length(key)
         depth = 0; rootClosed = 0; ok = 1
-        scoreCount = 0; keyDepth = -1; keyVal = ""
+        totalCount = 0; rootCount = 0; keyVal = ""
         prevSig = ""
         i = 1
         while (i <= n) {
@@ -129,8 +179,9 @@ parse_score() {
                     j++
                 }
                 # A string is a key iff the next non-space byte is a colon. It is
-                # THE key iff its bytes are exactly score — which an escape can
-                # only lengthen, so the span check alone rejects every forgery.
+                # THE key iff its bytes are exactly the one asked for — which an
+                # escape can only lengthen, so the span check alone rejects every
+                # forgery.
                 k = j + 1
                 while (k <= n && substr(buf, k, 1) ~ /[ \t\r\n]/) k++
                 isKey = (k <= n && substr(buf, k, 1) == ":")
@@ -148,35 +199,11 @@ parse_score() {
                 # apostrophe in this block: it sits inside the awk single quote.)
                 if (isKey && prevSig != "{" && prevSig != ",") { ok = 0; break }
 
-                if (isKey && j - i == 6 && substr(buf, i + 1, 5) == "score") {
-                    scoreCount++
-                    if (scoreCount == 1) {
-                        keyDepth = depth
-                        # The value is taken by a flat scan to the next
-                        # terminator, deliberately NOT re-walking strings or
-                        # containers the way the loop above does. It does not
-                        # need to: this only has to FIND the token, and the
-                        # anchored grammar below decides whether it is a score.
-                        # Anything that is not a bare JSON number — "1.0" with
-                        # its quotes, [0.5], {"a":1} — comes back garbled and is
-                        # rejected there, so a sloppier scan cannot widen what
-                        # gets credited, only what gets thrown away.
-                        #
-                        # The quote is deliberately NOT in the stop set, and this
-                        # is load-bearing in the opposite direction from how it
-                        # reads. {"score":1.0"passed":true} is a verifier that
-                        # dropped a comma; scanning THROUGH the quote yields the
-                        # token 1.0"passed":true, which the grammar refuses, and
-                        # the malformed payload fails closed. Add the quote here
-                        # and the token truncates to a clean 1.0 — the same
-                        # payload is then awarded FULL MARKS. Tightening the scan
-                        # loosens the verdict, so it stays loose on purpose;
-                        # NO_READABLE_SCORE["glued_token"] pins it.
-                        v = k + 1
-                        while (v <= n && substr(buf, v, 1) ~ /[ \t\r\n]/) v++
-                        start = v
-                        while (v <= n && substr(buf, v, 1) !~ /[]},\t\r\n ]/) v++
-                        keyVal = substr(buf, start, v - start)
+                if (isKey && j - i == klen + 1 && substr(buf, i + 1, klen) == key) {
+                    totalCount++
+                    if (depth == 1) {
+                        rootCount++
+                        if (rootCount == 1) keyVal = value_at(k + 1)
                     }
                 }
                 prevSig = "\""
@@ -191,12 +218,43 @@ parse_score() {
             if (c !~ /[ \t\r\n]/) prevSig = c
             i++
         }
-        if (ok && rootClosed && scoreCount == 1 && keyDepth == 1 &&
-            keyVal ~ /^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$/) {
-            x = keyVal + 0
-            if (x >= -1e-6 && x <= 1 + 1e-6) print keyVal
+        # The key must sit at the level of the root itself, exactly once. A payload
+        # carrying two of them at depth 1 has not said it once, and one that has
+        # the key only inside a nested object has not said it at all.
+        if (!(ok && rootClosed && rootCount == 1)) exit
+        # strict additionally poisons on a duplicate ANYWHERE. See the callers for
+        # why only score can afford it.
+        if (strict == 1 && totalCount != 1) exit
+
+        if (kind == "number") {
+            # Anchored, so "1.0abc" cannot coerce to 1.0, and range-checked, which
+            # also catches 1e400 (strtod takes it to +inf).
+            if (keyVal ~ /^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$/) {
+                x = keyVal + 0
+                if (x >= -1e-6 && x <= 1 + 1e-6) print keyVal
+            }
+        } else if (kind == "literal") {
+            if (keyVal ~ /^(true|false)$/) print keyVal
+        } else if (kind == "string") {
+            # The JSON string grammar, and this is the one place the walker owes
+            # more than "find the token": a string is printed back into the result
+            # document verbatim, so a token that is not a legal JSON string takes
+            # the whole document down with it — the same corruption as emitting two
+            # tokens, just from a different cause. Raw control bytes are what a
+            # verifier building detail by hand actually produces, and json.loads
+            # rejects them inside a string (strict=True). Callers default an
+            # unreadable string to "", which costs a debugging aid, not a grade.
+            if (keyVal ~ /^"([^"\\[:cntrl:]]|\\(["\\\/bfnrt]|u[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]))*"$/) print keyVal
         }
     }'
+}
+
+# The score a checkpoint actually earned, or "" if it earned none. strict=1: a
+# score stated twice, at any depth, is not a score — score can afford the strictest
+# reading because failing closed sends it to the infra chain, which is a re-run
+# rather than a grade.
+parse_score() {
+    parse_json_root_value score "$1" 1 number
 }
 
 # Discover repos in /workspace/ (directories with .git)
@@ -491,13 +549,31 @@ for verifier in "$VERIFIER_DIR"/*.sh; do
     # VERIFIER_JSON, which is raw verifier stdout on the good path.
     checkpoint_score="$VERIFIER_SCORE"
 
-    # Extract passed from verifier JSON
-    checkpoint_passed=$(printf '%s' "$VERIFIER_JSON" | grep -oP '"passed"\s*:\s*\K(true|false)' || echo "false")
+    # passed and detail come off the same walker as the score, at the same depth.
+    # A regex cannot see nesting, and json.dumps needs no adversary to produce a
+    # payload it reads wrong: a verifier that states its score and puts a stage
+    # flag in a diagnostics object hands an unanchored read a "passed": true that
+    # belongs to the diagnostic, not the verdict. scorer_guard.py:335 measures 22
+    # corpus verifiers with no top-level "passed" at all, so on those the nested
+    # one is the ONLY match there is — a 0.0 checkpoint recorded as a pass.
+    #
+    # strict=0 here, unlike score, and that is a decision rather than an oversight.
+    # Failing closed means something different for each key. A score the shell
+    # cannot read routes to the infra chain: a re-run, a safe escape. A passed it
+    # cannot read is a recorded false — a wrong data point indistinguishable from a
+    # real agent failure, feeding checkpoints_passed / all_passed and the pass-rate
+    # reporting downstream. Under strict=1 the legitimate payload
+    # {"score":1.0,"passed":true,"diagnostics":{"passed":true}} records passed=false
+    # at score=1.0, fabricating a FAIL. Depth-1 scoping already refuses the nested
+    # key in both directions; going strict on top of it would only trade the
+    # fabricated pass for a fabricated fail.
+    checkpoint_passed=$(parse_json_root_value passed "$VERIFIER_JSON" 0 literal)
+    [ -n "$checkpoint_passed" ] || checkpoint_passed="false"
 
-    # Extract the canonical "detail" string (verifier_output.schema.json) as a
-    # JSON string token, including escapes, so it can be embedded verbatim.
+    # The canonical "detail" string (verifier_output.schema.json), as a JSON string
+    # token with its escapes intact, so it can be embedded verbatim below.
     # Preserved per-checkpoint in output.json for debugging; empty when absent.
-    checkpoint_detail=$(printf '%s' "$VERIFIER_JSON" | grep -oPm1 '"detail"\s*:\s*\K"(\\.|[^"\\])*"')
+    checkpoint_detail=$(parse_json_root_value detail "$VERIFIER_JSON" 0 string)
     [ -n "$checkpoint_detail" ] || checkpoint_detail='""'
 
     if [ "$VERIFIER_RAN" != "true" ]; then
