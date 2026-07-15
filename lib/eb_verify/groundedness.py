@@ -14,6 +14,7 @@ Reasons per citation:
   path_escape    — cited path resolves outside the workspace (.. or symlink)
   too_short      — normalized span shorter than MIN_SPAN_CHARS
   too_large      — cited file exceeds MAX_EVIDENCE_FILE_BYTES (never read)
+  not_a_regular_file — cited path is a pipe/socket/device, not evidence
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
-from eb_verify.plugins import FileTooLargeError, safe_read
+from eb_verify.plugins import FileTooLargeError, NotRegularFileError, safe_read
 
 # Spans shorter than this after whitespace normalization are not evidence.
 MIN_SPAN_CHARS = 20
@@ -110,6 +111,11 @@ def _check_one(
         except FileTooLargeError:
             # Size cap fired (after containment passed): file never read.
             return CitationResult(citation, grounded=False, reason="too_large")
+        except NotRegularFileError:
+            # A pipe/socket/device the agent planted inside its own workspace.
+            # Listed before ValueError: it subclasses ValueError, and this is
+            # not a containment failure.
+            return CitationResult(citation, grounded=False, reason="not_a_regular_file")
         except ValueError:
             # safe_read's containment check fired: .. traversal or symlink escape.
             return CitationResult(citation, grounded=False, reason="path_escape")
