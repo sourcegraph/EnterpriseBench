@@ -25,6 +25,16 @@ BENCHMARKS = REPO_ROOT / "benchmarks"
 # ---------------------------------------------------------------------------
 
 
+def _of(paths: list[str], repo: str = "svc") -> list[lc.OracleFile]:
+    """Bare paths -> oracle entries, all in one repo.
+
+    The bucket-parity cases below are the CSB reference's own single-repo
+    fixtures, so a single repo tag is the faithful port; the cases that turn on
+    repo identity pass their own entries.
+    """
+    return [lc.OracleFile(repo=repo, path=p) for p in paths]
+
+
 @pytest.mark.parametrize(
     "instruction, oracle_files, oracle_symbols, want_bucket",
     [
@@ -57,7 +67,7 @@ BENCHMARKS = REPO_ROOT / "benchmarks"
     ],
 )
 def test_classify_bucket_parity(instruction, oracle_files, oracle_symbols, want_bucket):
-    got = lc.classify(instruction, oracle_files, oracle_symbols)
+    got = lc.classify(instruction, _of(oracle_files), oracle_symbols)
     assert got.bucket == want_bucket
 
 
@@ -68,7 +78,7 @@ def test_dir_bucket_requires_path_form_not_bare_noun():
     own directory."""
     leak = lc.classify(
         "Requests to the escalation service lose context somewhere in the chain.",
-        ["escalation/handler.go"],
+        _of(["escalation/handler.go"]),
         [],
     )
     assert leak.bucket is not lc.Bucket.DIR
@@ -133,7 +143,7 @@ def test_load_task_reads_toml_ground_truth_not_expected_solution_json(tmp_path):
     )
     oracle = lc.load_task(task_dir)
     assert oracle is not None
-    assert oracle.oracle_files == ["src/checkout/cart.py"]
+    assert oracle.oracle_files == [lc.OracleFile(repo="shop", path="src/checkout/cart.py")]
 
 
 def test_load_task_none_when_ground_truth_empty(tmp_path):
@@ -343,7 +353,7 @@ def test_generic_manifest_basename_is_not_an_exact_path_leak(basename):
     """
     leak = lc.classify(
         instruction=f"The build fails after a dependency bump. Inspect the {basename}.",
-        oracle_files=[f"svc/deps/{basename}", "svc/internal/resolver/graph.go"],
+        oracle_files=_of([f"svc/deps/{basename}", "svc/internal/resolver/graph.go"]),
         oracle_symbols=[],
     )
     assert leak.bucket is not lc.Bucket.EXACT_PATH
@@ -354,7 +364,7 @@ def test_qualified_generic_manifest_path_still_leaks():
     """`envoy/go.mod` has a directory component -- still specific, still a leak."""
     leak = lc.classify(
         instruction="The bump landed in envoy/go.mod and broke the build.",
-        oracle_files=["envoy/go.mod"],
+        oracle_files=_of(["envoy/go.mod"]),
         oracle_symbols=[],
     )
     assert leak.bucket is lc.Bucket.EXACT_PATH
@@ -365,7 +375,7 @@ def test_non_generic_basename_still_leaks():
     """The filter must not blanket-suppress real basename leaks."""
     leak = lc.classify(
         instruction="The regression is in retry_policy.go somewhere.",
-        oracle_files=["svc/net/retry_policy.go"],
+        oracle_files=_of(["svc/net/retry_policy.go"]),
         oracle_symbols=[],
     )
     assert leak.bucket is lc.Bucket.EXACT_PATH
@@ -383,7 +393,7 @@ def test_generic_filter_does_not_apply_when_the_manifest_IS_the_oracle():
     launder."""
     leak = lc.classify(
         instruction="A CVE landed in a transitive dep. Check go.mod for the pin.",
-        oracle_files=["go.mod", "go.sum"],   # the manifest IS the oracle
+        oracle_files=_of(["go.mod", "go.sum"]),   # the manifest IS the oracle
         oracle_symbols=[],
     )
     assert leak.bucket is lc.Bucket.EXACT_PATH
@@ -393,7 +403,7 @@ def test_generic_filter_does_not_apply_when_the_manifest_IS_the_oracle():
     # mere entry point, and the filter applies.
     leak = lc.classify(
         instruction="A CVE landed in a transitive dep. Check go.mod for the pin.",
-        oracle_files=["go.mod", "internal/auth/verify.go"],
+        oracle_files=_of(["go.mod", "internal/auth/verify.go"]),
         oracle_symbols=[],
     )
     assert leak.bucket is not lc.Bucket.EXACT_PATH

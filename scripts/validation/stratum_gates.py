@@ -47,15 +47,20 @@ from scripts.validation.stratum_model import (
 # ---------------------------------------------------------------------------
 
 
-def score_gate_a(declared_repos: set[str], oracle_repos: set[str],
-                 has_oracle_files: bool = True) -> GateEvidence:
+def score_gate_a(declared_repos: set[str],
+                 oracle_files: list[lc.OracleFile]) -> GateEvidence:
     """PARITY: the baseline arm must be able to see every oracle file locally.
 
     The baseline Dockerfile clones exactly the task's declared `[[repos]]`
     (scripts/sandbox/dockerfile_generator.generate_standard_dockerfile). If an
     oracle file lives in a repo that is never cloned, the baseline arm is
     solving blind -- the empty-baseline confound this gate exists to reject.
+
+    Scored off the same ``OracleFile`` list the other gates read, so an entry
+    this gate cannot check is one the others cannot silently disagree about.
     """
+    untagged = sorted(o.path for o in oracle_files if not o.repo)
+    oracle_repos = {o.repo for o in oracle_files if o.repo}
     ev: dict[str, Any] = {"declared_repos": sorted(declared_repos),
                           "oracle_repos": sorted(oracle_repos)}
 
@@ -65,16 +70,19 @@ def score_gate_a(declared_repos: set[str], oracle_repos: set[str],
             "task declares no repos: baseline arm would get an empty workspace",
             ev,
         )
-    if has_oracle_files and not oracle_repos:
-        # `missing = {} - declared` is empty, so this would otherwise PASS
-        # vacuously -- a parity gate that verified nothing. The schema requires
-        # a `repo` on every required_files entry; a task without one cannot be
-        # checked, and an uncheckable gate must not report success.
+    if untagged:
+        # An untagged entry used to be DROPPED from the parity set, so a task
+        # whose oracle was partly tagged had only the tagged part checked and
+        # passed on it. The schema requires a `repo` on every required_files
+        # entry; an entry that cannot be checked must fail the gate, not leave
+        # it. Covers the all-untagged case (where `missing` would otherwise be
+        # empty and the gate would pass vacuously) and the mixed case alike.
         return GateEvidence(
             "A", GateStatus.FAIL,
-            "oracle files carry no `repo` tag, so parity cannot be verified "
-            "(schemas/task.schema.json requires `repo` on every required_files entry)",
-            ev,
+            f"{len(untagged)} oracle file(s) carry no `repo` tag, so parity "
+            f"cannot be verified for them: {', '.join(untagged)} "
+            f"(schemas/task.schema.json requires `repo` on every required_files entry)",
+            {**ev, "untagged_oracle_files": untagged},
         )
     missing = oracle_repos - declared_repos
     if missing:
@@ -125,7 +133,7 @@ def _modules(paths: list[str], granularity: str) -> set[str]:
 
 
 def score_gate_d(declared_repos: set[str],
-                 oracle_files: list[str],
+                 oracle_files: list[lc.OracleFile],
                  granularity: str,
                  crnt_positive: bool,
                  difficulty_stratum: str) -> GateEvidence:
@@ -173,7 +181,7 @@ def score_gate_d(declared_repos: set[str],
             ev,
         )
 
-    mods = _modules(oracle_files, granularity)
+    mods = _modules([o.path for o in oracle_files], granularity)
     ev["n_modules"] = len(mods)
     ev["modules"] = sorted(mods)
     dispersed = len(oracle_files) >= GATE_D_MIN_FILES and len(mods) >= GATE_D_MIN_MODULES
@@ -363,17 +371,6 @@ def _declared_repos(task_toml: dict[str, Any]) -> set[str]:
     return {r.path for r in crnt_validator.extract_repos(task_toml) if r.path}
 
 
-def _oracle_repos(ground_truth: dict[str, Any]) -> set[str]:
-    """The repos the oracle files actually live in, off the already-loaded
-    ground truth -- Gate A does not re-read the task to get them."""
-    out: set[str] = set()
-    for key in ("required_files", "sufficient_files"):
-        for entry in (ground_truth.get(key) or []):
-            if isinstance(entry, dict) and entry.get("repo"):
-                out.add(entry["repo"])
-    return out
-
-
 def _crnt_positive(task_toml: dict[str, Any]) -> bool:
     """Per-task CRNT boolean. Stricter than "declares >= 2 repos": every
     declared repo must be covered by a required_files entry.
@@ -388,7 +385,7 @@ def _crnt_positive(task_toml: dict[str, Any]) -> bool:
     return bool(crnt_validator.evaluate_crnt(task_toml).passes_crnt)
 
 
-def measure_ttfr(run_key: str, oracle_files: list[str],
+def measure_ttfr(run_key: str, oracle_files: list[lc.OracleFile],
                  runs_root: Path) -> dict[str, Any]:
     """Gate C's measurement, from the baseline arm's real trace.
 
@@ -401,7 +398,7 @@ def measure_ttfr(run_key: str, oracle_files: list[str],
     what keeps this out of the already-published retrieval-recall aggregate.
     """
     trace = runs_root / run_key / "baseline" / "agent_trace.jsonl"
-    r = compute_ttfr(trace, oracle_files)
+    r = compute_ttfr(trace, [o.qualified for o in oracle_files])
     return {"coverage": r.coverage, "ttfr": r.turns_to_first_relevant,
             "run_key": run_key, "trace_sha256": _sha256_file(trace)}
 
@@ -469,8 +466,7 @@ def score_task(task_dir: Path,
     stratum = task_toml.get("difficulty_stratum", "")
 
     gates = {
-        "A": score_gate_a(declared, _oracle_repos(oracle.ground_truth),
-                          has_oracle_files=bool(oracle.oracle_files)),
+        "A": score_gate_a(declared, oracle.oracle_files),
         "B": score_gate_b(lc.decide(run_key, oracle)),
         "C": score_gate_c(m.get("C")),
         "D": score_gate_d(declared, oracle.oracle_files, params.module_granularity,

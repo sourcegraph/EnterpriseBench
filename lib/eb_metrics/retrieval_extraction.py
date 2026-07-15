@@ -41,9 +41,9 @@ repo-relative path leads with a non-code directory (e.g. grafana's
 ``/workspace/<repo>/...`` retrieved string — see
 ``test_normalize_known_limitation_non_code_dir_lead`` in
 ``tests/eb_metrics/test_ir_metrics.py``. This module's actual join never
-hits that path: :func:`required_files_from_ground_truth` already drops the
-``repo::`` qualifier (EB's ``ground_truth.json`` carries ``repo`` as a
-separate structured field, never a ``repo::path`` string), and
+hits that path: :func:`required_files_from_ground_truth` emits ``repo/path``
+(EB's ``ground_truth.json`` carries ``repo`` as a separate structured field,
+never a ``repo::path`` string, so the join is a plain path segment), and
 :func:`_align_retrieved_to_required` canonicalizes any retrieved path whose
 *components* trail-match a required path — including non-code-dir leads —
 to the required path's own string before the exact-match metrics run, so
@@ -536,15 +536,24 @@ def required_files_from_ground_truth(
     *,
     include_sufficient: bool = False,
 ) -> list[str]:
-    """Read ``ground_truth.json`` → relevant file paths (the recall target).
+    """Read ``ground_truth.json`` → relevant files (the recall target).
 
     Uses ``required_files`` ("MUST be found") by default; set
-    ``include_sufficient`` to also fold in ``sufficient_files``. Following
-    CSB's dict-flattening, each entry contributes its repo-relative ``path``
-    (the ``repo`` qualifier is dropped). Returns ``[]`` if the file is
-    missing, unparseable, or carries no required files.
+    ``include_sufficient`` to also fold in ``sufficient_files``. Returns ``[]``
+    if the file is missing, unparseable, or carries no required files.
+
+    Each entry contributes ``<repo>/<path>``, because a bare path is not an
+    identity: the corpus's multi-repo tasks require *the same path in several
+    repos* (refactor-orch-008's oracle is etcd's ``go.mod`` AND kubernetes'),
+    and dropping the qualifier both collapsed them into one entry and let any
+    repo's ``go.mod`` -- or a nested submodule's -- satisfy either. An entry
+    with no repo contributes its bare path; Gate A is what rejects those, so
+    this loader does not have to guess a repo for them.
     """
-    return [path for _, path in _ground_truth_entries(gt_path, include_sufficient=include_sufficient)]
+    return [
+        f"{repo}/{path}" if repo else path
+        for repo, path in _ground_truth_entries(gt_path, include_sufficient=include_sufficient)
+    ]
 
 
 def _path_components(path: str) -> tuple[str, ...]:

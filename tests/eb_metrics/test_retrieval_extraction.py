@@ -258,7 +258,13 @@ def test_bash_redirect_target_still_counted(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_required_files_reads_paths_dropping_repo(tmp_path: Path) -> None:
+def test_required_files_keeps_the_repo_qualifier(tmp_path: Path) -> None:
+    """The oracle is (repo, path), not path.
+
+    This test previously asserted the opposite -- that the repo qualifier was
+    dropped -- and so pinned the defect it was meant to guard: with a bare
+    path, one repo's ``go.mod`` satisfies another's required entry.
+    """
     gt = _write_ground_truth(
         tmp_path / "ground_truth.json",
         [
@@ -267,9 +273,55 @@ def test_required_files_reads_paths_dropping_repo(tmp_path: Path) -> None:
         ],
     )
     assert required_files_from_ground_truth(gt) == [
-        "pkg/kubelet/prober/worker.go",
-        "pkg/kubelet/prober/worker_test.go",
+        "kubernetes/pkg/kubelet/prober/worker.go",
+        "kubernetes/pkg/kubelet/prober/worker_test.go",
     ]
+
+
+def test_same_path_in_different_repos_stays_distinct(tmp_path: Path) -> None:
+    """Two oracle entries sharing a path but not a repo are two files.
+
+    ``refactor-orch-008``'s real oracle: etcd's go.mod and kubernetes' go.mod.
+    Deduplicating on path alone collapsed them to a single bare ``go.mod``.
+    """
+    gt = _write_ground_truth(
+        tmp_path / "ground_truth.json",
+        [{"path": "go.mod", "repo": "etcd"}, {"path": "go.mod", "repo": "kubernetes"}],
+    )
+    assert required_files_from_ground_truth(gt) == ["etcd/go.mod", "kubernetes/go.mod"]
+
+
+def test_wrong_repo_and_nested_submodule_reads_are_not_hits(tmp_path: Path) -> None:
+    """Pins refactor-orch-008: only ``/workspace/kubernetes/go.mod`` is a hit.
+
+    The baseline's other same-named reads must not count -- a nested Go
+    submodule (``etcd/server/go.mod``) is in NEITHER oracle entry, and a
+    vendored manifest belongs to no oracle repo at all.
+    """
+    gt = _write_ground_truth(
+        tmp_path / "ground_truth.json",
+        [{"path": "go.mod", "repo": "etcd"}, {"path": "go.mod", "repo": "kubernetes"}],
+    )
+    required = required_files_from_ground_truth(gt)
+    reads = [
+        "/workspace/etcd/server/go.mod",       # nested submodule: in NEITHER oracle entry
+        "/workspace/grpc-go/vendor/go.mod",    # vendored manifest, foreign repo
+        "/workspace/kubernetes/staging/src/k8s.io/apiserver/go.mod",
+        "/workspace/kubernetes/go.mod",        # the first genuine hit
+    ]
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _assistant_tool_use(
+                f"t{i}", "Read", {"file_path": p},
+                ts=f"2026-01-01T00:00:0{i}.000Z", usage=_usage(10),
+            )
+            for i, p in enumerate(reads, start=1)
+        ],
+    )
+    result = compute_ttfr(trace, required)
+    assert result.coverage == "ok"
+    assert result.turns_to_first_relevant == 4
 
 
 def test_required_files_missing_or_empty(tmp_path: Path) -> None:
@@ -290,8 +342,8 @@ def test_required_files_optional_sufficient(tmp_path: Path) -> None:
             }
         )
     )
-    assert required_files_from_ground_truth(path) == ["a.go"]
-    assert required_files_from_ground_truth(path, include_sufficient=True) == ["a.go", "b.go"]
+    assert required_files_from_ground_truth(path) == ["r/a.go"]
+    assert required_files_from_ground_truth(path, include_sufficient=True) == ["r/a.go", "r/b.go"]
 
 
 # ---------------------------------------------------------------------------

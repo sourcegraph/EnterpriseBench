@@ -150,6 +150,31 @@ GENERIC_MANIFEST_BASENAMES = frozenset({
 
 
 @dataclass(frozen=True)
+class OracleFile:
+    """One ground-truth entry: a path AND the repo it lives in.
+
+    A bare path is not an identity in this corpus. The multi-repo tasks require
+    *the same path in several repos* -- refactor-orch-008's oracle is etcd's
+    ``go.mod`` and kubernetes' ``go.mod`` -- so a path-keyed oracle collapses
+    two files into one and lets either repo's manifest stand in for the other.
+    Each consumer takes the part it needs rather than re-deriving a repo by
+    splitting a prefix off a path, which fabricates repos named ``go.mod``.
+    """
+
+    repo: str
+    path: str
+
+    @property
+    def qualified(self) -> str:
+        """``<repo>/<path>`` -- the form that anchors a path to its repo.
+
+        What TTFR and recall match against, so a read of repo X's ``go.mod``
+        cannot satisfy repo Y's required entry.
+        """
+        return f"{self.repo}/{self.path}" if self.repo else self.path
+
+
+@dataclass(frozen=True)
 class Leak:
     bucket: Bucket
     token: str        # the leaking token; "" for behavioral / grep_hard
@@ -193,9 +218,15 @@ def _path_parts(path: str) -> tuple[str, list[str], list[str]]:
 
 
 def classify(instruction: str,
-             oracle_files: list[str],
+             oracle_files: list[OracleFile],
              oracle_symbols: list[str] | None = None) -> Leak:
-    """Classify one task. Most-specific leak wins; first hit reported."""
+    """Classify one task. Most-specific leak wins; first hit reported.
+
+    Leak detection scans each entry's repo-RELATIVE ``path``: the instruction
+    is expected to name the workspace's repos (it must, to say what is there),
+    so folding the repo into the scanned path would report every task as
+    leaking its own workspace layout.
+    """
     ins = instruction.lower()
 
     def names(word: str) -> bool:
@@ -214,11 +245,12 @@ def classify(instruction: str,
     # generic manifest -- i.e. only when there is genuinely something downstream
     # left to discover.
     oracle_has_non_generic = any(
-        _path_parts(f)[0] not in GENERIC_MANIFEST_BASENAMES for f in oracle_files
+        _path_parts(o.path)[0] not in GENERIC_MANIFEST_BASENAMES for o in oracle_files
     )
 
     # 1) exact path or basename, or >=2 consecutive path segments verbatim
-    for f in oracle_files:
+    for o in oracle_files:
+        f = o.path
         basename, _dirs, segs = _path_parts(f)
         # A bare generic manifest basename does not localize -- skip it here,
         # but keep checking the multi-segment fragments below, which restore
@@ -240,25 +272,30 @@ def classify(instruction: str,
     # 3) distinctive containing directory, but only when named in PATH form
     #    (`escalation/`), not as a bare domain noun ("the escalation service").
     #    A bare word collides with the task's own subject; path form does not.
-    for f in oracle_files:
-        _basename, dirs, _segs = _path_parts(f)
+    for o in oracle_files:
+        _basename, dirs, _segs = _path_parts(o.path)
         for d in dirs:
             if _distinctive(d) and (d.lower() + "/") in ins:
-                return Leak(Bucket.DIR, d, source_path=f)
+                return Leak(Bucket.DIR, d, source_path=o.path)
 
-    # 4) no locational leak -> admit; grep_hard if targets are dispersed
-    repos = {re.split(r"[/:]", f, 1)[0] for f in oracle_files}
+    # 4) no locational leak -> admit; grep_hard if targets are dispersed.
+    #    The repo comes off the entry. Splitting it off the front of the path
+    #    inferred a repo named "go.mod" for every bare-manifest oracle, which
+    #    read as one repo and cost those tasks the grep_hard bucket.
+    repos = {o.repo for o in oracle_files if o.repo}
     dispersed = len(oracle_files) >= 3 or len(repos) >= 2
     return Leak(Bucket.GREP_HARD if dispersed else Bucket.BEHAVIORAL, "")
 
 
 # --- EB task loader (task.toml [ground_truth], NOT expected_solution.json) --
 
-def _flatten_gt_paths(ground_truth: dict[str, Any]) -> list[str]:
-    """Flatten required_files + sufficient_files paths from EB ground_truth.
+def _flatten_gt_paths(ground_truth: dict[str, Any]) -> list[OracleFile]:
+    """Flatten required_files + sufficient_files entries from EB ground_truth.
 
     Mirrors ``lib/eb_verify/qa_adapter._oracle_tokens``: full path strings
-    (not just basenames), deduplicated, order preserved. Symbol-level tokens
+    (not just basenames), deduplicated on ``(repo, path)`` -- NOT on path,
+    which silently merged etcd's ``go.mod`` with kubernetes' -- order
+    preserved. Symbol-level tokens
     are intentionally not collected here — EB's ground_truth schema has no
     ``required_symbols`` field, and ``expected_solution.json`` only carries
     free-text judge-prompt prose (concept tokens embedded in sentences), not
@@ -267,16 +304,21 @@ def _flatten_gt_paths(ground_truth: dict[str, Any]) -> list[str]:
     stays empty for the EB corpus, so the SYMBOL bucket structurally exists
     (parity with the CSB taxonomy) but does not currently fire.
     """
-    seen: set[str] = set()
-    out: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    out: list[OracleFile] = []
     for section in ("required_files", "sufficient_files"):
         for entry in ground_truth.get(section, []) or []:
             if not isinstance(entry, dict):
                 continue
             path = entry.get("path")
-            if isinstance(path, str) and path and path not in seen:
-                seen.add(path)
-                out.append(path)
+            if not isinstance(path, str) or not path:
+                continue
+            repo_val = entry.get("repo")
+            repo = repo_val if isinstance(repo_val, str) else ""
+            key = (repo, path)
+            if key not in seen:
+                seen.add(key)
+                out.append(OracleFile(repo=repo, path=path))
     return out
 
 
@@ -333,7 +375,7 @@ class TaskOracle:
     ground_truth: dict[str, Any] = field(default_factory=dict)
 
     @property
-    def oracle_files(self) -> list[str]:
+    def oracle_files(self) -> list[OracleFile]:
         return _flatten_gt_paths(self.ground_truth)
 
 

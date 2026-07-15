@@ -245,20 +245,28 @@ def test_artifact_records_its_inputs_not_just_its_knobs():
 # ---------------------------------------------------------------------------
 
 
+def _of(entries: list[tuple[str, str]]) -> list[lc.OracleFile]:
+    """(repo, path) pairs -> oracle entries. An empty repo is an UNTAGGED
+    entry, which Gate A must fail rather than drop."""
+    return [lc.OracleFile(repo=r, path=p) for r, p in entries]
+
+
 def test_gate_a_fails_when_oracle_lives_in_an_undeclared_repo():
     """The 48-task confound: baseline cannot solve what it cannot see."""
-    ev = sg.score_gate_a(declared_repos={"repo-a"}, oracle_repos={"repo-a", "repo-b"})
+    ev = sg.score_gate_a(declared_repos={"repo-a"},
+                         oracle_files=_of([("repo-a", "x.go"), ("repo-b", "y.go")]))
     assert ev.status is sm.GateStatus.FAIL
     assert "repo-b" in ev.reason
 
 
 def test_gate_a_passes_when_baseline_clones_every_oracle_repo():
-    ev = sg.score_gate_a(declared_repos={"repo-a", "repo-b"}, oracle_repos={"repo-a"})
+    ev = sg.score_gate_a(declared_repos={"repo-a", "repo-b"},
+                         oracle_files=_of([("repo-a", "x.go")]))
     assert ev.status is sm.GateStatus.PASS
 
 
 def test_gate_a_fails_on_empty_baseline():
-    ev = sg.score_gate_a(declared_repos=set(), oracle_repos={"repo-a"})
+    ev = sg.score_gate_a(declared_repos=set(), oracle_files=_of([("repo-a", "x.go")]))
     assert ev.status is sm.GateStatus.FAIL
 
 
@@ -270,7 +278,9 @@ def test_gate_a_fails_on_empty_baseline():
 
 def _d(declared, files, granularity="parent_dir", crnt=False, stratum="large_single"):
     return sg.score_gate_d(
-        declared_repos=declared, oracle_files=files, granularity=granularity,
+        declared_repos=declared,
+        oracle_files=[lc.OracleFile(repo="r", path=f) for f in files],
+        granularity=granularity,
         crnt_positive=crnt, difficulty_stratum=stratum,
     )
 
@@ -635,15 +645,16 @@ def test_traces_digest_discriminates_trace_CONTENT_not_just_presence(tmp_path):
     # Same oracle, same coverage ("ok" both times) -- but the baseline in `b`
     # took three turns to reach it instead of one. That is a real ttfr move, and
     # a big enough one flips Gate C's verdict and the pool with it.
-    a = _fake_runs_root(tmp_path / "a", "t", [_read_tool_call("src/x.go")])
+    a = _fake_runs_root(tmp_path / "a", "t", [_read_tool_call("/workspace/r/src/x.go")])
     b = _fake_runs_root(tmp_path / "b", "t", [
-        _read_tool_call("noise/one.go"),
-        _read_tool_call("noise/two.go"),
-        _read_tool_call("src/x.go"),
+        _read_tool_call("/workspace/r/noise/one.go"),
+        _read_tool_call("/workspace/r/noise/two.go"),
+        _read_tool_call("/workspace/r/src/x.go"),
     ])
 
-    m_a = {"t": {"C": sg.measure_ttfr("t", ["src/x.go"], a)}}
-    m_b = {"t": {"C": sg.measure_ttfr("t", ["src/x.go"], b)}}
+    oracle = [lc.OracleFile(repo="r", path="src/x.go")]
+    m_a = {"t": {"C": sg.measure_ttfr("t", oracle, a)}}
+    m_b = {"t": {"C": sg.measure_ttfr("t", oracle, b)}}
 
     # Coverage is IDENTICAL and the ttfr differs -- which is exactly why the
     # counts cannot be the pin, and the content hash has to be.
@@ -793,16 +804,28 @@ def test_gate_a_keys_declared_repos_on_path_not_url_basename():
     toml = {"repos": [{"path": "docker-cli", "url": "https://github.com/docker/cli"},
                       {"path": "moby", "url": "https://github.com/moby/moby"}]}
     assert sg._declared_repos(toml) == {"docker-cli", "moby"}
-    ev = sg.score_gate_a(sg._declared_repos(toml), {"docker-cli", "moby"})
+    ev = sg.score_gate_a(sg._declared_repos(toml),
+                         _of([("docker-cli", "x.go"), ("moby", "y.go")]))
     assert ev.status is sm.GateStatus.PASS
 
 
 def test_gate_a_does_not_pass_vacuously_when_the_oracle_has_no_repo_tags():
     """`missing = {} - declared` is empty, so an oracle with no `repo` tags would
     otherwise PASS a parity gate that verified nothing. Uncheckable != fine."""
-    ev = sg.score_gate_a({"repo-a"}, set(), has_oracle_files=True)
+    ev = sg.score_gate_a({"repo-a"}, _of([("", "x.go")]))
     assert ev.status is sm.GateStatus.FAIL
     assert "cannot be verified" in ev.reason
+
+
+def test_gate_a_fails_when_only_SOME_oracle_entries_carry_a_repo():
+    """The mixed case, which the all-untagged guard did not catch: an untagged
+    entry used to be dropped from the parity set, so the gate checked only the
+    tagged remainder and passed on it -- reporting parity it never verified for
+    the very file it could not place."""
+    ev = sg.score_gate_a({"repo-a"}, _of([("repo-a", "x.go"), ("", "y.go")]))
+    assert ev.status is sm.GateStatus.FAIL
+    assert "y.go" in ev.reason
+    assert ev.evidence["untagged_oracle_files"] == ["y.go"]
 
 
 def test_gate_c_not_found_is_pending_not_a_pass():
