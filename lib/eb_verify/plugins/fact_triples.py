@@ -50,8 +50,7 @@ from eb_verify.fact_coverage import (
     load_scoring_deps,
 )
 from eb_verify.groundedness import Citation, check_groundedness
-from eb_verify.plugins import ValidationResult, safe_read
-from eb_verify.scorer_guard import artifact_not_checked
+from eb_verify.plugins import ValidationResult, not_checked_result, safe_read
 
 DEFAULT_ALPHA = 0.3
 # Chosen operating point for one-to-one greedy triple matching — NOT calibrated
@@ -412,15 +411,10 @@ class FactTriplesValidator:
         try:
             load_scoring_deps()
         except ScoringDepsUnavailable as exc:
-            detail = f"fact scoring unavailable (dependency: {exc})"
-            return ValidationResult(
-                valid=False,
-                detail=detail,
-                infra_error=artifact_not_checked(
-                    "scoring_deps_unavailable",
-                    detail,
-                    artifact_type=self.artifact_type,
-                ),
+            return not_checked_result(
+                self.artifact_type,
+                "scoring_deps_unavailable",
+                f"fact scoring unavailable (dependency: {exc})",
             )
 
         score = score_fact_triples(data["facts"], gt_data["facts"], workspace)

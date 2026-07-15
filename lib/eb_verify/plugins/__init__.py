@@ -7,12 +7,15 @@ Plugins are registered by artifact type name.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Protocol
 
-from eb_verify.scorer_guard import InfraError
+from eb_verify.scorer_guard import InfraError, artifact_not_checked
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -23,6 +26,23 @@ class ValidationResult:
     # to load) — a harness fault, never a verdict on the agent. `valid` is then
     # a placeholder consumers must branch past, as with CheckpointResult.
     infra_error: Optional[InfraError] = None
+
+
+def not_checked_result(
+    artifact_type: str, cause: str, detail: str
+) -> ValidationResult:
+    """Build the ValidationResult for an artifact the harness could not check.
+
+    The one constructor for this verdict, so every not-checked path agrees on
+    the placeholder `valid`, logs the fault, and carries the same `detail` in
+    both the result and its InfraError.
+    """
+    logger.error("Artifact %r: not checked (%s) — %s", artifact_type, cause, detail)
+    return ValidationResult(
+        valid=False,
+        detail=detail,
+        infra_error=artifact_not_checked(cause, detail, artifact_type=artifact_type),
+    )
 
 
 class ArtifactValidator(Protocol):

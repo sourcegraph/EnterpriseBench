@@ -80,10 +80,9 @@ class VerificationResult:
             lines.append("artifacts:")
             for ar in self.artifact_results:
                 if ar.get("infra_error"):
-                    # Same rule as the checkpoint INFRA_ERROR line: nobody
-                    # checked this artifact, so its valid=False is a placeholder
-                    # and printing INVALID would blame the agent for a harness
-                    # fault.
+                    # Same rule as the checkpoint INFRA_ERROR line above:
+                    # valid=False is a placeholder, and INVALID would blame the
+                    # agent for a harness fault.
                     status = "INFRA_ERROR (not checked)"
                 else:
                     status = "VALID" if ar.get("valid") else "INVALID"
