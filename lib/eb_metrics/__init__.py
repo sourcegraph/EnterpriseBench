@@ -14,6 +14,15 @@ codeprobe a hard requirement of *every* consumer — including
 ``scripts/cost_tracker.py``, which reaches this package only for
 :class:`~eb_metrics.usage_dedup.UsageDedup` and must keep running where
 codeprobe is absent (EnterpriseBench-4p5k).
+
+Import the submodule, not this package, in new code. A type-checker cannot see
+through :func:`__getattr__`, so a name reached as ``eb_metrics.compute_ttfr``
+checks as ``Any``, losing the signature. The usual repair — restating the
+imports under ``if TYPE_CHECKING`` — would put codeprobe back on the checker's
+path in exactly the environment this laziness exists to serve, so the re-export
+surface below is kept for compatibility rather than recommended. Every consumer
+in this repo already imports from the defining submodule, which type-checks
+normally.
 """
 
 from __future__ import annotations
