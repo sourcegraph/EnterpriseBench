@@ -47,11 +47,10 @@ class MilestoneResult:
     infra_error: Optional[InfraError] = None
 
     def __post_init__(self) -> None:
-        # The aggregators sum `score` unguarded, so an ill-formed result is either a
-        # crash or a laundered placeholder. Neither may be constructible. The
-        # invariant has one definition, shared with CheckpointResult.
+        # The aggregators sum `score` unguarded, so an ill-formed result is either
+        # a crash or a laundered placeholder. Neither may be constructible.
         enforce_verdict_invariant(
-            f"milestone {self.milestone_name!r}", self.score, self.infra_error
+            "milestone", self.milestone_name, self.score, self.infra_error
         )
 
 

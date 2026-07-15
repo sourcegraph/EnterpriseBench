@@ -81,15 +81,15 @@ class TestComputeScore:
 
 
 # ---------------------------------------------------------------------------
-# The no-verdict encoding (bead 8cc10)
+# The no-verdict encoding
 # ---------------------------------------------------------------------------
 
 class TestNoVerdictEncoding:
     """score and infra_error are mutually exclusive and jointly exhaustive.
 
-    The same structural invariant MilestoneResult enforces, via the same shared
-    guard (scorer_guard.enforce_verdict_invariant), so "no score" can never
-    again be encoded as a placeholder 0.0 in one module and None in another.
+    The ill-formed states are unconstructible, not merely documented — a
+    placeholder 0.0 alongside an infra_error is a false zero that blames the
+    agent for a broken harness.
     """
 
     def test_placeholder_score_with_infra_error_is_unconstructible(self):

@@ -26,11 +26,7 @@ class CheckpointResult:
     infra_error: Optional[InfraError] = None
 
     def __post_init__(self) -> None:
-        # Same structural invariant as MilestoneResult, via the same guard, so
-        # the ill-formed states are unconstructible in both modules.
-        enforce_verdict_invariant(
-            f"checkpoint {self.name!r}", self.score, self.infra_error
-        )
+        enforce_verdict_invariant("checkpoint", self.name, self.score, self.infra_error)
 
 
 @dataclass

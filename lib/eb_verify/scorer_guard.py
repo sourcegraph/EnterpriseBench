@@ -99,22 +99,19 @@ class InfraError:
 
 
 def enforce_verdict_invariant(
-    label: str, score: Optional[float], infra_error: Optional[InfraError]
+    kind: str, name: str, score: Optional[float], infra_error: Optional[InfraError]
 ) -> None:
     """Reject a result that does not encode "verdict XOR infra error".
 
     The single definition of the no-verdict encoding for every per-verifier
-    result type (``CheckpointResult``, ``MilestoneResult``): ``score`` is None
-    exactly when ``infra_error`` is set. Both set is a laundered placeholder —
-    a false zero one forgotten branch away from publication; neither set claims
-    a verdict that does not exist. Result types call this from
-    ``__post_init__`` so the ill-formed states are unconstructible, instead of
-    each re-stating the invariant in its own words (bead 8cc10).
+    result type: ``score`` is None exactly when ``infra_error`` is set. Both set
+    is a laundered placeholder — a false zero one forgotten branch away from
+    publication; neither set claims a verdict that does not exist.
     """
     if (score is None) != (infra_error is not None):
         raise ValueError(
-            f"{label}: exactly one of score/infra_error must be set — a verifier "
-            f"either reached a verdict or it did not "
+            f"{kind} {name!r}: exactly one of score/infra_error must be set — a "
+            f"verifier either reached a verdict or it did not "
             f"(score={score!r}, infra_error={infra_error!r})"
         )
 
