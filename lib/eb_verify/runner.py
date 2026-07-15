@@ -152,8 +152,9 @@ class CheckpointRunner:
     ) -> CheckpointResult:
         """A checkpoint whose verifier never reached a verdict.
 
-        `score` is a placeholder, never a measurement: `run_all` refuses to
-        report a numeric total once any checkpoint carries an infra_error.
+        `score` is None, never a number: `run_all` refuses to report a numeric
+        total once any checkpoint carries an infra_error, and `compute_score`
+        refuses to aggregate an unscored checkpoint at all.
         """
         logger.error(
             "Checkpoint %r: verifier did not run (%s) — %s",
@@ -165,7 +166,7 @@ class CheckpointRunner:
             name=checkpoint.name,
             weight=checkpoint.weight,
             passed=False,
-            score=0.0,
+            score=None,
             detail=error.detail,
             infra_error=error,
         )

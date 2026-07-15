@@ -273,6 +273,25 @@ class TestMilestoneResultInvariantIsStructural:
                 infra_error=InfraError(NO_VERDICT_REASON, "milestone", "boom"),
             )
 
+    def test_the_invariant_is_the_shared_guard_not_a_local_copy(self, monkeypatch):
+        """MilestoneResult must delegate to scorer_guard.enforce_verdict_invariant —
+        the same definition CheckpointResult uses — so the two encodings can never
+        drift apart again (bead 8cc10). Trip the shared guard and prove every
+        construction goes through it."""
+        import orchestration.milestone as milestone_module
+
+        class Tripwire(Exception):
+            pass
+
+        def tripped(label: str, score, infra_error) -> None:
+            raise Tripwire(label)
+
+        monkeypatch.setattr(
+            milestone_module, "enforce_verdict_invariant", tripped
+        )
+        with pytest.raises(Tripwire, match="milestone 'm'"):
+            MilestoneResult(1, "m", passed=True, score=1.0)
+
 
 class TestSessionScoreDoesNotAverageInPlaceholders:
     def test_total_score_is_none_when_any_milestone_is_infra(self):

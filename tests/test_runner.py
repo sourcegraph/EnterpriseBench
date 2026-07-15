@@ -118,6 +118,7 @@ class TestRunCheckpointMissingVerifier:
         assert result.infra_error is not None
         assert result.infra_error.context["cause"] == "missing_verifier"
         assert result.passed is False
+        assert result.score is None, "no verdict means no score, not a 0.0"
         assert "not found" in result.detail.lower()
 
 
@@ -210,7 +211,7 @@ class TestRunCheckpointNoExitCodeFallback:
 
         assert result.infra_error is not None
         assert result.passed is False
-        assert result.score != pytest.approx(1.0)
+        assert result.score is None, "no verdict means no score, not a free 1.0"
 
     def test_exit_1_without_json_is_infra_not_a_real_zero(self, tmp_path):
         task_dir = tmp_path / "task"
@@ -229,6 +230,7 @@ class TestRunCheckpointNoExitCodeFallback:
 
         assert result.infra_error is not None
         assert result.passed is False
+        assert result.score is None, "no verdict means no score, not a false zero"
 
 
 # ---------------------------------------------------------------------------
@@ -258,7 +260,7 @@ class TestRunCheckpointTimeout:
             result = runner.run_checkpoint(cp)
 
         assert result.passed is False
-        assert result.score == 0.0
+        assert result.score is None, "a timeout is no verdict — there is no score"
         assert "timed out" in result.detail.lower()
 
 

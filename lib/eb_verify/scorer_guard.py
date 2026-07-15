@@ -98,6 +98,27 @@ class InfraError:
         return payload
 
 
+def enforce_verdict_invariant(
+    label: str, score: Optional[float], infra_error: Optional[InfraError]
+) -> None:
+    """Reject a result that does not encode "verdict XOR infra error".
+
+    The single definition of the no-verdict encoding for every per-verifier
+    result type (``CheckpointResult``, ``MilestoneResult``): ``score`` is None
+    exactly when ``infra_error`` is set. Both set is a laundered placeholder —
+    a false zero one forgotten branch away from publication; neither set claims
+    a verdict that does not exist. Result types call this from
+    ``__post_init__`` so the ill-formed states are unconstructible, instead of
+    each re-stating the invariant in its own words (bead 8cc10).
+    """
+    if (score is None) != (infra_error is not None):
+        raise ValueError(
+            f"{label}: exactly one of score/infra_error must be set — a verifier "
+            f"either reached a verdict or it did not "
+            f"(score={score!r}, infra_error={infra_error!r})"
+        )
+
+
 class DiffProbeError(Exception):
     """A git/subprocess probe failed to *run* (missing git, EACCES, corrupt
     .git, I/O error, timeout) — distinct from "git ran and found no diff".

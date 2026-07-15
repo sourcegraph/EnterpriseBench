@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
-from eb_verify.scorer_guard import InfraError
+from eb_verify.scorer_guard import InfraError, enforce_verdict_invariant
 
 
 @dataclass
@@ -16,12 +16,21 @@ class CheckpointResult:
     name: str
     weight: float
     passed: bool
-    score: float  # 0.0–1.0 (partial credit possible)
+    # 0.0–1.0 (partial credit possible). None exactly when infra_error is set:
+    # the verifier never reached a verdict, so there is no score at all — not
+    # a placeholder 0.0. Consumers must branch on infra_error before reading it.
+    score: Optional[float]
     detail: str = ""
     # Set when the verifier never reached a verdict (crashed, timed out, was
-    # missing, emitted no JSON). `score` is then a placeholder, NOT a
-    # measurement — consumers must branch on this before reading it.
+    # missing, emitted no JSON).
     infra_error: Optional[InfraError] = None
+
+    def __post_init__(self) -> None:
+        # Same structural invariant as MilestoneResult, via the same guard, so
+        # the ill-formed states are unconstructible in both modules.
+        enforce_verdict_invariant(
+            f"checkpoint {self.name!r}", self.score, self.infra_error
+        )
 
 
 @dataclass
@@ -87,9 +96,20 @@ class VerificationResult:
 
 
 def compute_score(results: List[CheckpointResult]) -> float:
-    """Compute weighted total from checkpoint results. Weights should sum to 1.0."""
+    """Compute weighted total from checkpoint results. Weights should sum to 1.0.
+
+    Refuses results carrying no verdict (score=None): averaging around the gap
+    would fabricate a plausible total from a broken harness. Callers must
+    branch on infra_error before aggregating — ``runner.run_all`` does.
+    """
     if not results:
         return 0.0
+    unscored = [r.name for r in results if r.score is None]
+    if unscored:
+        raise ValueError(
+            "no total exists: checkpoint(s) never reached a verdict: "
+            + ", ".join(unscored)
+        )
     total_weight = sum(r.weight for r in results)
     if total_weight == 0.0:
         return 0.0

@@ -18,7 +18,11 @@ from typing import Optional
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lib"))
-from eb_verify.scorer_guard import InfraError, run_verifier_subprocess
+from eb_verify.scorer_guard import (
+    InfraError,
+    enforce_verdict_invariant,
+    run_verifier_subprocess,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +48,11 @@ class MilestoneResult:
 
     def __post_init__(self) -> None:
         # The aggregators sum `score` unguarded, so an ill-formed result is either a
-        # crash or a laundered placeholder. Neither may be constructible.
-        if (self.score is None) != (self.infra_error is not None):
-            raise ValueError(
-                f"milestone {self.milestone_name!r}: exactly one of score/infra_error "
-                f"must be set — a verifier either reached a verdict or it did not "
-                f"(score={self.score!r}, infra_error={self.infra_error!r})"
-            )
+        # crash or a laundered placeholder. Neither may be constructible. The
+        # invariant has one definition, shared with CheckpointResult.
+        enforce_verdict_invariant(
+            f"milestone {self.milestone_name!r}", self.score, self.infra_error
+        )
 
 
 @dataclass

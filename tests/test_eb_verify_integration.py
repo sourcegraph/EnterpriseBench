@@ -509,7 +509,7 @@ class TestErrorCases:
         result = runner.run_checkpoint(task.checkpoints[0])
 
         assert result.passed is False
-        assert result.score == 0.0
+        assert result.score is None, "a timeout is no verdict — there is no score"
         assert "timed out" in result.detail.lower()
 
     def test_verifier_path_traversal_blocked(self, tmp_path: Path) -> None:

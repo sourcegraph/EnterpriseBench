@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from eb_verify.scorer_guard import NO_VERDICT_REASON, InfraError
 from eb_verify.scoring import (
     CheckpointResult,
     VerificationResult,
@@ -16,6 +17,10 @@ from eb_verify.scoring import (
 
 def make_result(name: str, weight: float, passed: bool, score: float, detail: str = "") -> CheckpointResult:
     return CheckpointResult(name=name, weight=weight, passed=passed, score=score, detail=detail)
+
+
+def make_infra_error() -> InfraError:
+    return InfraError(NO_VERDICT_REASON, "deterministic_scoring", "boom")
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +78,60 @@ class TestComputeScore:
             make_result("b", w2, s2 > 0, s2),
         ]
         assert compute_score(results) == pytest.approx(expected)
+
+
+# ---------------------------------------------------------------------------
+# The no-verdict encoding (bead 8cc10)
+# ---------------------------------------------------------------------------
+
+class TestNoVerdictEncoding:
+    """score and infra_error are mutually exclusive and jointly exhaustive.
+
+    The same structural invariant MilestoneResult enforces, via the same shared
+    guard (scorer_guard.enforce_verdict_invariant), so "no score" can never
+    again be encoded as a placeholder 0.0 in one module and None in another.
+    """
+
+    def test_placeholder_score_with_infra_error_is_unconstructible(self):
+        with pytest.raises(ValueError, match="reached a verdict"):
+            CheckpointResult(
+                name="cp",
+                weight=1.0,
+                passed=False,
+                score=0.0,
+                infra_error=make_infra_error(),
+            )
+
+    def test_missing_score_without_infra_error_is_unconstructible(self):
+        with pytest.raises(ValueError, match="reached a verdict"):
+            CheckpointResult(name="cp", weight=1.0, passed=False, score=None)
+
+    def test_infra_checkpoint_carries_no_score(self):
+        result = CheckpointResult(
+            name="cp",
+            weight=1.0,
+            passed=False,
+            score=None,
+            infra_error=make_infra_error(),
+        )
+        assert result.score is None
+        assert result.infra_error is not None
+
+    def test_compute_score_refuses_unscored_checkpoints(self):
+        """Averaging around a missing verdict fabricates a plausible total —
+        the aggregate must crash naming the checkpoint, not invent a number."""
+        results = [
+            make_result("scored", 0.5, True, 1.0),
+            CheckpointResult(
+                name="broken",
+                weight=0.5,
+                passed=False,
+                score=None,
+                infra_error=make_infra_error(),
+            ),
+        ]
+        with pytest.raises(ValueError, match="broken"):
+            compute_score(results)
 
 
 # ---------------------------------------------------------------------------
