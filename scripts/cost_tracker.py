@@ -30,12 +30,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-LIB_DIR = Path(__file__).resolve().parent.parent / "lib"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+LIB_DIR = PROJECT_ROOT / "lib"
 if str(LIB_DIR) not in sys.path:
     sys.path.insert(0, str(LIB_DIR))
 
 from eb_metrics.usage_dedup import UsageDedup  # noqa: E402
 
+# Not LIB_DIR: `lib.shared` is scripts/lib/shared.py, a regular package that wins
+# over <repo>/lib (a namespace portion) regardless of path order.
 from lib.shared import load_task_index, strip_mode_suffix  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -179,10 +182,12 @@ def parse_trace(trace_path: Path) -> Usage:
     block; the module docstring says why it cannot be the primary one.
 
     Usage is deduplicated per request by :class:`~eb_metrics.usage_dedup.UsageDedup`
-    — the same accumulator the retrieval axis drives, so cost and the axis cannot
-    disagree about what a request cost. Summing every assistant line instead
-    billed one request once per content block; taking a request's first line
-    instead undercounts its output.
+    — the same accumulator the retrieval axis drives, so the two cannot disagree
+    about what a request cost, given the lines each reads as carrying usage. (They
+    still read different lines: this function takes only nested ``message.usage``,
+    while the axis also accepts flat top-level ``usage``.) Summing every assistant
+    line instead billed one request once per content block; taking a request's
+    first line instead undercounts its output.
 
     Usage on non-assistant lines (sub-agent / Task tool results) is not counted
     — see EnterpriseBench-jepu.
@@ -755,10 +760,9 @@ def main(argv: list[str] | None = None) -> None:
         format="%(levelname)s: %(message)s",
     )
 
-    project_root = Path(__file__).resolve().parent.parent
-    benchmarks_root = args.benchmarks_root or (project_root / "benchmarks")
-    output_path = args.output or (project_root / "results" / "cost_report.json")
-    result_dirs = args.results_dir or _discover_default_dirs(project_root)
+    benchmarks_root = args.benchmarks_root or (PROJECT_ROOT / "benchmarks")
+    output_path = args.output or (PROJECT_ROOT / "results" / "cost_report.json")
+    result_dirs = args.results_dir or _discover_default_dirs(PROJECT_ROOT)
 
     if not result_dirs:
         logger.error("No result directories found.")

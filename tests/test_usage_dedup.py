@@ -1,11 +1,11 @@
 """Tests for eb_metrics.usage_dedup — the one request-level token dedup.
 
 Cost accounting (``scripts/cost_tracker.py``) and the retrieval axis
-(``eb_metrics.retrieval_extraction``) used to carry a dedup each, and they
-disagreed: cost billed a request at its max-output snapshot, the axis at its
-first (EnterpriseBench-4p5k, review C4). They now drive this one accumulator.
-The cross-consumer test at the bottom is the guard that keeps them from drifting
-apart again.
+(``eb_metrics.retrieval_extraction``) drive one accumulator so they cannot
+disagree about what a request cost. The cross-consumer test at the bottom guards
+that, for the nested-usage dialect both consumers read; each still decides for
+itself which lines carry usage at all, so it does not cover the flat dialect only
+the axis accepts.
 """
 
 from __future__ import annotations
@@ -80,35 +80,35 @@ def test_request_billed_at_its_complete_output_not_its_first() -> None:
     assert dedup.total_tokens == 3589
 
 
-def test_junk_and_bool_field_values_are_billed_as_absent() -> None:
-    # JSON is untrusted: a non-numeric field must not crash the walk, and a bool
-    # must not sneak through as int(True) == 1.
-    dedup = _offer_all(
-        [_entry(request_id="r", input_tokens="many", cache_read_input_tokens=True,
-                output_tokens=3)]
-    )
+@pytest.mark.parametrize(
+    "junk",
+    [
+        pytest.param("1000", id="string"),
+        pytest.param(True, id="bool"),  # must not sneak through as int(True) == 1
+        pytest.param(float("inf"), id="inf"),  # int(inf) raises OverflowError
+        pytest.param(float("-inf"), id="-inf"),
+        pytest.param(float("nan"), id="nan"),  # int(nan) raises ValueError
+    ],
+)
+def test_a_junk_field_value_is_billed_as_absent_and_reported(
+    junk: object, caplog: pytest.LogCaptureFixture
+) -> None:
+    # JSON is untrusted — json.loads even accepts the non-standard Infinity / NaN
+    # literals — so an unreadable field must not crash the walk. Nor may it be
+    # quiet: counting it as absent can undercount, and a $0.00 line in a cost
+    # report with nothing to explain it is the failure mode.
+    with caplog.at_level(logging.WARNING, logger="eb_metrics.usage_dedup"):
+        dedup = _offer_all([_entry(request_id="r", input_tokens=junk, output_tokens=3)])
     assert dedup.field_total("input_tokens") == 0
-    assert dedup.field_total("cache_read_input_tokens") == 0
-    assert dedup.total_tokens == 3
-
-
-@pytest.mark.parametrize("junk", [float("inf"), float("-inf"), float("nan")])
-def test_non_finite_field_values_are_billed_as_absent(junk: float) -> None:
-    # json.loads accepts the non-standard Infinity / NaN literals, and neither
-    # survives int(): int(inf) raises OverflowError, int(nan) ValueError. Both
-    # consumers walk this, so an unreadable field must not crash the trace.
-    dedup = _offer_all([_entry(request_id="r", input_tokens=junk, output_tokens=3)])
-    assert dedup.field_total("input_tokens") == 0
-    assert dedup.total_tokens == 3
+    assert dedup.total_tokens == 3  # the readable field still bills
+    assert "input_tokens" in caplog.text
+    assert repr(junk) in caplog.text
 
 
 def test_an_int_too_large_for_a_float_is_billed_exactly() -> None:
-    # json.loads accepts an integer literal of up to ~4300 digits
-    # (sys.int_info.default_max_str_digits), so it can hand this boundary an int
-    # that float() cannot hold — float overflows around 309 digits, an order of
-    # magnitude sooner. Such a value is an exact token count, not junk: bill it,
-    # and do not route it through math.isfinite on the way (that raises
-    # OverflowError on an int this size, which is the crash the guard prevents).
+    # An exact token count, not junk: json.loads accepts an integer literal far
+    # wider than float can hold, so this must not reach math.isfinite (which
+    # raises OverflowError on an int this size).
     huge = int("9" * 400)
     dedup = _offer_all([_entry(request_id="r", input_tokens=huge, output_tokens=3)])
     assert dedup.field_total("input_tokens") == huge
@@ -126,18 +126,6 @@ def test_a_requests_other_lines_still_bill_a_field_one_line_reported_as_junk() -
     )
     assert dedup.field_total("input_tokens") == 1000
     assert dedup.total_tokens == 3589
-
-
-@pytest.mark.parametrize("junk", ["1000", float("inf"), float("nan"), True])
-def test_junk_field_value_is_reported_not_silently_zeroed(
-    junk: object, caplog: pytest.LogCaptureFixture
-) -> None:
-    # Counting junk as absent can undercount, so it must never be quiet: a $0.00
-    # line in a cost report with nothing to explain it is the failure mode.
-    with caplog.at_level(logging.WARNING, logger="eb_metrics.usage_dedup"):
-        _offer_all([_entry(request_id="r", input_tokens=junk)])
-    assert "input_tokens" in caplog.text
-    assert repr(junk) in caplog.text
 
 
 def test_an_absent_field_is_not_reported_as_junk(

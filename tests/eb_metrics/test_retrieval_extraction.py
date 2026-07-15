@@ -452,16 +452,13 @@ def _assistant_text(text: str, *, usage: dict, request_id: str) -> str:
 def test_compute_ttfr_bills_a_request_at_its_complete_output_not_its_first(
     tmp_path: Path,
 ) -> None:
-    # Regression (EnterpriseBench-4p5k, review C4): the axis used to take the
-    # FIRST usage snapshot per requestId. Within one request the cache/input
-    # counts are invariant but ``output_tokens`` streams upward, so the first
-    # line reports a partial output (140) and only the last carries the whole
-    # request (2589). First-wins therefore *undercounted*.
+    # Within one request the cache/input counts are invariant but output_tokens
+    # streams upward, so the first line reports a partial output (140) and only
+    # the last carries the whole request (2589) — first-wins undercounts.
     #
-    # Every earlier dedup test in this file repeats an identical snapshot on
-    # each line of a group, which first-wins and max-output score the same — so
-    # none of them could catch this. This one is built so the two impls must
-    # disagree.
+    # Built so first-wins and max-output MUST disagree: the other dedup tests in
+    # this file repeat an identical snapshot on each line of a group, which both
+    # score the same, so none of them can catch a regression here.
     stream = [
         {"input_tokens": 1000, "output_tokens": 140},
         {"input_tokens": 1000, "output_tokens": 900},
@@ -494,19 +491,18 @@ def test_compute_ttfr_bills_a_request_at_its_complete_output_not_its_first(
 def test_compute_ttfr_prices_a_step_on_a_non_final_line_of_its_request(
     tmp_path: Path,
 ) -> None:
-    # The case the deferred pricing exists for, and the one the test above does
-    # NOT cover: there, the tool_use closes its request, so its line already
-    # carries the complete snapshot and an implementation that froze the usage it
-    # saw at the time of the call would score identically. On real traces ~30% of
-    # tool_use blocks sit on a *non-final* line of their request, so the step
-    # fires while output_tokens is still climbing.
+    # The case deferred pricing exists for. On real traces ~30% of tool_use
+    # blocks sit on a non-final line of their request, so the step fires while
+    # output_tokens is still climbing; the test above cannot catch this, since
+    # there the tool_use closes its request and freezing the usage seen at the
+    # call would score identically.
     #
-    # A step is priced at what its request finally billed, which is only knowable
-    # once the request's last line has been read — hence _Step.requests_seen plus
-    # _TraceWalk.billed_prefix rather than a token count frozen at the call. This
-    # also pins the ordering _walk_trace depends on: usage.offer() must run
-    # before the tool_use blocks of the same line are opened as steps, or the
-    # step would miss its own request entirely.
+    # A step is priced at what its request finally billed, knowable only once the
+    # request's last line has been read — hence _Step.requests_seen plus
+    # _TraceWalk.billed_prefix rather than a count frozen at the call. Also pins
+    # the ordering _walk_trace depends on: usage.offer() must run before the same
+    # line's tool_use blocks are opened as steps, or the step misses its own
+    # request entirely.
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
         [

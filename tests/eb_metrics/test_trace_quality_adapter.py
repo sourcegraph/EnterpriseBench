@@ -9,9 +9,15 @@ from typing import Any
 
 import pytest
 
-from eb_metrics.aggregate_quality import build_quality_metrics
-from eb_metrics.ir_metrics import compute_ir_scores
-from eb_metrics.trace_quality_adapter import (
+# The adapter under test is the one eb_metrics module that needs codeprobe, which
+# is a sibling rig CI cannot install. Skip rather than error at collection —
+# pytest aborts the whole run on a collection error, taking the 3200 tests that
+# do not need codeprobe with it.
+pytest.importorskip("codeprobe", reason="the trace-quality adapter is codeprobe-backed")
+
+from eb_metrics.aggregate_quality import build_quality_metrics  # noqa: E402
+from eb_metrics.ir_metrics import compute_ir_scores  # noqa: E402
+from eb_metrics.trace_quality_adapter import (  # noqa: E402
     metrics_from_eb_record,
     metrics_from_results_file,
 )

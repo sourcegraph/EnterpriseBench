@@ -1,15 +1,13 @@
 """The eb_metrics package must not impose one adapter's deps on every consumer.
 
-``trace_quality_adapter`` and ``aggregate_quality`` import codeprobe, which is a
-sibling rig rather than a declared dependency — CI installs only ``pytest
-jsonschema tomli`` plus ``pip install -e lib/``. While ``__init__`` bound every
-export eagerly, importing *any* eb_metrics module executed those two, so the
-stdlib-only modules (``usage_dedup``, ``retrieval_extraction``, ``ir_metrics``,
-``retrieval_rollup``) were unimportable wherever codeprobe was absent, and
-``scripts/cost_tracker.py`` — dependency-clean until it started reaching here for
-:class:`UsageDedup` — died at import before reading a trace (EnterpriseBench-4p5k).
+``trace_quality_adapter`` and ``aggregate_quality`` import codeprobe, a sibling
+rig rather than a declared dependency — CI installs only ``pytest jsonschema
+tomli`` plus ``pip install -e lib/``. Anything ``__init__`` binds is executed by
+every consumer, which is what made the stdlib-only modules (``usage_dedup``,
+``retrieval_extraction``, ``ir_metrics``, ``retrieval_rollup``) unimportable
+wherever codeprobe was absent.
 
-The subprocess tests block codeprobe at the meta-path instead of relying on it
+The subprocess tests block codeprobe at the meta-path rather than relying on it
 being uninstalled, so they fail the same way in a dev env that has it.
 """
 
@@ -19,8 +17,6 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
-
-import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -87,38 +83,25 @@ def test_retrieval_axis_imports_without_codeprobe() -> None:
     assert result.stdout.strip() == "ok"
 
 
-def test_codeprobe_backed_export_still_fails_loudly_when_codeprobe_is_absent() -> None:
-    # Laziness defers the dependency; it must not disguise a missing one as a
-    # merely-absent attribute.
+def test_importing_the_package_alone_does_not_need_codeprobe() -> None:
+    # The isolation is that __init__ binds nothing, so reaching one adapter never
+    # executes another's imports.
     result = _run_without_codeprobe(
         """
         import eb_metrics
-        eb_metrics.build_quality_metrics
+        print(sorted(n for n in vars(eb_metrics) if not n.startswith("__")))
+        """
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "[]"
+
+
+def test_codeprobe_backed_adapter_still_fails_loudly_when_codeprobe_is_absent() -> None:
+    # Deferring the dependency must not disguise a missing one as merely absent.
+    result = _run_without_codeprobe(
+        """
+        from eb_metrics.aggregate_quality import build_quality_metrics
         """
     )
     assert result.returncode != 0
     assert "ModuleNotFoundError: No module named 'codeprobe'" in result.stderr
-
-
-def test_lazy_attribute_access_returns_the_real_object() -> None:
-    import eb_metrics
-    from eb_metrics.retrieval_extraction import compute_ttfr
-
-    assert eb_metrics.compute_ttfr is compute_ttfr
-    # UsageDedup is deliberately not re-exported; the submodule is the entrypoint.
-    assert "UsageDedup" not in eb_metrics.__all__
-
-
-def test_every_advertised_export_resolves() -> None:
-    pytest.importorskip("codeprobe", reason="two exports are codeprobe-backed")
-    import eb_metrics
-
-    for name in eb_metrics.__all__:
-        assert getattr(eb_metrics, name) is not None
-
-
-def test_unknown_attribute_raises_attribute_error() -> None:
-    import eb_metrics
-
-    with pytest.raises(AttributeError, match="no attribute 'nope'"):
-        eb_metrics.nope

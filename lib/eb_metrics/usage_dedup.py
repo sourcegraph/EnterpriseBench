@@ -7,11 +7,9 @@ snapshot. Counting each line therefore bills a multi-block turn once per block.
 Both token consumers drive this one accumulator — cost accounting
 (``scripts/cost_tracker.py``, which needs the final per-field breakdown) and the
 retrieval axis (``eb_metrics.retrieval_extraction``, which needs each tool_use
-step's running cost for TTFR). They used to carry a dedup each and disagreed
-about what a request cost: cost billed a request at its max-output snapshot, the
-axis at its first (EnterpriseBench-4p5k). The two decisions that must never
-drift between them — how lines group into requests (:func:`request_key`), and
-which snapshot a request bills (:meth:`UsageDedup.offer`) — now live here.
+step's running cost for TTFR). The two decisions that must never drift between
+them — how lines group into requests (:func:`request_key`), and which snapshot a
+request bills (:meth:`UsageDedup.offer`) — live here.
 
 Extracting the *usage* off a line does not: the axis also reads flat entries
 whose ``usage`` sits at top level, while cost reads only nested
@@ -55,25 +53,22 @@ def request_key(entry: Mapping[str, Any]) -> str | None:
 def _field_value(usage: Mapping[str, Any], field: str) -> int:
     """One usage field as a token count. Absent counts zero; junk counts zero loudly.
 
-    A trace is third-party input and junk in it does not survive ``int()``:
-    ``json.loads`` accepts the non-standard literals ``Infinity`` and ``NaN``,
-    and nothing stops a writer emitting a count as a string. Counting an
-    unreadable field as absent rather than raising keeps it from crashing both
-    consumers mid-trace — the same trade this boundary already makes for a
-    malformed line — and lets the request's other lines still bill the field
-    through :meth:`UsageDedup.offer`'s max. It can also undercount, hence the
-    warning: a silent zero surfaces as a $0.00 line in a cost report explaining
-    nothing.
+    A trace is third-party input: ``json.loads`` accepts the non-standard literals
+    ``Infinity`` and ``NaN``, and nothing stops a writer emitting a count as a
+    string. Counting an unreadable field as absent rather than raising keeps it
+    from crashing both consumers mid-trace, and lets the request's other lines
+    still bill the field through :meth:`UsageDedup.offer`'s max. It can also
+    undercount, hence the warning — a silent zero surfaces as a $0.00 line in a
+    cost report explaining nothing.
     """
     value = usage.get(field)
     if value is None:
         # Absent, or an explicit null: the line reports no count for this field.
         return 0
     if isinstance(value, int) and not isinstance(value, bool):
-        # Exact and finite at every width json.loads yields, so it must not reach
-        # math.isfinite: that raises OverflowError on an int too large for a
-        # float, which starts three orders of magnitude below the ~4300-digit
-        # literal CPython's parser accepts (sys.int_info.default_max_str_digits).
+        # Must precede math.isfinite, which raises OverflowError on an int too
+        # large for a float — reachable well below the ~4300-digit literal
+        # CPython's parser accepts (sys.int_info.default_max_str_digits).
         return value
     if isinstance(value, float) and math.isfinite(value):
         return int(value)
@@ -117,15 +112,11 @@ class UsageDedup:
         is complete only on the request's final line — so its *first* line
         undercounts output (140 against a true 2589 on real EB traces).
 
-        A request therefore bills the per-field *max* over its lines, rather than
-        whichever single line looked most complete. Both reduce to the same thing
-        on a well-formed request, but taking the max per field needs no such
-        assumption to hold: it cannot be walked backwards by a line that reports a
-        smaller value or omits a field outright (a later line carrying only
-        ``output_tokens`` would otherwise zero the input and cache tokens already
-        billed), and it does not care what order the lines arrive in. A trailing
-        all-zero ``isApiErrorMessage`` record is absorbed for free, since zero
-        never wins a max.
+        A request therefore bills the per-field *max* over its lines. Unlike
+        last-wins, that cannot be walked backwards by a line reporting a smaller
+        value or omitting a field outright — a trailing all-zero
+        ``isApiErrorMessage`` record, or a later line carrying only
+        ``output_tokens``, would otherwise zero what was already billed.
         """
         if not _has_usage(usage):
             return
