@@ -7,7 +7,20 @@ from dataclasses import dataclass, field
 from eb_verify.scorer_guard import is_valid_score
 
 
-class JudgeScoreError(Exception):
+class JudgeError(Exception):
+    """Base for every way the LLM judge can reach no verdict.
+
+    The two subclasses name the modes: :class:`JudgeScoreError` (the judge
+    responded, but with a non-score) and
+    :class:`~eb_verify.judge.backends.JudgeBackendError` (the judge could not be
+    reached or its response could not be parsed). Scoring callers catch this base
+    so a judge outage routes to the re-run channel, while any OTHER exception
+    (an ``AttributeError``/``TypeError`` from a refactor) propagates as the real
+    bug it is instead of being laundered into an infra re-run.
+    """
+
+
+class JudgeScoreError(JudgeError):
     """The judge returned something that is not a score.
 
     Not a zero and not full marks — no verdict at all. The caller must route it

@@ -96,8 +96,13 @@ class TestJudgeOutageRouting:
 
     def test_per_checkpoint_judge_exception_flags_infra(self, tmp_path: Path) -> None:
         _write_expected(tmp_path, _valid_expected())
+        # A JudgeError (here a backend outage) is the judge reaching no verdict —
+        # it must route to re-run. The catch is narrowed to JudgeError (yli6k #3),
+        # so this vector uses a JudgeError subclass rather than a bare Exception.
+        from eb_verify.judge import JudgeBackendError
+
         judge = MagicMock()
-        judge.evaluate_checkpoint.side_effect = RuntimeError("judge 500")
+        judge.evaluate_checkpoint.side_effect = JudgeBackendError("judge 500")
         with _agent_output_present(), patch(
             "eb_verify.judge.LLMJudge", return_value=judge
         ):
@@ -105,6 +110,20 @@ class TestJudgeOutageRouting:
         err = scores.get("verifier_infra_error")
         assert err is not None, "per-checkpoint judge exception must not keep un-capped grep"
         assert err["reason"] == "judge_checkpoint_failed"
+
+    def test_non_judge_exception_propagates_not_flagged_infra(self, tmp_path: Path) -> None:
+        """yli6k #3: a non-JudgeError from the judge call is a real bug, not an
+        infra no-verdict. It must propagate rather than be laundered into a
+        re-run that hides it. Before the narrowing, `except Exception` caught this
+        and recorded a spurious verifier_infra_error."""
+        _write_expected(tmp_path, _valid_expected())
+        judge = MagicMock()
+        judge.evaluate_checkpoint.side_effect = AttributeError("refactor bug")
+        with _agent_output_present(), patch(
+            "eb_verify.judge.LLMJudge", return_value=judge
+        ):
+            with pytest.raises(AttributeError, match="refactor bug"):
+                _apply_llm_judge(_uncapped_scores(), tmp_path, "cid", {})
 
     def test_judge_returning_a_non_score_flags_infra(self, tmp_path: Path) -> None:
         """A NaN judge score is not a verdict. A clamp would make it a free 1.0,

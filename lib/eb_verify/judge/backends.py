@@ -13,8 +13,10 @@ import shutil
 import subprocess
 import time
 
+from eb_verify.judge.models import JudgeError
 
-class JudgeBackendError(Exception):
+
+class JudgeBackendError(JudgeError):
     """Non-retryable backend failure."""
 
     def __init__(self, message: str, status_code: int | None = None):
@@ -93,7 +95,19 @@ class AnthropicBackend:
             raise JudgeBackendError(str(exc), status_code=429) from exc
         except anthropic.APIStatusError as exc:
             raise JudgeBackendError(str(exc), status_code=exc.status_code) from exc
-        return response.content[0].text
+        except anthropic.APIError as exc:
+            # Connection, timeout, and other transport failures carry no HTTP
+            # status. "The judge could not be reached" is the JudgeBackendError
+            # contract engine.py documents; raising the base here keeps a network
+            # blip routing to the re-run channel instead of escaping as a raw
+            # exception the scoring path no longer catches (bead yli6k #3).
+            raise JudgeBackendError(str(exc)) from exc
+        try:
+            return response.content[0].text
+        except (IndexError, AttributeError) as exc:
+            raise JudgeBackendError(
+                f"judge SDK response carried no text content: {exc}"
+            ) from exc
 
     def _call_urllib(self, system_prompt: str, user_prompt: str) -> str:
         import urllib.error
@@ -125,12 +139,25 @@ class AnthropicBackend:
         )
         try:
             with urllib.request.urlopen(req) as resp:
-                body = json.loads(resp.read())
-                return body["content"][0]["text"]
+                raw = resp.read()
         except urllib.error.HTTPError as exc:
             raise JudgeBackendError(
                 f"HTTP {exc.code}: {exc.read().decode(errors='replace')[:500]}",
                 status_code=exc.code,
+            ) from exc
+        except urllib.error.URLError as exc:
+            # DNS failure, connection refused, TLS error: the judge is unreachable
+            # and carries no HTTP status. HTTPError is a URLError subclass, so this
+            # branch only catches the transport-level failures the one above did
+            # not — routing them to re-run rather than a raw crash (bead yli6k #3).
+            raise JudgeBackendError(f"judge unreachable: {exc.reason}") from exc
+
+        try:
+            body = json.loads(raw)
+            return body["content"][0]["text"]
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
+            raise JudgeBackendError(
+                f"judge response could not be parsed: {exc}"
             ) from exc
 
 

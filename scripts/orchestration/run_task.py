@@ -64,7 +64,11 @@ from agents.harnesses.claude.cli.sgx import (
 # Scorer trust boundary — single definition of "infra failure vs real score",
 # shared by every scoring entry point in this file and by code_patch.validate.
 sys.path.insert(0, str(REPO_ROOT / "lib"))
-from eb_verify.scorer_guard import InfraError, guard_verifier_output
+from eb_verify.scorer_guard import (
+    InfraError,
+    guard_verifier_output,
+    judge_failure_error,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1625,7 +1629,7 @@ def _apply_llm_judge(
 
     try:
         sys.path.insert(0, str(REPO_ROOT / "lib"))
-        from eb_verify.judge import CheckpointJudgeInput, LLMJudge
+        from eb_verify.judge import CheckpointJudgeInput, JudgeError, LLMJudge
 
         judge = LLMJudge(model="cc:haiku")
     except Exception as exc:
@@ -1664,17 +1668,20 @@ def _apply_llm_judge(
                 checkpoint_description=cp_gt.get("expected_solution", "")[:200],
             )
             judge_score = judge_result.score
-        except Exception as exc:
-            # A judge call raised: this checkpoint's grep score cannot be
-            # capped. A bare `continue` would silently keep the un-capped grep
-            # score (apfp #3, over-credit on judge outage). Flag the whole run
-            # for re-run — a partially-capped score is not a real measurement.
+        except JudgeError as exc:
+            # A judge no-verdict (backend outage or non-score response): this
+            # checkpoint's grep score cannot be capped. A bare `continue` would
+            # silently keep the un-capped grep score (apfp #3, over-credit on judge
+            # outage). Flag the whole run for re-run — a partially-capped score is
+            # not a real measurement. Narrowed to JudgeError so an
+            # AttributeError/TypeError from a future refactor surfaces as the real
+            # bug it is instead of hiding behind a re-run loop (bead yli6k #3).
+            # judge_failure_error is the ONE constructor both scoring paths use, so
+            # the reason key ("judge_checkpoint_failed") matches the runner's
+            # (bead yli6k #2).
             logger.warning("LLM judge failed for %s: %s", cp_name, exc)
-            scores["verifier_infra_error"] = InfraError(
-                reason="judge_checkpoint_failed",
-                stage="llm_judge",
-                detail=f"LLM judge raised on checkpoint {cp_name!r}: {exc}",
-                context={"checkpoint": cp_name},
+            scores["verifier_infra_error"] = judge_failure_error(
+                cp_name, exc
             ).as_verifier_error()
             return scores
 

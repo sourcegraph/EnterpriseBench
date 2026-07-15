@@ -23,6 +23,7 @@ from eb_verify.judge.engine import LLMJudge
 from eb_verify.judge.models import (
     CheckpointJudgeInput,
     CheckpointJudgeResult,
+    JudgeError,
     JudgeScoreError,
 )
 
@@ -30,6 +31,7 @@ __all__ = [
     "LLMJudge",
     "CheckpointJudgeInput",
     "CheckpointJudgeResult",
+    "JudgeError",
     "JudgeBackendError",
     "JudgeScoreError",
 ]

@@ -21,14 +21,18 @@ from pathlib import Path
 from typing import Any, Optional, Protocol, cast
 
 from eb_verify.task_parser import TaskDefinition, Checkpoint
-from eb_verify.scorer_guard import INFRA_SENTINEL
 from eb_verify.scoring import (
     CheckpointResult,
     VerificationResult,
     compute_score,
     write_reward,
 )
-from eb_verify.scorer_guard import InfraError, guard_checkpoint_verdict, no_verdict
+from eb_verify.scorer_guard import (
+    InfraError,
+    guard_checkpoint_verdict,
+    judge_failure_error,
+    no_verdict,
+)
 from eb_verify.plugins import ValidationResult, get_validator
 
 logger = logging.getLogger(__name__)
@@ -379,13 +383,20 @@ class CheckpointRunner:
                     "LLM judge active but no agent output found in workspace"
                 )
 
+        # Imported at the runner's execution entry point rather than at module
+        # top, matching this file's lazy-judge convention (see __init__ and
+        # _run_judge_checkpoint): importing runner.py does not pull the judge
+        # package. run_all does — its transitive deps are stdlib-only, so this is
+        # cheap whether or not the task actually runs the judge.
+        from eb_verify.judge.models import JudgeError
+
         # Run checkpoints in order
         checkpoint_results = []
-        # Set once the judge reaches no verdict. The first such failure already
-        # routes the whole run to the re-run channel, so every later judge call
-        # would return a number nobody reads — and a backend outage fails all of
-        # them anyway, at a 120s timeout plus retries each.
-        judge_failure: Optional[str] = None
+        # Set to the exception the first judge call raised. The first no-verdict
+        # already routes the whole run to the re-run channel, so every later judge
+        # call would return a number nobody reads — and a backend outage fails all
+        # of them anyway, at a 120s timeout plus retries each.
+        judge_failure: Optional[JudgeError] = None
         for cp in self.task.checkpoints:
             print(f"[runner] Running checkpoint: {cp.name}")
 
@@ -410,19 +421,29 @@ class CheckpointRunner:
                 if judge_failure is None:
                     try:
                         judge_score = self._run_judge_checkpoint(cp, agent_output)
-                    except Exception as exc:
+                    except JudgeError as exc:
+                        # Only a judge no-verdict (backend/score error) is an infra
+                        # failure. Any OTHER exception is a real bug and must
+                        # propagate, not be laundered into a re-run (bead yli6k #3).
                         logger.warning("LLM judge failed for %s: %s", cp.name, exc)
-                        judge_failure = str(exc)
+                        judge_failure = exc
 
                 if judge_failure is not None:
                     # No verdict, so the Tier-2 ceiling cannot be applied. Grep
-                    # alone would stand as an un-capped score, so declare the
-                    # infra failure: INFRA_SENTINEL in the detail is what routes
-                    # the run, not the score below.
-                    detail_parts.append(
-                        f"{INFRA_SENTINEL}: LLM judge failed: {judge_failure}"
+                    # alone would stand as an un-capped score, so declare a TYPED
+                    # infra failure — the same InfraError run_task builds, carrying
+                    # reason="judge_checkpoint_failed". run_all collects it into
+                    # infra_errors below, which forces total_score invalid, sets
+                    # verifier_infra_error, and makes cli.py exit 2. (A sentinel
+                    # STRING in the detail was inert on this path: nothing re-parses
+                    # the runner's own composed detail, so the 0.0 stood as a real
+                    # score — bead yli6k #1.)
+                    infra_result = self._infra_result(
+                        cp, judge_failure_error(cp.name, judge_failure)
                     )
-                    final_score = 0.0
+                    checkpoint_results.append(infra_result)
+                    print(f"[runner]   INFRA {infra_result.detail}")
+                    continue
                 elif judge_score is not None:
                     final_score = min(grep_score, judge_score)
                     detail_parts.append(

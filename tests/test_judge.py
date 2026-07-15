@@ -158,15 +158,24 @@ def _fake_anthropic_module():
     """
     fake = types.ModuleType("anthropic")
 
-    class RateLimitError(Exception):
+    class APIError(Exception):
         pass
 
-    class APIStatusError(Exception):
+    class APIConnectionError(APIError):
+        pass
+
+    class APIStatusError(APIError):
         def __init__(self, message="", status_code=None):
             super().__init__(message)
             self.status_code = status_code
 
+    class RateLimitError(APIStatusError):
+        def __init__(self, message="", status_code=429):
+            super().__init__(message, status_code)
+
     fake.Anthropic = MagicMock()
+    fake.APIError = APIError
+    fake.APIConnectionError = APIConnectionError
     fake.RateLimitError = RateLimitError
     fake.APIStatusError = APIStatusError
     with patch.dict(sys.modules, {"anthropic": fake}):
@@ -303,6 +312,53 @@ class TestAnthropicBackend:
             with pytest.raises(JudgeBackendError) as excinfo:
                 backend._call_sdk("sys", "user")
         assert excinfo.value.status_code == 503
+
+    def test_sdk_connection_error_maps_to_judge_backend_error(self):
+        """A transport failure (no HTTP status) is "the judge could not be
+        reached" — it must become a JudgeBackendError so the scoring path (which
+        now catches only JudgeError, bead yli6k #3) routes it to re-run rather
+        than letting a raw APIConnectionError crash the run."""
+        backend = AnthropicBackend(model="claude-haiku-4-5-20251001")
+        with _fake_anthropic_module() as fake:
+            fake.Anthropic.return_value.messages.create.side_effect = (
+                fake.APIConnectionError("connection refused")
+            )
+            with pytest.raises(JudgeBackendError, match="connection refused") as excinfo:
+                backend._call_sdk("sys", "user")
+        assert excinfo.value.status_code is None  # transport failure carries no status
+
+    def test_sdk_empty_content_maps_to_judge_backend_error(self):
+        backend = AnthropicBackend(model="claude-haiku-4-5-20251001")
+        with _fake_anthropic_module() as fake:
+            fake.Anthropic.return_value.messages.create.return_value = (
+                types.SimpleNamespace(content=[])
+            )
+            with pytest.raises(JudgeBackendError, match="no text content"):
+                backend._call_sdk("sys", "user")
+
+    def test_urllib_url_error_maps_to_judge_backend_error(self):
+        """A DNS/connection failure (URLError, not HTTPError) is unreachable, not
+        an HTTP status. It must route to re-run, not crash the scoring path."""
+        backend = AnthropicBackend(model="claude-haiku-4-5-20251001")
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test"}), patch(
+            "urllib.request.urlopen",
+            side_effect=urllib.error.URLError("name resolution failed"),
+        ):
+            with pytest.raises(JudgeBackendError, match="judge unreachable") as excinfo:
+                backend._call_urllib("sys", "user")
+        assert excinfo.value.status_code is None
+
+    def test_urllib_malformed_200_body_maps_to_judge_backend_error(self):
+        backend = AnthropicBackend(model="claude-haiku-4-5-20251001")
+        body = b'{"unexpected": "shape"}'  # 200 OK, but no content[0].text
+        resp_cm = MagicMock()
+        resp_cm.__enter__.return_value.read.return_value = body
+        resp_cm.__exit__.return_value = False
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test"}), patch(
+            "urllib.request.urlopen", return_value=resp_cm
+        ):
+            with pytest.raises(JudgeBackendError, match="could not be parsed"):
+                backend._call_urllib("sys", "user")
 
 
 # ---------------------------------------------------------------------------

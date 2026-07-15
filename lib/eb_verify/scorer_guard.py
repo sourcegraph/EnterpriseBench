@@ -311,6 +311,28 @@ def no_verdict(
     )
 
 
+def judge_failure_error(
+    checkpoint: str, exc: Exception, *, stage: str = "llm_judge"
+) -> InfraError:
+    """The single :class:`InfraError` for an LLM judge that reached no verdict.
+
+    Both scoring paths that run the judge build their infra error here:
+    ``run_task._apply_llm_judge`` (the docker path) and
+    :meth:`eb_verify.runner.CheckpointRunner.run_all` (the cli path). Before this
+    constructor the two paths spelled the same event differently — run_task tagged
+    ``reason="judge_checkpoint_failed"`` while the runner emitted the
+    :data:`INFRA_SENTINEL` string, which routed as ``reason="verifier_crash"`` —
+    so re-run triage and outage analytics could not count judge failures
+    consistently (bead yli6k). One constructor, one reason key, both paths.
+    """
+    return InfraError(
+        reason="judge_checkpoint_failed",
+        stage=stage,
+        detail=f"LLM judge raised on checkpoint {checkpoint!r}: {exc}",
+        context={"checkpoint": checkpoint},
+    )
+
+
 def guard_checkpoint_verdict(
     stdout: str,
     returncode: int,
