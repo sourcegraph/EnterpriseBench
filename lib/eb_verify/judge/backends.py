@@ -96,11 +96,10 @@ class AnthropicBackend:
         except anthropic.APIStatusError as exc:
             raise JudgeBackendError(str(exc), status_code=exc.status_code) from exc
         except anthropic.APIError as exc:
-            # Connection, timeout, and other transport failures carry no HTTP
-            # status. "The judge could not be reached" is the JudgeBackendError
-            # contract engine.py documents; raising the base here keeps a network
-            # blip routing to the re-run channel instead of escaping as a raw
-            # exception the scoring path no longer catches (bead yli6k #3).
+            # Transport failure (connection/timeout): no HTTP status. Wrapping as
+            # JudgeBackendError routes it to re-run per engine.py's contract,
+            # instead of escaping as a raw exception the scoring path no longer
+            # catches (bead yli6k #3).
             raise JudgeBackendError(str(exc)) from exc
         try:
             return response.content[0].text
@@ -146,10 +145,9 @@ class AnthropicBackend:
                 status_code=exc.code,
             ) from exc
         except urllib.error.URLError as exc:
-            # DNS failure, connection refused, TLS error: the judge is unreachable
-            # and carries no HTTP status. HTTPError is a URLError subclass, so this
-            # branch only catches the transport-level failures the one above did
-            # not — routing them to re-run rather than a raw crash (bead yli6k #3).
+            # Transport failure (DNS/refused/TLS): unreachable, no HTTP status.
+            # HTTPError is a URLError subclass, so this branch catches only what the
+            # one above did not, routing it to re-run rather than a crash (yli6k #3).
             raise JudgeBackendError(f"judge unreachable: {exc.reason}") from exc
 
         try:

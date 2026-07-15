@@ -383,11 +383,8 @@ class CheckpointRunner:
                     "LLM judge active but no agent output found in workspace"
                 )
 
-        # Imported at the runner's execution entry point rather than at module
-        # top, matching this file's lazy-judge convention (see __init__ and
-        # _run_judge_checkpoint): importing runner.py does not pull the judge
-        # package. run_all does — its transitive deps are stdlib-only, so this is
-        # cheap whether or not the task actually runs the judge.
+        # Lazy import (this file's convention, see __init__): importing runner.py
+        # must not pull the judge package.
         from eb_verify.judge.models import JudgeError
 
         # Run checkpoints in order
@@ -429,15 +426,11 @@ class CheckpointRunner:
                         judge_failure = exc
 
                 if judge_failure is not None:
-                    # No verdict, so the Tier-2 ceiling cannot be applied. Grep
-                    # alone would stand as an un-capped score, so declare a TYPED
-                    # infra failure — the same InfraError run_task builds, carrying
-                    # reason="judge_checkpoint_failed". run_all collects it into
-                    # infra_errors below, which forces total_score invalid, sets
-                    # verifier_infra_error, and makes cli.py exit 2. (A sentinel
-                    # STRING in the detail was inert on this path: nothing re-parses
-                    # the runner's own composed detail, so the 0.0 stood as a real
-                    # score — bead yli6k #1.)
+                    # No verdict → the Tier-2 cap cannot be applied and un-capped
+                    # grep must not stand. Emit a typed infra failure; run_all
+                    # refuses a numeric total. (A sentinel string in the detail was
+                    # inert here — nobody re-parses it — so the 0.0 stood as a real
+                    # score. See judge_failure_error. yli6k #1.)
                     infra_result = self._infra_result(
                         cp, judge_failure_error(cp.name, judge_failure)
                     )

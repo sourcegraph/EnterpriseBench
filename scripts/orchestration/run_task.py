@@ -1669,16 +1669,11 @@ def _apply_llm_judge(
             )
             judge_score = judge_result.score
         except JudgeError as exc:
-            # A judge no-verdict (backend outage or non-score response): this
-            # checkpoint's grep score cannot be capped. A bare `continue` would
-            # silently keep the un-capped grep score (apfp #3, over-credit on judge
-            # outage). Flag the whole run for re-run — a partially-capped score is
-            # not a real measurement. Narrowed to JudgeError so an
-            # AttributeError/TypeError from a future refactor surfaces as the real
-            # bug it is instead of hiding behind a re-run loop (bead yli6k #3).
-            # judge_failure_error is the ONE constructor both scoring paths use, so
-            # the reason key ("judge_checkpoint_failed") matches the runner's
-            # (bead yli6k #2).
+            # A judge no-verdict: this checkpoint's grep score cannot be capped. A
+            # bare `continue` would keep the un-capped grep score (apfp #3,
+            # over-credit on outage), so flag the whole run for re-run. Catch is
+            # narrowed to JudgeError (yli6k #3) and routes through the shared
+            # judge_failure_error constructor (yli6k #2).
             logger.warning("LLM judge failed for %s: %s", cp_name, exc)
             scores["verifier_infra_error"] = judge_failure_error(
                 cp_name, exc

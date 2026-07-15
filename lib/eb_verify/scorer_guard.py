@@ -318,12 +318,11 @@ def judge_failure_error(
 
     Both scoring paths that run the judge build their infra error here:
     ``run_task._apply_llm_judge`` (the docker path) and
-    :meth:`eb_verify.runner.CheckpointRunner.run_all` (the cli path). Before this
-    constructor the two paths spelled the same event differently — run_task tagged
-    ``reason="judge_checkpoint_failed"`` while the runner emitted the
-    :data:`INFRA_SENTINEL` string, which routed as ``reason="verifier_crash"`` —
-    so re-run triage and outage analytics could not count judge failures
-    consistently (bead yli6k). One constructor, one reason key, both paths.
+    :meth:`eb_verify.runner.CheckpointRunner.run_all` (the cli path). Previously
+    they spelled the same event differently — run_task's ``reason`` vs the runner's
+    :data:`INFRA_SENTINEL` string (which routed as ``reason="verifier_crash"``) —
+    so re-run triage could not count judge failures consistently (bead yli6k). One
+    constructor, one reason key, both paths.
     """
     return InfraError(
         reason="judge_checkpoint_failed",
