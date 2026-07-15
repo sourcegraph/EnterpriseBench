@@ -83,7 +83,7 @@ You are working on a codebase task involving repos from the crossrepo domain.
 
 ## Available Resources
 
-No local repositories are pre-checked out.
+The local `/workspace/` directory contains: gcc.
 
 **Note:** Additional repositories are accessible via Sourcegraph MCP tools:
 - `github.com/llvm/llvm-project` (llvm/llvm-project)
