@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from analyze_scores import (
     Checkpoint,
+    HEADLINE_MODES,
     TaskResult,
     _compute_delta,
     _dist_stats,
@@ -23,6 +24,7 @@ from analyze_scores import (
     infer_mode,
     load_all_results,
     load_task_metadata_from_toml,
+    matched_subset,
     mcp_deltas,
     parse_result,
     per_task_summary,
@@ -556,3 +558,73 @@ class TestInvalidRunExclusion:
         results = load_all_results([tmp_path / "runs"], tmp_path / "benchmarks")
         assert [r.task_id for r in results] == ["t1"]
         assert _dist_stats(results)["mean"] == pytest.approx(1.0)
+
+
+# ---------------------------------------------------------------------------
+# Matched subset
+# ---------------------------------------------------------------------------
+
+
+class TestMatchedSubset:
+    """The headline must compare arms over one task set, not three."""
+
+    def _three_arms(self, task_id: str, **scores: float) -> list[TaskResult]:
+        return [
+            _make_result(
+                task_id=task_id, mode=mode, task_score=score, checkpoints_total=1
+            )
+            for mode, score in scores.items()
+        ]
+
+    def test_task_missing_an_arm_is_excluded(self):
+        results = [
+            *self._three_arms("t1", baseline=1.0, mcp_only=1.0, hybrid=1.0),
+            *self._three_arms("t2", baseline=1.0, hybrid=1.0),  # no mcp_only
+        ]
+        assert sorted({r.task_id for r in matched_subset(results)}) == ["t1"]
+
+    def test_all_arms_present_is_kept(self):
+        results = self._three_arms("t1", baseline=0.0, mcp_only=1.0, hybrid=0.5)
+        assert len(matched_subset(results)) == 3
+
+    def test_code_patch_task_drops_out_via_missing_mcp_only(self):
+        """mode_gate refuses code_patch under mcp_only, so no result exists.
+
+        The intersection removes it without the analysis knowing what an
+        artifact is — the bead's "exclude the 2 code_patch tasks" requirement.
+        """
+        results = [
+            *self._three_arms("normal-001", baseline=1.0, mcp_only=1.0, hybrid=1.0),
+            # ineligible_for_mode returns before scoring, so mcp_only is absent
+            *self._three_arms("patch-001", baseline=1.0, hybrid=1.0),
+        ]
+        matched = matched_subset(results)
+        assert sorted({r.task_id for r in matched}) == ["normal-001"]
+
+    def test_extra_modes_are_dropped_not_intersected_on(self):
+        """A cli run must neither join the headline nor shrink it."""
+        results = [
+            *self._three_arms("t1", baseline=1.0, mcp_only=1.0, hybrid=1.0),
+            *self._three_arms("t2", baseline=1.0, mcp_only=1.0, hybrid=1.0, cli=1.0),
+        ]
+        matched = matched_subset(results)
+        assert sorted({r.task_id for r in matched}) == ["t1", "t2"]
+        assert {r.mode for r in matched} == set(HEADLINE_MODES)
+
+    def test_unmatched_mean_differs_from_matched(self):
+        """The bug this exists to stop: an arm's mean moved by its own task set."""
+        results = [
+            *self._three_arms("t1", baseline=0.5, mcp_only=0.5, hybrid=0.5),
+            # baseline-only easy task inflates the unmatched baseline mean
+            *self._three_arms("t2", baseline=1.0),
+        ]
+        unmatched_baseline = _dist_stats([r for r in results if r.mode == "baseline"])
+        matched = matched_subset(results)
+        matched_baseline = _dist_stats([r for r in matched if r.mode == "baseline"])
+
+        assert unmatched_baseline["mean"] == pytest.approx(0.75)
+        assert matched_baseline["mean"] == pytest.approx(0.5)
+
+    def test_empty_when_no_task_has_all_arms(self):
+        results = self._three_arms("t1", baseline=1.0)
+        assert matched_subset(results) == []

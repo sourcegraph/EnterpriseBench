@@ -286,11 +286,42 @@ def _dist_stats(results: list[TaskResult]) -> dict[str, Any]:
     }
 
 
+#: Arms the headline compares. ``cli`` is excluded for the same reason
+#: ``run_sweep.DEFAULT_SWEEP_MODES`` excludes it: it is not part of this
+#: comparison, and intersecting on it would silently shrink the subset.
+HEADLINE_MODES = ("baseline", "mcp_only", "hybrid")
+
+
 def by_mode(results: list[TaskResult]) -> dict[str, dict[str, Any]]:
     buckets: dict[str, list[TaskResult]] = {}
     for r in results:
         buckets.setdefault(r.mode, []).append(r)
     return {mode: _dist_stats(rs) for mode, rs in sorted(buckets.items())}
+
+
+def matched_subset(
+    results: list[TaskResult],
+    modes: tuple[str, ...] = HEADLINE_MODES,
+) -> list[TaskResult]:
+    """Results for only those tasks that produced a valid run in *every* mode.
+
+    Comparing per-arm means over each arm's own task set compares two different
+    benchmarks and attributes the difference to the tool. The arms genuinely do
+    not cover the same tasks: ``mode_gate.check_eligibility`` refuses
+    ``code_patch`` tasks under ``mcp_only`` (they need local writes the gate
+    denies), and any arm can lose a task to an invalidated run. Intersecting
+    first means the headline varies the tool and nothing else.
+
+    This subsumes the code_patch exclusion rather than special-casing it: an
+    ineligible task never yields an ``mcp_only`` result, so it drops out of the
+    intersection on its own.
+    """
+    by_task: dict[str, set[str]] = {}
+    for r in results:
+        by_task.setdefault(r.task_id, set()).add(r.mode)
+
+    complete = {tid for tid, seen in by_task.items() if set(modes) <= seen}
+    return [r for r in results if r.task_id in complete and r.mode in modes]
 
 
 def by_group_and_mode(
@@ -485,10 +516,21 @@ def analyze(
     benchmarks_root: Path,
 ) -> dict[str, Any]:
     results = load_all_results(results_dirs, benchmarks_root)
+    matched = matched_subset(results)
+    matched_ids = sorted({r.task_id for r in matched})
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "total_results": len(results),
+        # The headline. by_mode below is the same statistic over each arm's own
+        # task set, kept for reference — it is not comparable across arms.
+        "matched": {
+            "modes": list(HEADLINE_MODES),
+            "n_tasks": len(matched_ids),
+            "task_ids": matched_ids,
+            "by_mode": by_mode(matched),
+            "mcp_delta": mcp_deltas(matched),
+        },
         "by_mode": by_mode(results),
         "by_suite": by_group_and_mode(results, "suite"),
         "by_difficulty": by_group_and_mode(results, "difficulty"),
