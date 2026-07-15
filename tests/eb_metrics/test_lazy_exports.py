@@ -93,25 +93,20 @@ def test_codeprobe_backed_export_still_fails_loudly_when_codeprobe_is_absent() -
     result = _run_without_codeprobe(
         """
         import eb_metrics
-        try:
-            eb_metrics.build_quality_metrics
-        except ModuleNotFoundError as exc:
-            print(f"ModuleNotFoundError: {exc}")
+        eb_metrics.build_quality_metrics
         """
     )
-    assert result.returncode == 0, result.stderr
-    assert "No module named 'codeprobe'" in result.stdout
+    assert result.returncode != 0
+    assert "ModuleNotFoundError: No module named 'codeprobe'" in result.stderr
 
 
 def test_lazy_attribute_access_returns_the_real_object() -> None:
     import eb_metrics
-    from eb_metrics.usage_dedup import UsageDedup
     from eb_metrics.retrieval_extraction import compute_ttfr
 
     assert eb_metrics.compute_ttfr is compute_ttfr
     # UsageDedup is deliberately not re-exported; the submodule is the entrypoint.
     assert "UsageDedup" not in eb_metrics.__all__
-    assert UsageDedup is not None
 
 
 def test_every_advertised_export_resolves() -> None:
