@@ -473,3 +473,86 @@ class TestPerTaskSummary:
         results2 = [_make_result(task_id="normal-001")]
         summary2 = per_task_summary(results2)
         assert summary2[0]["is_calibration"] is False
+
+
+# ---------------------------------------------------------------------------
+# INVALID-run exclusion
+# ---------------------------------------------------------------------------
+
+
+class TestInvalidRunExclusion:
+    """An invalidated run must be dropped, never counted as a low score.
+
+    ``run_task`` flags a run INVALID and then *falls through to scoring* in three
+    branches (``_route_zero_mcp_run``, ``_route_integrity_violation``,
+    ``_scan_mcp_config_error``), so these files carry a real-looking score. The
+    zero-MCP branch is the one that bites under the mcp_only filesystem gate.
+    """
+
+    def test_lowercase_invalid_with_scores_is_dropped(self, tmp_path: Path):
+        path = tmp_path / "runs" / "t1" / "mcp_only" / "results.json"
+        _write_results_json(path, task_id="t1")
+        data = json.loads(path.read_text())
+        data["status"] = "invalid"  # run_task._route_zero_mcp_run
+        data["phase"] = "agent_infra_error"
+        data["success"] = False
+        path.write_text(json.dumps(data))
+
+        assert parse_result(path, tmp_path / "benchmarks") is None
+
+    def test_uppercase_invalid_is_dropped(self, tmp_path: Path):
+        """The verifier schema writes uppercase; the fold must catch it."""
+        path = tmp_path / "runs" / "t1" / "mcp_only" / "results.json"
+        _write_results_json(path, task_id="t1")
+        data = json.loads(path.read_text())
+        data["status"] = "INVALID"
+        path.write_text(json.dumps(data))
+
+        assert parse_result(path, tmp_path / "benchmarks") is None
+
+    def test_uppercase_valid_is_kept(self, tmp_path: Path):
+        """9 results.json on disk carry status='VALID' — they must still count."""
+        path = tmp_path / "runs" / "t1" / "baseline" / "results.json"
+        _write_results_json(path, task_id="t1")
+        data = json.loads(path.read_text())
+        data["status"] = "VALID"
+        path.write_text(json.dumps(data))
+
+        tr = parse_result(path, tmp_path / "benchmarks")
+        assert tr is not None
+        assert tr.normalized_score == pytest.approx(2.0 / 3.0)
+
+    def test_legacy_result_without_status_is_kept(self, tmp_path: Path):
+        """84 of 93 results on disk predate the status field."""
+        path = tmp_path / "runs" / "t1" / "baseline" / "results.json"
+        _write_results_json(path, task_id="t1")  # no status, success=True
+        tr = parse_result(path, tmp_path / "benchmarks")
+        assert tr is not None
+
+    def test_status_derived_when_absent(self, tmp_path: Path):
+        """A failed legacy run is INVALID even though it never stamped status."""
+        path = tmp_path / "runs" / "t1" / "baseline" / "results.json"
+        _write_results_json(path, task_id="t1")
+        data = json.loads(path.read_text())
+        data["success"] = False
+        data["phase"] = "error"
+        path.write_text(json.dumps(data))
+
+        assert parse_result(path, tmp_path / "benchmarks") is None
+
+    def test_invalid_run_does_not_enter_the_mean(self, tmp_path: Path):
+        """End-to-end: the arm's mean must not move because a run was invalid."""
+        good = tmp_path / "runs" / "t1" / "mcp_only" / "results.json"
+        _write_results_json(good, task_id="t1", task_score=3.0, checkpoints_total=3)
+
+        bad = tmp_path / "runs" / "t2" / "mcp_only" / "results.json"
+        _write_results_json(bad, task_id="t2", task_score=0.0, checkpoints_total=3)
+        data = json.loads(bad.read_text())
+        data["status"] = "invalid"
+        data["phase"] = "agent_infra_error"
+        data["success"] = False
+        bad.write_text(json.dumps(data))
+
+        results = load_all_results([tmp_path / "runs"], tmp_path / "benchmarks")
+        assert [r.task_id for r in results] == ["t1"]
+        assert _dist_stats(results)["mean"] == pytest.approx(1.0)

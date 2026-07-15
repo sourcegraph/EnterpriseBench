@@ -49,6 +49,7 @@ from create_sg_mirrors import parse_toml
 
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
 from validation import validate_repo_entry
+from run_status import RUN_STATUS_INVALID, effective_status
 
 # Tool-access arm enforcement — see mode_gate for why the ablation is a
 # filesystem permission rather than a prompt or a tool denylist. mode_gate is a
@@ -138,11 +139,10 @@ class TaskRunConfig:
     min_disk_gb: float = 10.0
 
 
-# Status marker for runs that must not be scored (e.g. MCP pre-flight failure,
-# a broken grading-asset seal). Whether such a run is re-runnable is decided by
-# failure_class, not by this marker: verifier_infra_error earns a fresh attempt,
-# integrity_violation never does.
-RUN_STATUS_INVALID = "invalid"
+# RUN_STATUS_INVALID is imported from lib.run_status, which the analysis shares.
+# Whether an invalid run is re-runnable is decided by failure_class, not by the
+# marker: verifier_infra_error earns a fresh attempt, integrity_violation never
+# does.
 
 # The directory holding both the agent's tree and the grading assets. It must be
 # root-owned so the agent cannot unlink/rename the sealed entries inside it.
@@ -2390,23 +2390,12 @@ def _extract_tool_usage(output_dir: Path) -> dict:
 
 
 def _effective_status(result: "TaskRunResult") -> str:
-    """The status to persist: INVALID for any run that failed short of complete.
+    """The status to persist for *result*.
 
-    An explicitly-set ``status`` wins; otherwise it is derived, because most
-    infra branches (OOM, timeout, build-failed, setup-failed) set only
-    ``phase``/``success`` and reading the raw field would let those runs look
-    scoreable on disk. Deriving means a new failure branch cannot forget to
-    flag its run: there is no allow-list to drift out of sync.
-
-    A run is INVALID unless it succeeded or reached ``phase == "complete"``.
-    The disjunction is what keeps ``dry_run_complete`` non-INVALID — it sets
-    ``success=True`` and is not a failure, though it never scores.
+    The rule itself lives in ``lib.run_status`` because the analysis has to
+    apply the same one when it reads these files back.
     """
-    if result.status:
-        return result.status
-    if result.success or result.phase == "complete":
-        return ""
-    return RUN_STATUS_INVALID
+    return effective_status(result.status, result.success, result.phase)
 
 
 def _newest_trace_path(find_stdout: str) -> str | None:

@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from run_status import is_scoreable  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Data types
 # ---------------------------------------------------------------------------
@@ -157,6 +160,21 @@ def parse_result(result_path: Path, benchmarks_root: Path) -> TaskResult | None:
     task_id = data.get("task_id")
     if not task_id:
         logger.warning("No task_id in %s", result_path)
+        return None
+
+    # An invalidated run is dropped, not scored. Several branches
+    # (``_route_zero_mcp_run``, ``_route_integrity_violation``,
+    # ``_scan_mcp_config_error``) flag the run INVALID and then fall through to
+    # scoring, so the file on disk carries a real-looking score. Under the
+    # mcp_only filesystem gate the zero-MCP-call branch is the common one, and
+    # counting its near-zero scores would push the gated arm down for a reason
+    # that has nothing to do with retrieval quality.
+    if not is_scoreable(
+        data.get("status"), data.get("success", False), data.get("phase", "")
+    ):
+        logger.info(
+            "Excluding INVALID run %s (phase=%s)", result_path, data.get("phase", "")
+        )
         return None
 
     scores = data.get("scores")
