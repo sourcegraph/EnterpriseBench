@@ -13,7 +13,7 @@
     "F": "verifier calibration run: score the null, golden and adversarial submissions per task. Threshold: null <= 0.1, golden >= 0.9, adversarial <= 0.5."
   },
   "provenance": {
-    "source_sha": "e33b26612260cf4e7e6f7573fbac83de26aaacb6",
+    "source_sha": "b789d1681d6bb358e40689160633c44ef994a382",
     "source_dirty": false,
     "corpus_root": "benchmarks",
     "runs_root": "/home/ds/projects/EnterpriseBench/results/runs",
@@ -32,8 +32,8 @@
       "gate_f_adversarial_max": 0.5
     },
     "trace_coverage": {
-      "ok": 60,
-      "not_found": 23,
+      "ok": 59,
+      "not_found": 24,
       "no_trace": 28
     },
     "traces_digest": "1e35b120ac8daff3b49de0b7e6d0e74a4c42db4fc625c8c1ac6090406d7f3349"
@@ -43,7 +43,7 @@
   },
   "summary": {
     "scored": 116,
-    "candidates": 35,
+    "candidates": 37,
     "admitted": 0,
     "gate_counts": {
       "A": {
@@ -57,9 +57,9 @@
         "pending_measurement": 0
       },
       "C": {
-        "pass": 11,
-        "fail": 49,
-        "pending_measurement": 56
+        "pass": 12,
+        "fail": 47,
+        "pending_measurement": 57
       },
       "D": {
         "pass": 92,
@@ -924,7 +924,7 @@
             ],
             "crnt_positive": true,
             "difficulty_stratum": "dual_repo",
-            "n_oracle_files": 3,
+            "n_oracle_files": 4,
             "module_granularity": "parent_dir"
           }
         },
@@ -1417,16 +1417,15 @@
     {
       "task_id": "err-provenance-tri-httpx-proxy-001",
       "suite": "customer_escalation",
-      "is_candidate": false,
+      "is_candidate": true,
       "admitted": false,
       "is_final": false,
       "pending_gates": [
+        "C",
         "E",
         "F"
       ],
-      "failed_gates": [
-        "C"
-      ],
+      "failed_gates": [],
       "gates": {
         "A": {
           "gate": "A",
@@ -1457,14 +1456,15 @@
         },
         "C": {
           "gate": "C",
-          "status": "fail",
-          "reason": "trivial to localize: turns-to-first-relevant=3 (<=7)",
+          "status": "pending_measurement",
+          "reason": "baseline trace shows no oracle-file read, but the extractor cannot see inside Agent/Task/Skill delegations -- 'never localized' and 'localized out of view' are indistinguishable here, so difficulty is NOT asserted",
           "evidence": {
-            "coverage": "ok",
+            "coverage": "not_found",
             "run_key": "err-provenance-tri-httpx-proxy-001",
-            "ttfr": 3,
+            "ttfr": null,
             "tier": null
-          }
+          },
+          "input_contract": "baseline calibration run: per-task agent trace -> compute_ttfr(trace, required_files) (jn73.1). Needs turns-to-first-relevant per task. Threshold: exclude <=7 (trivial); tier-1 >=20; tier-2 12-19. ALSO REQUIRED for the not_found cases: teach the path extractor to see inside Agent/Task/Skill/Workflow delegations (it currently recognizes only Read/Grep/Glob/Bash/WebFetch/WebSearch/MCP), otherwise a baseline that delegates its investigation is indistinguishable from one that never localized."
         },
         "D": {
           "gate": "D",
@@ -3298,7 +3298,7 @@
             ],
             "crnt_positive": true,
             "difficulty_stratum": "multi_repo",
-            "n_oracle_files": 4,
+            "n_oracle_files": 5,
             "module_granularity": "parent_dir"
           }
         },
@@ -3382,7 +3382,7 @@
             ],
             "crnt_positive": true,
             "difficulty_stratum": "multi_repo",
-            "n_oracle_files": 4,
+            "n_oracle_files": 5,
             "module_granularity": "parent_dir"
           }
         },
@@ -3463,7 +3463,7 @@
             ],
             "crnt_positive": true,
             "difficulty_stratum": "dual_repo",
-            "n_oracle_files": 2,
+            "n_oracle_files": 4,
             "module_granularity": "parent_dir"
           }
         },
@@ -3547,7 +3547,7 @@
             ],
             "crnt_positive": true,
             "difficulty_stratum": "multi_repo",
-            "n_oracle_files": 2,
+            "n_oracle_files": 6,
             "module_granularity": "parent_dir"
           }
         },
@@ -3632,7 +3632,7 @@
             ],
             "crnt_positive": true,
             "difficulty_stratum": "multi_repo",
-            "n_oracle_files": 2,
+            "n_oracle_files": 5,
             "module_granularity": "parent_dir"
           }
         },
@@ -3716,7 +3716,7 @@
             ],
             "crnt_positive": true,
             "difficulty_stratum": "multi_repo",
-            "n_oracle_files": 2,
+            "n_oracle_files": 5,
             "module_granularity": "parent_dir"
           }
         },
@@ -3737,16 +3737,14 @@
     {
       "task_id": "dep-traversal-007",
       "suite": "dependency_management",
-      "is_candidate": false,
+      "is_candidate": true,
       "admitted": false,
       "is_final": false,
       "pending_gates": [
         "E",
         "F"
       ],
-      "failed_gates": [
-        "C"
-      ],
+      "failed_gates": [],
       "gates": {
         "A": {
           "gate": "A",
@@ -3775,12 +3773,12 @@
         },
         "C": {
           "gate": "C",
-          "status": "fail",
-          "reason": "trivial to localize: turns-to-first-relevant=6 (<=7)",
+          "status": "pass",
+          "reason": "hard to localize: turns-to-first-relevant=8 (above the trivial cut, untiered band 8-11)",
           "evidence": {
             "coverage": "ok",
             "run_key": "dep-traversal-007",
-            "ttfr": 6,
+            "ttfr": 8,
             "tier": null
           }
         },
@@ -3880,7 +3878,7 @@
             ],
             "crnt_positive": true,
             "difficulty_stratum": "multi_repo",
-            "n_oracle_files": 3,
+            "n_oracle_files": 5,
             "module_granularity": "parent_dir"
           }
         },
@@ -3963,7 +3961,7 @@
             ],
             "crnt_positive": true,
             "difficulty_stratum": "multi_repo",
-            "n_oracle_files": 4,
+            "n_oracle_files": 5,
             "module_granularity": "parent_dir"
           }
         },
@@ -8584,7 +8582,7 @@
           "status": "pass",
           "reason": "no locational leak",
           "evidence": {
-            "bucket": "behavioral",
+            "bucket": "grep_hard",
             "token": "",
             "source_path": ""
           }
@@ -8613,7 +8611,7 @@
             ],
             "crnt_positive": true,
             "difficulty_stratum": "dual_repo",
-            "n_oracle_files": 1,
+            "n_oracle_files": 2,
             "module_granularity": "parent_dir"
           }
         },
@@ -8665,7 +8663,7 @@
           "status": "pass",
           "reason": "no locational leak",
           "evidence": {
-            "bucket": "behavioral",
+            "bucket": "grep_hard",
             "token": "",
             "source_path": ""
           }
@@ -8693,7 +8691,7 @@
             ],
             "crnt_positive": true,
             "difficulty_stratum": "dual_repo",
-            "n_oracle_files": 1,
+            "n_oracle_files": 2,
             "module_granularity": "parent_dir"
           }
         },
@@ -8745,7 +8743,7 @@
           "status": "pass",
           "reason": "no locational leak",
           "evidence": {
-            "bucket": "behavioral",
+            "bucket": "grep_hard",
             "token": "",
             "source_path": ""
           }
@@ -8774,7 +8772,7 @@
             ],
             "crnt_positive": true,
             "difficulty_stratum": "tri_repo",
-            "n_oracle_files": 1,
+            "n_oracle_files": 3,
             "module_granularity": "parent_dir"
           }
         },
@@ -8827,7 +8825,7 @@
           "status": "pass",
           "reason": "no locational leak",
           "evidence": {
-            "bucket": "behavioral",
+            "bucket": "grep_hard",
             "token": "",
             "source_path": ""
           }
@@ -8857,7 +8855,7 @@
             ],
             "crnt_positive": true,
             "difficulty_stratum": "tri_repo",
-            "n_oracle_files": 1,
+            "n_oracle_files": 3,
             "module_granularity": "parent_dir"
           }
         },
@@ -9168,7 +9166,7 @@
           "status": "pass",
           "reason": "no locational leak",
           "evidence": {
-            "bucket": "behavioral",
+            "bucket": "grep_hard",
             "token": "",
             "source_path": ""
           }
@@ -9176,18 +9174,18 @@
         "C": {
           "gate": "C",
           "status": "fail",
-          "reason": "trivial to localize: turns-to-first-relevant=5 (<=7)",
+          "reason": "trivial to localize: turns-to-first-relevant=6 (<=7)",
           "evidence": {
             "coverage": "ok",
             "run_key": "refactor-orch-008",
-            "ttfr": 5,
+            "ttfr": 6,
             "tier": null
           }
         },
         "D": {
           "gate": "D",
           "status": "fail",
-          "reason": "not CRNT-positive and concentrated: 1 oracle file(s) across 1 module(s); needs >=3 files and >=2 modules",
+          "reason": "not CRNT-positive and concentrated: 2 oracle file(s) across 1 module(s); needs >=3 files and >=2 modules",
           "evidence": {
             "n_repos": 3,
             "repos": [
@@ -9197,7 +9195,7 @@
             ],
             "crnt_positive": false,
             "difficulty_stratum": "tri_repo",
-            "n_oracle_files": 1,
+            "n_oracle_files": 2,
             "module_granularity": "parent_dir",
             "n_modules": 1,
             "modules": [
