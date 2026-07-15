@@ -22,7 +22,11 @@ only the grouping and selection are shared.
 
 from __future__ import annotations
 
+import logging
+import math
 from typing import Any, Mapping
+
+logger = logging.getLogger(__name__)
 
 # The four Anthropic usage-token fields, in the order they are reported.
 USAGE_FIELDS = (
@@ -49,9 +53,38 @@ def request_key(entry: Mapping[str, Any]) -> str | None:
 
 
 def _field_value(usage: Mapping[str, Any], field: str) -> int:
-    """One usage field as an int, treating junk (and ``bool``) as absent."""
-    value = usage.get(field, 0)
+    """One usage field as a token count. Absent counts zero; junk counts zero loudly.
+
+    A trace is third-party input and junk in it does not survive ``int()``:
+    ``json.loads`` accepts the non-standard literals ``Infinity`` and ``NaN``
+    (``int(inf)`` raises OverflowError, ``int(nan)`` ValueError), and nothing
+    stops a writer emitting a count as a string. Counting junk as absent rather
+    than raising keeps one unreadable field from crashing both consumers
+    mid-trace — the same trade this boundary already makes for a malformed line
+    — and lets the request's other lines still bill the field through
+    :meth:`UsageDedup.offer`'s max. It can also undercount, hence the warning: a
+    silent zero surfaces as a $0.00 line in a cost report explaining nothing.
+    """
+    value = usage.get(field)
+    if value is None:
+        # Absent, or an explicit null: the line reports no count for this field.
+        return 0
     if isinstance(value, bool) or not isinstance(value, (int, float)):
+        logger.warning(
+            "usage field %s is %r, not a token count; counting it as absent",
+            field,
+            value,
+        )
+        return 0
+    if isinstance(value, int):
+        # Exact and always finite, at any width. Asking math.isfinite first would
+        # raise OverflowError on an int too large for a float — a JSON integer
+        # literal has no width limit — which is the crash this guard prevents.
+        return value
+    if not math.isfinite(value):
+        logger.warning(
+            "usage field %s is non-finite (%r); counting it as absent", field, value
+        )
         return 0
     return int(value)
 
