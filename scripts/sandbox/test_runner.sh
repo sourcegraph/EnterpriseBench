@@ -93,12 +93,37 @@ now_ms() {
 # 1.5 through. JSON's separator is always a period.
 parse_json_root_value() {
     printf '%s' "$2" | LC_ALL=C awk -v key="$1" -v strict="$3" -v kind="$4" '
+    # The index of the quote closing the string opened at p, or past n if the
+    # payload ends first (a trailing backslash makes p += 2 overshoot by one; both
+    # callers only ask whether p > n, so the size of the overshoot never matters).
+    #
+    # Walks by INDEX, never accumulating the bytes: a verifier that prints a
+    # megabyte of detail would make a char-by-char concat quadratic. A backslash
+    # escapes whatever byte follows, so \" does not close the string, \\ leaves the
+    # next quote free to, and { stays six bytes of text rather than a brace that
+    # could move the depth.
+    #
+    # Both callers have to skip a string by the SAME rule, which is why the rule
+    # lives here once: the walk relies on it to keep a brace inside a string out of
+    # the depth count, and value_at relies on it to hand back the very span the
+    # walk agreed was one string. Two copies left to drift apart would be a forged
+    # score.
+    function string_end(p,   d) {
+        p++
+        while (p <= n) {
+            d = substr(buf, p, 1)
+            if (d == "\\") { p += 2; continue }
+            if (d == "\"") break
+            p++
+        }
+        return p
+    }
     # The value of the key found at depth 1, or "" if it has none this can read.
     # Both branches only have to FIND the token; the grammar in END decides
     # whether it is one. Uses buf/n as globals rather than parameters — awk copies
     # a scalar argument, and copying the whole payload per key would undo the care
     # the walk above takes to stay linear on a megabyte of detail.
-    function value_at(v,   start, w, d) {
+    function value_at(v,   start, w) {
         while (v <= n && substr(buf, v, 1) ~ /[ \t\r\n]/) v++
         if (substr(buf, v, 1) != "\"") {
             # Flat scan to the next terminator, deliberately NOT re-walking
@@ -124,13 +149,7 @@ parse_json_root_value() {
         # which most real detail strings contain. It is provably neutral for the
         # number and literal grammars: both are anchored, and a token that still
         # carries its quotes matches neither.
-        w = v + 1
-        while (w <= n) {
-            d = substr(buf, w, 1)
-            if (d == "\\") { w += 2; continue }
-            if (d == "\"") break
-            w++
-        }
+        w = string_end(v)
         if (w > n) return ""   # unterminated; the root cannot have closed either
         return substr(buf, v, w - v + 1)
     }
@@ -165,19 +184,9 @@ parse_json_root_value() {
                 (rootClosed || c != "{")) { ok = 0; break }
 
             if (c == "\"") {
-                # Walk to the closing quote by INDEX, never accumulating the
-                # bytes: a verifier that prints a megabyte of detail would make
-                # a char-by-char concat quadratic. A backslash escapes whatever
-                # byte follows, so \" does not close the string, \\ leaves the
-                # next quote free to, and { stays six bytes of text rather
-                # than a brace that could move the depth.
-                j = i + 1
-                while (j <= n) {
-                    d = substr(buf, j, 1)
-                    if (d == "\\") { j += 2; continue }
-                    if (d == "\"") break
-                    j++
-                }
+                # Skipping the string is what keeps a brace inside it — or an
+                # escaped \"score\" — from moving the depth or forging a key.
+                j = string_end(i)
                 # A string is a key iff the next non-space byte is a colon. It is
                 # THE key iff its bytes are exactly the one asked for — which an
                 # escape can only lengthen, so the span check alone rejects every
