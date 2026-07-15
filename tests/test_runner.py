@@ -303,8 +303,11 @@ class TestValidateArtifacts:
         runner = CheckpointRunner(task=task, workspace=tmp_path)
         results = runner.validate_artifacts()
         assert len(results) == 1
+        # valid=False is a placeholder here: nobody checked the artifact, so
+        # the verdict channel is infra_error, not valid.
         assert results[0]["valid"] is False
         assert "No validator" in results[0]["detail"]
+        assert results[0]["infra_error"]["cause"] == "validator_unregistered"
 
     def test_no_artifacts(self, tmp_path):
         task = make_task(artifacts=ArtifactSpec(required=[]))

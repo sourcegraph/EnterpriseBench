@@ -159,6 +159,10 @@ class TestUnsupportedValidator:
         assert results[0]["valid"] is False
         assert "require_grounded_citations" in results[0]["detail"]
         assert "runbook" in results[0]["detail"]
+        # A task/harness config mismatch the agent cannot influence: the gate
+        # the task demands was never applied, so this is the infra channel,
+        # not an agent failure the grounding gate may zero.
+        assert results[0]["infra_error"]["cause"] == "groundedness_unsupported"
 
 
 # ---------------------------------------------------------------------------

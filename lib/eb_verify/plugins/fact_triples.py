@@ -51,6 +51,7 @@ from eb_verify.fact_coverage import (
 )
 from eb_verify.groundedness import Citation, check_groundedness
 from eb_verify.plugins import ValidationResult, safe_read
+from eb_verify.scorer_guard import artifact_not_checked
 
 DEFAULT_ALPHA = 0.3
 # Chosen operating point for one-to-one greedy triple matching — NOT calibrated
@@ -405,13 +406,21 @@ class FactTriplesValidator:
         # fails here instead. Load the stack behind one guard before scoring: callers
         # (runner.validate_artifacts, cli) invoke validate() unguarded, so letting this
         # escape would abort the whole verification run over a dependency fault that is
-        # not the agent's doing.
+        # not the agent's doing. It routes to the infra channel because the artifact
+        # was never CHECKED: a bare valid=False would score the fault against the
+        # agent.
         try:
             load_scoring_deps()
         except ScoringDepsUnavailable as exc:
+            detail = f"fact scoring unavailable (dependency: {exc})"
             return ValidationResult(
                 valid=False,
-                detail=f"fact scoring unavailable (dependency: {exc})",
+                detail=detail,
+                infra_error=artifact_not_checked(
+                    "scoring_deps_unavailable",
+                    detail,
+                    artifact_type=self.artifact_type,
+                ),
             )
 
         score = score_fact_triples(data["facts"], gt_data["facts"], workspace)
