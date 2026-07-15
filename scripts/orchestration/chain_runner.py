@@ -74,11 +74,6 @@ def _agent_failure(failure: SessionFailure, session_number: int) -> dict:
     and an agent failure is the opposite claim: a real measurement that belongs in
     the results table. Reusing the shape would put this run one ``is_invalid``
     reader away from the exclusion it exists to avoid.
-
-    ``detail`` arrives already scrubbed from :class:`SessionFailure`, which
-    applies the same redact-then-bound rule ``InfraError`` does (bead otgzo). This
-    dict reaches the same three sinks, so it inherits the guarantee rather than
-    re-deriving it — or forgetting to.
     """
     return {
         "reason": failure.reason,
@@ -517,16 +512,10 @@ def run_chain(
 
 
 def _milestones_apply(session_num: int, session_count: int) -> bool:
-    """Whether a session's milestones are part of the chain's score at all.
+    """Whether a session's milestones count toward the chain's score.
 
-    The last session's are not: the final checkpoints measure that session's work,
-    so running milestones on it too would score the same thing twice.
-
-    One definition, two callers — the loop that RUNS milestones and the zero-fill
-    that scores the ones the agent never reached. Written as two separate
-    comparisons the pair can drift into disagreeing, and the drift is silent: a
-    fill for a milestone the healthy path would never have run invents a penalty
-    that only agents who die pay.
+    The last session's do not: the final checkpoints measure that session's work.
+    Shared by the run path and the zero-fill so the two cannot drift apart.
     """
     return session_num < session_count
 
@@ -548,13 +537,18 @@ def _zero_fill_unreached_milestones(
     would be the false zero of bead s58f: there, the work may well have been done
     and the harness is what broke.
     """
+    # What actually ran, read off the record rather than re-derived from the
+    # completed-session count: the count only stands in for it because the loop
+    # breaks at the failure, and a fill for a session already scored would double
+    # it.
+    already_scored = {ms.session_number for ms in chain_result.milestone_scores}
     for session_config in task_def.sessions:
         session_num = session_config.session_number
         if not session_config.milestones or not _milestones_apply(
             session_num, task_def.session_count
         ):
             continue
-        if session_num <= chain_result.sessions_completed:
+        if session_num in already_scored:
             continue
         chain_result.milestone_scores.append(
             SessionScore(

@@ -48,13 +48,8 @@ class AgentFailure(Exception):
     an upward bias, and the same over-credit family the scorer guard exists to
     close, arriving through the exclusion channel instead of the scoring one.
 
-    Nothing infers this. Every other exception out of the agent is UNCLASSIFIED
-    and routes to the re-run channel, because the alternative — reading budget
-    exhaustion out of an arbitrary traceback — is a guess, and a wrong guess in
-    that direction blames the model for a broken harness. That is the false-zero
-    bug (beads s58f, hktt/pt0n) this codebase already closed once. Only the
-    adapter driving the model knows which failure it saw, so only the adapter
-    may say so.
+    Only the adapter driving the model knows which failure it saw, so only the
+    adapter may declare one. Nothing infers this.
     """
 
     def __init__(self, reason: str, detail: str = "") -> None:
@@ -70,27 +65,18 @@ class SessionFailure:
     ``kind`` is set at the only place that can know it — the stage that raised —
     and is never re-derived downstream from a message string.
 
-    ``detail`` and ``reason`` are scrubbed on construction, the same rule and for
-    the same reason as :class:`~eb_verify.scorer_guard.InfraError` (bead otgzo):
-    they are built from text this harness does not author — the agent's own
-    exception, declared or not — and reach three sinks that keep them verbatim
-    (``chain_result.json``, stdout via ``ChainResult.summary``, and
-    ``logger.error``). The agent runs with ``ANTHROPIC_API_KEY`` in its
-    environment. Scrubbing here rather than at each sink is what makes it
-    impossible for a caller to forget, and an ``AgentFailure`` is exactly as
-    untrusted as an undeclared one — declaring whose fault the failure was says
-    nothing about what text it carries.
-
-    ``reason`` is scrubbed too, where ``InfraError`` leaves its own alone: that
-    class's reasons are harness-authored constants, but an ``AgentFailure``'s
-    comes from the adapter, and an adapter that passes a response body as its
-    machine key would otherwise publish it unbounded.
+    ``detail`` and ``reason`` are scrubbed at birth (:mod:`eb_verify.redact`, bead
+    otgzo) — both are adapter-supplied text reaching chain_result.json, stdout, and
+    the log verbatim. A declared ``AgentFailure`` is exactly as untrusted as an
+    undeclared one; whose fault the failure was says nothing about what text it
+    carries. ``reason`` is scrubbed where ``InfraError`` leaves its own alone:
+    that class's reasons are harness constants, but an ``AgentFailure``'s is not.
     """
 
     kind: str  # AGENT_FAILURE | INFRA_FAILURE
     reason: str  # machine key, e.g. "context_budget_exhausted" | "commit_error"
     detail: str
-    stage: str  # setup | agent | commit
+    stage: str  # setup | agent | simulate | commit
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "detail", safe_detail(self.detail))
@@ -244,13 +230,9 @@ def run_session(
     3. Commit results to session branch
     4. Return result with branch state
 
-    A failure is classified by the stage that raised it, because that is the only
-    place that knows whose failure it is. Setup and commit are the harness's own
-    code, so anything they raise is INFRA. Only the agent stage can produce an
-    :class:`AgentFailure`, and only if the adapter declares one — an undeclared
-    exception out of the agent is INFRA too, so an unrecognised failure fails
-    closed into the re-run channel rather than into a zero the model may not have
-    earned.
+    A failure is classified by the stage that raised it, the only place that knows
+    whose it is: an :class:`AgentFailure` from the agent stage is the model's,
+    everything else fails closed to INFRA.
 
     Args:
         agent_callable: callable(workspace_path, prompt) -> str. Required unless
@@ -290,7 +272,7 @@ def run_session(
         )
 
         # 2. Run agent or simulate
-        stage = "agent"
+        stage = "simulate" if simulate else "agent"
         if simulate:
             agent_output = simulate_agent_work(
                 workspace_path=workspace_path,
@@ -326,13 +308,11 @@ def run_session(
         )
 
     except Exception as exc:
-        # An AgentFailure counts as the agent's only from the agent stage, and only
-        # when a real agent ran. The claim "the model failed" is the adapter's
-        # alone: the same exception out of setup or commit is harness code wearing
-        # the agent's name, and out of `simulate_agent_work` it is a zero charged
-        # to a model that never ran at all. Both would score a session the model
-        # may well have completed.
-        if isinstance(exc, AgentFailure) and stage == "agent" and not simulate:
+        # Only the agent stage, which by construction is not the simulate one: the
+        # same exception out of setup or commit is harness code wearing the agent's
+        # name, and out of `simulate_agent_work` it is a zero charged to a model
+        # that never ran. Both would score a session the model may have completed.
+        if isinstance(exc, AgentFailure) and stage == "agent":
             result.failure = SessionFailure(
                 kind=AGENT_FAILURE, reason=exc.reason, detail=exc.detail, stage=stage
             )

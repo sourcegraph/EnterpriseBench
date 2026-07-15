@@ -53,12 +53,23 @@ from orchestration.session import (
 
 from .test_chain_session_failure import (
     agent_failing_at,
+    chain_task_toml,
     scoring_verifier,
     task_def,
     verifier_ran,
     working_agent,
     write_verifier,
 )
+
+
+def milestones_named(result, name: str) -> list:
+    """Every milestone result under ``name``, across all sessions."""
+    return [
+        m
+        for ms in result.milestone_scores
+        for m in ms.milestones
+        if m.milestone_name == name
+    ]
 
 
 def disk_reading_checkpoints(task_dir: Path, marker: str) -> list[dict]:
@@ -180,12 +191,7 @@ class TestAnAgentFailureIsScored:
             task_dir=str(tmp_path),
         )
 
-        zeroed = [
-            m
-            for ms in result.milestone_scores
-            for m in ms.milestones
-            if m.milestone_name == "m2"
-        ]
+        zeroed = milestones_named(result, "m2")
         assert len(zeroed) == 1, "session 2's milestone must still be in the denominator"
         assert zeroed[0].score == pytest.approx(0.0)
         assert zeroed[0].passed is False
@@ -202,37 +208,14 @@ class TestAnAgentFailureIsScored:
             "agent never got here, and a reader that cannot tell it from a verifier's "
             "real 0.0 cannot check that claim"
         )
+        # The negative control, in the same run: session 1's milestone really did
+        # get a verdict, so the flag has to distinguish it. Without this the flag
+        # could be hardcoded True and every assertion above would still pass.
+        assert milestones_named(result, "m1")[0].not_reached is False
 
         # (1.0 * 0.1 + 0.0 * 0.1 + 0.0 * 1.0) / 1.2 — with m2 dropped it would be
         # 0.1/1.1 = 0.0909, i.e. the agent rewarded for the milestone it skipped.
         assert result.total_score == pytest.approx(0.0833, abs=0.001)
-
-    def test_a_milestone_the_agent_did_reach_is_not_marked_not_reached(self, tmp_path):
-        """The negative control for the fill's provenance: a real verdict must not
-        claim to be one, or the flag means nothing."""
-        td = task_def(
-            session_count=2,
-            final_checkpoints=disk_reading_checkpoints(tmp_path, "session_2.md"),
-            session_milestones={
-                1: [{"name": "m1", "verifier": scoring_verifier(tmp_path, 1.0, "m1.sh")}]
-            },
-        )
-
-        result = run_chain(
-            td,
-            workspace_root=str(tmp_path / "ws"),
-            agent_callable=agent_failing_at(2, budget_exhausted()),
-            task_dir=str(tmp_path),
-        )
-
-        assert verifier_ran(tmp_path, "m1.sh")
-        real = [
-            m
-            for ms in result.milestone_scores
-            for m in ms.milestones
-            if m.milestone_name == "m1"
-        ]
-        assert real[0].not_reached is False
 
     def test_the_summary_does_not_render_a_fill_as_a_verdict(self, tmp_path):
         """`FAIL (0.00)` is what a verifier that ran and scored zero renders as.
@@ -282,12 +265,7 @@ class TestTheLastSessionsMilestonesAreExcludedFromBothPaths:
         )
 
         assert not verifier_ran(tmp_path, "last.sh")
-        assert not [
-            m
-            for ms in result.milestone_scores
-            for m in ms.milestones
-            if m.milestone_name == "last"
-        ]
+        assert not milestones_named(result, "last")
 
     def test_an_agent_failure_does_not_zero_fill_them(self, tmp_path):
         """The complement of the case above, and the one that drifts: the agent
@@ -308,12 +286,10 @@ class TestTheLastSessionsMilestonesAreExcludedFromBothPaths:
 
         assert result.agent_failure is not None
         assert not verifier_ran(tmp_path, "last.sh")
-        assert not [
-            m
-            for ms in result.milestone_scores
-            for m in ms.milestones
-            if m.milestone_name == "last"
-        ], "the final session's milestones are not part of the chain's score on either path"
+        assert not milestones_named(result, "last"), (
+            "the final session's milestones are not part of the chain's score on "
+            "either path"
+        )
         # Only the final checkpoint counts: 0.0 * 1.0 / 1.0. A stray zero-fill would
         # add 0.1 to the denominator and change nothing about the numerator — the
         # score would stay 0.0 and hide the drift, which is why the assertion above
@@ -407,9 +383,10 @@ class TestRunSessionTypesTheFailureAtItsSource:
 
     def test_an_agent_failure_while_simulating_is_infra(self, tmp_path, monkeypatch):
         """There is no model in simulate mode, so there is nobody to charge a zero
-        to. The scaffold raising AgentFailure would otherwise be typed AGENT — the
-        stage is 'agent' — and scored as a model's earned failure on a run where no
-        model ever ran. Harness code cannot confess on the agent's behalf."""
+        to: the scaffold raising AgentFailure must not be scored as a model's earned
+        failure on a run where no model ever ran. Harness code cannot confess on the
+        agent's behalf. The stage says so — 'simulate', not 'agent' — which is what
+        keeps the classifier a single honest comparison instead of a compensator."""
 
         def explode(**kwargs):
             raise AgentFailure("context_budget_exhausted", "scaffold says so")
@@ -425,7 +402,7 @@ class TestRunSessionTypesTheFailureAtItsSource:
         )
 
         assert result.failure.kind == INFRA_FAILURE
-        assert result.failure.stage == "agent"
+        assert result.failure.stage == "simulate"
 
     def test_a_completed_session_carries_no_failure(self, tmp_path):
         result = self._run(tmp_path, working_agent())
@@ -469,27 +446,7 @@ class TestAgentFailureJsonContract:
     """
 
     def _task_toml(self, tmp_path: Path) -> Path:
-        toml_path = tmp_path / "task.toml"
-        toml_path.write_text(
-            "[task]\n"
-            'id = "chain-agent-failure"\n'
-            'suite = "customer_escalation"\n'
-            'difficulty = "medium"\n'
-            'session_type = "chain"\n'
-            "session_count = 2\n"
-            "\n"
-            "[[sessions]]\n"
-            'prompt = "session 1"\n'
-            "\n"
-            "[[sessions]]\n"
-            'prompt = "session 2"\n'
-            "\n"
-            "[[checkpoints]]\n"
-            'name = "cp"\n'
-            "weight = 1.0\n"
-            f'verifier = "{scoring_verifier(tmp_path, 1.0)}"\n'
-        )
-        return toml_path
+        return chain_task_toml(tmp_path, task_id="chain-agent-failure")
 
     def test_the_earned_zero_is_written_with_a_zero_exit(self, tmp_path, monkeypatch):
         from orchestration import chain_runner

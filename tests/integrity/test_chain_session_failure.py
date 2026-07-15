@@ -106,6 +106,42 @@ def task_def(
     )
 
 
+def chain_task_toml(
+    task_dir: Path,
+    verifier: str | None = None,
+    task_id: str = "chain-session-failure",
+) -> Path:
+    """A well-formed 2-session chain task on disk — the shape a real benchmark
+    task has, for the tests that drive the CLI rather than ``run_chain``."""
+    verifier = verifier or scoring_verifier(task_dir, 1.0)
+    toml_path = task_dir / "task.toml"
+    toml_path.write_text(
+        "[task]\n"
+        f'id = "{task_id}"\n'
+        'suite = "customer_escalation"\n'
+        'difficulty = "medium"\n'
+        'session_type = "chain"\n'
+        "session_count = 2\n"
+        "\n"
+        "[[repos]]\n"
+        'path = "repo-a"\n'
+        'url = "https://example.invalid/repo-a"\n'
+        'rev = "deadbeef"\n'
+        "\n"
+        "[[sessions]]\n"
+        'prompt = "session 1"\n'
+        "\n"
+        "[[sessions]]\n"
+        'prompt = "session 2"\n'
+        "\n"
+        "[[checkpoints]]\n"
+        'name = "cp"\n'
+        "weight = 1.0\n"
+        f'verifier = "{verifier}"\n'
+    )
+    return toml_path
+
+
 def agent_failing_at(session_number: int | None, exc: Exception | None = None):
     """An agent that works normally until ``session_number``, then dies.
 

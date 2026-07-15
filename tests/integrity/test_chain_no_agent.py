@@ -45,6 +45,7 @@ from .test_chain_session_failure import (  # reuse the sentinel helpers
     verifier_ran,
     working_agent,
 )
+from .test_chain_session_failure import chain_task_toml as _chain_task_toml
 from .test_chain_session_failure import task_def as _chain_task_def
 
 
@@ -62,34 +63,8 @@ def task_def(
 
 
 def chain_task_toml(task_dir: Path, verifier: str | None = None) -> Path:
-    """A well-formed 2-session chain task — the shape a real benchmark task has."""
-    verifier = verifier or scoring_verifier(task_dir, 1.0)
-    toml_path = task_dir / "task.toml"
-    toml_path.write_text(
-        "[task]\n"
-        'id = "chain-no-agent"\n'
-        'suite = "customer_escalation"\n'
-        'difficulty = "medium"\n'
-        'session_type = "chain"\n'
-        "session_count = 2\n"
-        "\n"
-        "[[repos]]\n"
-        'path = "repo-a"\n'
-        'url = "https://example.invalid/repo-a"\n'
-        'rev = "deadbeef"\n'
-        "\n"
-        "[[sessions]]\n"
-        'prompt = "session 1"\n'
-        "\n"
-        "[[sessions]]\n"
-        'prompt = "session 2"\n'
-        "\n"
-        "[[checkpoints]]\n"
-        'name = "cp"\n'
-        "weight = 1.0\n"
-        f'verifier = "{verifier}"\n'
-    )
-    return toml_path
+    """The shared 2-session TOML builder, under this module's task id."""
+    return _chain_task_toml(task_dir, verifier=verifier, task_id="chain-no-agent")
 
 
 def run_cli(task_toml: Path, *flags: str) -> subprocess.CompletedProcess:
