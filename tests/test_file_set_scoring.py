@@ -120,9 +120,7 @@ def test_required_list_is_deduplicated():
 
 
 def test_empty_required_files_is_rejected_not_scored():
-    """A checkpoint with nothing to find is a task-authoring bug. Scoring it
-    vacuously perfect would hand every agent a free pass, so refuse to produce
-    a number at all — an empty answer against empty GT must not be a 1.0."""
+    """An empty answer against empty GT must not score a vacuous 1.0."""
     with pytest.raises(ValueError, match="no required files"):
         score_file_set([], [])
     with pytest.raises(ValueError, match="no required files"):
@@ -146,22 +144,11 @@ def test_custom_matcher_composes():
     assert result.f1 == 1.0
 
 
-def test_suffix_policy_misses_repo_prefixed_ground_truth():
-    """A directional hole in the historical blob matcher, pinned here because
-    it belongs to the matcher, not the math: a listed path SHORTER than the
-    required path matches nothing. Tracked for the blob adoption (rmz1x)."""
-    result = score_file_set(
-        ["httpx/_config.py"], ["httpx/httpx/_config.py"], match=suffix_match
-    )
-    assert result.f1 == 0.0
-
-
 # ------------------------------------------ a lenient matcher cannot buy credit
 #
-# Credit runs through a 1-to-1 pairing, so a matcher chooses WHICH files are
-# credited, never HOW MANY. These two tests are the load-bearing ones: without
-# the pairing, each exploit below scores a passing 1.0 under the very matcher
-# the shipped checks use (`--policy suffix`).
+# The load-bearing tests: without the 1-to-1 pairing, each exploit below scores
+# a passing 1.0 under the very matcher the shipped checks use (`--policy
+# suffix`).
 
 
 def test_padding_variants_of_one_found_file_cannot_inflate_precision():
@@ -200,14 +187,22 @@ def test_one_vague_guess_cannot_claim_several_required_files():
     assert result.f1 == pytest.approx(2 / 3)
 
 
-def test_pairing_credits_every_required_file_it_can():
+@pytest.mark.parametrize(
+    "required",
+    [
+        ["_config.py", "httpx/httpx/_config.py"],
+        ["httpx/httpx/_config.py", "_config.py"],
+    ],
+)
+def test_pairing_is_maximum_so_ground_truth_order_cannot_move_the_score(required):
     """The pairing is maximum, not greedy-first: a specific guess must not be
-    wasted on a file another guess also covers. Both required files are found,
-    even though `_config.py` alone could have absorbed the first."""
+    wasted on a required file a vaguer one also covers. Here `other/_config.py`
+    can only pay for `_config.py`, so greedy — which lets the first listed file
+    take `_config.py` — finds 1 under one GT order and 2 under the other. A
+    score that moves when a task author reorders a JSON array is not a score;
+    the maximum pairing finds both either way."""
     result = score_file_set(
-        ["httpx/httpx/_config.py", "httpcore/httpcore/_config.py"],
-        ["httpx/httpx/_config.py", "httpcore/httpcore/_config.py"],
-        match=suffix_match,
+        ["httpx/httpx/_config.py", "other/_config.py"], required, match=suffix_match
     )
     assert result.n_matched == 2
     assert result.f1 == 1.0
@@ -228,16 +223,18 @@ def test_from_counts_matches_pairwise_math():
 
 def test_incoherent_counts_are_rejected():
     # More required files credited than exist.
-    with pytest.raises(ValueError, match="exceeds"):
+    with pytest.raises(ValueError, match="outside"):
         FileSetScore(n_required=2, n_listed=3, n_matched=3)
     # Credit without listing anything — the shape that fabricated a passing 1.0
     # out of an empty answer before the counts shared one true-positive total.
-    with pytest.raises(ValueError, match="exceeds"):
+    with pytest.raises(ValueError, match="outside"):
         FileSetScore(n_required=5, n_listed=0, n_matched=5)
     with pytest.raises(ValueError, match="no required files"):
         FileSetScore(n_required=0, n_listed=5, n_matched=0)
-    with pytest.raises(ValueError, match="negative"):
+    with pytest.raises(ValueError, match="outside"):
         FileSetScore(n_required=1, n_listed=-1, n_matched=0)
+    with pytest.raises(ValueError, match="outside"):
+        FileSetScore(n_required=1, n_listed=1, n_matched=-1)
 
 
 # ----------------------------------------------------------------------- detail

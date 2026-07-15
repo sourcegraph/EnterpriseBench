@@ -14,8 +14,9 @@ from typing import Callable, List, Optional, Sequence
 
 from eb_verify.scorer_guard import InfraError
 
-# Inclusive: a file-set checkpoint passes at F1 >= this. Kept at the historical
-# recall-only pass bar so "passed" keeps meaning "half-right or better".
+# Default bar for `passed`, inclusive. Only a default: checkpoints set their own
+# bar (the blobs today span 0.3/0.4/0.5/0.6), so a caller with one compares f1
+# itself. At this bar, full recall passes iff |answer| <= 3|GT|.
 FILE_SET_PASS_THRESHOLD = 0.5
 
 
@@ -28,14 +29,9 @@ class FileSetScore:
     nothing for over-listing. Rationale and options considered:
     docs/file_discovery_scoring_decision.md.
 
-    Three counts; precision/recall/F1 are derived. ``n_matched`` is the single
-    true-positive count shared by both — deliberately ONE number, because two
-    independently-counted true-positive totals (one per side) is what let both
-    halves of the answer lie: a vague guess crediting several required files at
-    once inflated recall, and many near-duplicate spellings of one found file
-    all counting as "relevant" inflated precision. Both are ruled out by
-    construction here: ``n_matched`` is a 1-to-1 pairing, so it can never exceed
-    either side's cardinality.
+    Three counts; precision/recall/F1 are derived. ``n_matched`` is one
+    true-positive count shared by both sides, never two independently-counted
+    totals — that is what stops either half of the answer from lying.
 
     Counts, not paths, because not every matcher is a pairwise predicate —
     file_extraction.py's refinement rule credits per answer, so that call site
@@ -51,20 +47,18 @@ class FileSetScore:
     n_matched: int  # required files credited, under a 1-to-1 pairing
 
     def __post_init__(self) -> None:
-        if min(self.n_listed, self.n_matched) < 0:
-            raise ValueError(f"negative count in {self}")
         if self.n_required < 1:
             # A checkpoint with nothing to find is a task-authoring bug. Scoring
             # it vacuously perfect would hand every agent a free pass, so refuse
             # to produce a number at all and let the caller raise an infra error.
             raise ValueError(f"no required files to score against in {self}")
-        if self.n_matched > min(self.n_required, self.n_listed):
-            # Unreachable from any real pairing: you cannot credit more files
-            # than either side holds. Catches miscounts at the counts-based
-            # call site, which would otherwise fabricate a passing score.
+        if not 0 <= self.n_matched <= min(self.n_required, self.n_listed):
+            # No real pairing lands here: you cannot credit more files than
+            # either side holds, or fewer than none. Catches miscounts at the
+            # counts-based call site, which would otherwise fabricate a score.
             raise ValueError(
-                f"matched {self.n_matched} exceeds required {self.n_required} "
-                f"or listed {self.n_listed}"
+                f"matched {self.n_matched} outside [0, min(required "
+                f"{self.n_required}, listed {self.n_listed})] in {self}"
             )
 
     @property
@@ -82,13 +76,7 @@ class FileSetScore:
 
     @property
     def f1(self) -> float:
-        """Harmonic mean of precision and recall; 0.0 when both are 0.
-
-        Because precision and recall share one 1-to-1 true-positive count, at
-        the 0.5 pass bar this subsumes the "cap |answer| at 3x |GT|" alternative
-        for EVERY matcher, not just exact equality: full recall passes iff
-        |answer| <= 3|GT|. See docs/file_discovery_scoring_decision.md.
-        """
+        """Harmonic mean of precision and recall; 0.0 when both are 0."""
         p, r = self.precision, self.recall
         if p + r == 0:
             return 0.0
@@ -114,11 +102,12 @@ def _max_pairing(
 ) -> int:
     """Size of a maximum 1-to-1 pairing between listed and required files.
 
-    The true-positive count, and the reason a lenient matcher cannot buy credit:
-    a listed file is worth at most one required file no matter how many it
-    matches, and a required file is found at most once no matter how many
-    spellings of it were listed. Kuhn's augmenting-path algorithm — required
-    sets are a handful of files, so the quadratic is free.
+    The true-positive count. 1-to-1 is what denies a lenient matcher extra
+    credit; MAXIMUM (rather than greedy first-match) is what makes the count
+    independent of the order ``required_files`` happens to be written in, and
+    stops a specific guess being wasted on a file a vaguer one also covers.
+    Kuhn's augmenting-path algorithm — required sets are a handful of files
+    (<= 6 across the suite today), so the quadratic is free.
     """
     credited_by = [-1] * len(required)  # required index -> listed index, or -1
 
@@ -133,7 +122,7 @@ def _max_pairing(
                 return True
         return False
 
-    return sum(assign(li, [False] * len(required)) for li in range(len(listed)))
+    return sum(1 for li in range(len(listed)) if assign(li, [False] * len(required)))
 
 
 def score_file_set(
@@ -151,13 +140,11 @@ def score_file_set(
     credited but never HOW MANY: no matcher, however lenient, can make
     over-listing free. That independence is the whole point of one primitive.
 
-    Both lists are deduplicated by exact string first: repeating the right
-    answer is not spray, and repeating filler earns no extra penalty. Near-
-    duplicate spellings survive dedup, but the pairing already denies them a
-    second credit, so they only cost precision — as filler should.
+    Both lists are deduplicated by exact string first, so repeating an entry
+    neither helps nor hurts. Near-duplicate spellings survive dedup, but the
+    pairing denies them a second credit, so they only cost precision.
 
-    Raises ValueError on empty ``required_files``: a checkpoint with nothing to
-    find is a bug in the task, not a free pass for the agent.
+    Raises ValueError on empty ``required_files``.
     """
     required = list(dict.fromkeys(required_files))
     listed = list(dict.fromkeys(agent_files))

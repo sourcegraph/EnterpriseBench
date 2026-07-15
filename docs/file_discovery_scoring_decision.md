@@ -36,10 +36,12 @@ over-listing continuously. Jaccard is a monotone transform of F1
 (J = F1/(2−F1)): same ranking, harsher values, less standard. F1 chosen.
 
 **(b) Recall with a cap on |answer|** (score 0 if the agent lists more than
-3×|required_files|). Subsumed by F1: at the pass threshold 0.5, full recall
-passes iff |answer| ≤ 3|GT| — the same bar, but continuous, with no arbitrary
-constant, and a bare cap still gives free credit *inside* the cap for 3×
-enumeration. The subsumption holds for **every** matcher, not just exact
+3×|required_files|). Subsumed by F1: at a pass bar of 0.5, full recall passes
+iff |answer| ≤ 3|GT| — the same bar, but continuous, where a bare cap still
+gives free credit *inside* the cap for 3× enumeration. (This does not abolish
+the constant so much as derive it from the pass bar: the general form is
+|answer| ≤ |GT|·(2−t)/t, and 3× is what t=0.5 yields.) The subsumption holds
+for **every** matcher, not just exact
 equality, because credit is a 1-to-1 pairing (see Semantics). That is a
 precondition, not a freebie: score precision off "listed files matching ≥1
 required file" instead, and a lenient matcher voids the theorem — 51 differently
@@ -72,7 +74,11 @@ Implemented in `eb_verify.scoring.FileSetScore` / `score_file_set`
   nothing was listed, which cannot leak a pass: recall is then 0, so F1 is 0.
 - Empty `required_files` **raises**. A checkpoint with nothing to find is a
   task-authoring bug; scoring it vacuously perfect would pass every agent.
-- `passed` stays `score >= 0.5` (`FILE_SET_PASS_THRESHOLD`, inclusive).
+- `passed` is `f1 >= 0.5` (`FILE_SET_PASS_THRESHOLD`, inclusive) — a *default*,
+  not the bar. Checkpoints set their own; the blobs today span 0.3 (97×), 0.5
+  (71×), 0.4 (14×), 0.6 (5×), so most adopters will compare `f1` themselves and
+  the 3× figure above becomes 5.67× at a 0.3 bar. Whether the bars should be
+  unified is a separate question this decision does not settle.
 - `detail` exposes found/total, listed count, and P/R/F1.
 - **Matcher-agnostic — enforced, not assumed.** The matcher owns all path
   semantics; the primitive owns the math. Because credit runs through the
