@@ -129,8 +129,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 
 def cmd_validate_artifact(args: argparse.Namespace) -> int:
-    from eb_verify.plugins import ValidationResult, get_validator
-    from eb_verify.scorer_guard import artifact_not_checked
+    from eb_verify.plugins import get_validator, safe_validate
 
     validator = get_validator(args.artifact_type)
     if validator is None:
@@ -139,22 +138,7 @@ def cmd_validate_artifact(args: argparse.Namespace) -> int:
               f"reproduction_script, security_assessment, answer", file=sys.stderr)
         return 1
 
-    workspace = Path(args.path)
-    try:
-        result = validator.validate(workspace)
-    except Exception as exc:
-        # A crashing validator is a harness fault, not a verdict on the
-        # artifact. Build the same InfraError the runner does, so both entry
-        # points name one cause, and fall through to the one exit below.
-        result = ValidationResult(
-            valid=False,  # placeholder — the infra_error branch wins
-            infra_error=artifact_not_checked(
-                "artifact_validator_crash",
-                f"validator for '{args.artifact_type}' crashed: "
-                f"{type(exc).__name__}: {exc}",
-                artifact_type=args.artifact_type,
-            ),
-        )
+    result = safe_validate(validator, Path(args.path), args.artifact_type)
     if result.infra_error is not None:
         # No verdict — the harness could not check the artifact. See cmd_run on
         # exit code 2. Distinct from the unknown-type branch above (rc 1): that

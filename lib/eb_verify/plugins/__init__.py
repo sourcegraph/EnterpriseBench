@@ -7,12 +7,16 @@ Plugins are registered by artifact type name.
 
 from __future__ import annotations
 
+import inspect
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Protocol
+from typing import Dict, Optional, Protocol, cast
 
-from eb_verify.scorer_guard import InfraError
+from eb_verify.scorer_guard import InfraError, artifact_not_checked
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -22,9 +26,6 @@ class ValidationResult:
     # Set when the artifact could not be CHECKED — a harness fault, never a
     # verdict on the agent. `valid` is then a placeholder consumers must branch
     # past before reading it, the same convention as CheckpointResult.infra_error.
-    # A validator may set this to report a fault it caught itself (its scoring
-    # deps failed to load, say) rather than raising; the callers' guards build
-    # the same channel for one that raises instead.
     infra_error: Optional[InfraError] = None
 
 
@@ -34,6 +35,19 @@ class ArtifactValidator(Protocol):
     artifact_type: str
 
     def validate(self, workspace: Path) -> ValidationResult: ...
+
+
+class _GroundednessCapableValidator(Protocol):
+    """An artifact validator whose validate() accepts the groundedness flag.
+
+    Membership is established at runtime by safe_validate()'s inspect.signature
+    probe, not statically — this Protocol exists so the probed call site is
+    typed instead of an untyped reflection call.
+    """
+
+    def validate(
+        self, workspace: Path, require_grounded_citations: bool = ...
+    ) -> ValidationResult: ...
 
 
 # Plugin registry — populated by imports below
@@ -50,6 +64,64 @@ def get_validator(artifact_type: str) -> Optional[ArtifactValidator]:
 
 def list_validators() -> list[str]:
     return list(_registry.keys())
+
+
+def safe_validate(
+    validator: ArtifactValidator,
+    workspace: Path,
+    artifact_type: str,
+    *,
+    require_grounded: bool = False,
+) -> ValidationResult:
+    """Call ``validator.validate()``, returning every harness fault as infra_error.
+
+    The artifact-channel sibling of scorer_guard.run_verifier_subprocess: it owns
+    the whole ladder a validator can fall off before reaching a verdict, so no
+    caller re-derives it and a new caller cannot forget to. Nothing here raises.
+
+    A fault is never reported as ``valid=False`` alone — that reads as a verdict
+    on the agent's artifact, and scoring it would fabricate a 0.0 for a fault
+    that is the harness's doing.
+    """
+    try:
+        if not require_grounded:
+            return validator.validate(workspace)
+        # The task demands a gate this validator may not implement; the base
+        # ArtifactValidator protocol is validate(workspace) only, so the
+        # signature is the capability check.
+        if "require_grounded_citations" not in inspect.signature(
+            validator.validate
+        ).parameters:
+            detail = (
+                "require_grounded_citations is set but the "
+                f"'{artifact_type}' validator does not support grounded citations"
+            )
+            logger.error("Artifact %r: not checked — %s", artifact_type, detail)
+            return ValidationResult(
+                valid=False,
+                detail=detail,
+                infra_error=artifact_not_checked(
+                    "groundedness_unsupported", detail, artifact_type=artifact_type
+                ),
+            )
+        # The probe above verified the kwarg exists; the cast records that
+        # runtime fact for the type checker.
+        capable = cast(_GroundednessCapableValidator, validator)
+        return capable.validate(workspace, require_grounded_citations=True)
+    except Exception as exc:
+        # The traceback exists only here; the InfraError carries the type and
+        # message, so log the stack for the operator triaging the re-run.
+        logger.exception("Artifact %r: validator crashed", artifact_type)
+        detail = (
+            f"validator for '{artifact_type}' crashed: {type(exc).__name__}: {exc}"
+        )
+        return ValidationResult(
+            valid=False,
+            detail=detail,
+            infra_error=artifact_not_checked(
+                "artifact_validator_crash", detail, artifact_type=artifact_type
+            ),
+        )
 
 
 class FileTooLargeError(ValueError):
@@ -127,12 +199,9 @@ register(TopologicalOrderValidator())
 # reports the unknown artifact type explicitly.
 #
 # The scoring deps must be probed explicitly: fact_triples defers them to its scoring
-# call sites, so importing it cleanly proves only that jsonschema is present. Relying
-# on the ImportError alone once registered a validator that then raised from inside
-# validate(), which killed the whole run back when callers invoked it unguarded. The
-# callers guard it now, so that fault is recorded rather than fatal; probing here still
-# routes a missing dep through the same warning as a missing jsonschema, so there is
-# one "unavailable" path rather than two.
+# call sites, so importing it cleanly proves only that jsonschema is present. Probing
+# here routes a missing dep through the same warning as a missing jsonschema, so there
+# is one "unavailable" path rather than two.
 try:
     from eb_verify.fact_coverage import scoring_deps_available
 
