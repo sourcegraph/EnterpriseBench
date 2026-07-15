@@ -31,7 +31,7 @@ now_ms() {
 # Read the value of KEY from the root of a verifier payload, or print nothing if
 # the payload does not state one this can trust:
 #
-#   parse_json_root_value <key> <payload> <strict 0|1> <number|literal|string>
+#   parse_json_root_value <key> <payload> <dup_anywhere_fails 0|1> <number|literal|string>
 #
 # Every field the result document is built from comes through here. A regex cannot
 # see nesting, and each field this reads sits beside agent-echoed text and verifier
@@ -55,16 +55,13 @@ now_ms() {
 #                                                  finished saying what it meant
 #
 # All four are payloads no verifier that reached a verdict can emit, so each fails
-# CLOSED. What that COSTS differs per key, which is what the strict knob is for and
-# why the callers, not this function, decide it. strict=1 additionally poisons the
-# read on a duplicate of the key at ANY depth.
+# CLOSED. What that COSTS differs per key, so how much MORE to refuse is the
+# callers to decide: dup_anywhere_fails=1 additionally poisons the read on a
+# duplicate of the key at ANY depth. See the three wrappers below, which are the
+# only callers.
 #
 # The value is then held to the grammar named by kind — all three anchored, so
-# "1.0abc" cannot coerce to 1.0 and a quoted "true" is not the literal. number is
-# additionally range-checked to [0, 1] (which also catches 1e400, whose strtod is
-# +inf); its exponent branch is not decoration, since json.dumps emits 1e-05 for
-# any small float, and the 1e-6 tolerance mirrors eb_verify.scorer_guard's
-# _SCORE_EPSILON so the shell and the guard admit exactly the same values. Matched
+# "1.0abc" cannot coerce to 1.0 and a quoted "true" is not the literal. Matched
 # tokens are printed verbatim, never coerced through "+ 0", so a number stays a
 # byte-faithful JSON number and a string keeps its escapes.
 #
@@ -91,8 +88,11 @@ now_ms() {
 # walk against the byte stream and void the string-skipping. It also fixes strtod's
 # separator: under a comma locale "1.5" + 0 is 1, so the range check would wave a
 # 1.5 through. JSON's separator is always a period.
+#
+# Nothing below this line may carry a literal apostrophe, comment included: the
+# whole awk program is one single-quoted argument, and an apostrophe closes it.
 parse_json_root_value() {
-    printf '%s' "$2" | LC_ALL=C awk -v key="$1" -v strict="$3" -v kind="$4" '
+    printf '%s' "$2" | LC_ALL=C awk -v key="$1" -v dup_anywhere_fails="$3" -v kind="$4" '
     # The index of the quote closing the string opened at p, or past n if the
     # payload ends first (a trailing backslash makes p += 2 overshoot by one; both
     # callers only ask whether p > n, so the size of the overshoot never matters).
@@ -204,8 +204,7 @@ parse_json_root_value() {
                 # never wrote. json.loads refuses those bytes; so does this now.
                 # (A comma-separated ,"score":1.0 the agent smuggles in IS valid
                 # JSON that every parser reads as a score — a verifier escaping
-                # bug, not one this layer can or should second-guess. No literal
-                # apostrophe in this block: it sits inside the awk single quote.)
+                # bug, not one this layer can or should second-guess.)
                 if (isKey && prevSig != "{" && prevSig != ",") { ok = 0; break }
 
                 if (isKey && j - i == klen + 1 && substr(buf, i + 1, klen) == key) {
@@ -231,13 +230,15 @@ parse_json_root_value() {
         # carrying two of them at depth 1 has not said it once, and one that has
         # the key only inside a nested object has not said it at all.
         if (!(ok && rootClosed && rootCount == 1)) exit
-        # strict additionally poisons on a duplicate ANYWHERE. See the callers for
-        # why only score can afford it.
-        if (strict == 1 && totalCount != 1) exit
+        # See the wrappers for why only score can afford this.
+        if (dup_anywhere_fails == 1 && totalCount != 1) exit
 
         if (kind == "number") {
-            # Anchored, so "1.0abc" cannot coerce to 1.0, and range-checked, which
-            # also catches 1e400 (strtod takes it to +inf).
+            # Range-checked to [0, 1], which also catches 1e400 (strtod takes it to
+            # +inf). The exponent branch is not decoration: json.dumps emits 1e-05
+            # for any small float. The 1e-6 tolerance mirrors _SCORE_EPSILON in
+            # eb_verify.scorer_guard, so the shell and the guard admit exactly the
+            # same values.
             if (keyVal ~ /^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$/) {
                 x = keyVal + 0
                 if (x >= -1e-6 && x <= 1 + 1e-6) print keyVal
@@ -258,13 +259,28 @@ parse_json_root_value() {
     }'
 }
 
-# The score a checkpoint actually earned, or "" if it earned none. strict=1: a
-# score stated twice, at any depth, is not a score — score can afford the strictest
-# reading because failing closed sends it to the infra chain, which is a re-run
-# rather than a grade.
-parse_score() {
-    parse_json_root_value score "$1" 1 number
-}
+# The three keys the result document is built from, and the only callers of the
+# walker. Each fixes its key, its grammar, and how much duplication it refuses.
+#
+# Only score refuses a duplicate anywhere, because only score can afford to: an
+# unreadable score routes to the infra chain, which is a re-run — a safe escape.
+# The other two have no such escape. An unreadable passed becomes a recorded false,
+# indistinguishable from a real agent failure by the time it reaches
+# checkpoints_passed / all_passed and the pass-rate reporting; an unreadable detail
+# only loses a debugging aid, which is what lets it fail closed to "" at all.
+#
+# Depth-1 scoping, not duplicate-refusal, is what closes the bug behind this: a
+# diagnostics.passed flipping a 0.0 checkpoint, which is the ONLY passed a
+# depth-blind read finds on the 22 corpus verifiers that state no top-level one
+# (scorer_guard.py:335). Refusing duplicates on top of it would just point the same
+# fabrication the other way, recording passed=false at score=1.0 for the legitimate
+# {"score":1.0,"passed":true,"diagnostics":{"passed":true}}.
+#
+# detail keeps its quotes: it is the canonical string of verifier_output.schema.json
+# and is embedded verbatim into the result document below.
+parse_score()  { parse_json_root_value score  "$1" 1 number; }
+parse_passed() { parse_json_root_value passed "$1" 0 literal; }
+parse_detail() { parse_json_root_value detail "$1" 0 string; }
 
 # Discover repos in /workspace/ (directories with .git)
 discover_repos() {
@@ -554,35 +570,19 @@ for verifier in "$VERIFIER_DIR"/*.sh; do
     echo "--- Checkpoint: $name (weight=$weight, timeout=${checkpoint_timeout}s) ---" >&2
     run_verifier "$verifier" "$checkpoint_timeout"
 
-    # Already parsed and range-checked by run_verifier — never re-parse
-    # VERIFIER_JSON, which is raw verifier stdout on the good path.
+    # run_verifier BRANCHED on the score (the infra chain reads it to decide whether
+    # the verifier reached a verdict at all), so the document has to carry the very
+    # value that decision was made from — hence the variable, not a re-read of
+    # VERIFIER_JSON. passed and detail decided nothing upstream, so reading them off
+    # the payload here is not a second opinion on a settled question.
     checkpoint_score="$VERIFIER_SCORE"
 
-    # passed and detail come off the same walker as the score, at the same depth.
-    # A regex cannot see nesting, and json.dumps needs no adversary to produce a
-    # payload it reads wrong: a verifier that states its score and puts a stage
-    # flag in a diagnostics object hands an unanchored read a "passed": true that
-    # belongs to the diagnostic, not the verdict. scorer_guard.py:335 measures 22
-    # corpus verifiers with no top-level "passed" at all, so on those the nested
-    # one is the ONLY match there is — a 0.0 checkpoint recorded as a pass.
-    #
-    # strict=0 here, unlike score, and that is a decision rather than an oversight.
-    # Failing closed means something different for each key. A score the shell
-    # cannot read routes to the infra chain: a re-run, a safe escape. A passed it
-    # cannot read is a recorded false — a wrong data point indistinguishable from a
-    # real agent failure, feeding checkpoints_passed / all_passed and the pass-rate
-    # reporting downstream. Under strict=1 the legitimate payload
-    # {"score":1.0,"passed":true,"diagnostics":{"passed":true}} records passed=false
-    # at score=1.0, fabricating a FAIL. Depth-1 scoping already refuses the nested
-    # key in both directions; going strict on top of it would only trade the
-    # fabricated pass for a fabricated fail.
-    checkpoint_passed=$(parse_json_root_value passed "$VERIFIER_JSON" 0 literal)
+    # Defaults are the shell's, not the walker's: it prints nothing when the payload
+    # states no root value it can trust.
+    checkpoint_passed=$(parse_passed "$VERIFIER_JSON")
     [ -n "$checkpoint_passed" ] || checkpoint_passed="false"
 
-    # The canonical "detail" string (verifier_output.schema.json), as a JSON string
-    # token with its escapes intact, so it can be embedded verbatim below.
-    # Preserved per-checkpoint in output.json for debugging; empty when absent.
-    checkpoint_detail=$(parse_json_root_value detail "$VERIFIER_JSON" 0 string)
+    checkpoint_detail=$(parse_detail "$VERIFIER_JSON")
     [ -n "$checkpoint_detail" ] || checkpoint_detail='""'
 
     if [ "$VERIFIER_RAN" != "true" ]; then

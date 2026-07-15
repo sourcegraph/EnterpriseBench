@@ -785,12 +785,6 @@ DETAIL_READ = {
     # A nested detail either side of the real one. The mirror pins the rule rather
     # than the reading order — the vector a "take the first match" reader gets
     # wrong is the one a last-match reader gets right, and only depth gets both.
-    #
-    # Neither is a first-match read in practice, which is worth spelling out: the
-    # old extraction passed grep -m1 and looked bounded, but -m1 stops after the
-    # first matching LINE, while -o prints EVERY match on it. json.dumps emits one
-    # line, so both of these returned two tokens and corrupted the document. The
-    # flag read as a fix for exactly the bug it did not fix.
     "nested_before_real": (
         '{"score": 0.0, "diagnostics": {"detail": "inner"}, "detail": "outer"}',
         "outer",
