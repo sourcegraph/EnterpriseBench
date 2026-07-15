@@ -31,8 +31,17 @@ except ImportError:
     except ImportError:
         tomllib = None
 
-from orchestration.session import SessionConfig, SessionResult, run_session
-from orchestration.milestone import SessionScore, run_session_milestones
+from orchestration.session import (
+    SessionConfig,
+    SessionFailure,
+    SessionResult,
+    run_session,
+)
+from orchestration.milestone import (
+    MilestoneResult,
+    SessionScore,
+    run_session_milestones,
+)
 from orchestration.runner_cli import add_passthrough_args
 from eb_verify.scorer_guard import InfraError
 
@@ -55,6 +64,28 @@ def _session_failure(session_number: int, detail: str) -> dict:
         detail=detail,
         context={"session_number": session_number},
     ).as_verifier_error()
+
+
+def _agent_failure(failure: SessionFailure, session_number: int) -> dict:
+    """The MODEL failed the task, so the chain has a score: the 0.0 it earned.
+
+    Deliberately NOT an :class:`InfraError`. That class is the choke point for the
+    invalidity channels — everything built through it means "no verdict, re-run" —
+    and an agent failure is the opposite claim: a real measurement that belongs in
+    the results table. Reusing the shape would put this run one ``is_invalid``
+    reader away from the exclusion it exists to avoid.
+
+    ``detail`` arrives already scrubbed from :class:`SessionFailure`, which
+    applies the same redact-then-bound rule ``InfraError`` does (bead otgzo). This
+    dict reaches the same three sinks, so it inherits the guarantee rather than
+    re-deriving it — or forgetting to.
+    """
+    return {
+        "reason": failure.reason,
+        "stage": failure.stage,
+        "detail": failure.detail,
+        "session_number": session_number,
+    }
 
 
 def _no_agent_configured() -> dict:
@@ -98,12 +129,19 @@ class ChainResult:
 
     * ``verifier_infra_error`` — a milestone verifier never reached a verdict, so
       there is no score to record.
-    * ``session_failure`` — a configured session never completed, so the agent
-      never did the work the checkpoints would be scoring.
+    * ``session_failure`` — a configured session never completed for a reason that
+      is not the model's, so the agent never did the work the checkpoints would be
+      scoring.
     * ``agent_not_configured`` — no agent was wired into the chain at all, so no
       session ran and the remedy is a harness, not a re-run.
 
     They are independent, and each is reported when it occurs.
+
+    ``agent_failure`` is NOT one of them. It records that the MODEL failed the
+    task, which is a real measurement worth exactly the 0.0 it earned, so the run
+    keeps its score and stays in the results table. Excluding it would be the
+    upward bias described on :class:`~orchestration.session.AgentFailure`, which
+    is where the failure gets typed (bead jma9y).
 
     ``simulated`` records that the score came from marker files the scaffold wrote,
     not from agent work; nothing else on the result distinguishes the two.
@@ -119,10 +157,15 @@ class ChainResult:
     verifier_infra_error: Optional[dict] = None
     session_failure: Optional[dict] = None
     agent_not_configured: Optional[dict] = None
+    agent_failure: Optional[dict] = None
 
     @property
     def is_invalid(self) -> bool:
-        """True if this chain has no score, for any reason."""
+        """True if this chain has no score, for any reason.
+
+        ``agent_failure`` is absent by design: the model failing is a verdict, not
+        the absence of one.
+        """
         return (
             self.session_failure is not None
             or self.verifier_infra_error is not None
@@ -155,6 +198,13 @@ class ChainResult:
                         f"(no verdict: {m.infra_error.cause}) {m.infra_error.detail}"
                     )
                     continue
+                if m.not_reached:
+                    # Not "FAIL": no verifier ran. The zero is the work not done,
+                    # not a verdict on work that was.
+                    lines.append(
+                        f"    {m.milestone_name}: NOT REACHED (0.00) {m.message}"
+                    )
+                    continue
                 status = "PASS" if m.passed else "FAIL"
                 lines.append(
                     f"    {m.milestone_name}: {status} ({m.score:.2f}) {m.message}"
@@ -185,6 +235,17 @@ class ChainResult:
 
         if self.is_invalid:
             return "\n".join(lines)
+
+        # Reported alongside the score, never instead of it: the run is valid and
+        # the number below is the one the model earned by failing.
+        if self.agent_failure is not None:
+            lines.append(
+                f"\nAGENT FAILURE — the agent failed session "
+                f"{self.agent_failure['session_number']} of {self.total_sessions} "
+                f"({self.agent_failure['reason']}); the chain is scored on the work "
+                f"it completed before then. This is a real result, not a re-run."
+            )
+            lines.append(f"  {self.agent_failure['detail']}")
 
         # A None score with no infra error means no milestone ran at all. Render it
         # as unscored — the fields used to default to 0.0 and print that as earned.
@@ -265,6 +326,13 @@ def _validate_chain_task(task_def: ChainTaskDefinition) -> None:
             f"{len(task_def.sessions)} session(s) defined — the chain cannot be scored "
             f"against a session count it does not have"
         )
+    if not task_def.final_checkpoints:
+        raise ValueError(
+            f"chain {task_def.task_id}: no final checkpoints — they are the only "
+            f"measure of whether the chain's task got done, and without them an "
+            f"agent that dies mid-chain scores only the milestones it passed first, "
+            f"which the agent-failure path would publish as its total"
+        )
 
 
 def _log_chain_outcome(chain_result: ChainResult) -> None:
@@ -290,6 +358,13 @@ def _log_chain_outcome(chain_result: ChainResult) -> None:
         return
     if chain_result.total_score is None:
         logger.info("Chain complete. No milestones scored.")
+    elif chain_result.agent_failure is not None:
+        logger.info(
+            "Chain scored. The agent failed session %d (%s) and earned %.2f.",
+            chain_result.agent_failure["session_number"],
+            chain_result.agent_failure["reason"],
+            chain_result.total_score,
+        )
     else:
         logger.info("Chain complete. Total score: %.2f", chain_result.total_score)
 
@@ -379,18 +454,30 @@ def run_chain(
         )
         chain_result.session_results.append(session_result)
 
-        if not session_result.success:
-            logger.error("Session %d failed, aborting chain.", session_num)
-            chain_result.session_failure = _session_failure(
-                session_number=session_num,
-                detail=session_result.error or "session did not complete",
-            )
+        # Read the type; never re-derive it from the message. The stage that
+        # raised is the only place that knew whose failure it was.
+        failure = session_result.failure
+        if failure is not None:
+            if failure.is_agent:
+                logger.error(
+                    "Session %d: the agent failed the task (%s) — scoring the chain "
+                    "on what it managed before it died.",
+                    session_num,
+                    failure.reason,
+                )
+                chain_result.agent_failure = _agent_failure(failure, session_num)
+            else:
+                logger.error("Session %d failed, aborting chain.", session_num)
+                chain_result.session_failure = _session_failure(
+                    session_number=session_num, detail=failure.detail
+                )
             break
 
         previous_branch_state = session_result.branch_state
 
-        # Run milestones between sessions (not after the final one)
-        if session_config.milestones and session_num < task_def.session_count:
+        if session_config.milestones and _milestones_apply(
+            session_num, task_def.session_count
+        ):
             milestone_score = run_session_milestones(
                 milestones=session_config.milestones,
                 workspace_path=workspace_root,
@@ -399,11 +486,19 @@ def run_chain(
             )
             chain_result.milestone_scores.append(milestone_score)
 
-    # Gated on every session: the checkpoints score whatever is on disk, so on a
-    # workspace the agent never worked in they reach real verdicts, not failures.
+    if chain_result.agent_failure is not None:
+        _zero_fill_unreached_milestones(chain_result, task_def)
+
+    # The checkpoints score whatever is on disk, so they must not run on a
+    # workspace whose provenance is unknown: after an INFRA failure what is there
+    # is a harness artifact, not the model's work, and scoring it reaches a real
+    # verdict on the wrong thing. After an AGENT failure the workspace is exactly
+    # what the model managed before it died, which is what it earned.
+    #
+    # `final_checkpoints` is non-empty by validation, so it is not re-checked here.
     if (
-        task_def.final_checkpoints
-        and chain_result.sessions_completed == task_def.session_count
+        chain_result.sessions_completed == task_def.session_count
+        or chain_result.agent_failure is not None
     ):
         final_milestone = run_session_milestones(
             milestones=[
@@ -419,6 +514,64 @@ def run_chain(
     _compute_total_score(chain_result, task_def)
     _log_chain_outcome(chain_result)
     return chain_result
+
+
+def _milestones_apply(session_num: int, session_count: int) -> bool:
+    """Whether a session's milestones are part of the chain's score at all.
+
+    The last session's are not: the final checkpoints measure that session's work,
+    so running milestones on it too would score the same thing twice.
+
+    One definition, two callers — the loop that RUNS milestones and the zero-fill
+    that scores the ones the agent never reached. Written as two separate
+    comparisons the pair can drift into disagreeing, and the drift is silent: a
+    fill for a milestone the healthy path would never have run invents a penalty
+    that only agents who die pay.
+    """
+    return session_num < session_count
+
+
+def _zero_fill_unreached_milestones(
+    chain_result: ChainResult, task_def: ChainTaskDefinition
+) -> None:
+    """Score 0.0 for the milestones the agent died before reaching.
+
+    Dropping them instead would shrink the denominator and reweight the milestones
+    the agent DID pass — the partial mean ``SessionScore.total_score`` refuses to
+    compute, arriving one level up. The agent earned these zeros by not getting to
+    them.
+
+    This is a fill, not a verdict: the verifier never ran, so there is no
+    measurement here, only the fact that the work it would have measured was never
+    done. That is why ``infra_error`` stays ``None`` — nothing broke — and why
+    this runs on the AGENT path alone. The identical zero on an infra failure
+    would be the false zero of bead s58f: there, the work may well have been done
+    and the harness is what broke.
+    """
+    for session_config in task_def.sessions:
+        session_num = session_config.session_number
+        if not session_config.milestones or not _milestones_apply(
+            session_num, task_def.session_count
+        ):
+            continue
+        if session_num <= chain_result.sessions_completed:
+            continue
+        chain_result.milestone_scores.append(
+            SessionScore(
+                session_number=session_num,
+                milestones=[
+                    MilestoneResult(
+                        session_number=session_num,
+                        milestone_name=m["name"],
+                        passed=False,
+                        score=0.0,
+                        message="the agent never reached this milestone",
+                        not_reached=True,
+                    )
+                    for m in session_config.milestones
+                ],
+            )
+        )
 
 
 def _compute_total_score(chain_result: ChainResult, task_def: ChainTaskDefinition):
@@ -532,7 +685,14 @@ def main():
         "sessions_total": result.total_sessions,
         "simulated": result.simulated,
     }
-    for channel in ("verifier_infra_error", "session_failure", "agent_not_configured"):
+    for channel in (
+        "verifier_infra_error",
+        "session_failure",
+        "agent_not_configured",
+        # Not an invalidity channel: it travels WITH a score, telling a reader the
+        # number is a zero the model earned rather than one it never attempted.
+        "agent_failure",
+    ):
         cause = getattr(result, channel)
         if cause is not None:
             payload[channel] = cause

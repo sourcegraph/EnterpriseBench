@@ -32,16 +32,23 @@ sys.path.insert(0, str(REPO_ROOT / "lib"))
 from eb_verify.redact import MAX_DETAIL_CHARS, bound, redact, safe_detail
 from eb_verify.scorer_guard import InfraError, guard_checkpoint_verdict
 from orchestration.chain_runner import ChainTaskDefinition, run_chain
-from orchestration.session import SessionConfig
+from orchestration.session import AgentFailure, SessionConfig
 
 # Shaped like a real Anthropic key so the pattern is exercised, but not one.
 FAKE_KEY = "sk-ant-api03-" + "A" * 40
 
 
 def task_def() -> ChainTaskDefinition:
-    """The smallest chain that reaches the session channel: one session, no
-    checkpoints. Built here rather than imported from its sibling module, per
-    this corpus's convention of keeping each vector's fixtures standalone."""
+    """The smallest chain that reaches the session channel: one session, and the
+    one final checkpoint every chain must declare. Built here rather than imported
+    from its sibling module, per this corpus's convention of keeping each vector's
+    fixtures standalone.
+
+    On the infra vectors the checkpoint never runs — the session dies first and an
+    infra failure gates the final checkpoints off — so its verifier stays a path
+    that satisfies validation and nothing more. The agent vectors DO run it, and
+    call ``write_checkpoint`` to put a real script at that path.
+    """
     return ChainTaskDefinition(
         task_id="chain-redaction",
         suite="customer_escalation",
@@ -49,7 +56,7 @@ def task_def() -> ChainTaskDefinition:
         session_count=1,
         repos=[{"path": "repo-a"}],
         sessions=[SessionConfig(session_number=1, prompt="session 1")],
-        final_checkpoints=[],
+        final_checkpoints=[{"name": "cp", "weight": 1.0, "verifier": "checks/cp.sh"}],
     )
 
 
@@ -239,3 +246,82 @@ class TestSessionFailureChannel:
         the session died."""
         result = self._run(tmp_path, "connection refused to localhost:8080")
         assert "connection refused to localhost:8080" in result.session_failure["detail"]
+
+
+# ---------------------------------------------------------------------------
+# agent_failure — not an invalidity channel, but the same untrusted text
+# ---------------------------------------------------------------------------
+
+
+def write_checkpoint(task_dir: Path) -> None:
+    """Materialize the checkpoint ``task_def`` only declares.
+
+    An agent failure is SCORED, so unlike the infra vectors it runs the final
+    checkpoints. Left as a bare path the verifier would reach no verdict, set
+    ``verifier_infra_error``, and divert these tests into the channel above —
+    where they would pass while asserting nothing about the agent one.
+    """
+    checks = task_dir / "checks"
+    checks.mkdir(exist_ok=True)
+    script = checks / "cp.sh"
+    script.write_text('#!/bin/sh\necho \'{"score": 0.0}\'\nexit 0\n')
+    script.chmod(0o755)
+
+
+class TestAgentFailureChannel:
+    """The declared channel carries the same untrusted text, and one field more.
+
+    Declaring whose fault the failure was says nothing about what text it
+    carries: an adapter builds ``detail`` from the provider's response exactly as
+    an undeclared exception does. ``reason`` is the field the channel above never
+    has to scrub — every infra reason is the harness constant ``f"{stage}_error"``,
+    so an ``AgentFailure``'s adapter-supplied key is scrubbed here or nowhere.
+    """
+
+    def _run(self, tmp_path: Path, reason: str, detail: str):
+        write_checkpoint(tmp_path)
+
+        def agent(workspace: str, prompt: str) -> str:
+            raise AgentFailure(reason, detail)
+
+        return run_chain(
+            task_def(),
+            workspace_root=str(tmp_path / "ws"),
+            agent_callable=agent,
+            task_dir=str(tmp_path),
+        )
+
+    def test_detail_reaches_no_sink_with_its_secret(self, tmp_path) -> None:
+        result = self._run(
+            tmp_path, "provider_error", f'401 {{"message": "invalid {FAKE_KEY}"}}'
+        )
+
+        assert result.agent_failure is not None, "the agent channel, not the infra one"
+        assert FAKE_KEY not in result.agent_failure["detail"], "persisted sink"
+        assert FAKE_KEY not in result.summary(), "stdout sink"
+        assert FAKE_KEY not in result.session_results[0].error, "the source field"
+
+    def test_reason_is_scrubbed_though_no_infra_reason_ever_needs_it(
+        self, tmp_path
+    ) -> None:
+        """``InfraError`` leaves its own ``reason`` alone, and correctly: those are
+        harness-authored constants. This one is the adapter's string, so an adapter
+        that passes a response body as its machine key publishes it verbatim."""
+        result = self._run(tmp_path, f"auth_failed_{FAKE_KEY}", "boom")
+
+        assert FAKE_KEY not in result.agent_failure["reason"], "persisted sink"
+        assert FAKE_KEY not in result.summary(), "stdout sink — summary prints reason"
+
+    def test_runaway_reason_cannot_flood_the_sinks(self, tmp_path) -> None:
+        result = self._run(tmp_path, "x" * 100_000, "boom")
+        assert len(result.agent_failure["reason"]) == MAX_DETAIL_CHARS
+
+    def test_the_failure_still_reads_as_the_failure(self, tmp_path) -> None:
+        """The negative control. ``reason`` is routed on downstream, so scrubbing
+        that mangled an ordinary machine key would break the channel it protects."""
+        result = self._run(
+            tmp_path, "context_budget_exhausted", "the agent exhausted its context"
+        )
+
+        assert result.agent_failure["reason"] == "context_budget_exhausted"
+        assert result.agent_failure["detail"] == "the agent exhausted its context"

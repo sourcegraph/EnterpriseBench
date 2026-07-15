@@ -35,7 +35,7 @@ from orchestration.chain_runner import (
     ChainTaskDefinition,
     run_chain,
 )
-from orchestration.session import SessionConfig
+from orchestration.session import AgentFailure, SessionConfig
 
 
 def write_verifier(task_dir: Path, name: str, body: str) -> str:
@@ -70,6 +70,17 @@ def verifier_ran(task_dir: Path, name: str = "final.sh") -> bool:
     return (task_dir / f"{name}.ran").exists()
 
 
+def final_checkpoints(
+    task_dir: Path, score: float = 1.0, name: str = "final.sh"
+) -> list[dict]:
+    """The final-checkpoint set every chain task must define — they are the only
+    measure of whether the chain's task got done, so ``_validate_chain_task``
+    rejects a chain without them."""
+    return [
+        {"name": "cp", "weight": 1.0, "verifier": scoring_verifier(task_dir, score, name)}
+    ]
+
+
 def task_def(
     session_count: int,
     final_checkpoints: list[dict] | None = None,
@@ -95,8 +106,12 @@ def task_def(
     )
 
 
-def agent_failing_at(session_number: int | None):
+def agent_failing_at(session_number: int | None, exc: Exception | None = None):
     """An agent that works normally until ``session_number``, then dies.
+
+    ``exc`` defaults to a bare ``RuntimeError`` — an UNDECLARED failure, which the
+    session layer must classify as infra. Pass an ``AgentFailure`` to model an
+    adapter declaring the model's own failure.
 
     ``None`` never fails — the healthy agent the negative controls need.
     """
@@ -105,7 +120,7 @@ def agent_failing_at(session_number: int | None):
     def agent(workspace: str, prompt: str) -> str:
         calls["n"] += 1
         if calls["n"] == session_number:
-            raise RuntimeError("agent died")
+            raise exc or RuntimeError("agent died")
         (Path(workspace) / "repo-a" / f"session_{calls['n']}.md").write_text("work\n")
         return f"session {calls['n']} done"
 
@@ -122,11 +137,7 @@ class TestFailedSessionIsNeverAScore:
     ):
         """THE BUG. Two sessions configured, the agent dies in session 1. The
         final checkpoints used to run anyway and hand the chain a perfect 1.0."""
-        verifier = scoring_verifier(tmp_path, 1.0)
-        td = task_def(
-            session_count=2,
-            final_checkpoints=[{"name": "cp", "weight": 1.0, "verifier": verifier}],
-        )
+        td = task_def(session_count=2, final_checkpoints=final_checkpoints(tmp_path))
 
         result = run_chain(
             td,
@@ -154,6 +165,7 @@ class TestFailedSessionIsNeverAScore:
         milestone = scoring_verifier(tmp_path, 1.0, name="m1.sh")
         td = task_def(
             session_count=2,
+            final_checkpoints=final_checkpoints(tmp_path),
             session_milestones={1: [{"name": "m1", "verifier": milestone}]},
         )
 
@@ -168,6 +180,10 @@ class TestFailedSessionIsNeverAScore:
         assert result.milestone_scores[0].total_score == pytest.approx(1.0)
         assert result.session_failure["session_number"] == 2
         assert result.total_score is None, "one passing milestone is not a chain score"
+        assert not verifier_ran(tmp_path), (
+            "an infra failure leaves a workspace that is a harness artifact, not "
+            "the model's work — the final checkpoints must not measure it"
+        )
 
     def test_a_broken_verifier_and_a_failed_session_are_both_reported(self, tmp_path):
         """An operator needs both signals: fixing the verifier would not make this
@@ -175,6 +191,7 @@ class TestFailedSessionIsNeverAScore:
         broken = write_verifier(tmp_path, "broken.sh", "#!/bin/sh\nexit 0\n")
         td = task_def(
             session_count=2,
+            final_checkpoints=final_checkpoints(tmp_path),
             session_milestones={1: [{"name": "m1", "verifier": broken}]},
         )
 
@@ -191,12 +208,7 @@ class TestFailedSessionIsNeverAScore:
         assert result.total_score is None
 
     def test_summary_renders_invalid_run_instead_of_a_number(self, tmp_path):
-        td = task_def(
-            session_count=2,
-            final_checkpoints=[
-                {"name": "cp", "weight": 1.0, "verifier": scoring_verifier(tmp_path, 1.0)}
-            ],
-        )
+        td = task_def(session_count=2, final_checkpoints=final_checkpoints(tmp_path))
 
         text = run_chain(
             td,
@@ -220,17 +232,35 @@ class TestTheGateCannotBeSilentlyDefeated:
         checkpoints would run and score an empty workspace no agent ever touched —
         the same fabrication, reached through a degenerate config instead of a
         failed session."""
-        td = task_def(
-            session_count=0,
-            final_checkpoints=[
-                {"name": "cp", "weight": 1.0, "verifier": scoring_verifier(tmp_path, 1.0)}
-            ],
-        )
+        td = task_def(session_count=0, final_checkpoints=final_checkpoints(tmp_path))
 
         with pytest.raises(ValueError, match="no sessions"):
             run_chain(td, workspace_root=str(tmp_path / "ws"), task_dir=str(tmp_path))
 
         assert not verifier_ran(tmp_path)
+
+    def test_a_chain_with_no_final_checkpoints_is_rejected(self, tmp_path):
+        """The final checkpoints are the only measure of whether the task got
+        done. Without them a chain that died at session 2 scores the milestones
+        session 1 passed — a 1.0 for a chain the agent never finished — and the
+        agent-failure path would publish it, because an agent failure IS scored."""
+        td = task_def(
+            session_count=2,
+            final_checkpoints=[],
+            session_milestones={
+                1: [{"name": "m1", "verifier": scoring_verifier(tmp_path, 1.0, "m1.sh")}]
+            },
+        )
+
+        with pytest.raises(ValueError, match="no final checkpoints"):
+            run_chain(
+                td,
+                workspace_root=str(tmp_path / "ws"),
+                agent_callable=agent_failing_at(2, AgentFailure("gave_up")),
+                task_dir=str(tmp_path),
+            )
+
+        assert not verifier_ran(tmp_path, "m1.sh")
 
     def test_a_task_def_with_fewer_sessions_than_session_count_is_rejected(
         self, tmp_path
@@ -239,7 +269,7 @@ class TestTheGateCannotBeSilentlyDefeated:
         the chain exits 0 with no score — recorded as a completed run. Reachable
         without the parser: ChainTaskDefinition is a mutable dataclass, and callers
         (including tests in this repo) build one directly."""
-        td = task_def(session_count=2)
+        td = task_def(session_count=2, final_checkpoints=final_checkpoints(tmp_path))
         td.sessions = td.sessions[:1]
 
         with pytest.raises(ValueError, match="session_count=2 but 1 session"):
@@ -255,10 +285,7 @@ class TestHealthyChainStillScores:
     def test_every_session_completing_scores_the_final_checkpoints(self, tmp_path):
         """The fix must not stop a real chain from scoring."""
         td = task_def(
-            session_count=2,
-            final_checkpoints=[
-                {"name": "cp", "weight": 1.0, "verifier": scoring_verifier(tmp_path, 0.5)}
-            ],
+            session_count=2, final_checkpoints=final_checkpoints(tmp_path, 0.5)
         )
 
         result = run_chain(

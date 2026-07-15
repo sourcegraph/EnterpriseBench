@@ -33,6 +33,14 @@ class MilestoneResult:
     reached a verdict, so there is no score to record. Callers must not
     substitute a number for it — a placeholder 0.0 is a false zero that blames
     the agent for a broken harness, and a placeholder 1.0 is free credit.
+
+    ``not_reached`` marks the one 0.0 this rule permits without a verifier having
+    run: the chain ended in an agent failure before this milestone's session, so
+    the work it would measure was never done (bead jma9y). It is scored rather
+    than dropped because dropping it would shrink the denominator and reweight the
+    milestones the agent did pass. The flag is what keeps it from being the very
+    placeholder the paragraph above forbids — a reader can tell this zero from a
+    verifier's real one, and check the claim behind it.
     """
 
     session_number: int
@@ -41,6 +49,7 @@ class MilestoneResult:
     score: Optional[float]  # 0.0 to 1.0; None iff infra_error is set
     message: str = ""
     infra_error: Optional[InfraError] = None
+    not_reached: bool = False
 
     def __post_init__(self) -> None:
         # The aggregators sum `score` unguarded, so an ill-formed result is either a
@@ -50,6 +59,20 @@ class MilestoneResult:
                 f"milestone {self.milestone_name!r}: exactly one of score/infra_error "
                 f"must be set — a verifier either reached a verdict or it did not "
                 f"(score={self.score!r}, infra_error={self.infra_error!r})"
+            )
+        # An unreached milestone is the one scored 0.0 without a verifier; it may
+        # not be anything else. Left unguarded, the flag becomes a way to launder
+        # an arbitrary number past the rule it is an exception to. `passed` is
+        # checked too: a milestone the agent never reached cannot have been passed,
+        # and `all_passed` reads that field without consulting the score.
+        if self.not_reached and (
+            self.score != 0.0 or self.infra_error is not None or self.passed
+        ):
+            raise ValueError(
+                f"milestone {self.milestone_name!r}: not_reached means the agent "
+                f"never got here, which is a failed 0.0 and nothing else "
+                f"(score={self.score!r}, passed={self.passed!r}, "
+                f"infra_error={self.infra_error!r})"
             )
 
 

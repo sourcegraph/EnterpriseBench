@@ -108,7 +108,13 @@ class TestRunChainModePassthrough:
                 default_factory=lambda: [{"path": "repo1", "url": "x", "rev": "y"}]
             )
             sessions: list = field(default_factory=list)
-            final_checkpoints: list = field(default_factory=list)
+            # A chain task without final checkpoints is rejected at validation,
+            # which runs before mode is propagated.
+            final_checkpoints: list = field(
+                default_factory=lambda: [
+                    {"name": "cp", "weight": 1.0, "verifier": "checks/cp.sh"}
+                ]
+            )
             metadata: dict = field(default_factory=dict)
             simulation: dict = field(default_factory=dict)
 
@@ -119,7 +125,8 @@ class TestRunChainModePassthrough:
         with patch("orchestration.chain_runner.run_session") as mock_run:
             from orchestration.session import SessionResult
 
-            mock_run.return_value = SessionResult(session_number=1, success=True)
+            # success is derived from `failure`, so a result with none succeeded.
+            mock_run.return_value = SessionResult(session_number=1)
             try:
                 run_chain(task_def=task_def, simulate=True, mode="hybrid")
             except Exception:

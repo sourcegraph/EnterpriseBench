@@ -30,6 +30,77 @@ from .branch_manager import (
 logger = logging.getLogger(__name__)
 
 
+# Who earned a session's failure. The chain's whole disposition turns on this:
+# an AGENT failure is scored, an INFRA failure is routed to the re-run channel.
+AGENT_FAILURE = "agent"
+INFRA_FAILURE = "infra"
+
+
+class AgentFailure(Exception):
+    """The MODEL failed the task — an earned 0.0, not an infrastructure fault.
+
+    An agent adapter raises this to declare that the failure is the agent's own:
+    it exhausted its context or turn budget, gave up, produced nothing, or
+    crashed its own loop. The chain SCORES such a session instead of routing it
+    to the re-run channel. Excluding it would compute a model's reported mean
+    only over the runs its agent happened to survive, so a model that reliably
+    blows its budget on hard chains would never receive the zeros it earned —
+    an upward bias, and the same over-credit family the scorer guard exists to
+    close, arriving through the exclusion channel instead of the scoring one.
+
+    Nothing infers this. Every other exception out of the agent is UNCLASSIFIED
+    and routes to the re-run channel, because the alternative — reading budget
+    exhaustion out of an arbitrary traceback — is a guess, and a wrong guess in
+    that direction blames the model for a broken harness. That is the false-zero
+    bug (beads s58f, hktt/pt0n) this codebase already closed once. Only the
+    adapter driving the model knows which failure it saw, so only the adapter
+    may say so.
+    """
+
+    def __init__(self, reason: str, detail: str = "") -> None:
+        self.reason = reason  # machine key, e.g. "context_budget_exhausted"
+        self.detail = detail or reason
+        super().__init__(self.detail)
+
+
+@dataclass(frozen=True)
+class SessionFailure:
+    """Why a session did not complete, and who earned it.
+
+    ``kind`` is set at the only place that can know it — the stage that raised —
+    and is never re-derived downstream from a message string.
+
+    ``detail`` and ``reason`` are scrubbed on construction, the same rule and for
+    the same reason as :class:`~eb_verify.scorer_guard.InfraError` (bead otgzo):
+    they are built from text this harness does not author — the agent's own
+    exception, declared or not — and reach three sinks that keep them verbatim
+    (``chain_result.json``, stdout via ``ChainResult.summary``, and
+    ``logger.error``). The agent runs with ``ANTHROPIC_API_KEY`` in its
+    environment. Scrubbing here rather than at each sink is what makes it
+    impossible for a caller to forget, and an ``AgentFailure`` is exactly as
+    untrusted as an undeclared one — declaring whose fault the failure was says
+    nothing about what text it carries.
+
+    ``reason`` is scrubbed too, where ``InfraError`` leaves its own alone: that
+    class's reasons are harness-authored constants, but an ``AgentFailure``'s
+    comes from the adapter, and an adapter that passes a response body as its
+    machine key would otherwise publish it unbounded.
+    """
+
+    kind: str  # AGENT_FAILURE | INFRA_FAILURE
+    reason: str  # machine key, e.g. "context_budget_exhausted" | "commit_error"
+    detail: str
+    stage: str  # setup | agent | commit
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "detail", safe_detail(self.detail))
+        object.__setattr__(self, "reason", safe_detail(self.reason))
+
+    @property
+    def is_agent(self) -> bool:
+        return self.kind == AGENT_FAILURE
+
+
 @dataclass
 class SessionConfig:
     """Configuration for a single session within a chain."""
@@ -43,13 +114,25 @@ class SessionConfig:
 
 @dataclass
 class SessionResult:
-    """Result of running a single session."""
+    """Result of running a single session.
+
+    ``success`` and ``error`` are derived from ``failure`` rather than stored
+    beside it: a session either completed or carries the reason it did not, and
+    two fields that can disagree let a caller read one and miss the other.
+    """
 
     session_number: int
     branch_state: BranchState | None = None
     agent_output: str = ""
-    success: bool = False
-    error: str = ""
+    failure: SessionFailure | None = None
+
+    @property
+    def success(self) -> bool:
+        return self.failure is None
+
+    @property
+    def error(self) -> str:
+        return self.failure.detail if self.failure is not None else ""
 
 
 def setup_workspace(
@@ -161,6 +244,14 @@ def run_session(
     3. Commit results to session branch
     4. Return result with branch state
 
+    A failure is classified by the stage that raised it, because that is the only
+    place that knows whose failure it is. Setup and commit are the harness's own
+    code, so anything they raise is INFRA. Only the agent stage can produce an
+    :class:`AgentFailure`, and only if the adapter declares one — an undeclared
+    exception out of the agent is INFRA too, so an unrecognised failure fails
+    closed into the re-run channel rather than into a zero the model may not have
+    earned.
+
     Args:
         agent_callable: callable(workspace_path, prompt) -> str. Required unless
                        ``simulate`` is set.
@@ -186,6 +277,7 @@ def run_session(
     logger.info("=== Starting session %d for task %s ===", session_num, task_id)
 
     result = SessionResult(session_number=session_num)
+    stage = "setup"
 
     try:
         # 1. Setup
@@ -198,6 +290,7 @@ def run_session(
         )
 
         # 2. Run agent or simulate
+        stage = "agent"
         if simulate:
             agent_output = simulate_agent_work(
                 workspace_path=workspace_path,
@@ -211,6 +304,7 @@ def run_session(
         result.agent_output = agent_output
 
         # 3. Commit to session branch in ALL repos
+        stage = "commit"
         branch_state = None
         for repo in repos:
             repo_path = str(Path(workspace_root) / repo["path"])
@@ -223,7 +317,6 @@ def run_session(
             if branch_state is None:
                 branch_state = bs  # Use first repo as primary branch state
         result.branch_state = branch_state
-        result.success = True
 
         logger.info(
             "Session %d completed. Branch: %s, SHA: %s",
@@ -232,14 +325,35 @@ def run_session(
             branch_state.commit_sha[:8],
         )
 
-    except Exception as e:
-        # Scrubbed at birth, not at the sinks. `error` is read back by
-        # `ChainResult.summary` verbatim as well as wrapped into the
-        # `session_failure` channel, so redacting it downstream would leave the
-        # summary path — which prints to stdout — carrying the raw exception.
-        # The agent runs with ANTHROPIC_API_KEY in its environment and this
-        # `except` catches whatever it raises, response bodies included.
-        result.error = safe_detail(e)
-        logger.error("Session %d failed: %s", session_num, result.error)
+    except Exception as exc:
+        # An AgentFailure counts as the agent's only from the agent stage, and only
+        # when a real agent ran. The claim "the model failed" is the adapter's
+        # alone: the same exception out of setup or commit is harness code wearing
+        # the agent's name, and out of `simulate_agent_work` it is a zero charged
+        # to a model that never ran at all. Both would score a session the model
+        # may well have completed.
+        if isinstance(exc, AgentFailure) and stage == "agent" and not simulate:
+            result.failure = SessionFailure(
+                kind=AGENT_FAILURE, reason=exc.reason, detail=exc.detail, stage=stage
+            )
+        else:
+            # Everything else fails closed to INFRA. The detail carries the
+            # exception type because `str(exc)` is empty for a bare `raise
+            # IndexError`, and an operator sent to re-run needs more than a blank.
+            result.failure = SessionFailure(
+                kind=INFRA_FAILURE,
+                reason=f"{stage}_error",
+                detail=f"{type(exc).__name__}: {exc}",
+                stage=stage,
+            )
+        # Log off the constructed failure, never `exc` — the raw text is what
+        # carries the credential.
+        logger.error(
+            "Session %d failed during %s (%s): %s",
+            session_num,
+            stage,
+            result.failure.kind,
+            result.failure.detail,
+        )
 
     return result

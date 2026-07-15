@@ -274,6 +274,51 @@ class TestMilestoneResultInvariantIsStructural:
             )
 
 
+class TestNotReachedCannotBeAnythingElse:
+    """``not_reached`` is the one 0.0 permitted without a verifier having run: the
+    chain died of an agent failure before this milestone's session, so the work it
+    would measure was never done (bead jma9y).
+
+    It is the exception to the rule above, which makes it the way around that rule
+    if it is not itself constrained. Each field it implies is enforced here, or the
+    flag becomes a laundering channel for exactly the placeholder the class exists
+    to reject.
+    """
+
+    def test_a_nonzero_score_is_rejected(self):
+        with pytest.raises(ValueError, match="nothing else"):
+            MilestoneResult(1, "m", passed=False, score=1.0, not_reached=True)
+
+    def test_claiming_to_have_passed_is_rejected(self):
+        """`all_passed` reads `passed` without consulting the score, so a
+        not_reached milestone that claims it passed would report a chain's
+        milestones as all green on work the agent never got to."""
+        with pytest.raises(ValueError, match="nothing else"):
+            MilestoneResult(1, "m", passed=True, score=0.0, not_reached=True)
+
+    def test_carrying_an_infra_error_is_rejected(self):
+        """The two are opposite claims: not_reached says nothing broke and the
+        agent simply never arrived; infra_error says the harness failed and the run
+        has no score at all."""
+        with pytest.raises(ValueError, match="reached a verdict|nothing else"):
+            MilestoneResult(
+                1,
+                "m",
+                passed=False,
+                score=0.0,
+                infra_error=InfraError(NO_VERDICT_REASON, "milestone", "boom"),
+                not_reached=True,
+            )
+
+    def test_the_shape_the_zero_fill_actually_builds_is_accepted(self):
+        """The negative control: the guard must not reject the one caller it
+        exists to constrain."""
+        m = MilestoneResult(1, "m", passed=False, score=0.0, not_reached=True)
+        assert m.not_reached is True
+        assert m.score == 0.0
+        assert m.passed is False
+
+
 class TestSessionScoreDoesNotAverageInPlaceholders:
     def test_total_score_is_none_when_any_milestone_is_infra(self):
         """A placeholder must never be averaged into a real mean: 1.0 and an

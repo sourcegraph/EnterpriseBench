@@ -40,6 +40,7 @@ from orchestration.chain_runner import NO_AGENT_REASON, ChainTaskDefinition, run
 from orchestration.session import SessionConfig, run_session
 
 from .test_chain_session_failure import (  # reuse the sentinel helpers
+    final_checkpoints,
     scoring_verifier,
     verifier_ran,
     working_agent,
@@ -171,7 +172,7 @@ class TestNoAgentIsNeverAScore:
         simulate was also set, and score the simulation as if the agent had run."""
         with pytest.raises(ValueError, match="simulate"):
             run_chain(
-                task_def(),
+                task_def(final_checkpoints=final_checkpoints(tmp_path)),
                 workspace_root=str(tmp_path / "ws"),
                 simulate=True,
                 agent_callable=working_agent(),
