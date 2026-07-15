@@ -70,9 +70,10 @@ def _field_value(usage: Mapping[str, Any], field: str) -> int:
         # Absent, or an explicit null: the line reports no count for this field.
         return 0
     if isinstance(value, int) and not isinstance(value, bool):
-        # Exact and finite at any width, so it must not reach math.isfinite:
-        # that raises OverflowError on an int too large for a float, and a JSON
-        # integer literal has no width limit.
+        # Exact and finite at every width json.loads yields, so it must not reach
+        # math.isfinite: that raises OverflowError on an int too large for a
+        # float, which starts three orders of magnitude below the ~4300-digit
+        # literal CPython's parser accepts (sys.int_info.default_max_str_digits).
         return value
     if isinstance(value, float) and math.isfinite(value):
         return int(value)

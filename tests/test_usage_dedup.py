@@ -103,11 +103,12 @@ def test_non_finite_field_values_are_billed_as_absent(junk: float) -> None:
 
 
 def test_an_int_too_large_for_a_float_is_billed_exactly() -> None:
-    # A JSON integer literal has no width limit, so json.loads can hand this
-    # boundary an int that float() cannot hold. It is an exact token count, not
-    # junk: bill it, and do not route it through math.isfinite on the way (that
-    # raises OverflowError on an int this size, which is the crash the finite
-    # guard exists to prevent).
+    # json.loads accepts an integer literal of up to ~4300 digits
+    # (sys.int_info.default_max_str_digits), so it can hand this boundary an int
+    # that float() cannot hold — float overflows around 309 digits, an order of
+    # magnitude sooner. Such a value is an exact token count, not junk: bill it,
+    # and do not route it through math.isfinite on the way (that raises
+    # OverflowError on an int this size, which is the crash the guard prevents).
     huge = int("9" * 400)
     dedup = _offer_all([_entry(request_id="r", input_tokens=huge, output_tokens=3)])
     assert dedup.field_total("input_tokens") == huge
