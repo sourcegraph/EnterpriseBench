@@ -2074,13 +2074,9 @@ def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
     _reap_agent_processes(container_id)
     _close_workspace_for_scoring(container_id)
     try:
-        # Undo any restrictive agent umask on agent_output/ so the scorer can read
-        # its own answer.json. A present-but-unreadable answer becomes an infra
-        # error and a symlink/hard link aimed at the seal becomes an
-        # integrity_violation — never the false 0.0 this bug produces (bead
-        # EnterpriseBench-qx4pg). The fragment names its own channel; the caller's
-        # routers dispatch it. Inside the try so the finally still reopens
-        # /workspace for a later chain session.
+        # Inside the try so the finally still reopens /workspace for a later
+        # chain session. The fragment names its own channel; the caller's routers
+        # dispatch it.
         open_result = _open_agent_output_for_scoring(container_id)
         if open_result is not None:
             return {"task_score": 0.0, "all_passed": False, **open_result}

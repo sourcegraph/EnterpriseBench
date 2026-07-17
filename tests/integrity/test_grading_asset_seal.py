@@ -1748,12 +1748,15 @@ class TestUmaskDoesNotUnderCreditTheScorer:
         ).stdout.strip()
         subprocess.run(
             ["docker", "exec", cid, "bash", "-c",
-             "useradd -m -s /bin/bash agent; "
-             f"groupadd {SCORING_GROUP}; "
-             f"useradd -M -s /bin/bash -g {SCORING_GROUP} {SCORING_USER}; "
-             "mkdir -p /workspace && chown agent:agent /workspace"],
+             "useradd -m -s /bin/bash agent; mkdir -p /workspace"],
             capture_output=True, check=True,
         )
+        # The scoring identity comes from production's own sealer for the reason
+        # _seal_cid below spells out: a hand-rolled groupadd/useradd drops the
+        # SCORING_UID pin and its fallback, and drifts silently when they change.
+        # It also leaves /workspace in its real session shape (root-owned 1777)
+        # rather than agent-owned.
+        _seal_grading_assets(cid)
         # Mirror production: the HARNESS creates agent_output before the agent
         # runs (_install_claude_cli mkdirs it as root, _run_agent mkdirs it in the
         # wrapper around the agent command), so the directory is 0755 and the
