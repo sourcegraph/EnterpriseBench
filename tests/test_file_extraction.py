@@ -530,10 +530,11 @@ def test_dotdot_is_normalized_away(tmp_path):
 # specifically than the ground truth does, which is what happens whenever one
 # required path is a component-suffix of another.
 
-# The ground truth of technical_debt/refactor-orchestration-tri-babel-001, verbatim:
-# repo-relative paths plus a separate `repo` field, so webpack's bare 'package.json'
-# is a component-suffix of the other two. (The tokio task has the same shape with
-# Cargo.toml, and bead rmz1x points 26 more check scripts at this scorer.)
+# The ground truth of technical_debt/refactor-orchestration-tri-babel-001, verbatim as it
+# ships AFTER d900w: every path leads with its repo, so webpack's manifest is
+# 'webpack/package.json', no longer a bare 'package.json' that is a component-suffix of
+# the other two. Stored as (repo, repo-relative) so the tests can build both the ground
+# truth ('<repo>/<relpath>') and the mandated answer ('/workspace/<repo>/<relpath>').
 NESTED_GT = [
     ("babel", "packages/babel-parser/package.json"),
     ("webpack", "package.json"),
@@ -543,17 +544,17 @@ NESTED_GT = [
 
 def nested_gt_file(tmp_path: Path) -> Path:
     return write_json(tmp_path / "ground_truth.json", {"required_files": [
-        {"path": path, "repo": repo} for repo, path in NESTED_GT
+        {"path": f"{repo}/{path}", "repo": repo} for repo, path in NESTED_GT
     ]})
 
 
 def test_nested_gt_does_not_zero_a_fully_specified_answer(tmp_path):
-    """Crediting per ground-truth entry, every guess in a perfect answer matched
-    more than one required file — 'package.json' is a tail of the other two — so all
-    three were booked ambiguous: 0/3, the worst possible score for a flawless answer."""
+    """A perfect answer that spells each required file exactly as ground truth does
+    scores 1.0. Once paths are repo-qualified, webpack's 'webpack/package.json' is no
+    longer a tail of the other two, so no guess in a perfect answer looks ambiguous."""
     gt = nested_gt_file(tmp_path)
     answer = write_json(tmp_path / "answer.json",
-                        {"source_files": [path for _, path in NESTED_GT]})
+                        {"source_files": [f"{repo}/{path}" for repo, path in NESTED_GT]})
     proc = run_cli(answer, gt)
     assert score_of(proc) == 1.0, json.loads(proc.stdout)["detail"]
 
@@ -561,8 +562,9 @@ def test_nested_gt_does_not_zero_a_fully_specified_answer(tmp_path):
 def test_nested_gt_scores_the_absolute_shape_the_harness_mandates(tmp_path):
     """The case that actually ships. run_task.py's appendix tells every agent 'All
     file paths MUST be absolute and anchored at /workspace/<repo>/...', so the answer
-    is never component-equal to a ground-truth entry — it is strictly longer.
-    Crediting only exact matches would leave this at 1/3, fixing nothing that ships.
+    is strictly longer than its repo-qualified ground-truth entry (it prepends the mount
+    plus repeats the repo). Crediting only exact matches would leave this at 0, fixing
+    nothing that ships.
     """
     gt = nested_gt_file(tmp_path)
     answer = write_json(tmp_path / "answer.json", {"code_paths": [
@@ -570,6 +572,24 @@ def test_nested_gt_scores_the_absolute_shape_the_harness_mandates(tmp_path):
     ]})
     proc = run_cli(answer, gt)
     assert score_of(proc) == 1.0, json.loads(proc.stdout)["detail"]
+
+
+def test_a_wrong_repo_answer_no_longer_over_credits_a_bare_tail(tmp_path):
+    """EnterpriseBench-d900w, pinned on the shipped shape. babel's required manifest is
+    'babel/packages/babel-parser/package.json'; webpack's is 'webpack/package.json'. An
+    agent that answers only babel's ROOT manifest '/workspace/babel/package.json' has
+    named a file that is NOT required — and before repo-qualification it banked webpack's
+    'package.json' as a component-suffix, scoring 1/3. Now it scores a true 0.0, while the
+    genuinely correct three-file answer still scores 1.0.
+    """
+    gt = nested_gt_file(tmp_path)
+    wrong = write_json(tmp_path / "wrong.json",
+                       {"source_files": ["/workspace/babel/package.json"]})
+    assert score_of(run_cli(wrong, gt)) == 0.0
+    right = write_json(tmp_path / "right.json", {"source_files": [
+        f"/workspace/{repo}/{path}" for repo, path in NESTED_GT
+    ]})
+    assert score_of(run_cli(right, gt)) == 1.0
 
 
 def test_an_abbreviation_cannot_claim_the_deeper_of_two_unequal_matches(tmp_path):
@@ -669,25 +689,27 @@ def test_the_mandated_absolute_shape_is_not_ambiguous_against_nested_gt(tmp_path
 
 
 def test_a_gt_path_holding_the_mount_component_zeroes_the_mandated_shape(tmp_path):
-    """A KNOWN, LATENT false zero, pinned here rather than asserted away. Tracked as
-    EnterpriseBench-d900w; NOT fixed in this bead.
+    """The residual, still-LATENT edge of EnterpriseBench-d900w. d900w's SHIPPED over-
+    credit — a wrong-repo answer crediting a bare 'package.json'/'Cargo.toml' — is closed:
+    ground_truth_files now enforces that every required path leads with its repo, so a
+    different repo's answer no longer shares a component-suffix with it. What repo-
+    qualification does NOT reach is a required path whose own components END in
+    'workspace/<a repo>/<that repo's file>'.
 
     '/workspace/' is a hardcoded universal mount prefix (run_task.py), and components()
-    keeps 'workspace' as an ordinary path component. So a required file whose own path
-    happens to END in 'workspace/<a repo>/<that repo's file>' is a component-suffix of
-    the mandated answer for a DIFFERENT required file, and gets booked as an abbreviated
-    hit. The answer then refines one entry and abbreviates another, the ambiguity clause
-    fires, and a correct, spec-compliant answer is credited nothing:
+    keeps 'workspace' as an ordinary path component. So such a required file is still a
+    component-suffix of the mandated answer for a DIFFERENT required file, and gets booked
+    as an abbreviated hit. The answer then refines one entry and abbreviates another, the
+    ambiguity clause fires, and a correct, spec-compliant answer is credited nothing:
 
         gt     = ['config.py', 'src/workspace/app/config.py']
         answer = ['/workspace/app/config.py']   # the mandated shape, naming 'config.py'
-        => 0/2, ambiguous — where the pre-refinement rule scored 1/2
+        => 0/2, ambiguous
 
-    The root cause is that matches() is blind to the `repo` field both sides carry: were
-    it honoured, the answer declares repo 'app' and the deeper entry declares repo
-    'src', so they would never be candidates for one another and no ambiguity would
-    arise. That is d900w's subject, and fixing it here would be a silent semantics
-    change to two live 0.40-weight checkpoints inside a bead nobody reviewed for it.
+    The root cause is that _matches_parts is blind to the `repo` field both sides carry.
+    d900w pushed the fix into the data (repo-qualify + enforce) rather than teach the
+    matcher the repo, which the tokio subcrate shape makes undecidable at runtime; this
+    edge is the price of that choice, kept latent by the enforcement.
 
     LATENT, not live: no ground_truth.json in the repo has a 'workspace' path component
     (verified across benchmarks/**). Repos named 'workspace' are not exotic though —
@@ -722,10 +744,9 @@ def test_a_required_file_without_a_repo_fails_closed(tmp_path):
     """`repo` is required by schemas/task.schema.json, but nothing validates
     ground_truth.json against it, so this module is the last line of defence.
 
-    Without it the collision check below has nothing to adjudicate: two entries that
-    both omit `repo` compare equal, collapse into one, and silently halve the
-    denominator — the same over-credit, arrived at by a missing field instead of a
-    conflicting one.
+    Without it the repo-qualification enforcement has nothing to check against: a path
+    with no declared repo cannot be confirmed to lead with it, so an under-qualified
+    ground truth would slip through and re-open the wrong-repo over-credit d900w closes.
     """
     gt = write_json(tmp_path / "ground_truth.json", {"required_files": [
         {"path": "package.json"}, {"path": "package.json"},
@@ -736,21 +757,43 @@ def test_a_required_file_without_a_repo_fails_closed(tmp_path):
     assert INFRA_SENTINEL in json.loads(proc.stdout)["detail"]
 
 
-def test_the_same_path_required_from_two_repos_fails_closed(tmp_path):
-    """Two repos requiring the same relative path are two files, not a duplicate
-    spelling — but a component-suffix matcher cannot tell them apart, and the dedup
-    above would silently collapse them, shrinking the denominator and inflating every
-    agent's score. Our artifact is the wrong one, so it fails closed. (It also keeps
-    ground-truth component lists distinct, which score_answer's crediting relies on.)
+def test_a_ground_truth_path_not_led_by_its_repo_fails_closed(tmp_path):
+    """The enforcement that closes EnterpriseBench-d900w. Ground truth is our artifact,
+    and its every path must lead with the repo the file lives in — the shape run_task.py
+    already mandates for answers ('/workspace/<repo>/...'). A bare 'package.json' declared
+    for repo 'webpack' violates that contract: were it scored, a wrong-repo answer whose
+    only 'package.json' lives in a *different* repo would still be a component-suffix of
+    it and bank partial credit. So it fails closed rather than silently over-crediting.
     """
     gt = write_json(tmp_path / "ground_truth.json", {"required_files": [
         {"path": "package.json", "repo": "webpack"},
-        {"path": "package.json", "repo": "babel"},
     ]})
     answer = write_json(tmp_path / "answer.json", {"source_files": ["package.json"]})
     proc = run_cli(answer, gt)
     assert proc.returncode != 0
-    assert INFRA_SENTINEL in json.loads(proc.stdout)["detail"]
+    detail = json.loads(proc.stdout)["detail"]
+    assert INFRA_SENTINEL in detail and "not repo-qualified" in detail
+
+
+def test_same_file_from_two_repos_is_two_files_once_repo_qualified(tmp_path):
+    """The old same-path-from-two-repos collision is unrepresentable once paths are
+    repo-qualified: 'webpack/package.json' and 'babel/package.json' have distinct
+    component lists, so both count (denominator 2) and neither collapses. A bare
+    'package.json' answer is a component-suffix of both and picks out neither — booked
+    ambiguous, 0.0 — which is why the enforcement above can replace the collision check
+    the scorer used to run after the fact.
+    """
+    gt = gt_with(tmp_path, ["webpack/package.json", "babel/package.json"])
+    answer = write_json(tmp_path / "answer.json", {"source_files": ["package.json"]})
+    proc = run_cli(answer, gt)
+    payload = json.loads(proc.stdout)
+    assert payload["score"] == 0.0, payload["detail"]
+    assert "ambiguous" in payload["detail"]
+    # ...while naming each repo explicitly credits both: denominator was 2, not collapsed.
+    answer2 = write_json(tmp_path / "answer2.json",
+                         {"source_files": ["/workspace/webpack/package.json",
+                                           "/workspace/babel/package.json"]})
+    assert score_of(run_cli(answer2, gt)) == 1.0
 
 
 @pytest.mark.parametrize("required", [

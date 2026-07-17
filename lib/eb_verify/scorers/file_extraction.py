@@ -168,18 +168,26 @@ def score_answer(gt_paths: List[str], found: List[str]) -> tuple[set[str], List[
     * It refines some and abbreviates others: it distinguishes none of them, and is
       credited to none. ``y/a.py`` refines a required "a.py" and abbreviates a required
       "x/y/a.py", and there is no ground for preferring either reading of it.
-    * It only refines: credit the most specific one. This is what lets a required file
-      be a tail of another (the babel/tokio tasks require a bare "package.json"
-      alongside "packages/babel-parser/package.json") without every guess in a perfect
-      answer looking ambiguous.
+    * It only refines: credit the most specific one. This handles a required file whose
+      components are a tail of another required file's — rare now that
+      :func:`ground_truth_files` requires every path to lead with its repo, but still
+      reachable within one repo — without every guess in a perfect answer looking
+      ambiguous.
     * It only abbreviates: specificity is demanded only where it distinguishes
       something, so it still scores against the *one* required file it abbreviates
       ("setup.py" against a lone ground truth of "httpx/setup.py"), and is credited to
       none when it is a tail shared by several.
 
-    A ground truth ending in ``workspace/<repo>/<file>`` abbreviates back into the
-    absolute ``/workspace/<repo>/...`` shape run_task.py mandates — a latent false zero,
-    pinned by a test and tracked as EnterpriseBench-d900w.
+    The refine/abbreviate split earns its keep on *under-qualified answers*, not ground
+    truth: since d900w, ground truth is repo-qualified and enforced, so a wrong-repo
+    answer like ``/workspace/babel/package.json`` no longer shares a component-suffix with
+    a different repo's required ``webpack/package.json`` and scores a true 0.0. One
+    residual, latent hole survives repo-qualification: a required path whose own
+    components END in ``workspace/<repo>/<file>`` is still a component-suffix of the
+    mandated answer for a *different* required file, because :func:`_matches_parts` is
+    repo-blind. No shipped ground truth carries a mid-path ``workspace`` component (a test
+    guards this), so it stays latent; closing it would mean teaching the matcher the repo,
+    which the enforcement above deliberately pushed into the data instead.
 
     Order-independent, and over-credit is impossible: a matched entry is never "used
     up", and ``matched`` is a set of ground-truth entries, so recall stays capped at
@@ -261,7 +269,7 @@ def ground_truth_files(gt_file: str) -> List[str]:
         raise HarnessError("ground_truth.json has no required_files to score against")
 
     paths: List[str] = []
-    seen: dict[tuple[str, ...], str] = {}  # component list -> the repo that declared it
+    seen: set[tuple[str, ...]] = set()  # component lists already counted, for dedup
     for i, entry in enumerate(required):
         if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
             raise HarnessError(
@@ -271,16 +279,6 @@ def ground_truth_files(gt_file: str) -> List[str]:
         if not path:
             raise HarnessError(f"ground_truth.json required_files[{i}] path is empty")
 
-        # Two entries with the same components collapse into one required file only
-        # when the same repo declares both — 'a/x.py' and './a/x.py' are one file, and
-        # counting them twice would distort the denominator while making an answer that
-        # matched both look ambiguous below.
-        #
-        # Any other collision fails closed. The same path from two *different* repos is
-        # two files a component-suffix matcher cannot tell apart, and collapsing them
-        # would shrink the denominator and inflate every agent's score. A collision we
-        # cannot even adjudicate — because an entry omitted the 'repo' the task schema
-        # requires — is the same hazard with less evidence, so it gets the same answer.
         key = tuple(components(path))
         if not key:
             # A non-empty string that normalizes to no components — '.', './', '..',
@@ -300,15 +298,27 @@ def ground_truth_files(gt_file: str) -> List[str]:
                 f"it is required to tell same-named files in different repos apart"
             )
         repo = repo.strip()
+        # The path must be repo-qualified: its leading component names the workspace dir
+        # the file lives in, i.e. the repo. This mirrors the contract run_task.py already
+        # mandates for answers ('/workspace/<repo>/...'), enforced here on ground truth so
+        # the two agree. It is what lets _matches_parts stay repo-blind without
+        # over-crediting a wrong-repo answer: once every required path carries its repo as
+        # the leading component, a bare tail like 'package.json' can no longer be a
+        # component-suffix of a *different* repo's answer (EnterpriseBench-d900w). It also
+        # subsumes the old same-path-from-two-repos collision check — identical component
+        # lists now imply an identical leading component, hence a single repo — so a
+        # cross-repo collision is unrepresentable rather than caught after the fact.
+        if key[0] != repo:
+            raise HarnessError(
+                f"ground_truth.json required_files[{i}] ('{path}') is not repo-qualified: "
+                f"its leading path component {key[0]!r} must equal repo {repo!r}. "
+                f"Prefix the path with its repo (EnterpriseBench-d900w)."
+            )
         if key in seen:
-            if seen[key] != repo:
-                raise HarnessError(
-                    f"ground_truth.json requires '{path}' from two different repos "
-                    f"({seen[key]!r} and {repo!r}); a component-suffix matcher cannot "
-                    f"distinguish them — repo-qualify the paths"
-                )
+            # The same file spelled twice ('a/x.py' and './a/x.py') is one required file,
+            # not two — counting it twice would distort the recall denominator.
             continue
-        seen[key] = repo
+        seen.add(key)
         paths.append(path)
     return paths
 
