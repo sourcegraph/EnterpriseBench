@@ -1730,8 +1730,20 @@ class TestUmaskDoesNotUnderCreditTheScorer:
              "mkdir -p /workspace && chown agent:agent /workspace"],
             capture_output=True, check=True,
         )
-        # The agent creates agent_output itself, exactly as run_task's
-        # instruction appendix tells it to (`mkdir -p`), under its own umask.
+        # Mirror production: the HARNESS creates agent_output before the agent
+        # runs (_install_claude_cli mkdirs it as root, _run_agent mkdirs it in the
+        # wrapper around the agent command), so the directory is 0755 and the
+        # agent's own `mkdir -p` from the instruction appendix is a no-op. Letting
+        # the agent create it here instead would land a 0700 directory and test
+        # the fix against a shape production never produces.
+        subprocess.run(
+            ["docker", "exec", cid, "bash", "-c",
+             "mkdir -p /workspace/agent_output && "
+             "chown agent:agent /workspace/agent_output"],
+            capture_output=True, check=True,
+        )
+        # The agent AUTHORS answer.json under its own umask — that file's mode is
+        # the live vector: at umask 077 it lands 0600 and only the READ fails.
         subprocess.run(
             ["docker", "exec", "-u", "agent", cid, "bash", "-c",
              f"umask {umask}; mkdir -p /workspace/agent_output; "
@@ -1742,8 +1754,9 @@ class TestUmaskDoesNotUnderCreditTheScorer:
 
     def _scorer_sees_answer(self, cid: str) -> bool:
         # Exactly what an answer.json checkpoint does: as ebscorer, is answer.json
-        # a readable file? `[ -f ]` is false when the parent dir cannot be
-        # traversed, which is the whole under-credit mechanism.
+        # a readable file? Both halves matter — on the live vector `[ -f ]` passes
+        # (the dir is traversable) and the `cat` is what gets EACCES on the agent's
+        # 0600 file, which is why the under-credit is silent.
         out = subprocess.run(
             ["docker", "exec", "-u", SCORING_USER, cid, "bash", "-c",
              "[ -f /workspace/agent_output/answer.json ] && "
