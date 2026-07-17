@@ -47,6 +47,23 @@ logger = logging.getLogger(__name__)
 SESSION_FAILURE_REASON = "session_failed"
 NO_AGENT_REASON = "no_agent_configured"
 
+# ChainResult's invalidity channels, in the order a cause is reported. The channel
+# name is the ``failure_class`` a reader sees, so the three keep their distinct
+# remedies instead of collapsing into one bucket.
+INVALID_CHANNELS: tuple[str, ...] = (
+    "verifier_infra_error",
+    "session_failure",
+    "agent_not_configured",
+)
+
+# ``failure_class`` for a --simulate run. Not one of the channels above: a
+# simulation is a healthy run of the scaffold, it is simply not an agent trial.
+SIMULATED_FAILURE_CLASS = "simulated"
+SIMULATED_DETAIL = (
+    "chain run with --simulate — the score came from marker files the simulation "
+    "scaffold wrote, not from agent work, so it is not a scoreable trial."
+)
+
 
 def _session_failure(session_number: int, detail: str) -> dict:
     """A configured session never completed, so the chain has no score.
@@ -271,6 +288,24 @@ def _validate_chain_task(task_def: ChainTaskDefinition) -> None:
             f"{len(task_def.sessions)} session(s) defined — the chain cannot be scored "
             f"against a session count it does not have"
         )
+
+
+def _validity_cause(chain_result: ChainResult) -> tuple[Optional[str], str]:
+    """The ``(failure_class, error)`` results.json records for this chain.
+
+    ``(None, "")`` only for a real agent run, which is the sole state a reader may
+    score. A validity reader decides from ``failure_class``/``status``/``success``/
+    ``phase`` and consults nothing else, so every reason this chain's score is not
+    a trustworthy agent result has to arrive through one of them — recording it
+    under ``config`` instead leaves it invisible (EnterpriseBench-78zt5).
+    """
+    for channel in INVALID_CHANNELS:
+        cause = getattr(chain_result, channel)
+        if cause is not None:
+            return channel, cause["detail"]
+    if chain_result.simulated:
+        return SIMULATED_FAILURE_CLASS, SIMULATED_DETAIL
+    return None, ""
 
 
 def _log_chain_outcome(chain_result: ChainResult) -> None:
@@ -543,7 +578,7 @@ def main():
         "sessions_total": result.total_sessions,
         "simulated": result.simulated,
     }
-    for channel in ("verifier_infra_error", "session_failure", "agent_not_configured"):
+    for channel in INVALID_CHANNELS:
         cause = getattr(result, channel)
         if cause is not None:
             payload[channel] = cause
@@ -557,13 +592,12 @@ def main():
     # which satisfied the score reader but left this run invisible to
     # skip-completed and worth 0.0 to every cost rollup.
     #
-    # `success` is "this run produced a score", not "this run did not crash":
-    # run_sweep maps it straight to scored/failed, and a chain that ran cleanly
-    # but scored nothing (no milestones — chain_runner.py:442) belongs in
-    # `failed`, not in the results table with a null. A null total_score reaches
-    # here only that way; an invalid run exits nonzero below and is read at
-    # run_benchmark's error channel instead.
-    scored = not result.is_invalid and result.total_score is not None
+    # `success` is "this run produced a score from agent work", not "this run did
+    # not crash": run_sweep maps it straight to scored/failed, and a chain that
+    # ran cleanly but scored nothing (no milestones) belongs in `failed`, not in
+    # the results table with a null.
+    failure_class, error = _validity_cause(result)
+    scored = failure_class is None and result.total_score is not None
     write_results_json(
         Path(task_dir),
         task_id=result.task_id,
@@ -571,7 +605,11 @@ def main():
         # The headline aggregators filter on phase == complete AND success, so a
         # scored chain has to say both or it drops out of the headline.
         phase=PHASE_COMPLETE if scored else "",
-        status=RUN_STATUS_INVALID if result.is_invalid else "",
+        # A cause means the score is not an agent's: not merely unscored (which a
+        # clean chain with no milestones is), but ineligible to be scored at all.
+        status="" if failure_class is None else RUN_STATUS_INVALID,
+        error=error,
+        failure_class=failure_class,
         scores={"task_score": result.total_score},
         # No agent-level token/cost accounting exists for chains yet: sessions
         # are run per-milestone and their usage is never aggregated. Reported

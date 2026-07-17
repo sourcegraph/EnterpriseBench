@@ -16,6 +16,12 @@ two independent reasons that this module pins down:
      ``__main__`` guard, so the process exited 0 — run_benchmark recorded
      status="completed" with score None. A stub reported as a real run.
 
+A third concern joined them once the runner could write results at all: it
+reported success unconditionally, so a task whose OWN fixtures were malformed was
+recorded as a valid completed run scoring whatever the scorer made of the
+wreckage. The last two classes below split that from its mirror image — a broken
+AGENT must still earn its low score rather than escape into the re-run channel.
+
 The exit-code tests run the runner as a real subprocess on purpose. Calling
 ``main()`` in-process would return 1 happily even while the shipped entrypoint
 threw the value away; only ``sys.exit(main())`` makes the code reach the caller,
@@ -230,4 +236,93 @@ class TestScoreModeWritesResults:
         )
         assert proc.returncode == 0, proc.stderr
         payload = json.loads((task_dir / RESULTS_FILENAME).read_text())
+        assert payload["scores"]["task_score"] < 1.0
+
+
+class TestBrokenFixtureIsInvalidNotScored:
+    """The events file is a TASK FIXTURE the agent did not author.
+
+    Its validation errors were printed to stderr and discarded, so a task whose
+    own fixture was malformed still wrote success=true / phase=complete and
+    whatever score the scorer computed from the wreckage. run_task's contract is
+    the opposite: a verifier that cannot reach a verdict reports
+    verifier_infra_error + status=invalid, and the run goes to the re-run channel.
+    """
+
+    @pytest.fixture
+    def broken_fixture_run(self, task_dir: Path) -> tuple:
+        """Non-monotonic timestamps: the ordering the scorer's timeliness axis is
+        computed against does not hold, so no verdict it reaches is trustworthy."""
+        _write_jsonl(
+            task_dir / "events.jsonl",
+            [EVENTS[0], {**EVENTS[0], "timestamp_ms": -5000, "id": "evt-002"}],
+        )
+        agent = _write_jsonl(task_dir / "agent_actions.jsonl", ORACLE_ACTIONS)
+        proc = _run(
+            str(task_dir / "task.toml"),
+            "--agent-actions",
+            str(agent),
+            "--mode",
+            "baseline",
+        )
+        payload_path = task_dir / RESULTS_FILENAME
+        payload = json.loads(payload_path.read_text()) if payload_path.exists() else {}
+        return proc, payload
+
+    def test_broken_fixture_exits_nonzero(self, broken_fixture_run: tuple) -> None:
+        """The exit code is the gate: run_benchmark returns status="error" on
+        nonzero BEFORE it reads scores.task_score, which is an unguarded read."""
+        proc, _ = broken_fixture_run
+        assert proc.returncode == 1
+
+    def test_broken_fixture_is_not_a_completed_run(self, broken_fixture_run: tuple) -> None:
+        _, payload = broken_fixture_run
+        assert payload["success"] is False
+        assert payload["phase"] == ""
+        assert payload["status"] == "invalid"
+
+    def test_broken_fixture_reports_the_verifier_as_the_cause(
+        self, broken_fixture_run: tuple
+    ) -> None:
+        """Named as run_task names the same cause, so one vocabulary classifies
+        every runner's infra failure — and the error says which fixture broke."""
+        _, payload = broken_fixture_run
+        assert payload["failure_class"] == "verifier_infra_error"
+        assert "timestamp" in payload["error"]
+
+    def test_broken_fixture_carries_the_shared_shape(self, broken_fixture_run: tuple) -> None:
+        """The invalid write is the same contract as the scored one, not a
+        stripped-down variant that starves the readers it skips."""
+        _, payload = broken_fixture_run
+        assert tuple(payload) == RESULTS_FIELDS
+
+
+class TestBadAgentActionsAreStillScored:
+    """The agent's action file is AGENT OUTPUT, and the opposite call.
+
+    Routing its validation errors to `invalid` too would be a new integrity hole
+    pointing the other way: a broken agent would escape the low score it earned
+    into the re-run channel. Only the task's own fixtures invalidate a run.
+    """
+
+    def test_unknown_action_type_warns_but_scores(self, task_dir: Path) -> None:
+        agent = _write_jsonl(
+            task_dir / "agent_actions.jsonl",
+            [{**ORACLE_ACTIONS[0], "action_type": "teleport"}],
+        )
+        proc = _run(
+            str(task_dir / "task.toml"),
+            "--agent-actions",
+            str(agent),
+            "--mode",
+            "baseline",
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert "unknown action_type" in proc.stderr
+
+        payload = json.loads((task_dir / RESULTS_FILENAME).read_text())
+        assert payload["status"] == ""
+        assert payload["failure_class"] is None
+        assert payload["success"] is True
+        # It earned a score, and a worse one than the oracle-matching run.
         assert payload["scores"]["task_score"] < 1.0

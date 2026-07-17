@@ -48,10 +48,15 @@ except ImportError:
 
 try:
     from .runner_cli import add_passthrough_args
-    from .results_io import PHASE_COMPLETE, write_results_json
+    from .results_io import PHASE_COMPLETE, RUN_STATUS_INVALID, write_results_json
 except ImportError:
     from runner_cli import add_passthrough_args
-    from results_io import PHASE_COMPLETE, write_results_json
+    from results_io import PHASE_COMPLETE, RUN_STATUS_INVALID, write_results_json
+
+# A verifier could not reach a verdict, so there is no score to record. Same name
+# run_task reports the same cause under (run_task.py:1549) — a reader classifies
+# every runner's infra failure by one vocabulary.
+VERIFIER_INFRA_ERROR = "verifier_infra_error"
 
 
 def load_task_config(task_dir: Path) -> dict:
@@ -102,14 +107,16 @@ def run_scoring(
     agent_path: Path,
     config: ScoringConfig | None = None,
 ) -> ScoreResult:
-    """Load files and run the scorer."""
-    # Validate inputs
-    event_errors = validate_event_file(events_path)
-    if event_errors:
-        print(f"WARNING: Event file validation issues:", file=sys.stderr)
-        for e in event_errors:
-            print(f"  - {e}", file=sys.stderr)
+    """Load files and run the scorer.
 
+    The agent's action file is validated as a WARNING and scored regardless: a
+    malformed action is the agent's own failure, and routing it anywhere but the
+    scorer would let a broken agent escape the 0 it earned.
+
+    The task's own event fixture is the caller's precondition and is not checked
+    here — the asymmetry is the point, and it is why the two validators no longer
+    sit side by side.
+    """
     action_errors = validate_action_file(agent_path)
     if action_errors:
         print(f"WARNING: Agent action file validation issues:", file=sys.stderr)
@@ -206,15 +213,57 @@ def main() -> int:
         print(f"Agent actions file not found: {agent_path}", file=sys.stderr)
         return 1
 
-    result = run_scoring(events_path, oracle_path, agent_path)
-
     # Durable result, in the shape every runner writes (results_io). The score
     # was printed to stdout and nowhere else before EnterpriseBench-78zt5, so a
     # caller reading results.json saw None no matter how the agent did.
     task_meta = config.get("task", {})
+    run_facts = dict(
+        task_id=task_meta.get("id", ""),
+        # Offline scoring of an actions file the agent already wrote: this
+        # process spends no tokens, so it reports none.
+        tool_usage={},
+        config={"mode": args.mode, "agent_actions": str(agent_path)},
+        task_metadata={
+            "suite": task_meta.get("suite", ""),
+            "task_type": task_meta.get("task_type", ""),
+            "difficulty": task_meta.get("difficulty", ""),
+            "languages": config.get("metadata", {}).get("languages", []),
+        },
+    )
+
+    # The events file is the task's OWN fixture, not agent output: if it is
+    # malformed the verifier's inputs are broken, so no verdict it reaches about
+    # the agent is trustworthy and the run belongs in the invalid/re-run channel
+    # rather than the results table with whatever the scorer computed from the
+    # wreckage. This is why it is checked here and not beside the agent-action
+    # validator inside run_scoring, which warns and scores on purpose.
+    fixture_errors = validate_event_file(events_path)
+    if fixture_errors:
+        print(
+            "INVALID RUN — this task's own event fixture is malformed, so no "
+            "verdict reached about the agent would be trustworthy:",
+            file=sys.stderr,
+        )
+        for e in fixture_errors:
+            print(f"  - {e}", file=sys.stderr)
+        write_results_json(
+            task_dir,
+            success=False,
+            phase="",
+            status=RUN_STATUS_INVALID,
+            error="; ".join(fixture_errors),
+            failure_class=VERIFIER_INFRA_ERROR,
+            **run_facts,
+        )
+        # Nonzero routes the run to run_benchmark's error channel, which it
+        # reads BEFORE scores.task_score (run_benchmark.py:333 vs :353) — the
+        # exit code, not the payload, is what keeps this out of the results table.
+        return 1
+
+    result = run_scoring(events_path, oracle_path, agent_path)
+
     write_results_json(
         task_dir,
-        task_id=task_meta.get("id", ""),
         success=True,
         # The headline aggregators filter on phase == complete AND success.
         phase=PHASE_COMPLETE,
@@ -226,16 +275,7 @@ def main() -> int:
             "ordering": result.ordering,
             "extra_actions": result.extra_actions,
         },
-        # Offline scoring of an actions file the agent already wrote: this
-        # process spends no tokens, so it reports none.
-        tool_usage={},
-        config={"mode": args.mode, "agent_actions": str(agent_path)},
-        task_metadata={
-            "suite": task_meta.get("suite", ""),
-            "task_type": task_meta.get("task_type", ""),
-            "difficulty": task_meta.get("difficulty", ""),
-            "languages": config.get("metadata", {}).get("languages", []),
-        },
+        **run_facts,
     )
 
     if args.json:
