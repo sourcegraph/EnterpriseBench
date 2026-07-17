@@ -13,10 +13,11 @@ the agent timestamps its own actions.  A future streaming mode could feed
 events incrementally, but file-based is the pragmatic v1.
 
 Usage:
-    python event_replay.py <task_dir> [--agent-actions <path>]
+    python event_replay.py <task.toml> [--agent-actions <path>]
 
-    task_dir must contain:
-      - task.toml (with session_type = "event_replay")
+    The positional is a task.toml FILE (with session_type = "event_replay"),
+    the same contract run_task and chain_runner declare. Its directory must
+    also contain:
       - events.jsonl
       - oracle_actions.jsonl
 
@@ -51,23 +52,6 @@ try:
 except ImportError:
     from runner_cli import add_passthrough_args
     from results_io import PHASE_COMPLETE, write_results_json
-
-
-def resolve_task_dir(task_path: Path) -> Path:
-    """Normalize a task.toml FILE or a task DIRECTORY to the task directory.
-
-    run_benchmark dispatches every runner as ``<runner> <task.toml path>``
-    (run_benchmark.py:320 — its task list comes from an ``rglob("task.toml")``),
-    but this runner's positional was declared and consumed as a directory. So
-    every run_benchmark dispatch resolved ``.../task.toml/task.toml`` and died
-    with FileNotFoundError before it could score anything, which disabled the
-    session_type outright (EnterpriseBench-78zt5).
-
-    Accepting both is what makes that safe to fix: the usage in this module's
-    docstring passes a directory, and hand-run invocations depend on it.
-    """
-    resolved = task_path.resolve()
-    return resolved.parent if resolved.is_file() else resolved
 
 
 def load_task_config(task_dir: Path) -> dict:
@@ -170,9 +154,9 @@ def print_report(result: ScoreResult) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Event-replay runner and scorer")
     parser.add_argument(
-        "task_dir",
+        "task_toml",
         type=Path,
-        help="Path to task directory, or to its task.toml (both accepted)",
+        help="Path to the task.toml file",
     )
     parser.add_argument(
         "--agent-actions", type=Path, default=None,
@@ -191,24 +175,23 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
 
-    task_dir = resolve_task_dir(args.task_dir)
+    # Positional is a task.toml FILE (as in run_task and chain_runner), so the
+    # task directory is its parent. Consuming it as a directory instead resolved
+    # .../task.toml/task.toml and killed every run_benchmark dispatch before it
+    # could score (EnterpriseBench-78zt5).
+    task_dir = args.task_toml.parent.resolve()
 
     # Load task config
     config = load_task_config(task_dir)
     events_path, oracle_path = resolve_paths(task_dir, config)
 
     if args.agent_actions is None:
-        # No sandbox integration exists yet (EnterpriseBench-ia157, the
-        # event_replay sibling of EnterpriseBench-02bdi): nothing clones the
-        # declared repos or runs an agent, so there is no actions.jsonl to score.
-        #
-        # Exiting nonzero is the whole point. run_benchmark forwards no
-        # --agent-actions (it is not in runner_cli.PASSTHROUGH_FLAGS), so every
-        # dispatched event_replay task lands here; returning 0 had run_benchmark
-        # record status="completed" with score None — a stub reported as a real
-        # run that scored nothing. Nonzero routes it to run_benchmark's existing
-        # error channel (run_benchmark.py:333) instead, with no special-casing of
-        # this runner there.
+        # No sandbox integration exists yet (EnterpriseBench-ia157): nothing
+        # clones the declared repos or runs an agent, so there is no
+        # actions.jsonl to score. Exiting nonzero is the point — run_benchmark
+        # forwards no --agent-actions, so every dispatched task lands here, and
+        # returning 0 had it record status="completed" with score None: a stub
+        # reported as a real run that scored nothing.
         print("Event-replay runner (sandbox integration not yet implemented)")
         print(f"  Task: {config['task']['id']}")
         print(f"  Events: {events_path} ({len(load_events(events_path))} events)")

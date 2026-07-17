@@ -7,7 +7,8 @@ two independent reasons that this module pins down:
      ``<runner> <task.toml path>`` (its task list comes from an
      ``rglob("task.toml")``), but this runner declared and consumed its
      positional as a DIRECTORY — so it resolved ``.../task.toml/task.toml`` and
-     died with FileNotFoundError before scoring anything.
+     died with FileNotFoundError before scoring anything. It now declares a
+     task.toml FILE, the contract run_task and chain_runner already share.
   2. Silent stub. With the directory arg corrected, ``--agent-actions`` is not a
      passthrough flag, so run_benchmark never sends it and every dispatch lands
      in the "sandbox integration not yet implemented" branch. That branch
@@ -37,7 +38,6 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "orchestration"))
 
 from results_io import RESULTS_FIELDS, RESULTS_FILENAME  # noqa: E402
-from event_replay import resolve_task_dir  # noqa: E402
 
 
 TASK_TOML = """\
@@ -84,15 +84,19 @@ def _write_jsonl(path: Path, rows: list[dict]) -> Path:
     return path
 
 
-@pytest.fixture
-def task_dir(tmp_path: Path) -> Path:
-    """A minimal, valid event_replay task directory."""
-    d = tmp_path / "er-test-001"
-    d.mkdir()
+def _make_task_dir(d: Path) -> Path:
+    """Populate *d* as a minimal, valid event_replay task directory."""
+    d.mkdir(parents=True)
     (d / "task.toml").write_text(TASK_TOML)
     _write_jsonl(d / "events.jsonl", EVENTS)
     _write_jsonl(d / "oracle_actions.jsonl", ORACLE_ACTIONS)
     return d
+
+
+@pytest.fixture
+def task_dir(tmp_path: Path) -> Path:
+    """A minimal, valid event_replay task directory."""
+    return _make_task_dir(tmp_path / "er-test-001")
 
 
 def _run(*args: str) -> subprocess.CompletedProcess:
@@ -103,35 +107,51 @@ def _run(*args: str) -> subprocess.CompletedProcess:
     )
 
 
-class TestResolveTaskDir:
-    """The arg contract: run_benchmark sends a FILE, humans send a DIRECTORY."""
+@pytest.fixture(scope="module")
+def dispatched(tmp_path_factory: pytest.TempPathFactory) -> tuple:
+    """One run of the exact invocation run_benchmark makes: a task.toml FILE and
+    no --agent-actions, which is the branch every dispatched task lands in.
 
-    def test_directory_resolves_to_itself(self, task_dir: Path) -> None:
-        assert resolve_task_dir(task_dir) == task_dir.resolve()
+    Module-scoped: the tests below read this one result from different angles
+    rather than each re-spawning the identical command.
+    """
+    d = _make_task_dir(tmp_path_factory.mktemp("dispatched") / "er-test-001")
+    return _run(str(d / "task.toml"), "--mode", "baseline"), d
 
-    def test_task_toml_file_resolves_to_its_directory(self, task_dir: Path) -> None:
-        assert resolve_task_dir(task_dir / "task.toml") == task_dir.resolve()
 
-    def test_nonexistent_path_resolves_as_a_directory(self, tmp_path: Path) -> None:
-        """A missing path is not a file, so it must fall through to load_task_config's
-        FileNotFoundError rather than silently becoming its own parent."""
-        missing = tmp_path / "nope"
-        assert resolve_task_dir(missing) == missing.resolve()
+@pytest.fixture(scope="module")
+def scored_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Task dir of one scored perfect run (agent actions == oracle).
+
+    Module-scoped for the same reason as ``dispatched``: its consumers only read
+    the results.json this leaves behind, so one run serves all of them.
+    """
+    d = _make_task_dir(tmp_path_factory.mktemp("scored") / "er-test-001")
+    agent = _write_jsonl(d / "agent_actions.jsonl", ORACLE_ACTIONS)
+    proc = _run(
+        str(d / "task.toml"),
+        "--agent-actions",
+        str(agent),
+        "--mode",
+        "baseline",
+    )
+    assert proc.returncode == 0, proc.stderr
+    return d
+
+
+@pytest.fixture(scope="module")
+def scored(scored_dir: Path) -> dict:
+    """The results.json payload that run left behind."""
+    return json.loads((scored_dir / RESULTS_FILENAME).read_text())
 
 
 class TestRunBenchmarkDispatchContract:
     """The exact invocation run_benchmark makes: a task.toml FILE path."""
 
-    def test_task_toml_path_does_not_crash_on_load(self, task_dir: Path) -> None:
+    def test_task_toml_path_does_not_crash_on_load(self, dispatched: tuple) -> None:
         """Regression: this raised FileNotFoundError on .../task.toml/task.toml,
         which disabled the event_replay session_type entirely."""
-        proc = _run(str(task_dir / "task.toml"), "--mode", "baseline")
-        assert "FileNotFoundError" not in proc.stderr
-        assert "er-test-001" in proc.stdout
-
-    def test_directory_path_still_works(self, task_dir: Path) -> None:
-        """The docstring's documented usage must not regress while fixing the above."""
-        proc = _run(str(task_dir), "--mode", "baseline")
+        proc, _ = dispatched
         assert "FileNotFoundError" not in proc.stderr
         assert "er-test-001" in proc.stdout
 
@@ -139,19 +159,19 @@ class TestRunBenchmarkDispatchContract:
 class TestStubBranchFailsClosed:
     """No --agent-actions means nothing was scored — say so with the exit code."""
 
-    def test_stub_exits_nonzero(self, task_dir: Path) -> None:
+    def test_stub_exits_nonzero(self, dispatched: tuple) -> None:
         """Regression: returning 0 here had run_benchmark record a "completed" run
         with score None. Nonzero routes it to run_benchmark's error channel."""
-        proc = _run(str(task_dir / "task.toml"), "--mode", "baseline")
+        proc, _ = dispatched
         assert proc.returncode != 0
 
-    def test_stub_writes_no_results(self, task_dir: Path) -> None:
+    def test_stub_writes_no_results(self, dispatched: tuple) -> None:
         """It scored nothing, so it must not leave a results.json claiming otherwise."""
-        _run(str(task_dir / "task.toml"), "--mode", "baseline")
-        assert not (task_dir / RESULTS_FILENAME).exists()
+        _, d = dispatched
+        assert not (d / RESULTS_FILENAME).exists()
 
-    def test_stub_explains_itself(self, task_dir: Path) -> None:
-        proc = _run(str(task_dir / "task.toml"), "--mode", "baseline")
+    def test_stub_explains_itself(self, dispatched: tuple) -> None:
+        proc, _ = dispatched
         assert "not yet implemented" in proc.stdout
 
     def test_missing_agent_actions_file_exits_nonzero(self, task_dir: Path) -> None:
@@ -169,50 +189,31 @@ class TestStubBranchFailsClosed:
 class TestScoreModeWritesResults:
     """The score was printed to stdout and nowhere else before this bead."""
 
-    @pytest.fixture
-    def scored(self, task_dir: Path) -> Path:
-        """Score a perfect run (agent actions == oracle) and return the task dir."""
-        agent = _write_jsonl(task_dir / "agent_actions.jsonl", ORACLE_ACTIONS)
-        proc = _run(
-            str(task_dir / "task.toml"),
-            "--agent-actions",
-            str(agent),
-            "--mode",
-            "baseline",
-        )
-        assert proc.returncode == 0, proc.stderr
-        return task_dir
+    def test_results_json_is_written(self, scored_dir: Path) -> None:
+        assert (scored_dir / RESULTS_FILENAME).exists()
 
-    def test_results_json_is_written(self, scored: Path) -> None:
-        assert (scored / RESULTS_FILENAME).exists()
-
-    def test_results_carry_the_shared_shape(self, scored: Path) -> None:
+    def test_results_carry_the_shared_shape(self, scored: dict) -> None:
         """Same contract every other runner writes — not an event_replay dialect."""
-        payload = json.loads((scored / RESULTS_FILENAME).read_text())
-        assert tuple(payload) == RESULTS_FIELDS
+        assert tuple(scored) == RESULTS_FIELDS
 
-    def test_score_is_durable_not_just_printed(self, scored: Path) -> None:
-        payload = json.loads((scored / RESULTS_FILENAME).read_text())
-        assert payload["scores"]["task_score"] == pytest.approx(1.0)
+    def test_score_is_durable_not_just_printed(self, scored: dict) -> None:
+        assert scored["scores"]["task_score"] == pytest.approx(1.0)
 
     def test_scored_run_is_visible_to_skip_completed_and_headline(
-        self, scored: Path
+        self, scored: dict
     ) -> None:
         """success gates run_sweep + is_task_completed; phase gates the headline."""
-        payload = json.loads((scored / RESULTS_FILENAME).read_text())
-        assert payload["success"] is True
-        assert payload["phase"] == "complete"
+        assert scored["success"] is True
+        assert scored["phase"] == "complete"
 
-    def test_task_metadata_comes_from_the_task_toml(self, scored: Path) -> None:
-        payload = json.loads((scored / RESULTS_FILENAME).read_text())
-        assert payload["task_id"] == "er-test-001"
-        assert payload["task_metadata"]["suite"] == "incident_response"
-        assert payload["task_metadata"]["languages"] == ["python"]
+    def test_task_metadata_comes_from_the_task_toml(self, scored: dict) -> None:
+        assert scored["task_id"] == "er-test-001"
+        assert scored["task_metadata"]["suite"] == "incident_response"
+        assert scored["task_metadata"]["languages"] == ["python"]
 
-    def test_offline_scoring_reports_no_tool_usage(self, scored: Path) -> None:
+    def test_offline_scoring_reports_no_tool_usage(self, scored: dict) -> None:
         """This process spends no tokens; empty is honest, a fabricated 0.0 is not."""
-        payload = json.loads((scored / RESULTS_FILENAME).read_text())
-        assert payload["tool_usage"] == {}
+        assert scored["tool_usage"] == {}
 
     def test_imperfect_run_scores_below_one(self, task_dir: Path) -> None:
         """Guard against a write that hardcodes success rather than reading the score."""

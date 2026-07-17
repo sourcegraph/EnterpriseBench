@@ -61,7 +61,7 @@ def test_producer_emits_exactly_the_contract() -> None:
 _RUNNERS = {
     "run_task": (build_run_task_parser, ["dummy/task.toml"]),
     "chain_runner": (build_chain_parser, ["dummy/task.toml"]),
-    "event_replay": (build_event_parser, ["dummy/task_dir"]),
+    "event_replay": (build_event_parser, ["dummy/task.toml"]),
 }
 
 

@@ -12,23 +12,15 @@ runner sees the whole set:
   * ``analysis/recompute_headline_*``   — ``phase`` + ``success``  (headline filter)
   * ``analysis/aggregate_mcp_clean``    — ``status``               (drops "invalid")
 
-The shape was authored richly in one runner (``run_task._save_results``) and
-ad-hoc in the others, so a runner could satisfy the reader it happened to be
-tested against and silently starve the rest: ``chain_runner`` wrote a bare
-``{"scores": {"task_score": ...}}``, which scores but is invisible to
-skip-completed and contributes 0.0 to every cost total, while ``event_replay``
-printed its score to stdout and wrote nothing at all (EnterpriseBench-78zt5).
-Neither failed loudly — an absent key is indistinguishable from a real default
-at every one of those read sites.
-
-Declaring the shape once here mirrors what ``runner_cli`` does for the flag
-contract in the opposite direction: that module is the authority on what
-run_benchmark SENDS a runner, this one on what a runner SENDS BACK.
-``write_results_json``'s signature is the *shape* authority (which keys exist,
-and what an absent value means); each runner stays the *value* authority (what
-its own run actually did). ``tests/test_results_io.py`` binds this module's
-output to the real reader functions, so dropping a key fails there rather than
-as a zero in a cost report.
+Declaring the shape once here is what stops a runner from satisfying the reader
+it happened to be tested against while silently starving the rest — an absent key
+is indistinguishable from a real default at every one of those read sites, so it
+surfaces as a zero in a cost report rather than as a failure (EnterpriseBench-78zt5).
+This mirrors ``runner_cli`` in the opposite direction: that module is the
+authority on what run_benchmark SENDS a runner, this one on what a runner SENDS
+BACK. ``write_results_json``'s signature is the *shape* authority (which keys
+exist, and what an absent value means); each runner stays the *value* authority
+(what its own run actually did).
 
 What this module does NOT own: where the file lands. Runners disagree on that
 (``results/runs/<task_id>/<mode>/`` vs the task directory) and reconciling it is
@@ -65,9 +57,8 @@ RUN_STATUS_INVALID = "invalid"
 # headline aggregators admit a row only on ``phase == "complete" and success is
 # True`` (scripts/analysis/recompute_headline_*.py), and run_task derives
 # INVALID from it (``_effective_status``), so a runner that typo'd it would drop
-# its task out of the headline rather than fail. The readers compare against the
-# literal, so this constant's VALUE is part of the contract — the tests pin it to
-# "complete" on purpose rather than importing it into the assertion.
+# its task out of the headline rather than fail. Readers compare against the
+# literal, so this constant's VALUE is part of the contract, not just its name.
 PHASE_COMPLETE = "complete"
 
 # Top-level keys of results.json, in write order. Every payload carries all of
