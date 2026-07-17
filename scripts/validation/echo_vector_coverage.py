@@ -24,14 +24,28 @@ exercised the checks:
     vacuous    NO check returned a verdict                   -> clean is VACUOUS
     leak       some check credited the echo (> 0)            -> real leak
 
---json-echo then answers the follow-on question: for the cohort the md vector
-never exercised, what does an HONEST vector score? It marshals the prompt's own
-text into the answer shape (the prompt's ```json fence when it publishes one,
-otherwise the shape its checks read) and scores every check — the treatment.
-It reruns the identical shape filled with prompt-free filler — the control.
-Only treatment-minus-control is credit attributable to prompt VOCABULARY; credit
-the filler also earns is a structural freebie (the check credits any well-formed
-answer), a real defect but a different one.
+--json-echo then answers the follow-on question: for the checks the md vector
+never exercised, what does an HONEST vector score? It marshals text into the
+answer shape (the prompt's ```json fence when it publishes one, otherwise the
+shape its checks actually read) and scores every check, three times:
+
+    treatment  this task's own prompt     what a prompt echo can score
+    filler     lorem ipsum, same shape    structural credit — any well-formed
+                                          answer of this shape earns it
+    foreign    ANOTHER task's real prompt domain-prose credit — English, same
+                                          register, none of this task's ground truth
+
+Only credit beyond BOTH controls is attributable to this prompt's vocabulary.
+The foreign arm is load-bearing: these checks match English ground-truth
+substrings, so Latin filler cannot score them for reasons having nothing to do
+with echo, and controlling against filler alone credits "the answer is English
+prose" as a leak — overstating the delta and mis-ranking which tasks are worst.
+
+Deltas are compared SHAPE BY SHAPE and then maxed, never maxed per arm and
+subtracted: an unrelated shape where a control happened to score must not erase
+a real leak visible on another. Where no control produced a verdict the delta is
+None, not 0 — unknown is not "no leak", and an `or 0` there would reproduce
+inside this tool the exact None-is-zero conflation it exists to expose.
 
 Measurement only. This tool changes no verdict and enforces nothing; it
 quantifies what the existing invariant does and does not cover.
@@ -62,21 +76,28 @@ QUARANTINE_FILE = REPO_ROOT / "tests" / "integrity" / "known_prompt_echo_leaks.j
 # ```json ... ``` fence in instruction.md — the answer shape the prompt publishes.
 JSON_FENCE_RE = re.compile(r"```json\s*\n(.*?)```", re.DOTALL)
 
-# `answer.get('key'` / `answer.get("key"` inside a check — the keys it reads.
-ANSWER_GET_RE = re.compile(r"answer\.get\(\s*['\"]([^'\"]+)['\"]")
-
-# Any string key a check pulls out of a dict: `f.get('path')` or `e["symbol"]`.
-# Derived, not hardcoded, for the same reason ANSWER_GET_RE is: a leaf name this
-# tool has never heard of must not silently shrink the probe.
-LEAF_ACCESS_RE = re.compile(
+# Any string key a check pulls out of a dict: `x.get('path')` or `e["symbol"]`.
+# Deliberately NOT anchored to the identifier `answer`: checks bind the parsed
+# deliverable to whatever name they like (`report`, `claimed`, `data`), and
+# anchoring to one name silently shrinks the probe on the rest — the very failure
+# this tool exists to expose.
+KEY_ACCESS_RE = re.compile(
     r"""\.get\(\s*['"]([^'"]+)['"]|\[\s*['"]([^'"]+)['"]\s*\]"""
 )
 
-# Fallback only, when a check exposes no dict access at all to learn from.
-DEFAULT_LEAF_FIELDS = ("path", "file", "name", "description")
+# os.environ['REPORT'] and friends are shell/env reads, not answer fields. They
+# match KEY_ACCESS_RE, and letting them through is what keeps the
+# DEFAULT_LEAF_FIELDS fallback from ever firing. Answer fields are snake_case;
+# env vars are SCREAMING_CASE.
+ENV_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
-# Control filler: same JSON shape, same bulk, zero prompt vocabulary. Credit that
-# survives this is structural (any well-formed answer earns it), not echo.
+# Always offered, never merely fallen back to: a check reading `f['path']` via an
+# idiom the scrape misses must still find the field present.
+DEFAULT_LEAF_FIELDS = ("path", "file", "name", "description", "reason", "detail",
+                       "symbol", "evidence")
+
+# Control arm 1 — shape-only. Same JSON shape, same bulk, no natural language at
+# all. Credit surviving this is structural: any well-formed answer earns it.
 FILLER = "lorem ipsum dolor sit amet consectetur adipiscing elit " * 40
 
 
@@ -146,31 +167,36 @@ def fill(node: object, text: str) -> object:
     return node
 
 
-def keys_from_checks(task_dir: Path) -> list[str]:
-    """Answer keys the checks read (`answer.get('x', answer.get('y', ...))`).
+def accessed_keys(task_dir: Path) -> tuple[str, ...]:
+    """Every dict key the checks read, whatever variable they read it from.
 
     Most report prompts publish no ```json fence, yet their checks still
-    json.load the deliverable. The shape is then discoverable only from the
-    checks — so derive it there rather than leave the task unmeasured.
-    """
-    keys: set[str] = set()
-    for sh in sorted((task_dir / "checks").glob("*.sh")):
-        keys.update(ANSWER_GET_RE.findall(sh.read_text(errors="replace")))
-    return sorted(keys)
+    json.load the deliverable, so the shape is discoverable only here. Scraped
+    without anchoring to a variable name (`answer`/`report`/`claimed` are all in
+    use) and without anchoring to a nesting level: a superset is inert (an unread
+    key is filler) whereas a missing one shrinks the probe silently and reports
+    the task as echo-resistant when it was merely never exercised.
 
-
-def leaf_fields(task_dir: Path) -> tuple[str, ...]:
-    """Field names the checks read out of dicts, for list-of-dict answer shapes.
-
-    Scraped from the checks rather than hardcoded: a superset is harmless (an
-    unread field is inert filler) whereas a missing one shrinks the probe
-    silently, which is the very failure this tool exists to expose.
+    SCREAMING_CASE names are dropped — they are os.environ reads, not answer
+    fields, and letting them through masks a genuinely empty scrape.
     """
     found: set[str] = set()
     for sh in sorted((task_dir / "checks").glob("*.sh")):
-        for a, b in LEAF_ACCESS_RE.findall(sh.read_text(errors="replace")):
-            found.add(a or b)
-    return tuple(sorted(found)) or DEFAULT_LEAF_FIELDS
+        for a, b in KEY_ACCESS_RE.findall(sh.read_text(errors="replace")):
+            name = a or b
+            if not ENV_NAME_RE.match(name):
+                found.add(name)
+    return tuple(sorted(found))
+
+
+def leaf_fields(task_dir: Path) -> tuple[str, ...]:
+    """Field names to offer inside list-of-dict answers.
+
+    Union, not fallback: the scrape and the defaults each cover idioms the other
+    misses, and an extra field costs nothing while a missing one costs a false
+    clean.
+    """
+    return tuple(sorted(set(accessed_keys(task_dir)) | set(DEFAULT_LEAF_FIELDS)))
 
 
 def candidate_templates(task_dir: Path, prompt: str) -> list[object]:
@@ -185,7 +211,7 @@ def candidate_templates(task_dir: Path, prompt: str) -> list[object]:
     fence = answer_template(prompt)
     if fence is not None:
         out.append(fence)
-    keys = keys_from_checks(task_dir)
+    keys = accessed_keys(task_dir)
     leaves = leaf_fields(task_dir)
     if keys:
         # A list of strings covers the scalar reader too: checks stringify the
@@ -195,28 +221,30 @@ def candidate_templates(task_dir: Path, prompt: str) -> list[object]:
         out.append({k: [""] for k in keys})
         out.append({k: [{f: "" for f in leaves}] for k in keys})
     # Bare top-level list (`claimed = json.load(f)` then e["file"]/e["symbol"]) —
-    # the heredoc idiom the answer.get() scan cannot see. Always worth trying:
-    # a shape that fits nothing simply throws and contributes no score.
+    # the heredoc idiom a key scrape cannot attribute to a variable. Always worth
+    # trying: a shape that fits nothing throws and contributes no score.
     out.append([{f: "" for f in leaves}])
     return out
 
 
-def probe(task_dir: Path, text: str, templates: list, deliverables: list[str]) -> dict:
-    """Best score each check reaches under any candidate shape filled with `text`.
+def probe_shape(task_dir: Path, text: str, tpl: object,
+                deliverables: list[str]) -> dict:
+    """Score every check against ONE shape filled with `text`."""
+    body = json.dumps(fill(tpl, text))
+    with tempfile.TemporaryDirectory() as td:
+        ws = Path(td)
+        gate.materialize(ws, deliverables, body)
+        return gate.run_checks(task_dir, ws)
 
-    Per-check max across shapes: a shape that makes one check throw must not
-    mask another check that the same text would have credited.
 
-    Shapes and deliverables are passed in, not re-derived: they do not depend on
-    `text`, and both arms of a task probe the identical set.
+def best_per_check(per_shape: list[dict]) -> dict:
+    """Highest score each check reached under any shape; None if it never ran.
+
+    A shape that makes one check throw must not mask another check the same text
+    would have credited.
     """
     best: dict[str, float | None] = {}
-    for tpl in templates:
-        body = json.dumps(fill(tpl, text))
-        with tempfile.TemporaryDirectory() as td:
-            ws = Path(td)
-            gate.materialize(ws, deliverables, body)
-            scores = gate.run_checks(task_dir, ws)
+    for scores in per_shape:
         for k, v in scores.items():
             if v is None:
                 best.setdefault(k, None)
@@ -226,90 +254,233 @@ def probe(task_dir: Path, text: str, templates: list, deliverables: list[str]) -
 
 
 def mean(scores: dict) -> float | None:
+    """Mean over the checks that produced a verdict. None if none did.
+
+    Callers MUST report n_scored/n_checks alongside this: it is an average over
+    what ran, not over what the task grades, and conflating those is the defect
+    this tool exists to expose.
+    """
     vals = [v for v in scores.values() if v is not None]
     return round(sum(vals) / len(vals), 3) if vals else None
 
 
-def measure_json_echo(task_dir: Path) -> dict:
-    """Treatment (prompt text) vs control (filler) in the prompt's own JSON shape.
+def per_check_echo_delta(arms: dict) -> dict:
+    """Credit attributable to THIS prompt's vocabulary, per check.
 
-    The control is what makes this honest: a check that credits BOTH is a
-    structural freebie (it would credit any well-formed answer), which is a
-    different defect from an echo leak. Only the treatment-minus-control delta
-    is credit attributable to prompt vocabulary.
+    Compared SHAPE BY SHAPE, then maxed — not maxed per arm and subtracted. An
+    unrelated shape where a control happened to score well must not erase a real
+    vocabulary leak visible on another shape.
+
+    None (not 0) when no shape produced a verdict for both the treatment and at
+    least one control: unknown is not "no leak". `or 0` here would reproduce the
+    None-is-zero conflation this whole tool indicts.
+    """
+    out: dict[str, float | None] = {}
+    checks = {k for scores in arms["treatment"] for k in scores}
+    for k in checks:
+        deltas = []
+        for i, t_scores in enumerate(arms["treatment"]):
+            t = t_scores.get(k)
+            if t is None:
+                continue
+            baselines = [arm[i].get(k) for arm in
+                         (arms["filler"], arms["foreign"]) if arm[i].get(k) is not None]
+            if not baselines:
+                continue
+            deltas.append(t - max(baselines))
+        out[k] = round(max(deltas), 3) if deltas else None
+    return out
+
+
+def measure_json_echo(task_dir: Path, foreign: str) -> dict:
+    """Treatment vs TWO controls, in the answer shape the checks actually read.
+
+    treatment  this task's own prompt      — what an echo can score
+    filler     lorem ipsum, same shape     — structural credit: any well-formed answer
+    foreign    ANOTHER task's real prompt  — domain-prose credit: English, right
+                                             register, none of this task's ground truth
+
+    The foreign arm is what makes the attribution honest. These checks match
+    English ground-truth substrings, so Latin filler cannot score them for reasons
+    that have nothing to do with prompt vocabulary — controlling only against
+    filler credits "the answer is English prose" as an echo leak. Only credit
+    beyond BOTH controls is attributable to this prompt.
     """
     rel = str(task_dir.relative_to(gate.BENCH))
     row: dict = {"task": rel, "suite": rel.split("/")[0]}
     prompt = prompt_text(task_dir)
+    if prompt is None:
+        return row | {"probe": "no_instruction_md"}
     templates = candidate_templates(task_dir, prompt)
     deliverables = gate.deliverable_paths(task_dir)
-    if not templates or not deliverables:
-        return row | {"probe": "no_shape_derivable"}
-    treat = probe(task_dir, prompt, templates, deliverables)
-    ctrl = probe(task_dir, FILLER, templates, deliverables)
-    t_mean, c_mean = mean(treat), mean(ctrl)
+    arms = {
+        name: [probe_shape(task_dir, text, tpl, deliverables) for tpl in templates]
+        for name, text in (("treatment", prompt), ("filler", FILLER),
+                           ("foreign", foreign))
+    }
+    best = {name: best_per_check(shapes) for name, shapes in arms.items()}
+    t_mean = mean(best["treatment"])
     if t_mean is None:
-        return row | {"probe": "checks_still_threw"}
-    delta = round(t_mean - (c_mean or 0.0), 3)
+        return row | {"probe": "checks_still_threw",
+                      "n_checks": len(best["treatment"])}
+    deltas = per_check_echo_delta(arms)
+    scored = [v for v in deltas.values() if v is not None]
     return row | {
         "probe": "probed",
+        "n_checks": len(best["treatment"]),
+        "n_scored": sum(1 for v in best["treatment"].values() if v is not None),
+        "n_threw": sum(1 for v in best["treatment"].values() if v is None),
         "treatment_mean": t_mean,
-        "control_mean": c_mean,
-        "echo_delta": delta,
-        "treatment": treat,
-        "control": ctrl,
-        # a check the prompt alone drives to >0 that filler cannot: a real leak
-        "echo_leaking_checks": sorted(
-            k for k, v in treat.items()
-            if v is not None and v > 0 and (ctrl.get(k) or 0) < v
-        ),
+        "filler_mean": mean(best["filler"]),
+        "foreign_mean": mean(best["foreign"]),
+        "echo_delta": round(sum(scored) / len(scored), 3) if scored else None,
+        "treatment": best["treatment"],
+        "filler": best["filler"],
+        "foreign": best["foreign"],
+        "per_check_delta": deltas,
+        # THE INVARIANT'S OWN PROPERTY: "a prompt copy must earn ZERO credit on
+        # EVERY check". That is an absolute threshold — any check the echo scores
+        # above 0 violates it, whatever a control does. No control needed, and no
+        # dependence on which foreign prompt got picked.
+        "checks_crediting_echo": sorted(k for k, v in best["treatment"].items()
+                                        if v is not None and v > 0),
+        # scores beyond BOTH controls on some shape: this prompt's vocabulary
+        "echo_leaking_checks": sorted(k for k, d in deltas.items()
+                                      if d is not None and d > 0),
+        # scores, but no better than a control: credit any answer of this shape earns
         "structural_freebie_checks": sorted(
-            k for k, v in treat.items()
-            if v is not None and v > 0 and (ctrl.get(k) or 0) >= v
+            k for k, d in deltas.items()
+            if d is not None and d <= 0 and (best["treatment"].get(k) or 0) > 0
+        ),
+        # treatment scored but no control ever ran: attribution unknown, not zero
+        "control_inconclusive_checks": sorted(
+            k for k, d in deltas.items()
+            if d is None and (best["treatment"].get(k) or 0) > 0
         ),
     }
 
 
-def prompt_text(task_dir: Path) -> str:
-    return (task_dir / "instruction.md").read_text(errors="replace")
+def prompt_text(task_dir: Path) -> str | None:
+    """This task's prompt, or None when it ships none.
+
+    Guarded: gate.echo_scores() guards the same read, and an unguarded one here
+    would let a single task without an instruction.md abort the whole sweep
+    through ThreadPoolExecutor.map.
+    """
+    instr = task_dir / "instruction.md"
+    if not instr.exists():
+        return None
+    return instr.read_text(errors="replace")
+
+
+def foreign_prompt(task_dir: Path, pool: list[Path]) -> str | None:
+    """A real prompt from a DIFFERENT task, preferring the SAME suite.
+
+    The domain-prose control: English, written to the same template, about the
+    same kind of problem — but not this task. Same-suite is deliberate and is the
+    CONSERVATIVE choice: a sibling shares this task's domain vocabulary, so any
+    credit it earns is credit generic prose earns, and only what the real prompt
+    scores BEYOND it is task-specific. Picking a distant suite would make the
+    control nearly as inert as Latin filler and inflate the delta.
+
+    It errs toward understating: if a sibling happens to share ground-truth
+    terms, the control scores high and the leak is reported smaller than it is.
+    For a number backing an escalation, understating is the safe direction.
+
+    Deterministic — offset halfway around the sorted pool, so pairings are stable
+    across runs and no task controls against itself.
+    """
+    ordered = sorted((d for d in pool if d != task_dir), key=str)
+    if not ordered:
+        return None
+    start = len(ordered) // 2
+    rotated = ordered[start:] + ordered[:start]
+    for same_suite in (True, False):
+        for cand in rotated:
+            if (cand.parent == task_dir.parent) is same_suite:
+                text = prompt_text(cand)
+                if text:
+                    return text
+    return None
 
 
 def run_json_echo(rows: list[dict], workers: int, as_json: bool) -> int:
-    """Probe the cohort the md vector never exercised."""
-    targets = [r for r in rows if r["verdict"] in ("vacuous", "partial")
-               and not r["quarantined"]]
+    """Probe every task the md vector left unexercised, in whole or in part.
+
+    Cohort is `n_threw > 0`, NOT the vacuous/partial labels: classify() reports
+    one label per task and lets `leak` win, so a task leaking on one check while
+    five others throw would hide its five unexercised checks behind the label.
+    Quarantined tasks are probed too — quarantine records one known leaking
+    check, which says nothing about whether the rest were ever exercised.
+    """
+    targets = [r for r in rows if r["n_threw"] > 0]
+    pool = [gate.BENCH / r["task"] for r in rows]
+
+    def run(r: dict) -> dict:
+        task_dir = gate.BENCH / r["task"]
+        foreign = foreign_prompt(task_dir, pool)
+        if foreign is None:
+            return {"task": r["task"], "suite": r["task"].split("/")[0],
+                    "probe": "no_foreign_control"}
+        return measure_json_echo(task_dir, foreign) | {
+            "quarantined": r["quarantined"], "md_verdict": r["verdict"]}
+
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        out = list(ex.map(lambda r: measure_json_echo(gate.BENCH / r["task"]), targets))
+        out = list(ex.map(run, targets))
     out.sort(key=lambda r: -(r.get("echo_delta") or 0))
 
     if as_json:
         print(json.dumps(out, indent=2))
         return 0
 
-    print(f"{'task':<58} {'treat':>6} {'ctrl':>6} {'delta':>6}  status")
-    print("-" * 96)
+    print(f"{'task':<52} {'treat':>6} {'fill':>6} {'frgn':>6} {'delta':>6} "
+          f"{'ran':>5}  status")
+    print("-" * 104)
     for r in out:
         if r["probe"] != "probed":
-            print(f"{r['task']:<58} {'—':>6} {'—':>6} {'—':>6}  {r['probe']}")
+            print(f"{r['task']:<52} {'—':>6} {'—':>6} {'—':>6} {'—':>6} "
+                  f"{'—':>5}  {r['probe']}")
             continue
-        print(f"{r['task']:<58} {r['treatment_mean']:>6} "
-              f"{str(r['control_mean']):>6} {r['echo_delta']:>6}  "
-              f"{'ECHO-LEAK' if r['echo_leaking_checks'] else 'no echo credit'}")
+        status = "ECHO-LEAK" if r["echo_leaking_checks"] else "no echo credit"
+        if r["control_inconclusive_checks"]:
+            status += " (+inconclusive)"
+        print(f"{r['task']:<52} {r['treatment_mean']:>6} "
+              f"{str(r['filler_mean']):>6} {str(r['foreign_mean']):>6} "
+              f"{str(r['echo_delta']):>6} {r['n_scored']}/{r['n_checks']:<3}  {status}")
 
     probed = [r for r in out if r["probe"] == "probed"]
+    crediting = [r for r in probed if r["checks_crediting_echo"]]
     leaking = [r for r in probed if r["echo_leaking_checks"]]
-    print("-" * 96)
-    print(f"cohort (unexercised by md vector) : {len(targets)}")
-    print(f"probed (prompt text, JSON-shaped) : {len(probed)}")
-    for reason in ("no_shape_derivable", "checks_still_threw"):
+    print("-" * 104)
+    print(f"cohort (>=1 check the md vector never exercised) : {len(targets)}")
+    print(f"probed                                          : {len(probed)}")
+    for reason in ("checks_still_threw", "no_instruction_md", "no_foreign_control"):
         n = len([r for r in out if r["probe"] == reason])
         if n:
             print(f"  unprobeable ({reason}): {n}")
-    print(f"\nECHO-LEAKING under a JSON-shaped echo : {len(leaking)}")
-    for suite, n in Counter(r["suite"] for r in leaking).most_common():
+    partial = [r for r in probed if r["n_threw"]]
+    if partial:
+        print(f"  NB {len(partial)} probed rows average over a SUBSET of their "
+              f"checks (see ran column)")
+
+    # Headline: the invariant's OWN property, which needs no control.
+    print(f"\nVIOLATE THE INVARIANT'S STATED PROPERTY  : {len(crediting)}")
+    print('  ("a prompt copy must earn ZERO credit on every check" — these score >0)')
+    for suite, n in Counter(r["suite"] for r in crediting).most_common():
         print(f"  {suite:<28} {n}")
-    if probed:
-        deltas = [r["echo_delta"] for r in probed]
+
+    # Attribution: of that credit, how much is the PROMPT and not the shape.
+    print(f"\nof those, credit beyond BOTH controls (task-specific vocabulary) : "
+          f"{len(leaking)}")
+    freebie = [r for r in probed if r["structural_freebie_checks"]]
+    incon = [r for r in probed if r["control_inconclusive_checks"]]
+    print(f"structural freebies (credit a control also earns)                : "
+          f"{len(freebie)}")
+    if incon:
+        print(f"control-inconclusive (attribution unknown, NOT zero)             : "
+              f"{len(incon)}")
+    deltas = [r["echo_delta"] for r in probed if r["echo_delta"] is not None]
+    if deltas:
         print(f"\nmean echo delta over probed cohort: "
               f"{round(sum(deltas)/len(deltas), 3)}")
         print(f"max  echo delta: {max(deltas)}")
