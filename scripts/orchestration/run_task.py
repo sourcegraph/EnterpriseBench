@@ -1863,15 +1863,10 @@ def _open_agent_output_for_scoring(container_id: str) -> dict | None:
     # though ``chmod -R`` would NOT follow this NESTED symlink. The agent was told
     # to WRITE answer.json, so a symlink there is never legitimate — reject it on
     # the same tamper channel as a symlinked agent_output.
-    if (
-        _docker_exec(
-            container_id,
-            ["test", "-L", ANSWER_ARTIFACT_PATH],
-            timeout=30,
-            user="root",
-        ).returncode
-        == 0
-    ):
+    answer_symlink_probe = _docker_exec(
+        container_id, ["test", "-L", ANSWER_ARTIFACT_PATH], timeout=30, user="root"
+    )
+    if answer_symlink_probe.returncode == 0:
         return _agent_output_tampered(
             f"{ANSWER_ARTIFACT_PATH} is a symlink — the checks would read its "
             "target (e.g. the sealed answer key) instead of an agent-authored "

@@ -1396,8 +1396,12 @@ def _open_exec(
     return fake_exec, calls
 
 
-def _infra_reason(result: dict | None) -> str:
-    """The verifier_infra_error detail from an _open_agent_output_for_scoring result."""
+def _infra_detail(result: dict | None) -> str:
+    """The verifier_infra_error detail from an _open_agent_output_for_scoring result.
+
+    Named for the field it returns: ``reason`` is the sibling machine key
+    ("agent_output_unreadable_by_scorer") these tests assert separately.
+    """
     return result["verifier_infra_error"]["detail"]
 
 
@@ -1466,7 +1470,7 @@ class TestOpenAgentOutputForScoring:
         fake, calls = _open_exec(kind="file")
         with patch.object(rt, "_docker_exec", side_effect=fake):
             result = _open_agent_output_for_scoring("cid")
-        assert "plain file" in _infra_reason(result)
+        assert "plain file" in _infra_detail(result)
         assert "integrity_violation" not in result
         assert not any(c[0] == "chmod" for c in calls)
 
@@ -1505,7 +1509,7 @@ class TestOpenAgentOutputForScoring:
         fake, _ = _open_exec(chmod_ok=False)
         with patch.object(rt, "_docker_exec", side_effect=fake):
             result = _open_agent_output_for_scoring("cid")
-        assert "chmod: denied" in _infra_reason(result)
+        assert "chmod: denied" in _infra_detail(result)
         assert "integrity_violation" not in result
 
     def test_present_but_unreadable_answer_is_infra_not_false_zero(self) -> None:
@@ -1514,7 +1518,7 @@ class TestOpenAgentOutputForScoring:
         fake, _ = _open_exec(answer_readable=False)
         with patch.object(rt, "_docker_exec", side_effect=fake):
             result = _open_agent_output_for_scoring("cid")
-        assert "answer.json" in _infra_reason(result)
+        assert "answer.json" in _infra_detail(result)
         assert "integrity_violation" not in result
 
     def test_absent_answer_json_is_not_flagged(self) -> None:
