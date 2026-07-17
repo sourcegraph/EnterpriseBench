@@ -62,6 +62,8 @@ from run_task import (  # noqa: E402
     _seal_grading_assets,
 )
 
+from tests.conftest import docker_available  # noqa: E402
+
 
 def _is_parent_check(cmd: list[str]) -> bool:
     """The /workspace ownership+sticky probe (vs the grading-asset find)."""
@@ -801,7 +803,7 @@ class TestScoringIdentityContainsAgentCodeEndToEnd:
     """
 
     def test_arbitrary_code_as_the_scorer_cannot_forge_a_score(self) -> None:
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         cid = subprocess.run(
@@ -910,7 +912,7 @@ class TestScoringIdentityContainsAgentCodeEndToEnd:
     def test_a_root_scorer_is_caught_by_the_gate(self) -> None:
         """Mutation guard: the identity assertion must actually fail the run if
         someone points scoring back at root (the state this bead rejected)."""
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         cid = subprocess.run(
@@ -947,7 +949,7 @@ class TestLingeringAgentProcessCannotInjectAnswer:
     """
 
     def test_the_injection_works_without_the_reap_and_the_reap_stops_it(self) -> None:
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         def build() -> str:
@@ -1038,7 +1040,7 @@ class TestLingeringAgentProcessCannotInjectAnswer:
         reap cannot kill leaves survivors, and the run must fail closed rather
         than score beside them (the durable fix is a separate scoring container,
         fix-candidate-3)."""
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         cid = subprocess.run(
@@ -1129,7 +1131,7 @@ class TestRealTaskStillScoresUnderTheNewIdentity:
         return cid
 
     def test_a_correct_answer_still_scores_and_a_wrong_one_still_fails(self) -> None:
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
         if not (REPO_ROOT / self.CALIBRATION / "ground_truth.json").exists():
             pytest.skip("calibration task not present")
@@ -1175,7 +1177,7 @@ class TestRealTaskStillScoresUnderTheNewIdentity:
         rewrite the verifier, and copy the answer key over its own answer. Under
         the root grader both succeeded. The score must still be 0.0.
         """
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
         if not (REPO_ROOT / self.CALIBRATION / "ground_truth.json").exists():
             pytest.skip("calibration task not present")
@@ -1233,7 +1235,7 @@ class TestForgeAttackEndToEnd:
     let the unprivileged user overwrite a verifier with a forged verdict."""
 
     def test_sealed_agent_cannot_forge_a_verdict_or_read_ground_truth(self) -> None:
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         # debian-based, matching every production base image in
@@ -1766,38 +1768,33 @@ class TestUmaskDoesNotUnderCreditTheScorer:
         return out.returncode == 0 and "42" in out.stdout
 
     def _seal_cid(self) -> str:
-        """A container mirroring the real seal: 1777 /workspace, root-owned
-        grading assets group-readable by the scorer, no 'other' access.
+        """A container sealed by the real _seal_grading_assets, assets populated.
 
-        Reproduces _seal_grading_assets' end state (u=rwX,g=rX,o=) across ALL of
-        GRADING_PATHS — .verifiers, .task, .eb_verify and test.sh — not just the
-        two the single-file constants name. A fixture that sealed only the latter
-        could not tell a re-verify covering the whole sealed set from one covering
-        two paths, which is how the gap in that check went unseen.
+        Sealing through production's own function rather than a hand-copied
+        chown/chmod keeps the fixture tracking GRADING_PATHS by construction: add
+        a fifth sealed path, or change the seal's mode, and this fixture follows.
+        A hand-maintained copy would silently stop mirroring production while
+        test_seal_is_checked_across_every_grading_path_not_just_two_files kept
+        passing against the stale shape — the exact drift it exists to catch.
         """
         cid = subprocess.run(
             ["docker", "run", "-d", "--rm", "debian:bookworm-slim", "sleep", "300"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()
+        # The agent user, and content in every sealed path so the seal has
+        # something to cover. _seal_grading_assets creates the scoring identity
+        # and sets /workspace root-owned + 1777 itself.
         subprocess.run(
             ["docker", "exec", cid, "bash", "-c",
              "useradd -m -s /bin/bash agent; "
-             f"groupadd {SCORING_GROUP}; "
-             f"useradd -M -s /bin/bash -g {SCORING_GROUP} {SCORING_USER}; "
-             # /workspace world-writable + sticky, as WORKSPACE_MODE_SESSION.
-             "mkdir -p /workspace && chmod 1777 /workspace; "
-             # Sealed grading assets: root-owned, group-read, no 'other' access.
              "mkdir -p /workspace/.task /workspace/.verifiers /workspace/.eb_verify; "
              'echo \'{"answer": "42"}\' > /workspace/.task/ground_truth.json; '
              'echo \'grep -q EXPECTED_TOKEN\' > /workspace/.verifiers/check1.sh; '
              'echo \'SECRET_PLUGIN_LOGIC\' > /workspace/.eb_verify/plugin.py; '
-             'echo \'#!/bin/bash\' > /workspace/test.sh; '
-             f"chown -R root:{SCORING_GROUP} /workspace/.task /workspace/.verifiers "
-             f"/workspace/.eb_verify /workspace/test.sh; "
-             "chmod -R u=rwX,g=rX,o= /workspace/.task /workspace/.verifiers "
-             "/workspace/.eb_verify /workspace/test.sh"],
+             'echo \'#!/bin/bash\' > /workspace/test.sh'],
             capture_output=True, check=True,
         )
+        _seal_grading_assets(cid)
         return cid
 
     @staticmethod
@@ -1808,7 +1805,7 @@ class TestUmaskDoesNotUnderCreditTheScorer:
         ).stdout.strip()
 
     def test_umask_077_correct_answer_is_readable_after_the_open(self) -> None:
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         cid = self._build("077")
@@ -1858,7 +1855,7 @@ class TestUmaskDoesNotUnderCreditTheScorer:
 
     def test_umask_022_baseline_still_readable(self) -> None:
         # The default umask that already worked must keep working after the open.
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         cid = self._build("022")
@@ -1881,7 +1878,7 @@ class TestUmaskDoesNotUnderCreditTheScorer:
         # ground_truth.json to o=rX and leak the answer key into a chain session.
         # The guard must reject the symlink -> integrity_violation (INVALID, never
         # a re-run mulligan), seal untouched.
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         cid = self._seal_cid()
@@ -1923,7 +1920,7 @@ class TestUmaskDoesNotUnderCreditTheScorer:
         # would read the answer key through it and score a false HIGH. The guard
         # must reject the symlinked answer.json -> integrity_violation (INVALID,
         # never scored), before any chmod, so those checks never run.
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         cid = self._seal_cid()
@@ -1964,7 +1961,7 @@ class TestUmaskDoesNotUnderCreditTheScorer:
         # exercise the post-chmod seal re-verify directly: after the grant, if a
         # grading asset is agent-readable, this open widened it -> tamper, never a
         # scoreable run.
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         cid = self._seal_cid()
@@ -2015,7 +2012,7 @@ class TestUmaskDoesNotUnderCreditTheScorer:
         so this pins the check itself rather than the seal that currently keeps
         the vector out of reach.
         """
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         cid = self._seal_cid()
