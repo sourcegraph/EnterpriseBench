@@ -716,21 +716,11 @@ def test_a_gt_path_holding_the_mount_component_zeroes_the_mandated_shape(tmp_pat
 # answers, and _matches_parts then flattens both to component lists and compares
 # them repo-blind. The field is validated and then ignored.
 #
-# NOT fixed here, and the reason is not squeamishness. Both available forks move a
-# PUBLISHED cross-arm number, in opposite directions, measured on real celery/httpx
-# ground truth against lib/eb_metrics/retrieval_extraction.py:
-#
-#   fork B, repo-prefix the corpus  -> MCP arm MISSES a file it correctly retrieved
-#   fork A, join repo at read time  -> requires stripping the 13 already-prefixed
-#                                      httpx/httpcore/h11 entries, which makes the
-#                                      MCP arm HIT files it currently misses
-#
-# retrieval_extraction reads required_files[].path as repo-relative and drops the
-# qualifier (:15-16, :355-359); its aligner (:404) needs `required` to be a trailing
-# slice of `retrieved`, so changing the stored path length moves recall for exactly
-# the arm whose reads are repo-relative. check_repo_staleness.py:301 reads the same
-# field against repo-relative `git ls-tree` output and is CI-gated by
-# staleness-check.yml:84. Picking a fork is an owner call about published numbers,
+# NOT fixed here. Both forks the bead offers are corpus migrations, and both move a
+# PUBLISHED cross-arm number in opposite directions: lib/eb_metrics/retrieval_extraction
+# reads required_files[].path as repo-relative, so changing the stored path length moves
+# recall for exactly the arm whose reads are repo-relative. The fork comparison and its
+# measurements live in the bead. Picking one is an owner call about published numbers,
 # not a scorer cleanup, so d900w stays needs-human and these stay pinned.
 
 
@@ -757,8 +747,13 @@ def test_a_wrong_repo_answer_over_credits_a_bare_tail(tmp_path):
                         {"source_files": ["/workspace/babel/package.json"]})
     proc = run_cli(answer, gt)
     payload = json.loads(proc.stdout)
+    assert INFRA_SENTINEL not in payload["detail"], payload["detail"]
     assert payload["score"] == 0.3333, payload["detail"]
-    assert "package.json" in payload["detail"]
+    missed = payload["detail"].split("missed: ")[1].rstrip(")").split(", ")
+    assert "package.json" not in missed, (
+        "webpack's bare 'package.json' is the wrongly-credited entry, so it is the one "
+        "NOT reported as missed: " + payload["detail"]
+    )
 
 
 def test_a_wrong_file_in_the_right_repo_over_credits_via_the_mount_prefix(tmp_path):
@@ -796,6 +791,11 @@ def test_a_wrong_file_in_the_right_repo_over_credits_via_the_mount_prefix(tmp_pa
                         {"source_files": ["/workspace/tokio/Cargo.toml"]})
     proc = run_cli(answer, gt)
     payload = json.loads(proc.stdout)
+    # Guard the flip, not just the score: this GT is spelled inline, so a fork that
+    # enforces components(path)[0] == repo rejects the hyper entry as malformed and
+    # emits an INFRA 0.0. Without this line, flipping the assert below to 0.0 would go
+    # green on that infra error and stop testing the matcher entirely.
+    assert INFRA_SENTINEL not in payload["detail"], payload["detail"]
     assert payload["score"] == 0.3333, payload["detail"]
     assert "tokio/Cargo.toml" not in payload["detail"], (
         "the wrongly-credited entry should be the one NOT reported as missed: "
