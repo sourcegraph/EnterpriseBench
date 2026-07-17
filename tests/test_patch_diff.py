@@ -47,6 +47,55 @@ class TestFileHeadersAreNotContent:
         assert "context line" not in added_code(diff("x = 1"), "python")
 
 
+class TestIncrementLinesAreContentNotHeaders:
+    """``++counter;`` is a pre-increment, not the ``+++ b/f`` file header.
+
+    The header was recognised by testing the RAW prefixed line against ``+++``,
+    which an added ``++counter;`` matches exactly — it renders as ``+++counter;``.
+    So a genuine JS/Java/TS pre-increment fix vanished from ``added_code`` and
+    scored 0 on check_patch_site (bead jn73.2.7, defect C). Content lines are the
+    ones inside a hunk; every header precedes the first ``@@``.
+    """
+
+    def test_added_pre_increment_is_code(self) -> None:
+        assert added_code(diff("++counter;"), "javascript") == "++counter;"
+        assert has_code_change(diff("++counter;"), "javascript") is True
+
+    def test_removed_pre_decrement_is_code(self) -> None:
+        d = diff("x = 1;", removed=("--counter;",))
+        assert removed_code(d, "javascript") == "--counter;"
+
+    def test_post_increment_control(self) -> None:
+        """The spelling that never collided with the header, for contrast."""
+        assert added_code(diff("counter++;"), "javascript") == "counter++;"
+
+    def test_file_header_is_still_not_content(self) -> None:
+        """The control: admitting ``++counter;`` must not admit ``+++ b/f``."""
+        assert "b/f" not in added_code(diff("++counter;"), "javascript")
+
+    def test_no_newline_marker_is_not_content(self) -> None:
+        """The one non-content line that lives INSIDE a hunk, so the gate misses it."""
+        assert added_code(diff("x = 1") + "\\ No newline at end of file\n", "python") == "x = 1"
+
+    def test_binary_section_yields_no_content(self) -> None:
+        """No hunk, so nothing in it is content — including git's own prose."""
+        d = (
+            "diff --git a/i.png b/i.png\n"
+            "index 1111111..2222222 100644\n"
+            "Binary files a/i.png and b/i.png differ\n"
+        )
+        assert added_code(d, "python") == ""
+
+    def test_rename_only_section_yields_no_content(self) -> None:
+        d = (
+            "diff --git a/a.py b/b.py\n"
+            "similarity index 100%\n"
+            "rename from a.py\n"
+            "rename to b.py\n"
+        )
+        assert added_code(d, "python") == ""
+
+
 class TestCommentOnlyIsNotCode:
     """The D2 repro, per language: a comment carrying the token scores nothing."""
 

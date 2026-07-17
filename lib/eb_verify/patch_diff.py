@@ -279,26 +279,11 @@ def _scan(line: str, syntax: _Syntax, state: _State) -> CodeLine:
     return CodeLine("".join(out), "".join(bare), "".join(marked), has_bare_code)
 
 
-# Lines a unified diff spends on saying which file it is describing. None of
-# them is content, and every one of them would scan as code.
-_METADATA = (
-    "diff --git ",
-    "index ",
-    "@@",
-    "old mode ",
-    "new mode ",
-    "new file mode ",
-    "deleted file mode ",
-    "similarity index ",
-    "dissimilarity index ",
-    "rename from ",
-    "rename to ",
-    "copy from ",
-    "copy to ",
-    "Binary files ",
-    "GIT binary patch",
-    "\\",  # "\ No newline at end of file"
-)
+# The only line inside a hunk that is not content. Everything else a unified diff
+# spends on describing the file ("diff --git", "index", "+++ b/f", mode and
+# rename lines, "Binary files ... differ") sits *before* the first "@@", so the
+# hunk gate in :func:`_side_lines` already excludes it.
+_NO_NEWLINE = "\\"  # "\ No newline at end of file"
 
 
 def _file_sections(diff: str) -> List[List[str]]:
@@ -330,14 +315,25 @@ def _side_lines(section: List[str], prefix: str) -> List[tuple[str, bool]]:
     agent edited *inside*, so it reads that block's interior as bare code, and
     a docstring the file already had becomes a place to hide a fix that was
     never written (bead jn73.2.7, D2).
+
+    Content is recognised by the diff's own grammar — a line is content only
+    *inside* a hunk — rather than by testing the raw line against the header
+    spellings. Those overlap: an added ``++counter;`` renders as ``+++counter;``,
+    which a ``startswith("+++")`` test reads as the ``+++ b/f`` header and drops,
+    so a genuine pre-increment fix scored 0 (bead jn73.2.7, defect C). The hunk
+    gate has no such ambiguity, because every header line precedes the first
+    ``@@`` while content lines always carry a ``+``/``-``/space prefix.
     """
-    header = prefix * 3
     other = "-" if prefix == "+" else "+"
     out: List[tuple[str, bool]] = []
+    in_hunk = False
     for line in section:
-        if line.startswith(header) or line.startswith(other * 3):
-            continue  # '+++ b/f' / '--- a/f'
-        if any(line.startswith(m) for m in _METADATA):
+        if line.startswith("@@"):
+            # Unprefixed, so this is the hunk header itself; an "@@" in the file
+            # arrives as "+@@"/" @@" and is content.
+            in_hunk = True
+            continue
+        if not in_hunk or line.startswith(_NO_NEWLINE):
             continue
         if line.startswith(prefix):
             out.append((line[1:], True))

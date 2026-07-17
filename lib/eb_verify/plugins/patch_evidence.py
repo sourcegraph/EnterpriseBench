@@ -102,9 +102,32 @@ def _git_diff(repo: Path, *args: str) -> str:
     return proc.stdout
 
 
+# Enough context to reach the top of any real source file, so a diff carries the
+# whole file rather than a window around each edit. Git has no "all context"
+# spelling, so this is a bound rather than a switch: a source file longer than a
+# million lines would truncate, and none of the fourteen repos is within three
+# orders of magnitude of it.
+_FULL_CONTEXT = "-U1000000"
+
+
 def _diff(repo: Path, paths: List[str]) -> str:
-    """The agent's uncommitted diff, limited to ``paths``."""
-    return _git_diff(repo, "HEAD", "--", *paths)
+    """The agent's uncommitted diff, limited to ``paths``, with full file context.
+
+    Full context because :mod:`eb_verify.patch_diff` decides "comment or code" by
+    scanning from the top of the file: a delimiter is only openable where it is
+    written. At git's default three lines, a docstring or block comment opening
+    further above the agent's edit is outside the hunk, so the scanner starts
+    mid-string with no state and reads the prose inside it as bare code — fix-
+    shaped text appended into a pre-existing docstring scored full credit on
+    both patch checkpoints with the real code untouched (bead jn73.2.7, defect
+    A, reopening D2 on all fourteen tasks).
+
+    Attached here rather than in :func:`~eb_verify.agent_git.git_diff_argv`:
+    ``code_patch`` shares that builder to emit patch text that must apply
+    cleanly, where whole-file context is unrelated bloat. The ``--name-only``
+    caller does not go through this function either — it reads no content.
+    """
+    return _git_diff(repo, _FULL_CONTEXT, "HEAD", "--", *paths)
 
 
 def _changed_files(repo: Path) -> List[str]:

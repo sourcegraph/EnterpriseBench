@@ -60,8 +60,13 @@ FIX_LINES: dict[str, tuple[str, ...]] = {
     "err-provenance-dual-markupsafe-striptags-001": (
         '_strip_tags_re = re.compile(r"<[^>]*>", re.DOTALL)',
     ),
+    # Upstream 5fc48e711b, spelled as the real repo spells it: 2.0.7 dispatches on
+    # `mode == "gzip"` in _get_decoder and registers `CONTENT_DECODERS = ["gzip",
+    # "deflate"]`. An earlier fixture invented `content_encoding in (...)` — a
+    # shape absent from urllib3 — which let the check's positive control pass
+    # while the genuine two-site fix scored 0.6 (bead jn73.2.7, defect B).
     "err-provenance-dual-urllib3-xgzip-001": (
-        'if content_encoding in ("gzip", "x-gzip"):',
+        'if mode in ("gzip", "x-gzip"):',
         'CONTENT_DECODERS = ["gzip", "x-gzip", "deflate"]',
     ),
     "error-prov-dual-reqwest-hyper-chunk-001": (
@@ -118,7 +123,7 @@ STRING_BYPASS_LINES: dict[str, tuple[str, ...]] = {
         'DUMMY = "_strip_tags_re = re.compile(pattern, re.DOTALL)"',
     ),
     "err-provenance-dual-urllib3-xgzip-001": (
-        'DUMMY1 = "if content_encoding in (gzip, x-gzip):"',
+        'DUMMY1 = "if mode in (gzip, x-gzip):"',
         'DUMMY2 = "CONTENT_DECODERS = [gzip, x-gzip, deflate]"',
     ),
     "error-prov-dual-reqwest-hyper-chunk-001": (
@@ -186,7 +191,7 @@ MULTILINE_FIX_LINES: dict[str, tuple[str, ...]] = {
         "    '%25', '%')",
     ),
     "err-provenance-dual-urllib3-xgzip-001": (
-        "if content_encoding in (",
+        "if mode in (",
         "    'gzip', 'x-gzip'",
         "):",
         "CONTENT_DECODERS = [",
@@ -219,6 +224,17 @@ WRONG_TARGET_DECOYS: list[tuple[str, str, tuple[str, ...]]] = [
      ("content_encoding = 'x-gzip'",)),
     ("urllib3 substring, not the element", "err-provenance-dual-urllib3-xgzip-001",
      ("CONTENT_DECODERS = ['noise-x-gzip-noise']",)),
+    # Defect B: the real names, reassigned to broken 1-tuples that DROP the
+    # existing "gzip". Real code, real names, x-gzip in a bracket — and a no-op:
+    # the genuine fix ADDS x-gzip alongside gzip, it does not replace it.
+    ("urllib3 dead reassignment of both real names",
+     "err-provenance-dual-urllib3-xgzip-001",
+     ("CONTENT_DECODERS = ('x-gzip',)", "content_encoding = ('x-gzip',)")),
+    # The same, with the missing "gzip" element supplied by a NEIGHBOURING dead
+    # statement — pins that each lookahead stays inside its own collection.
+    ("urllib3 elements pooled across statements",
+     "err-provenance-dual-urllib3-xgzip-001",
+     ("CONTENT_DECODERS = ('x-gzip',)", "x = ('gzip',)")),
 ]
 
 # How each language spells "the rest of this line is prose".
@@ -230,6 +246,24 @@ _COMMENT: dict[str, str] = {
     "javascript": "// ",
     "typescript": "// ",
 }
+
+# How each language opens and closes a block of prose spanning many lines — the
+# docstring or license header a real source file almost always carries.
+_BLOCK_COMMENT: dict[str, tuple[str, str]] = {
+    "python": ('"""', '"""'),
+    "ruby": ("=begin", "=end"),
+    "rust": ("/*", "*/"),
+    "java": ("/*", "*/"),
+    "javascript": ("/*", "*/"),
+    "typescript": ("/*", "*/"),
+}
+
+# Prose lines between the block-comment opener and the agent's edit. Git shows
+# three lines of context by default, so an opener further than that above the
+# edit falls outside the hunk — which is precisely defect A: the scanner then
+# starts with no string state and reads the prose inside the comment as code.
+# Eight is comfortably past three and still cheap to seed.
+_OPENER_DISTANCE = 8
 
 
 def _decoy_path(target: str) -> str:
@@ -270,6 +304,35 @@ class PatchTask:
         file.parent.mkdir(parents=True, exist_ok=True)
         with file.open("a") as fh:
             fh.write(body)
+
+    def _commit(self, message: str) -> None:
+        for cmd in (["git", "add", "-A"], ["git", "commit", "-qm", message]):
+            subprocess.run(cmd, cwd=str(self.repo), check=True, capture_output=True)
+
+    def open_block_comment(self) -> None:
+        """Re-seed the fix site as a file carrying a long pre-existing block comment.
+
+        Committed, so it is part of the baseline the agent inherits — a license
+        header or module docstring, which nearly every real source file has.
+        """
+        opener, closer = _BLOCK_COMMENT[self.lang]
+        prose = "".join(f"prose line {i}\n" for i in range(_OPENER_DISTANCE))
+        (self.repo / self.target).write_text(f"{opener}\n{prose}{closer}\n")
+        self._commit("block comment")
+
+    def write_inside_block(self, lines: tuple[str, ...]) -> None:
+        """Insert ``lines`` verbatim just above the block comment's closer.
+
+        No comment marker: the lines are already prose by virtue of where they
+        sit. That is the point — the agent types the fix's exact text but never
+        leaves the comment.
+        """
+        _, closer = _BLOCK_COMMENT[self.lang]
+        file = self.repo / self.target
+        text = file.read_text()
+        tail = f"{closer}\n"
+        assert text.endswith(tail), f"{self.task_id}: fix site is not a seeded block comment"
+        file.write_text(text[: -len(tail)] + "".join(f"{line}\n" for line in lines) + tail)
 
     def run(self, check: Path) -> dict:
         env = checkpoint_env(self.workspace, self.task_dir, self.task_id)
@@ -468,6 +531,66 @@ def test_string_literal_carrying_the_token_scores_zero(patch_task: PatchTask) ->
 
     assert semantics["score"] == 0.0, (
         f"{patch_task.task_id}: a dead string literal carrying the fix token scored "
+        f"{semantics['score']} on {patch_task.semantics_check.name} — "
+        f"{semantics['detail']}"
+    )
+
+
+def test_fix_shaped_prose_inside_a_far_opening_comment_scores_zero(
+    patch_task: PatchTask,
+) -> None:
+    """Defect A: a comment is not a patch even when its opener is off-screen.
+
+    :func:`test_comment_only_edit_at_fix_site_scores_zero` only ever exercised a
+    comment the agent opened *on the line it wrote*, which git's default three
+    lines of context always show. A block comment the file ALREADY had opens
+    further up, so the opener sits outside the hunk and the scanner starts
+    mid-string with no state — reading the prose inside it as bare code. The
+    agent types the fix's exact text into a docstring, changes nothing, and
+    collects full credit on both patch checkpoints. Real files carry license
+    headers and docstrings, so this is the common shape, not an exotic one.
+
+    Paired with :func:`test_genuine_fix_below_a_far_opening_comment_scores_full`,
+    so "0 inside a comment" cannot be satisfied by zeroing the whole file shape.
+    """
+    patch_task.open_block_comment()
+    patch_task.write_inside_block(patch_task.fix_lines)
+
+    site = patch_task.run(patch_task.site_check)
+    semantics = patch_task.run(patch_task.semantics_check)
+
+    assert site["score"] == 0.0, (
+        f"{patch_task.task_id}: the fix text typed INSIDE a pre-existing block "
+        f"comment at {patch_task.target} scored {site['score']} on "
+        f"check_patch_site — {site['detail']}"
+    )
+    assert semantics["score"] == 0.0, (
+        f"{patch_task.task_id}: the fix text typed INSIDE a pre-existing block "
+        f"comment scored {semantics['score']} on {patch_task.semantics_check.name} "
+        f"— {semantics['detail']}"
+    )
+
+
+def test_genuine_fix_below_a_far_opening_comment_scores_full(
+    patch_task: PatchTask,
+) -> None:
+    """The control: the same file, with the fix as real code once the comment closes.
+
+    Widening the scanner's view must not make a file with a docstring unscorable
+    — an agent that writes the genuine fix below the header still gets paid.
+    """
+    patch_task.open_block_comment()
+    patch_task.write(patch_task.fix_lines, commented=False)
+
+    site = patch_task.run(patch_task.site_check)
+    semantics = patch_task.run(patch_task.semantics_check)
+
+    assert site["score"] == 1.0, (
+        f"{patch_task.task_id}: a real fix below a block comment scored "
+        f"{site['score']} on check_patch_site — {site['detail']}"
+    )
+    assert semantics["score"] == 1.0, (
+        f"{patch_task.task_id}: a real fix below a block comment scored "
         f"{semantics['score']} on {patch_task.semantics_check.name} — "
         f"{semantics['detail']}"
     )
