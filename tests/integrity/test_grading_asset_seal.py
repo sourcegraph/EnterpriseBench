@@ -31,6 +31,7 @@ is reported as an ``integrity_violation`` — score 0.0, never routed to the
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -1075,6 +1076,76 @@ class TestLingeringAgentProcessCannotInjectAnswer:
             subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
 
 
+CALIBRATION_TASK = "benchmarks/customer_escalation/calibration-001"
+
+# The answer calibration-001's ground truth actually asks for — both required files.
+CALIBRATION_CORRECT_ANSWER = {
+    "source_files": ["src/flask/blueprints.py", "src/flask/sansio/scaffold.py"]
+}
+
+
+def _container_with_a_real_task(answer: dict, umask: str | None = None) -> str:
+    """A container carrying a real task's real grading assets and an answer.
+
+    One fixture for every test that needs the real scoring path, so it cannot
+    drift from production in one class and not another.
+
+    ``umask=None`` has root author answer.json, which the chown below leaves
+    agent-owned 0644 — the settled shape for the tests that are not about the
+    mode. ``umask='077'`` has the AGENT author it under that umask instead,
+    reproducing this bead's live vector: a 0600 answer.json that the
+    third-identity scorer, 'other' to the agent, cannot read.
+    """
+    cid = subprocess.run(
+        ["docker", "run", "-d", "--rm", "python:3.11-slim", "sleep", "300"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+
+    task = REPO_ROOT / CALIBRATION_TASK
+    subprocess.run(
+        [
+            "docker", "exec", cid, "bash", "-c",
+            "useradd -m -s /bin/bash agent; "
+            # production layout: the image hands /workspace to the agent, and the
+            # HARNESS creates agent_output before the agent runs, so the dir is
+            # 0755 whatever the agent's umask — only the FILE mode is the vector.
+            "mkdir -p /workspace/.verifiers /workspace/.task "
+            "/workspace/.eb_verify /workspace/agent_output /workspace/flask/.git; "
+            "chown -R agent:agent /workspace",
+        ],
+        capture_output=True, check=True,
+    )
+
+    rt._docker_cp(str(task / "checks/check_error_source.sh"),
+                  f"{cid}:/workspace/.verifiers/check_error_source.sh")
+    rt._docker_cp(str(task / "ground_truth.json"),
+                  f"{cid}:/workspace/.task/ground_truth.json")
+    rt._docker_cp(str(REPO_ROOT / "lib/eb_verify"),
+                  f"{cid}:/workspace/.eb_verify/eb_verify")
+    rt._docker_cp(str(REPO_ROOT / "scripts/sandbox/test_runner.sh"),
+                  f"{cid}:/workspace/test.sh")
+
+    write = (
+        f"cat > {ANSWER_ARTIFACT_PATH} <<'EOF'\n{json.dumps(answer)}\nEOF"
+    )
+    subprocess.run(
+        ["docker", "exec", cid, "bash", "-c", write] if umask is None
+        else ["docker", "exec", "-u", "agent", cid, "bash", "-c",
+              f"umask {umask}; {write}"],
+        capture_output=True, check=True,
+    )
+
+    subprocess.run(
+        ["docker", "exec", cid, "bash", "-c",
+         "chown -R agent:agent /workspace/agent_output /workspace/flask; "
+         # ...and the pre-seal state this bead exists to end
+         "chown -R agent:agent /workspace/.verifiers /workspace/.task "
+         "/workspace/.eb_verify /workspace/test.sh"],
+        capture_output=True, check=True,
+    )
+    return cid
+
+
 @pytest.mark.docker
 class TestRealTaskStillScoresUnderTheNewIdentity:
     """The other half of the bill: the seal must not silently zero real work.
@@ -1087,62 +1158,13 @@ class TestRealTaskStillScoresUnderTheNewIdentity:
     insists on a real score coming back out.
     """
 
-    CALIBRATION = "benchmarks/customer_escalation/calibration-001"
-
-    def _container_with_a_real_task(self, answer: dict) -> str:
-        cid = subprocess.run(
-            ["docker", "run", "-d", "--rm", "python:3.11-slim", "sleep", "300"],
-            capture_output=True, text=True, check=True,
-        ).stdout.strip()
-
-        task = REPO_ROOT / self.CALIBRATION
-        subprocess.run(
-            [
-                "docker", "exec", cid, "bash", "-c",
-                "useradd -m -s /bin/bash agent; "
-                # production layout: the image hands /workspace to the agent
-                "mkdir -p /workspace/.verifiers /workspace/.task "
-                "/workspace/.eb_verify /workspace/agent_output /workspace/flask/.git; "
-                "chown -R agent:agent /workspace",
-            ],
-            capture_output=True, check=True,
-        )
-
-        rt._docker_cp(str(task / "checks/check_error_source.sh"),
-                      f"{cid}:/workspace/.verifiers/check_error_source.sh")
-        rt._docker_cp(str(task / "ground_truth.json"),
-                      f"{cid}:/workspace/.task/ground_truth.json")
-        rt._docker_cp(str(REPO_ROOT / "lib/eb_verify"),
-                      f"{cid}:/workspace/.eb_verify/eb_verify")
-        rt._docker_cp(str(REPO_ROOT / "scripts/sandbox/test_runner.sh"),
-                      f"{cid}:/workspace/test.sh")
-
-        import json as _json
-        subprocess.run(
-            ["docker", "exec", cid, "bash", "-c",
-             f"cat > /workspace/agent_output/answer.json <<'EOF'\n"
-             f"{_json.dumps(answer)}\nEOF\n"
-             "chown -R agent:agent /workspace/agent_output /workspace/flask; "
-             # ...and the pre-seal state this bead exists to end
-             "chown -R agent:agent /workspace/.verifiers /workspace/.task "
-             "/workspace/.eb_verify /workspace/test.sh"],
-            capture_output=True, check=True,
-        )
-        return cid
-
     def test_a_correct_answer_still_scores_and_a_wrong_one_still_fails(self) -> None:
         if not docker_available():
             pytest.skip("docker daemon unavailable")
-        if not (REPO_ROOT / self.CALIBRATION / "ground_truth.json").exists():
+        if not (REPO_ROOT / CALIBRATION_TASK / "ground_truth.json").exists():
             pytest.skip("calibration task not present")
 
-        # The answer the ground truth actually asks for — both required files.
-        cid = self._container_with_a_real_task(
-            {"source_files": [
-                "src/flask/blueprints.py",
-                "src/flask/sansio/scaffold.py",
-            ]}
-        )
+        cid = _container_with_a_real_task(CALIBRATION_CORRECT_ANSWER)
         try:
             _seal_grading_assets(cid)
             scores = _run_scoring(cid, verifier_timeout=120)
@@ -1159,7 +1181,7 @@ class TestRealTaskStillScoresUnderTheNewIdentity:
         )
 
         # ...and the check is still discriminating, not just passing everything.
-        cid = self._container_with_a_real_task({"source_files": ["src/flask/wrong.py"]})
+        cid = _container_with_a_real_task({"source_files": ["src/flask/wrong.py"]})
         try:
             _seal_grading_assets(cid)
             wrong = _run_scoring(cid, verifier_timeout=120)
@@ -1179,10 +1201,10 @@ class TestRealTaskStillScoresUnderTheNewIdentity:
         """
         if not docker_available():
             pytest.skip("docker daemon unavailable")
-        if not (REPO_ROOT / self.CALIBRATION / "ground_truth.json").exists():
+        if not (REPO_ROOT / CALIBRATION_TASK / "ground_truth.json").exists():
             pytest.skip("calibration task not present")
 
-        cid = self._container_with_a_real_task({"source_files": ["src/flask/wrong.py"]})
+        cid = _container_with_a_real_task({"source_files": ["src/flask/wrong.py"]})
         try:
             forgery = (
                 'import json, os, shutil\n'
@@ -1852,6 +1874,46 @@ class TestUmaskDoesNotUnderCreditTheScorer:
             )
         finally:
             subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+    def test_umask_077_correct_answer_scores_on_a_real_task(self) -> None:
+        """The acceptance criterion, measured with the instrument that found it.
+
+        The sibling above proves the scorer can READ the answer after the open,
+        but it calls _open_agent_output_for_scoring directly: neuter the wiring in
+        _run_scoring and it stays green. This bug's whole class is an under-credit
+        nothing detects, and the bead's repro measured SCORES (umask 077 and 027
+        -> 0.0, umask 022 -> 1.0), so a real score off the real path is the proof
+        that is owed — a real calibration task's assets, a correct answer the
+        agent authored under umask 077, through _run_scoring end to end.
+        """
+        if not docker_available():
+            pytest.skip("docker daemon unavailable")
+        if not (REPO_ROOT / CALIBRATION_TASK / "ground_truth.json").exists():
+            pytest.skip("calibration task not present")
+
+        cid = _container_with_a_real_task(CALIBRATION_CORRECT_ANSWER, umask="077")
+        try:
+            # Anti-vacuity: the vector is live going in. 0600 is unreadable to
+            # 'other' whatever the directory's mode, and the scorer is 'other' —
+            # so a 1.0 below can only be the open's doing.
+            mode = self._mode(cid, ANSWER_ARTIFACT_PATH)
+            assert mode == "600", (
+                f"answer.json landed {mode}, not 600 — umask 077 never hid it from "
+                f"the scorer, so this proves nothing"
+            )
+
+            _seal_grading_assets(cid)
+            scores = _run_scoring(cid, verifier_timeout=120)
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+        assert scores["task_score"] == 1.0, (
+            f"a correct answer scored a false 0.0 because the agent's umask left it "
+            f"unreadable to the scorer — the under-credit this bead exists to end: "
+            f"{scores}"
+        )
+        assert "verifier_infra_error" not in scores, scores
+        assert "integrity_violation" not in scores, scores
 
     def test_umask_022_baseline_still_readable(self) -> None:
         # The default umask that already worked must keep working after the open.
