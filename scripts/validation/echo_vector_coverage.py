@@ -49,6 +49,7 @@ import json
 import re
 import sys
 import tempfile
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -64,9 +65,15 @@ JSON_FENCE_RE = re.compile(r"```json\s*\n(.*?)```", re.DOTALL)
 # `answer.get('key'` / `answer.get("key"` inside a check — the keys it reads.
 ANSWER_GET_RE = re.compile(r"answer\.get\(\s*['\"]([^'\"]+)['\"]")
 
-# Leaf field names checks pull out of list-of-dict answers (f.get('path'), ...).
-DICT_LEAF_FIELDS = ("path", "file", "name", "description", "reason", "detail",
-                    "symbol")
+# Any string key a check pulls out of a dict: `f.get('path')` or `e["symbol"]`.
+# Derived, not hardcoded, for the same reason ANSWER_GET_RE is: a leaf name this
+# tool has never heard of must not silently shrink the probe.
+LEAF_ACCESS_RE = re.compile(
+    r"""\.get\(\s*['"]([^'"]+)['"]|\[\s*['"]([^'"]+)['"]\s*\]"""
+)
+
+# Fallback only, when a check exposes no dict access at all to learn from.
+DEFAULT_LEAF_FIELDS = ("path", "file", "name", "description")
 
 # Control filler: same JSON shape, same bulk, zero prompt vocabulary. Credit that
 # survives this is structural (any well-formed answer earns it), not echo.
@@ -113,16 +120,14 @@ def measure(task_dir: Path) -> dict:
     }
 
 
-def answer_template(task_dir: Path) -> object | None:
+def answer_template(prompt: str) -> object | None:
     """The answer shape the prompt itself publishes, as a parsed template.
 
-    Returns None when instruction.md ships no parseable ```json fence — such a
-    task cannot be probed with a schema-faithful echo by this tool.
+    Returns None when the prompt ships no parseable ```json fence — most report
+    prompts don't, which is why candidate_templates() also derives shapes from
+    the checks.
     """
-    instr = task_dir / "instruction.md"
-    if not instr.exists():
-        return None
-    for block in JSON_FENCE_RE.findall(instr.read_text(errors="replace")):
+    for block in JSON_FENCE_RE.findall(prompt):
         try:
             return json.loads(block)
         except json.JSONDecodeError:
@@ -154,41 +159,57 @@ def keys_from_checks(task_dir: Path) -> list[str]:
     return sorted(keys)
 
 
-def candidate_templates(task_dir: Path) -> list[object]:
+def leaf_fields(task_dir: Path) -> tuple[str, ...]:
+    """Field names the checks read out of dicts, for list-of-dict answer shapes.
+
+    Scraped from the checks rather than hardcoded: a superset is harmless (an
+    unread field is inert filler) whereas a missing one shrinks the probe
+    silently, which is the very failure this tool exists to expose.
+    """
+    found: set[str] = set()
+    for sh in sorted((task_dir / "checks").glob("*.sh")):
+        for a, b in LEAF_ACCESS_RE.findall(sh.read_text(errors="replace")):
+            found.add(a or b)
+    return tuple(sorted(found)) or DEFAULT_LEAF_FIELDS
+
+
+def candidate_templates(task_dir: Path, prompt: str) -> list[object]:
     """Every answer shape worth trying, richest evidence first.
 
-    The prompt's own fence when it has one, plus check-derived shape variants
-    (scalar / list-of-string / list-of-dict) because a check's expected type is
-    not knowable statically. Content is ALWAYS only the filled text; the shape
-    is inert scaffolding, so trying several keeps this a measure of what prompt
-    VOCABULARY can buy rather than of shape-guessing luck.
+    The prompt's own fence when it has one, plus check-derived shapes because a
+    check's expected type is not knowable statically. Content is ALWAYS only the
+    filled text; the shape is inert scaffolding, so trying several keeps this a
+    measure of what prompt VOCABULARY can buy rather than of shape-guessing luck.
     """
     out: list[object] = []
-    fence = answer_template(task_dir)
+    fence = answer_template(prompt)
     if fence is not None:
         out.append(fence)
     keys = keys_from_checks(task_dir)
+    leaves = leaf_fields(task_dir)
     if keys:
-        out.append({k: "" for k in keys})
+        # A list of strings covers the scalar reader too: checks stringify the
+        # value before matching (`json.dumps(v)` / `' '.join(str(c) ...)`), so a
+        # separate {k: ""} shape scored identically on every task measured and
+        # only doubled the subprocess count.
         out.append({k: [""] for k in keys})
-        out.append({k: [{f: "" for f in DICT_LEAF_FIELDS}] for k in keys})
+        out.append({k: [{f: "" for f in leaves}] for k in keys})
     # Bare top-level list (`claimed = json.load(f)` then e["file"]/e["symbol"]) —
     # the heredoc idiom the answer.get() scan cannot see. Always worth trying:
     # a shape that fits nothing simply throws and contributes no score.
-    out.append([{f: "" for f in DICT_LEAF_FIELDS}])
+    out.append([{f: "" for f in leaves}])
     return out
 
 
-def probe(task_dir: Path, text: str) -> dict:
+def probe(task_dir: Path, text: str, templates: list, deliverables: list[str]) -> dict:
     """Best score each check reaches under any candidate shape filled with `text`.
 
     Per-check max across shapes: a shape that makes one check throw must not
     mask another check that the same text would have credited.
+
+    Shapes and deliverables are passed in, not re-derived: they do not depend on
+    `text`, and both arms of a task probe the identical set.
     """
-    deliverables = gate.deliverable_paths(task_dir)
-    templates = candidate_templates(task_dir)
-    if not deliverables or not templates:
-        return {}
     best: dict[str, float | None] = {}
     for tpl in templates:
         body = json.dumps(fill(tpl, text))
@@ -219,9 +240,13 @@ def measure_json_echo(task_dir: Path) -> dict:
     """
     rel = str(task_dir.relative_to(gate.BENCH))
     row: dict = {"task": rel, "suite": rel.split("/")[0]}
-    if not candidate_templates(task_dir):
+    prompt = prompt_text(task_dir)
+    templates = candidate_templates(task_dir, prompt)
+    deliverables = gate.deliverable_paths(task_dir)
+    if not templates or not deliverables:
         return row | {"probe": "no_shape_derivable"}
-    treat, ctrl = probe(task_dir, prompt_text(task_dir)), probe(task_dir, FILLER)
+    treat = probe(task_dir, prompt, templates, deliverables)
+    ctrl = probe(task_dir, FILLER, templates, deliverables)
     t_mean, c_mean = mean(treat), mean(ctrl)
     if t_mean is None:
         return row | {"probe": "checks_still_threw"}
@@ -236,7 +261,7 @@ def measure_json_echo(task_dir: Path) -> dict:
         # a check the prompt alone drives to >0 that filler cannot: a real leak
         "echo_leaking_checks": sorted(
             k for k, v in treat.items()
-            if v is not None and v > 0 and not (ctrl.get(k) or 0) >= v
+            if v is not None and v > 0 and (ctrl.get(k) or 0) < v
         ),
         "structural_freebie_checks": sorted(
             k for k, v in treat.items()
@@ -281,10 +306,7 @@ def run_json_echo(rows: list[dict], workers: int, as_json: bool) -> int:
         if n:
             print(f"  unprobeable ({reason}): {n}")
     print(f"\nECHO-LEAKING under a JSON-shaped echo : {len(leaking)}")
-    by_suite: dict[str, int] = {}
-    for r in leaking:
-        by_suite[r["suite"]] = by_suite.get(r["suite"], 0) + 1
-    for suite, n in sorted(by_suite.items(), key=lambda kv: -kv[1]):
+    for suite, n in Counter(r["suite"] for r in leaking).most_common():
         print(f"  {suite:<28} {n}")
     if probed:
         deltas = [r["echo_delta"] for r in probed]
@@ -337,14 +359,9 @@ def main() -> int:
                  and not r["quarantined"]]
     print(f"\nCERTIFIED-BUT-UNEXERCISED (unquarantined, vacuous or partial): "
           f"{len(uncovered)}")
-    by_suite: dict[str, int] = {}
-    for r in uncovered:
-        by_suite[r["suite"]] = by_suite.get(r["suite"], 0) + 1
-    for suite, n in sorted(by_suite.items(), key=lambda kv: -kv[1]):
+    for suite, n in Counter(r["suite"] for r in uncovered).most_common():
         print(f"  {suite:<28} {n}")
-    by_kind: dict[str, int] = {}
-    for r in uncovered:
-        by_kind[r["deliverable_kind"]] = by_kind.get(r["deliverable_kind"], 0) + 1
+    by_kind = Counter(r["deliverable_kind"] for r in uncovered)
     print("  by deliverable kind:", dict(sorted(by_kind.items())))
     return 0
 
