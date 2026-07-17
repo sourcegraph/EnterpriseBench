@@ -78,6 +78,27 @@ def _fail(stderr: str = "boom", returncode: int = 1) -> subprocess.CompletedProc
     )
 
 
+@pytest.fixture
+def captured_git_argv(monkeypatch, tmp_path) -> tuple[list[list[str]], Path]:
+    """``(argv seen, an empty repo)`` for asserting on patch_evidence's git calls.
+
+    The argv is the only place these properties are visible: the module builds
+    ``git -C <repo> diff ...``, which no grep of the source text would match.
+    """
+    from eb_verify.plugins import patch_evidence
+
+    seen: list[list[str]] = []
+
+    def _fake_run(argv, **kwargs):
+        seen.append(argv)
+        return _ok()
+
+    monkeypatch.setattr(patch_evidence.subprocess, "run", _fake_run)
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    return seen, repo
+
+
 def _reap_is(cmd: list) -> bool:
     """True if this exec is the pre-scoring agent-process reap."""
     return bool(cmd) and cmd[0] == "bash" and "kill -9" in cmd[-1] and "id -u agent" in cmd[-1]
@@ -606,7 +627,7 @@ class TestAgentCodeExecutionDuringScoring:
             f"the textconv/external-diff hooks: {offenders}"
         )
 
-    def test_patch_evidence_diffs_disable_textconv(self, monkeypatch, tmp_path) -> None:
+    def test_patch_evidence_diffs_disable_textconv(self, captured_git_argv) -> None:
         """The same rule, enforced where the check script no longer shows it.
 
         The test above greps checks/*.sh for the literal "git diff". The
@@ -621,20 +642,7 @@ class TestAgentCodeExecutionDuringScoring:
         """
         from eb_verify.plugins import patch_evidence
 
-        seen: list[list[str]] = []
-
-        class _Proc:
-            returncode = 0
-            stdout = ""
-            stderr = ""
-
-        def _fake_run(argv, **kwargs):
-            seen.append(argv)
-            return _Proc()
-
-        monkeypatch.setattr(patch_evidence.subprocess, "run", _fake_run)
-        repo = tmp_path / "rack"
-        (repo / ".git").mkdir(parents=True)
+        seen, repo = captured_git_argv
 
         patch_evidence._diff(repo, ["lib/rack/utils.rb"])
         patch_evidence._changed_files(repo)
@@ -651,9 +659,7 @@ class TestAgentCodeExecutionDuringScoring:
                 "diff.external is the same forgery via another config key"
             )
 
-    def test_patch_evidence_diffs_request_whole_file_context(
-        self, monkeypatch, tmp_path
-    ) -> None:
+    def test_patch_evidence_diffs_request_whole_file_context(self, captured_git_argv) -> None:
         """Context width is scoring policy, not a tuning knob.
 
         patch_diff decides "comment or code" by scanning from the top of the
@@ -675,20 +681,7 @@ class TestAgentCodeExecutionDuringScoring:
 
         from eb_verify.plugins import patch_evidence
 
-        seen: list[list[str]] = []
-
-        class _Proc:
-            returncode = 0
-            stdout = ""
-            stderr = ""
-
-        def _fake_run(argv, **kwargs):
-            seen.append(argv)
-            return _Proc()
-
-        monkeypatch.setattr(patch_evidence.subprocess, "run", _fake_run)
-        repo = tmp_path / "urllib3"
-        (repo / ".git").mkdir(parents=True)
+        seen, repo = captured_git_argv
 
         patch_evidence._diff(repo, ["src/urllib3/response.py"])
 

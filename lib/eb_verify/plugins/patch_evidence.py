@@ -44,6 +44,7 @@ from eb_verify.agent_git import git_diff_argv
 from eb_verify.patch_diff import (
     UnknownLanguage,
     added_code,
+    git_lines,
     has_code_change,
     language_for,
     marked_code,
@@ -131,19 +132,18 @@ def _diff(repo: Path, paths: List[str]) -> str:
 
 
 def _changed_files(repo: Path) -> List[str]:
-    # Split on "\n" for the same reason patch_diff._file_sections does: git ends
-    # a line with it and nothing else, while str.splitlines also breaks on \f,
-    # \v, \x85 and friends — and a path is agent-chosen text that may contain
-    # them (git only escapes them when core.quotePath is on, which is the
-    # agent's own config to turn off). No scoring bypass here today, since a
-    # fabricated path just diffs empty; converted anyway so the rule holds on
-    # both paths that feed the scanner, not only the one where it bites.
+    # git_lines rather than splitlines because a path is agent-chosen text that
+    # may carry \f, \v, \x85 and friends (git only escapes them when
+    # core.quotePath is on, which is the agent's own config to turn off). No
+    # scoring bypass here today — a fabricated path just diffs empty — but the
+    # rule holds on both paths that feed the scanner, not only the one where it
+    # bites.
     #
-    # The "if line" is load-bearing, not tidiness: "".split("\n") is [""], where
-    # "".splitlines() is []. Dropping the filter would make an empty result count
-    # as one entry. code_patch._get_diff_lines is the one call site still on
-    # splitlines and walks into exactly that trap — EnterpriseBench-jn73.2.7.10.
-    return [line for line in _git_diff(repo, "--name-only", "HEAD").split("\n") if line]
+    # The "if line" is load-bearing, not tidiness: dropping it would make an
+    # empty result count as one entry. code_patch._get_diff_lines is the one
+    # call site still on splitlines and walks into exactly that trap —
+    # EnterpriseBench-jn73.2.7.10.
+    return [line for line in git_lines(_git_diff(repo, "--name-only", "HEAD")) if line]
 
 
 def _code_changed_at(repo: Path, paths: List[str], lang: str) -> bool:

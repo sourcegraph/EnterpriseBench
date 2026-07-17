@@ -23,17 +23,26 @@ from eb_verify.patch_diff import (
 )
 
 
-def diff(*added: str, removed: tuple[str, ...] = ()) -> str:
-    """A minimal but realistically-shaped unified diff."""
-    body = "".join(f"-{line}\n" for line in removed)
+def diff(
+    *added: str,
+    removed: tuple[str, ...] = (),
+    context: tuple[str, ...] = ("context line",),
+) -> str:
+    """A minimal but realistically-shaped unified diff.
+
+    ``context`` is the hunk's unchanged lines, which whole-file context makes
+    load-bearing: they carry the baseline the agent committed, so a test that
+    poisons one is testing a forgery site rather than an edit.
+    """
+    body = "".join(f" {line}\n" for line in context)
+    body += "".join(f"-{line}\n" for line in removed)
     body += "".join(f"+{line}\n" for line in added)
     return (
         "diff --git a/f b/f\n"
         "index 1111111..2222222 100644\n"
         "--- a/f\n"
         "+++ b/f\n"
-        "@@ -1,3 +1,4 @@\n"
-        " context line\n" + body
+        "@@ -1,3 +1,4 @@\n" + body
     )
 
 
@@ -97,16 +106,7 @@ class TestOnlyNewlineEndsADiffLine:
         a thousand lines away.
         """
         forged = 'CONTENT_DECODERS = ["gzip", "x-gzip"]'
-        d = (
-            "diff --git a/f.py b/f.py\n"
-            "index 1111111..2222222 100644\n"
-            "--- a/f.py\n"
-            "+++ b/f.py\n"
-            "@@ -1,3 +1,4 @@\n"
-            f" # perf notes{sep}+{forged}\n"
-            " import io\n"
-            "+# done\n"
-        )
+        d = diff("# done", context=(f"# perf notes{sep}+{forged}", "import io"))
         assert added_code(d, "python") == "", (
             f"a CONTEXT line carrying {sep!r} minted an added code line: "
             f"{added_code(d, 'python')!r}"

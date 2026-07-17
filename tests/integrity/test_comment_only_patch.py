@@ -372,6 +372,25 @@ class PatchTask:
         )
         return json.loads(proc.stdout)
 
+    def assert_scores(self, *, site: float, semantics: float, why: str) -> None:
+        """Assert both patch checkpoints score exactly ``site`` and ``semantics``.
+
+        ``why`` names the shape under test and completes the sentence
+        "<task>: <why> scored <x> on <check>", so a failure says which bypass
+        (or which control) moved without the reader opening the test.
+        """
+        got_site = self.run(self.site_check)
+        got_semantics = self.run(self.semantics_check)
+
+        assert got_site["score"] == site, (
+            f"{self.task_id}: {why} scored {got_site['score']} on "
+            f"check_patch_site — {got_site['detail']}"
+        )
+        assert got_semantics["score"] == semantics, (
+            f"{self.task_id}: {why} scored {got_semantics['score']} on "
+            f"{self.semantics_check.name} — {got_semantics['detail']}"
+        )
+
 
 def _patch_tasks() -> list[Path]:
     """Every authored task whose declared deliverable includes a code_patch."""
@@ -463,17 +482,10 @@ def test_comment_only_edit_at_fix_site_scores_zero(patch_task: PatchTask) -> Non
     """THE defect: the fix line, commented out at the true site, buys nothing."""
     patch_task.write(patch_task.fix_lines, commented=True)
 
-    site = patch_task.run(patch_task.site_check)
-    semantics = patch_task.run(patch_task.semantics_check)
-
-    assert site["score"] == 0.0, (
-        f"{patch_task.task_id}: a comment-only edit at {patch_task.target} scored "
-        f"{site['score']} on check_patch_site — {site['detail']}"
-    )
-    assert semantics["score"] == 0.0, (
-        f"{patch_task.task_id}: a comment carrying the fix token scored "
-        f"{semantics['score']} on {patch_task.semantics_check.name} — "
-        f"{semantics['detail']}"
+    patch_task.assert_scores(
+        site=0.0,
+        semantics=0.0,
+        why=f"a comment-only edit at {patch_task.target} carrying the fix token",
     )
 
 
@@ -485,28 +497,16 @@ def test_genuine_fix_at_site_scores_full(patch_task: PatchTask) -> None:
     """
     patch_task.write(patch_task.fix_lines, commented=False)
 
-    site = patch_task.run(patch_task.site_check)
-    semantics = patch_task.run(patch_task.semantics_check)
-
-    assert site["score"] == 1.0, (
-        f"{patch_task.task_id}: a real code change at {patch_task.target} scored "
-        f"{site['score']} on check_patch_site — {site['detail']}"
-    )
-    assert semantics["score"] == 1.0, (
-        f"{patch_task.task_id}: the genuine fix scored {semantics['score']} on "
-        f"{patch_task.semantics_check.name} — {semantics['detail']}"
+    patch_task.assert_scores(
+        site=1.0,
+        semantics=1.0,
+        why=f"the genuine fix as real code at {patch_task.target}",
     )
 
 
 def test_no_diff_scores_zero(patch_task: PatchTask) -> None:
     """An agent that changed nothing scores nothing."""
-    site = patch_task.run(patch_task.site_check)
-    semantics = patch_task.run(patch_task.semantics_check)
-
-    assert site["score"] == 0.0, f"{patch_task.task_id}: clean repo scored {site['score']}"
-    assert semantics["score"] == 0.0, (
-        f"{patch_task.task_id}: clean repo scored {semantics['score']} on semantics"
-    )
+    patch_task.assert_scores(site=0.0, semantics=0.0, why="a clean repo with no diff at all")
 
 
 def test_real_fix_at_wrong_path_is_not_full_credit(patch_task: PatchTask) -> None:
@@ -519,17 +519,7 @@ def test_real_fix_at_wrong_path_is_not_full_credit(patch_task: PatchTask) -> Non
     decoy = _decoy_path(patch_task.target)
     patch_task.write(patch_task.fix_lines, commented=False, path=decoy)
 
-    site = patch_task.run(patch_task.site_check)
-    semantics = patch_task.run(patch_task.semantics_check)
-
-    assert site["score"] == 0.2, (
-        f"{patch_task.task_id}: the fix at a WRONG path ({decoy}) scored "
-        f"{site['score']} on check_patch_site — {site['detail']}"
-    )
-    assert semantics["score"] == 0.0, (
-        f"{patch_task.task_id}: the fix at a WRONG path scored {semantics['score']} "
-        f"on {patch_task.semantics_check.name} — {semantics['detail']}"
-    )
+    patch_task.assert_scores(site=0.2, semantics=0.0, why=f"the fix at a WRONG path ({decoy})")
 
 
 def test_string_literal_carrying_the_token_scores_zero(patch_task: PatchTask) -> None:
@@ -578,18 +568,10 @@ def test_fix_shaped_prose_inside_a_far_opening_comment_scores_zero(
     patch_task.open_block_comment()
     patch_task.write_inside_block(patch_task.fix_lines)
 
-    site = patch_task.run(patch_task.site_check)
-    semantics = patch_task.run(patch_task.semantics_check)
-
-    assert site["score"] == 0.0, (
-        f"{patch_task.task_id}: the fix text typed INSIDE a pre-existing block "
-        f"comment at {patch_task.target} scored {site['score']} on "
-        f"check_patch_site — {site['detail']}"
-    )
-    assert semantics["score"] == 0.0, (
-        f"{patch_task.task_id}: the fix text typed INSIDE a pre-existing block "
-        f"comment scored {semantics['score']} on {patch_task.semantics_check.name} "
-        f"— {semantics['detail']}"
+    patch_task.assert_scores(
+        site=0.0,
+        semantics=0.0,
+        why=f"the fix text typed INSIDE a pre-existing block comment at {patch_task.target}",
     )
 
 
@@ -604,17 +586,10 @@ def test_genuine_fix_below_a_far_opening_comment_scores_full(
     patch_task.open_block_comment()
     patch_task.write(patch_task.fix_lines, commented=False)
 
-    site = patch_task.run(patch_task.site_check)
-    semantics = patch_task.run(patch_task.semantics_check)
-
-    assert site["score"] == 1.0, (
-        f"{patch_task.task_id}: a real fix below a block comment scored "
-        f"{site['score']} on check_patch_site — {site['detail']}"
-    )
-    assert semantics["score"] == 1.0, (
-        f"{patch_task.task_id}: a real fix below a block comment scored "
-        f"{semantics['score']} on {patch_task.semantics_check.name} — "
-        f"{semantics['detail']}"
+    patch_task.assert_scores(
+        site=1.0,
+        semantics=1.0,
+        why="a real fix as code below a pre-existing block comment",
     )
 
 

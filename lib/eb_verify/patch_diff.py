@@ -296,6 +296,24 @@ def _scan(line: str, syntax: _Syntax, state: _State) -> CodeLine:
 _NO_NEWLINE = "\\"  # "\ No newline at end of file"
 
 
+def git_lines(text: str) -> List[str]:
+    """``text``'s lines, split on ``\\n`` and nothing else.
+
+    That is the only thing git ends a line with. ``str.splitlines`` also breaks
+    on ``\\v \\f \\x1c \\x1d \\x1e \\x85 \\u2028 \\u2029`` and a lone ``\\r``, none
+    of which git treats as a line ending — so it reads one line git emitted as
+    several, and the agent picks what the extras say. A form feed inside a
+    comment (``# notes\\x0c+CONTENT_DECODERS = [...]``) then mints an added line
+    carrying a fix that was never written, in a file that still parses. The
+    grammar in this module is only as sound as the line stream it runs on (bead
+    jn73.2.7).
+
+    Callers that count entries must drop the empty trailing field themselves:
+    ``git_lines("")`` is ``[""]``, where ``"".splitlines()`` is ``[]``.
+    """
+    return text.split("\n")
+
+
 def _file_sections(diff: str) -> List[List[str]]:
     """``diff``'s lines, grouped per file.
 
@@ -303,19 +321,10 @@ def _file_sections(diff: str) -> List[List[str]]:
     repeatable), and a delimiter left open at the end of one file's hunks says
     nothing about the next file. Letting it carry would swallow the next file's
     real code as "still inside a comment" — under-crediting an honest agent.
-
-    Split on ``\\n`` and nothing else, because that is the only thing git ends a
-    diff line with. ``str.splitlines`` also breaks on ``\\v \\f \\x1c \\x1d \\x1e
-    \\x85 \\u2028 \\u2029`` and a lone ``\\r``, none of which git treats as a line
-    ending — so it reads one line git emitted as several, and the agent picks
-    what the extras say. A form feed inside a comment (``# notes\\x0c+CONTENT_
-    DECODERS = [...]``) then mints an added line carrying a fix that was never
-    written, in a file that still parses. The grammar below is only as sound as
-    the line stream it runs on (bead jn73.2.7).
     """
     sections: List[List[str]] = []
     current: List[str] = []
-    for line in diff.split("\n"):
+    for line in git_lines(diff):
         if line.startswith("diff --git ") and current:
             sections.append(current)
             current = []

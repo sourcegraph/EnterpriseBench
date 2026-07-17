@@ -39,7 +39,8 @@ REPO="$WORKSPACE/urllib3"
 # What it cannot see is reachability (the list inside a never-called def) — the
 # pre-existing lexical floor, EnterpriseBench-jn73.2.7.5. Bead jn73.2.7,
 # residual A, the co-location follow-up, and defect B.
-BOTH_ELEMENTS='(?=[^)\]([]{0,200}?\x01gzip\x01)(?=[^)\]([]{0,200}?\x01x-gzip\x01)[^)\]([]{0,200}?[)\]]'
+NO_BRACKET='[^)\]([]{0,200}?'
+BOTH_ELEMENTS="(?=${NO_BRACKET}\x01gzip\x01)(?=${NO_BRACKET}\x01x-gzip\x01)${NO_BRACKET}[)\]]"
 
 hits() {
     python3 -m eb_verify.plugins.patch_evidence colocated \
@@ -50,11 +51,9 @@ hits() {
 DISPATCH="$(hits '(?:mode|content_encoding)\s+in\s*[\[(]'"$BOTH_ELEMENTS")"
 REGISTRY="$(hits '(?m:^)\s*(?:[\w.]+\.)?CONTENT_DECODERS\s*\+?=\s*[\[(]'"$BOTH_ELEMENTS")"
 
-SITES=0
-if [[ "$DISPATCH" -ge 1 ]]; then SITES=$((SITES + 1)); fi
-if [[ "$REGISTRY" -ge 1 ]]; then SITES=$((SITES + 1)); fi
+SITES=$(( (DISPATCH > 0) + (REGISTRY > 0) ))
 
-if [[ "$SITES" -ge 2 ]]; then
+if [[ "$SITES" -eq 2 ]]; then
     printf '{"score": 1.0, "passed": true, "detail": "patch adds x-gzip alongside gzip in both the decoder dispatch and the recognized-encodings list"}\n'
 elif [[ "$SITES" -eq 1 ]]; then
     printf '{"score": 0.6, "passed": true, "detail": "patch routes x-gzip at one site; only a partial fix (dispatch or decoder list, not both), so the body still falls through undecoded"}\n'
