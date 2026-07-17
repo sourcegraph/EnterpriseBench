@@ -156,16 +156,28 @@ def _prompt_text(task_dir: Path) -> str:
     return text
 
 
-def _tasks_grading_file_paths() -> list[Path]:
-    found: list[Path] = []
+def _candidate_task_dirs() -> list[Path]:
+    """Every non-archived task dir the sweep could consider: one carrying both a
+    ground_truth.json and the instruction.md the comparison reads.
+
+    Split out from the graded set so the coverage guard can report a denominator.
+    Coverage falls for two unrelated reasons and only one of them is this file's
+    bug; the counts separate them (see test_the_invariant_is_actually_covering_tasks).
+    """
+    out: list[Path] = []
     for gt_path in sorted(BENCH.rglob("ground_truth.json")):
         if {"_archived", "mined"} & set(gt_path.relative_to(BENCH).parts):
             continue
-        task_dir = gt_path.parent
-        if not (task_dir / "instruction.md").exists():
-            continue
+        if (gt_path.parent / "instruction.md").exists():
+            out.append(gt_path.parent)
+    return out
+
+
+def _tasks_grading_file_paths(candidates: list[Path]) -> list[Path]:
+    found: list[Path] = []
+    for task_dir in candidates:
         try:
-            gt = json.loads(gt_path.read_text())
+            gt = json.loads((task_dir / "ground_truth.json").read_text())
         except (json.JSONDecodeError, UnicodeDecodeError):
             continue  # schema tests own malformed ground_truth
         if isinstance(gt, dict) and _graded_paths(task_dir, gt):
@@ -173,7 +185,8 @@ def _tasks_grading_file_paths() -> list[Path]:
     return found
 
 
-TASK_DIRS = _tasks_grading_file_paths()
+CANDIDATE_DIRS = _candidate_task_dirs()
+TASK_DIRS = _tasks_grading_file_paths(CANDIDATE_DIRS)
 TASK_IDS = [str(d.relative_to(BENCH)) for d in TASK_DIRS]
 
 
@@ -199,10 +212,27 @@ def test_graded_file_path_absent_from_prompt(task_dir: Path) -> None:
 def test_the_invariant_is_actually_covering_tasks() -> None:
     """Guard against a silently empty sweep: if _graded_path_fields stops matching
     the check idioms (a scorer rename, a jq-to-python rewrite), every test above
-    vanishes and the suite still goes green."""
+    vanishes and the suite still goes green.
+
+    Reported as a fraction of the candidate corpus, because coverage falls for two
+    unrelated reasons whose fixes are opposite. Naming only the discovery half sent
+    two independent investigations (EnterpriseBench-8o9xs, EnterpriseBench-edsyz) at
+    a sound `_graded_path_fields` before either measured the denominator.
+    """
     assert len(TASK_DIRS) >= 60, (
-        f"only {len(TASK_DIRS)} tasks were found to grade file paths; 63 did when "
-        f"this was written. A drop means _graded_path_fields no longer reads how the "
-        f"checks consume required_files/sufficient_files, or _gt_body stopped "
-        f"unwrapping the nested ground_truth key — the sweep is passing vacuously."
+        f"only {len(TASK_DIRS)} of {len(CANDIDATE_DIRS)} candidate tasks grade file "
+        f"paths; 63 did when this was written, and a tree carrying the whole corpus "
+        f"still discovers exactly those 63 out of ~180 candidates today. Read BOTH "
+        f"numbers before changing anything here — they separate two different bugs:\n"
+        f"  * Candidates ALSO down: the corpus in this checkout is incomplete and the "
+        f"sweep is sound. 31 of those 63 task dirs (the *-dual-* cohort) are untracked "
+        f"in git (EnterpriseBench-hllf4), so a clean checkout discovers 32 while the "
+        f"tree that authored them discovers all 63. Discovery is not the bug: do not "
+        f"widen it, and do not lower this bound — 60 is calibrated to a complete "
+        f"corpus and lowering it would retire the guard. Confirm with:\n"
+        f"      git status --porcelain benchmarks | grep '^??'\n"
+        f"  * Candidates HOLD but graded falls: this file's own bug. _graded_path_fields "
+        f"no longer reads how the checks consume required_files/sufficient_files, or "
+        f"_gt_body stopped unwrapping the nested ground_truth key — the sweep is passing "
+        f"vacuously and every assertion above has silently vanished."
     )
