@@ -45,6 +45,7 @@ import run_task as rt  # noqa: E402
 from run_task import (  # noqa: E402
     AGENT_INSTRUCTION,
     AGENT_OUTPUT_DIR,
+    ANSWER_ARTIFACT_PATH,
     GRADING_PATHS,
     GROUND_TRUTH,
     SCORING_GROUP,
@@ -56,6 +57,7 @@ from run_task import (  # noqa: E402
     _assert_grading_assets_sealed,
     _assert_scoring_identity,
     _chown_to_agent,
+    _open_agent_output_for_scoring,
     _run_scoring,
     _seal_grading_assets,
 )
@@ -1352,3 +1354,251 @@ class TestForgeAttackEndToEnd:
             assert "test.sh" in err
         finally:
             subprocess.run(["docker", "kill", cid], capture_output=True)
+
+
+def _open_exec(
+    *,
+    dir_exists: bool = True,
+    chmod_ok: bool = True,
+    dir_readable: bool = True,
+    answer_present: bool = True,
+    answer_readable: bool = True,
+):
+    """A _docker_exec stand-in for _open_agent_output_for_scoring's probes.
+
+    Returns (fake_exec, calls) so a test can both steer each probe's outcome and
+    assert on the exact commands issued (e.g. that the grant carries no write bit).
+    """
+    calls: list[list] = []
+
+    def fake_exec(container_id, cmd, **kwargs):
+        calls.append(cmd)
+        if cmd[:2] == ["test", "-d"] and cmd[2] == AGENT_OUTPUT_DIR:
+            return _ok() if dir_exists else _fail()
+        if cmd[0] == "chmod":
+            return _ok() if chmod_ok else _fail("chmod: denied")
+        if cmd[:2] == ["test", "-r"] and cmd[2] == AGENT_OUTPUT_DIR:
+            return _ok() if dir_readable else _fail()
+        if cmd[:2] == ["test", "-e"] and cmd[2] == ANSWER_ARTIFACT_PATH:
+            return _ok() if answer_present else _fail()
+        if cmd[:2] == ["test", "-r"] and cmd[2] == ANSWER_ARTIFACT_PATH:
+            return _ok() if answer_readable else _fail()
+        return _ok()
+
+    return fake_exec, calls
+
+
+class TestOpenAgentOutputForScoring:
+    """Unit-level: the umask under-credit gate (bead EnterpriseBench-qx4pg).
+
+    A correct agent must not score a false 0.0 because a restrictive umask left
+    agent_output/ unreadable to the third-identity scorer.
+    """
+
+    def test_absent_agent_output_is_a_pass_and_opens_nothing(self) -> None:
+        # No output directory means an empty answer, which scores 0.0 on its own
+        # merits. Nothing for this gate to open, and no chmod to issue.
+        fake, calls = _open_exec(dir_exists=False)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            ok, err = _open_agent_output_for_scoring("cid")
+        assert ok is True and err == ""
+        assert not any(c[0] == "chmod" for c in calls), (
+            "opened a directory the agent never created"
+        )
+
+    def test_readable_answer_passes(self) -> None:
+        fake, _ = _open_exec()
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            ok, err = _open_agent_output_for_scoring("cid")
+        assert ok is True and err == ""
+
+    def test_grant_is_read_and_traverse_only_never_write(self) -> None:
+        fake, calls = _open_exec()
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            _open_agent_output_for_scoring("cid")
+        chmod = next(c for c in calls if c[0] == "chmod")
+        assert chmod == ["chmod", "-R", "u=rwX,go=rX", AGENT_OUTPUT_DIR]
+        # The load-bearing invariant: no group/other WRITE bit is ever granted,
+        # so the scorer (still 'other') cannot forge the answer it grades.
+        go_clause = chmod[2].split(",")[1]  # "go=rX"
+        assert go_clause.startswith("go=") and "w" not in go_clause
+
+    def test_chmod_failure_is_infra_not_pass(self) -> None:
+        fake, _ = _open_exec(chmod_ok=False)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            ok, err = _open_agent_output_for_scoring("cid")
+        assert ok is False and "chmod: denied" in err
+
+    def test_dir_unreadable_after_grant_is_infra(self) -> None:
+        fake, _ = _open_exec(dir_readable=False)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            ok, err = _open_agent_output_for_scoring("cid")
+        assert ok is False and SCORING_USER in err
+
+    def test_present_but_unreadable_answer_is_infra_not_false_zero(self) -> None:
+        # The exact bug: answer.json exists (the agent answered) but the scorer
+        # cannot read it. Must be VERIFIER_INFRA_ERROR, never a silent 0.0.
+        fake, _ = _open_exec(answer_readable=False)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            ok, err = _open_agent_output_for_scoring("cid")
+        assert ok is False and "answer.json" in err
+
+    def test_absent_answer_json_is_not_flagged(self) -> None:
+        # agent_output/ exists but holds no answer.json (agent wrote some other
+        # artifact, or nothing): a genuine empty answer, not this gate's concern.
+        fake, _ = _open_exec(answer_present=False, answer_readable=False)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            ok, err = _open_agent_output_for_scoring("cid")
+        assert ok is True and err == ""
+
+
+class TestRunScoringRoutesUnreadableAgentOutput:
+    """The gate is wired into _run_scoring, and it fails to INFRA, not a 0.0."""
+
+    def test_unreadable_agent_output_becomes_infra_error_and_reopens(self) -> None:
+        reopened: list[str] = []
+        with patch.object(
+            rt, "_assert_grading_assets_sealed", return_value=(True, "")
+        ), patch.object(rt, "_reap_agent_processes"), patch.object(
+            rt, "_close_workspace_for_scoring"
+        ), patch.object(
+            rt,
+            "_open_agent_output_for_scoring",
+            return_value=(False, "scorer cannot read answer.json"),
+        ), patch.object(
+            rt,
+            "_reopen_workspace_for_agent",
+            side_effect=lambda cid: reopened.append(cid),
+        ), patch.object(
+            rt, "_docker_exec", return_value=_ok(stdout='{"task_score": 1.0}')
+        ) as exec_:
+            scores = _run_scoring("cid")
+
+        assert scores["task_score"] == 0.0
+        assert scores["all_passed"] is False
+        infra = scores["verifier_infra_error"]
+        assert infra["reason"] == "agent_output_unreadable_by_scorer"
+        assert infra["stage"] == "deterministic_scoring"
+        # The finally block must still reopen the workspace for a chain's next
+        # session, even though we returned early inside the try.
+        assert reopened == ["cid"]
+        # And test.sh must never have run — we bailed before scoring, so the
+        # un-credited 1.0 in the mock's stdout can never reach the caller.
+        assert not any(
+            call.args[1][0] == "bash" and rt.TEST_SH in call.args[1][-1]
+            for call in exec_.call_args_list
+        ), "scoring ran test.sh despite unreadable agent output"
+
+
+@pytest.mark.docker
+class TestUmaskDoesNotUnderCreditTheScorer:
+    """bead EnterpriseBench-qx4pg, end-to-end on the real two-user topology.
+
+    A correct agent must not score a false 0.0 because its umask left
+    agent_output/ unreadable to the third-identity scorer (ebscorer, 'other' to
+    the agent). Reproduces the bug under umask 077, then proves the harness-side
+    open makes a correct answer.json readable — without granting the scorer the
+    write bit that would let it forge one.
+    """
+
+    def _build(self, umask: str) -> str:
+        cid = subprocess.run(
+            ["docker", "run", "-d", "--rm", "debian:bookworm-slim", "sleep", "300"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        subprocess.run(
+            ["docker", "exec", cid, "bash", "-c",
+             "useradd -m -s /bin/bash agent; "
+             f"groupadd {SCORING_GROUP}; "
+             f"useradd -M -s /bin/bash -g {SCORING_GROUP} {SCORING_USER}; "
+             "mkdir -p /workspace && chown agent:agent /workspace"],
+            capture_output=True, check=True,
+        )
+        # The agent creates agent_output itself, exactly as run_task's
+        # instruction appendix tells it to (`mkdir -p`), under its own umask.
+        subprocess.run(
+            ["docker", "exec", "-u", "agent", cid, "bash", "-c",
+             f"umask {umask}; mkdir -p /workspace/agent_output; "
+             'echo \'{"answer": "42"}\' > /workspace/agent_output/answer.json'],
+            capture_output=True, check=True,
+        )
+        return cid
+
+    def _scorer_sees_answer(self, cid: str) -> bool:
+        # Exactly what an answer.json checkpoint does: as ebscorer, is answer.json
+        # a readable file? `[ -f ]` is false when the parent dir cannot be
+        # traversed, which is the whole under-credit mechanism.
+        out = subprocess.run(
+            ["docker", "exec", "-u", SCORING_USER, cid, "bash", "-c",
+             "[ -f /workspace/agent_output/answer.json ] && "
+             "cat /workspace/agent_output/answer.json"],
+            capture_output=True, text=True,
+        )
+        return out.returncode == 0 and "42" in out.stdout
+
+    def test_umask_077_correct_answer_is_readable_after_the_open(self) -> None:
+        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+            pytest.skip("docker daemon unavailable")
+
+        cid = self._build("077")
+        try:
+            # Control: reproduce the bug. The scorer is blind to a correct answer.
+            assert not self._scorer_sees_answer(cid), (
+                "umask 077 did not hide the answer from the scorer — the test "
+                "proves nothing if the control case is already readable"
+            )
+
+            rt._close_workspace_for_scoring(cid)
+            ok, err = _open_agent_output_for_scoring(cid)
+            assert ok is True, err
+
+            # Fixed: the scorer can now read the answer it must grade -> 1.0, not
+            # a false 0.0.
+            assert self._scorer_sees_answer(cid), (
+                "the scorer still cannot read a correct answer.json after the "
+                "open — the umask under-credit bug is not fixed"
+            )
+
+            # Forge invariant preserved: read+traverse was granted, never write.
+            # ebscorer is 'other' and must not be able to plant an answer.
+            planted = subprocess.run(
+                ["docker", "exec", "-u", SCORING_USER, cid, "bash", "-c",
+                 "echo forged > /workspace/agent_output/answer.json"],
+                capture_output=True, text=True,
+            )
+            assert planted.returncode != 0, (
+                "opening agent_output for READ also granted the scorer WRITE — "
+                "it can now forge the very answer it grades"
+            )
+
+            # The agent keeps full access to its own tree for a chain session.
+            rt._reopen_workspace_for_agent(cid)
+            back = subprocess.run(
+                ["docker", "exec", "-u", "agent", cid, "bash", "-c",
+                 'echo \'{"answer": "43"}\' > /workspace/agent_output/answer.json'],
+                capture_output=True, text=True,
+            )
+            assert back.returncode == 0, (
+                f"the open cost the agent write access to its own output: "
+                f"{back.stderr.strip()}"
+            )
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+    def test_umask_022_baseline_still_readable(self) -> None:
+        # The default umask that already worked must keep working after the open.
+        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+            pytest.skip("docker daemon unavailable")
+
+        cid = self._build("022")
+        try:
+            assert self._scorer_sees_answer(cid), (
+                "umask 022 answer.json was not readable even before the open — "
+                "the baseline the suite relies on is broken"
+            )
+            rt._close_workspace_for_scoring(cid)
+            ok, err = _open_agent_output_for_scoring(cid)
+            assert ok is True, err
+            assert self._scorer_sees_answer(cid)
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)

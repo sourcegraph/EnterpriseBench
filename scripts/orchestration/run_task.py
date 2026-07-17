@@ -1750,6 +1750,77 @@ def _record_agent_trace(
         )
 
 
+def _open_agent_output_for_scoring(container_id: str) -> tuple[bool, str]:
+    """Make agent_output/ readable by the scorer regardless of the agent's umask.
+
+    The agent creates ``/workspace/agent_output`` itself (run_task's instruction
+    appendix tells it to ``mkdir -p``), so the agent's umask picks the mode. Under
+    umask 077 the directory lands 0700 agent:agent; scoring runs as a THIRD
+    identity (SCORING_USER, 'other' to the agent) that then cannot traverse it, so
+    ``[[ -f answer.json ]]`` is false and ~119 answer.json checkpoints score a
+    false 0.0 for a correct answer with no signal anything went wrong (bead
+    EnterpriseBench-qx4pg).
+
+    Runs as root AFTER ``_close_workspace_for_scoring``, so this read grant cannot
+    be exploited: the agent is no longer executing and /workspace is already
+    closed. It grants group+other READ and traverse only, never write, so the
+    scorer (still 'other', no write bit) cannot forge an answer — the
+    forge-prevention seal is untouched. Owner bits are left alone, so the agent
+    keeps full access in a later chain session.
+
+    Returns (ok, error_message):
+      - Absent agent_output is a legitimate empty answer, not this gate's concern
+        -> (True, '').
+      - agent_output (or answer.json) present but still unreadable by the scorer
+        after the grant -> (False, err), so the caller routes a
+        VERIFIER_INFRA_ERROR instead of recording the false 0.0 this bug produces.
+    """
+    exists = _docker_exec(
+        container_id, ["test", "-d", AGENT_OUTPUT_DIR], timeout=30, user="root"
+    )
+    if exists.returncode != 0:
+        # Agent wrote no output directory: an empty answer scores 0.0 on its own
+        # merits. Nothing for this gate to open.
+        return True, ""
+
+    # go=rX: read + traverse, no write bit; owner keeps u=rwX for chain sessions.
+    # Capital X sets execute only where it already applies (dirs, already-exec
+    # files), so answer.json stays 0644 rather than becoming 0755.
+    chmod = _docker_exec(
+        container_id,
+        ["chmod", "-R", "u=rwX,go=rX", AGENT_OUTPUT_DIR],
+        timeout=60,
+        user="root",
+    )
+    if chmod.returncode != 0:
+        return False, (
+            f"could not open {AGENT_OUTPUT_DIR} for the scorer: "
+            f"{chmod.stderr.strip() or 'unknown error'}"
+        )
+
+    if not _can_read(container_id, AGENT_OUTPUT_DIR, user=SCORING_USER):
+        return False, (
+            f"{AGENT_OUTPUT_DIR} is present but unreadable by {SCORING_USER} "
+            "after the read grant — the scorer would see no answer.json"
+        )
+
+    # answer.json present-but-unreadable is the exact false-0.0 vector: the file
+    # exists (the agent answered), but the scorer's `[[ -f ]]`/open() cannot reach
+    # it. This end-to-end read probe requires both traverse on the dir and read on
+    # the file, so a pass here means the scorer can actually load the answer.
+    answer_present = _docker_exec(
+        container_id, ["test", "-e", ANSWER_ARTIFACT_PATH], timeout=30, user="root"
+    )
+    if answer_present.returncode == 0 and not _can_read(
+        container_id, ANSWER_ARTIFACT_PATH, user=SCORING_USER
+    ):
+        return False, (
+            f"{ANSWER_ARTIFACT_PATH} is present but unreadable by {SCORING_USER} "
+            "after the read grant — a correct answer would score a false 0.0"
+        )
+    return True, ""
+
+
 def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
     """Run /workspace/test.sh and capture the JSON results.
 
@@ -1781,6 +1852,21 @@ def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
     _reap_agent_processes(container_id)
     _close_workspace_for_scoring(container_id)
     try:
+        # Undo any restrictive agent umask on agent_output/ so the scorer can read
+        # its own answer.json. Present-but-unreadable becomes an infra error, never
+        # a false 0.0 (bead EnterpriseBench-qx4pg). Inside the try so the finally
+        # still reopens /workspace for a later chain session.
+        opened, open_err = _open_agent_output_for_scoring(container_id)
+        if not opened:
+            return {
+                "task_score": 0.0,
+                "all_passed": False,
+                "verifier_infra_error": InfraError(
+                    reason="agent_output_unreadable_by_scorer",
+                    stage="deterministic_scoring",
+                    detail=open_err,
+                ).as_verifier_error(),
+            }
         result = _docker_exec(
             container_id,
             [
