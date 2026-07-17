@@ -137,6 +137,27 @@ def test_textconv_driver_cannot_forge_semantic_tokens(rigged_repo: Path) -> None
     )
 
 
+def test_textconv_driver_cannot_forge_a_colocated_match(rigged_repo: Path) -> None:
+    """`colocated` is a NEW diff-reading path — the same place a forgotten flag hides.
+
+    It reuses ``_diff``/``git_diff_argv``, so the forged textconv output must not
+    reach the marked view the co-location pattern searches. Pinned so the new mode
+    cannot silently reopen the door the ``site``/``code`` tests guard.
+    """
+    proc = subprocess.run(
+        ["python3", "-m", "eb_verify.plugins.patch_evidence", "colocated",
+         "--repo", str(rigged_repo), "--path", "lib/rack/utils.rb",
+         "--lang", "ruby", "--added", "--pattern", r"\.split\("],
+        capture_output=True, text=True, cwd=rigged_repo.parent,
+        env={"PYTHONPATH": str(Path(__file__).resolve().parents[2] / "lib"),
+             "PATH": "/usr/bin:/bin"},
+    )
+    assert proc.stdout.strip() == "0", (
+        "forged textconv output reached the co-location matcher; a per-task "
+        f"pattern would now credit a fix the agent never wrote: {proc.stdout!r}"
+    )
+
+
 def test_external_diff_driver_cannot_forge_a_code_change(rigged_repo: Path) -> None:
     """`diff.external` is the same trick via a different config key.
 

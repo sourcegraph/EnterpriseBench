@@ -7,23 +7,22 @@ set -euo pipefail
 WORKSPACE="${WORKSPACE:-/workspace}"
 REPO="$WORKSPACE/yarl"
 
-# ADDED/REMOVED carry the agent's diff with comments stripped, so a token
-# inside a comment reads as absent: appending one comment line at the fix site
-# used to score 1.0 here (bead jn73.2.7, D2).
-ADDED="$(python3 -m eb_verify.plugins.patch_evidence code \
-    --repo "$REPO" --path yarl/_url.py --lang python --added)"
+# The genuine fix decodes the %25-encoded zone separator via a replace/partition
+# on a host VARIABLE. `colocated` marks string edges (\x01) so credit requires a
+# `<word>.replace(`/`.partition(` call flush against the %25 literal —
+# `host.replace('%25', '%')`, across lines or not. The `\w\s*\.` receiver refuses
+# a dead `zone = "%25"` (no call), an unrelated `x.replace('foo', 'bar')` (marked
+# string is not %25), and a self-replace on the literal itself
+# (`('%25').replace('%25', '%')` — the receiver is `)`, not a word). What it
+# cannot see is reachability (the call inside `if False:` or a never-called
+# helper) — the pre-existing lexical floor, EnterpriseBench-jn73.2.7.5. Bead
+# jn73.2.7, residual A and the co-location follow-up.
+HITS="$(python3 -m eb_verify.plugins.patch_evidence colocated \
+    --repo "$REPO" --path yarl/_url.py --lang python --added \
+    --pattern '\w\s*\.\s*(?:replace|partition)\(\s*\x01[^\x01]*%25')"
 
-if [[ -z "${ADDED//[[:space:]]/}" ]]; then
-    printf '{"score": 0.0, "passed": false, "detail": "no added lines in yarl/_url.py"}\n'
-    exit 0
-fi
-
-# The correct fix references the RFC-encoded zone separator %25 (decode to %,
-# or partition on %25). Accept either the literal token or a clear zone/replace.
-if printf '%s' "$ADDED" | grep -q "%25"; then
+if [[ "$HITS" -ge 1 ]]; then
     printf '{"score": 1.0, "passed": true, "detail": "patch handles the %%25 encoded zone separator in yarl/_url.py"}\n'
-elif printf '%s' "$ADDED" | grep -Eq "zone|partition|replace\("; then
-    printf '{"score": 0.6, "passed": true, "detail": "patch edits the host/zone handling but does not clearly reference the %%25 separator"}\n'
 else
-    printf '{"score": 0.2, "passed": false, "detail": "diff in yarl/_url.py does not address the zone separator"}\n'
+    printf '{"score": 0.0, "passed": false, "detail": "diff in yarl/_url.py does not decode the %%25 zone separator (a bare %%25 literal with no replace/partition operating on it is not a fix)"}\n'
 fi

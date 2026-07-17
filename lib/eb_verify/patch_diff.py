@@ -21,12 +21,21 @@ write code here", never "is the code correct" — that is the per-task regex's j
 downstream, and a determined bypass (planting a token in a live string
 assignment) still reads as code, because it *is* code. The checkpoint pays for
 evidence of work at the fix site; it does not pretend to prove the fix.
+
+The floor of that: **reachability is invisible here.** The genuine fix expression
+wrapped in ``if (false)`` / ``if False:``, placed after an unconditional return,
+or inside a never-called function reads as code and scores full credit while
+shipping a no-op. This is not specific to any one task or to the marked/co-location
+view — it is the same on the bare-token tasks — and closing it needs semantic
+analysis a comment-stripper cannot do (dead-construct detection, return dominance,
+call-graph liveness) or a shift to behavioral scoring. Tracked as
+EnterpriseBench-jn73.2.7.5.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Sequence
+from typing import Callable, List, Sequence
 
 
 class UnknownLanguage(KeyError):
@@ -123,16 +132,47 @@ class _State:
     line_block_end: str | None = None
 
 
+# Marks a string literal's boundaries in the ``marked`` view so a caller can see
+# where a string sat *without* confusing its contents for surrounding code. A
+# control byte no real source line carries; :func:`_scan` strips any that arrive
+# in the input so the only ones present are the ones it wrote.
+STRING_MARK = "\x01"
+
+
 @dataclass(frozen=True)
 class CodeLine:
-    """One added or removed line, with the non-code spelled out.
+    """One added or removed line, in three views, with the non-code spelled out.
 
-    ``code`` is the line minus its comments. ``has_bare_code`` is whether any
-    code appeared *outside* a string literal, which is what separates
-    ``x = "note"`` (code) from a lone triple-quoted docstring (prose).
+    ``code`` is the line minus its comments, string *contents kept*.
+    ``bare_code`` is the same with string *interiors* dropped too, leaving only
+    code outside any literal (delimiters retained as punctuation).
+    ``marked`` keeps the string contents but replaces each string's *delimiters*
+    with :data:`STRING_MARK`, so ``key === '__proto__'`` reads
+    ``key === \\x01__proto__\\x01``. ``has_bare_code`` is whether any code
+    appeared *outside* a string literal (``x = "note"`` is code; a lone
+    triple-quoted docstring is prose).
+
+    Three views because a semantic grep asks three different things:
+
+    * ``bare_code`` — "did the agent write real code here?" A token that lives
+      only inside a string is a dead assignment, not a fix, so it is absent here
+      (``DUMMY = "range_spec.split(dash)"`` has no ``.split(`` in ``bare_code``;
+      bead jn73.2.7, residual A). This is what the pure-bare tasks match.
+    * ``code`` — the full text, for ``has_code_change`` (a string-only edit is
+      still real code).
+    * ``marked`` — for the few tasks whose fix genuinely *is* a string literal
+      (``'__proto__'``, ``"x-gzip"``, ``%25``, ``[\\s\\S]``). Matching a
+      structural token immediately before the mark (``=== \\x01__proto__``)
+      proves the token *operates on* that literal, which independent presence
+      checks could not: it refuses credit both to a dead ``obj.__proto__`` (the
+      token is bare, not a marked string) and to a literal wearing a matching
+      keyword elsewhere on the line, because only a real comparison puts the
+      operator flush against the mark.
     """
 
     code: str
+    bare_code: str
+    marked: str
     has_bare_code: bool
 
     @property
@@ -142,17 +182,27 @@ class CodeLine:
 
 def _scan(line: str, syntax: _Syntax, state: _State) -> CodeLine:
     """Strip one line's comments, carrying multi-line state across the call."""
+    # Any STRING_MARK in the input is stripped up front, so the only marks in the
+    # ``marked`` view are the ones this function writes at string boundaries — an
+    # agent cannot plant a byte that forges a string edge.
+    line = line.replace(STRING_MARK, " ")
+
     # A ruby =begin block runs until =end, both anchored at column 0.
     if state.line_block_end is not None:
         if line.startswith(state.line_block_end):
             state.line_block_end = None
-        return CodeLine("", False)
+        return CodeLine("", "", "", False)
     for opener, closer in syntax.line_block:
         if line.startswith(opener):
             state.line_block_end = closer
-            return CodeLine("", False)
+            return CodeLine("", "", "", False)
 
+    # ``out`` keeps string contents; ``bare`` drops them (delimiters go to both,
+    # as punctuation); ``marked`` keeps contents but replaces the delimiters with
+    # STRING_MARK, so a caller can tell "inside a string" from "flush against one".
     out: List[str] = []
+    bare: List[str] = []
+    marked: List[str] = []
     has_bare_code = False
     i = 0
     n = len(line)
@@ -170,16 +220,21 @@ def _scan(line: str, syntax: _Syntax, state: _State) -> CodeLine:
         if state.string_end is not None:
             # Backslash escapes a delimiter, and the backslash itself. Consume
             # both so "\\" reads as a terminated string, not an escaped quote.
+            # String interior: kept in ``out`` and ``marked``, withheld from ``bare``.
             if rest.startswith("\\") and len(rest) > 1:
                 out.append(rest[:2])
+                marked.append(rest[:2])
                 i += 2
                 continue
             if rest.startswith(state.string_end):
                 out.append(state.string_end)
+                bare.append(state.string_end)
+                marked.append(STRING_MARK)
                 i += len(state.string_end)
                 state.string_end = None
                 continue
             out.append(rest[0])
+            marked.append(rest[0])
             i += 1
             continue
 
@@ -203,12 +258,16 @@ def _scan(line: str, syntax: _Syntax, state: _State) -> CodeLine:
         if delim is not None:
             state.string_end = delim
             out.append(delim)
+            bare.append(delim)
+            marked.append(STRING_MARK)
             i += len(delim)
             continue
 
         if not rest[0].isspace():
             has_bare_code = True
         out.append(rest[0])
+        bare.append(rest[0])
+        marked.append(rest[0])
         i += 1
 
     # A single-quoted string does not survive a line break; a triple-quoted one
@@ -217,7 +276,7 @@ def _scan(line: str, syntax: _Syntax, state: _State) -> CodeLine:
     if state.string_end is not None and state.string_end not in syntax.multiline_strings:
         state.string_end = None
 
-    return CodeLine("".join(out), has_bare_code)
+    return CodeLine("".join(out), "".join(bare), "".join(marked), has_bare_code)
 
 
 # Lines a unified diff spends on saying which file it is describing. None of
@@ -309,22 +368,65 @@ def _code_lines(diff: str, lang: str, prefix: str) -> List[CodeLine]:
     return out
 
 
-def added_code(diff: str, lang: str) -> str:
+def code_lines(diff: str, lang: str, *, added: bool) -> List[CodeLine]:
+    """The substantive added (or removed) lines, comment-stripped, in file order.
+
+    Public so a caller that needs a view :func:`added_code` cannot flatten to —
+    the per-line ``marked`` text, where a structural token's adjacency to a
+    string literal is legible — can reach each line's fields directly.
+    """
+    return [cl for cl in _code_lines(diff, lang, "+" if added else "-") if cl.is_substantive]
+
+
+# The per-view field selectors, named so :func:`_emit`'s callers read as their
+# intent (bare vs. full) and mypy sees a typed function, not an untyped lambda.
+def _BARE(cl: CodeLine) -> str:
+    return cl.bare_code
+
+
+def _CODE(cl: CodeLine) -> str:
+    return cl.code
+
+
+def _MARKED(cl: CodeLine) -> str:
+    return cl.marked
+
+
+def _emit(lines: List[CodeLine], view: Callable[[CodeLine], str]) -> str:
+    return "\n".join(view(cl) for cl in lines)
+
+
+def marked_code(diff: str, lang: str, *, added: bool) -> str:
+    """The added (or removed) code with string delimiters replaced by :data:`STRING_MARK`.
+
+    ``key === '__proto__'`` becomes ``key === \\x01__proto__\\x01``. A caller can
+    then require a structural token flush against the mark (``=== \\x01__proto__``)
+    to credit "the token operates on this literal", which the flat ``code`` view
+    cannot express — there, a token inside an unrelated string reads the same as
+    one applied to the target. Emitted as one blob (lines joined by ``\\n``) so an
+    idiomatic fix wrapped across lines still reads as adjacent under a
+    whitespace-spanning match.
+    """
+    return _emit(code_lines(diff, lang, added=added), _MARKED)
+
+
+def added_code(diff: str, lang: str, *, include_strings: bool = False) -> str:
     """The added lines that carry code, comments stripped, one per line.
 
-    The text a per-task regex should match against: everything the agent added
-    that is neither commentary nor a bare string.
+    The text a per-task regex should match against. The default drops string
+    *interiors* too (``bare_code``): most fixes are bare tokens, and a token
+    that only appears inside a string literal is a dead assignment, not a fix
+    (bead jn73.2.7, residual A). ``include_strings=True`` keeps the contents,
+    for ``has_code_change`` — a string-only edit is still real code.
     """
-    return "\n".join(
-        cl.code for cl in _code_lines(diff, lang, "+") if cl.is_substantive
-    )
+    view = _CODE if include_strings else _BARE
+    return _emit(code_lines(diff, lang, added=True), view)
 
 
-def removed_code(diff: str, lang: str) -> str:
+def removed_code(diff: str, lang: str, *, include_strings: bool = False) -> str:
     """The removed lines that carried code, comments stripped, one per line."""
-    return "\n".join(
-        cl.code for cl in _code_lines(diff, lang, "-") if cl.is_substantive
-    )
+    view = _CODE if include_strings else _BARE
+    return _emit(code_lines(diff, lang, added=False), view)
 
 
 def has_code_change(diff: str, lang: str) -> bool:
@@ -332,5 +434,14 @@ def has_code_change(diff: str, lang: str) -> bool:
 
     False for the empty diff, and for one that only moves comments, blank lines
     or docstrings around — the distinction the patch-site checkpoint pays on.
+
+    Reads the strings-included view on purpose: this answers "is there real code
+    here", and a line whose only change is a string literal (``x = "x-gzip"``) is
+    real code even when the token-grep that separates a fix from a dead
+    assignment reads the bare view. Pinning it here keeps the *site* checkpoint —
+    which pays for landing at the fix site, not for the fix itself — from
+    under-crediting an honest string-only edit.
     """
-    return bool(added_code(diff, lang)) or bool(removed_code(diff, lang))
+    return bool(added_code(diff, lang, include_strings=True)) or bool(
+        removed_code(diff, lang, include_strings=True)
+    )

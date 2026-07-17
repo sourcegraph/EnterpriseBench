@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# check_localization.sh — Agent's answer.json names the source files on the failure path across markupsafe and jinja — including the true fix site (src/markupsafe/__init__.py) — scored as recall over ground_truth.json required_files, which the prompt never names.
+# check_localization.sh — Agent's answer.json names the source files on the failure path across markupsafe and jinja — including the true fix site (src/markupsafe/__init__.py) — scored as F1 (precision+recall) over ground_truth.json required_files, so a bare-basename dictionary or an over-listed dump falls below pass, which the prompt never names.
 #
-# Scored as recall over the oracle paths in ground_truth.json, which
+# Scored as F1 (precision+recall) over the oracle paths in ground_truth.json,
 # instruction.md never names. The old grep looked for symptom keywords the
 # PROMPT ITSELF supplies, so `cp instruction.md agent_output/answer.json` —
 # zero investigation — scored up to 1.00 on this checkpoint (bead jn73.2.7, D1).
@@ -12,5 +12,5 @@ WORKSPACE="${WORKSPACE:-/workspace}"
 export ANSWER_FILE="$WORKSPACE/agent_output/answer.json"
 export GT_FILE="$TASK_DIR/ground_truth.json"
 
-exec python3 -m eb_verify.plugins.file_extraction \
+exec python3 -m eb_verify.plugins.localization_evidence \
     --keys source_files,files,error_source.files,code_paths,citations

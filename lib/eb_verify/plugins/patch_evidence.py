@@ -34,6 +34,7 @@ for a token. Appending one comment line at the true fix site therefore scored
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -45,6 +46,7 @@ from eb_verify.patch_diff import (
     added_code,
     has_code_change,
     language_for,
+    marked_code,
     removed_code,
 )
 from eb_verify.plugins.file_extraction import HarnessError, _JsonErrorParser, emit
@@ -142,11 +144,66 @@ def _score_site(repo: Path, paths: List[str], lang: str) -> int:
     return emit(0.0, f"no code change at {where} (comments and blank lines are not code)")
 
 
+# Subcommands whose output is text/count (not a JSON verdict), so a nonzero exit
+# must abort the caller's `set -e` with empty stdout rather than print a verdict.
+_TEXT_MODES = ("code", "colocated")
+
+
 def _print_code(repo: Path, paths: List[str], lang: str, *, added: bool) -> int:
-    """Print the added/removed code at ``paths``, comments stripped, for grepping."""
-    diff = _diff(repo, paths)
-    print(added_code(diff, lang) if added else removed_code(diff, lang))
+    """Print the added/removed code at ``paths``, comments stripped, for grepping.
+
+    The bare view: a token that appears only inside a string literal is a dead
+    assignment, not a fix, so it reads as absent (residual A). This is what the
+    tasks whose fix is a bare token (a method call, identifier or operator) match.
+    """
+    print((added_code if added else removed_code)(_diff(repo, paths), lang))
     return 0
+
+
+def _count_colocated(
+    repo: Path, paths: List[str], lang: str, *, added: bool, pattern: str
+) -> int:
+    """Print how many times ``pattern`` matches the marked diff — for literal fixes.
+
+    The marked view replaces each string's delimiters with
+    :data:`~eb_verify.patch_diff.STRING_MARK` (``\\x01``), so ``pattern`` can pin a
+    structural token flush against a literal — e.g. ``(?:===)\\s*\\x01[^\\x01]*__proto__``
+    credits ``key === '__proto__'`` (real comparison against the string) but not a
+    dead ``obj.__proto__`` (the token is bare, no mark) nor a matching keyword that
+    merely shares the line with the literal (nothing sits flush against the mark).
+    The whole diff is one blob and the match runs under DOTALL, so a fix wrapped
+    across lines still counts. The count lets a task distinguish "fixed one site"
+    from "fixed both" (urllib3's dispatch + decoder list).
+
+    A malformed ``pattern`` is the task author's bug, not the agent's — it raises
+    :class:`HarnessError` so the caller books ``verifier_did_not_run``, never a 0.
+    """
+    try:
+        compiled = re.compile(pattern, re.DOTALL)
+    except re.error as exc:
+        raise HarnessError(f"bad co-location pattern {pattern!r}: {exc}") from exc
+    print(len(compiled.findall(marked_code(_diff(repo, paths), lang, added=added))))
+    return 0
+
+
+def _add_common(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--repo", required=True, help="path to the workspace repo")
+    # Repeatable: a task may accept more than one legitimate fix site (the
+    # httpcore5 pool fix lands in StrictConnPool or LaxConnPool).
+    p.add_argument(
+        "--path",
+        required=True,
+        action="append",
+        dest="paths",
+        help="repo-relative fix-site path; repeat for alternative sites",
+    )
+    p.add_argument("--lang", required=True, help="language of the fix site")
+
+
+def _add_side(p: argparse.ArgumentParser) -> None:
+    side = p.add_mutually_exclusive_group(required=True)
+    side.add_argument("--added", action="store_true")
+    side.add_argument("--removed", action="store_true")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -156,23 +213,23 @@ def build_parser() -> argparse.ArgumentParser:
         add_help=False,
     )
     sub = parser.add_subparsers(dest="mode", required=True)
-    for name in ("site", "code"):
-        p = sub.add_parser(name, add_help=False)
-        p.add_argument("--repo", required=True, help="path to the workspace repo")
-        # Repeatable: a task may accept more than one legitimate fix site (the
-        # httpcore5 pool fix lands in StrictConnPool or LaxConnPool).
-        p.add_argument(
-            "--path",
-            required=True,
-            action="append",
-            dest="paths",
-            help="repo-relative fix-site path; repeat for alternative sites",
-        )
-        p.add_argument("--lang", required=True, help="language of the fix site")
-        if name == "code":
-            side = p.add_mutually_exclusive_group(required=True)
-            side.add_argument("--added", action="store_true")
-            side.add_argument("--removed", action="store_true")
+
+    site = sub.add_parser("site", add_help=False)
+    _add_common(site)
+
+    code = sub.add_parser("code", add_help=False)
+    _add_common(code)
+    _add_side(code)
+
+    colocated = sub.add_parser("colocated", add_help=False)
+    _add_common(colocated)
+    _add_side(colocated)
+    colocated.add_argument(
+        "--pattern",
+        required=True,
+        help="Python regex over the marked view (\\x01 marks string edges). Count "
+             "the matches where a structural token sits flush against the literal.",
+    )
     return parser
 
 
@@ -184,21 +241,25 @@ def main(argv: List[str] | None = None) -> int:
     # channel — a JSON verdict on stdout, which that subcommand's caller reads
     # as diff text.
     raw = sys.argv[1:] if argv is None else list(argv)
-    mode: str | None = raw[0] if raw and raw[0] in ("site", "code") else None
+    mode: str | None = raw[0] if raw and raw[0] in ("site", *_TEXT_MODES) else None
     try:
         args = build_parser().parse_args(argv)
         mode = args.mode
         repo = Path(args.repo)
         if mode == "site":
             return _score_site(repo, args.paths, args.lang)
+        if mode == "colocated":
+            return _count_colocated(
+                repo, args.paths, args.lang, added=args.added, pattern=args.pattern
+            )
         return _print_code(repo, args.paths, args.lang, added=args.added)
     # UnknownLanguage lands here with the harness faults, not with the agent's
     # score: the task named a language this module cannot strip, which is our
     # bug. Defaulting to "no comments" would silently restore the hole this
     # module closes, on whichever task added the language.
     except (HarnessError, UnknownLanguage) as exc:
-        if mode == "code":
-            # No verdict channel on this path: print the sentinel to stderr and
+        if mode in _TEXT_MODES:
+            # No verdict channel on these paths: print the sentinel to stderr and
             # exit nonzero so the caller's `set -e` aborts with empty stdout,
             # which scorer_guard books as verifier_did_not_run.
             print(f"{INFRA_SENTINEL}: {exc}", file=sys.stderr)

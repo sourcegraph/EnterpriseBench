@@ -8,12 +8,16 @@ the diff text and absent from the code.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from eb_verify.patch_diff import (
+    STRING_MARK,
     UnknownLanguage,
     added_code,
     has_code_change,
+    marked_code,
     removed_code,
 )
 
@@ -108,24 +112,86 @@ class TestBareStringIsNotCode:
         assert has_code_change(d, "python") is True
 
 
-class TestStringContentsSurvive:
-    """Real upstream fixes here are string literals; stripping them would break them."""
+class TestBareViewDropsStringInteriors:
+    """The default view drops string *contents* — residual A.
 
-    def test_split_literal_kept(self) -> None:
+    A token that appears only inside a string literal is a dead assignment, not
+    a fix: ``DUMMY = "range_spec.split(dash)"`` left the vulnerable regex
+    untouched yet scored full semantic credit because the grep read the string
+    (bead jn73.2.7, residual A). The default view drops the interior so the
+    token reads as absent; ``include_strings=True`` keeps it for the tasks whose
+    genuine fix is a literal.
+    """
+
+    def test_split_method_call_survives_bare(self) -> None:
+        # `.split(` is a method call outside the string — bare code, kept.
         d = diff("        ranges = range_spec.split('-')")
-        assert ".split('-')" in added_code(d, "ruby")
+        assert ".split(" in added_code(d, "ruby")
 
-    def test_proto_literal_kept(self) -> None:
+    def test_dead_string_token_absent_from_bare(self) -> None:
+        # THE residual-A negative: the token lives only inside the string.
+        d = diff("        DUMMY = 'range_spec.split(dash)'")
+        assert ".split(dash)" not in added_code(d, "ruby")
+        assert ".split(dash)" in added_code(d, "ruby", include_strings=True)
+
+    def test_proto_literal_only_under_include_strings(self) -> None:
         d = diff("      if (key === '__proto__') { continue; }")
-        assert "__proto__" in added_code(d, "javascript")
+        assert "__proto__" not in added_code(d, "javascript")
+        assert "__proto__" in added_code(d, "javascript", include_strings=True)
+        # The structural token IS bare, so a co-line check can still anchor it.
+        assert "===" in added_code(d, "javascript")
 
     def test_comment_marker_inside_string_is_not_a_comment(self) -> None:
-        d = diff('url = "http://example.com/path"')
-        assert "example.com" in added_code(d, "javascript")
+        # The '//' is inside the string, so it must not truncate the line: bare
+        # code after the string ( ';' ) survives, and include-strings keeps all.
+        d = diff('url = "http://example.com/path";')
+        assert "example.com" not in added_code(d, "javascript")
+        assert "example.com" in added_code(d, "javascript", include_strings=True)
 
     def test_hash_inside_string_is_not_a_comment(self) -> None:
         d = diff('anchor = "section#heading"')
-        assert "heading" in added_code(d, "ruby")
+        assert "heading" not in added_code(d, "ruby")
+        assert "heading" in added_code(d, "ruby", include_strings=True)
+
+
+class TestMarkedView:
+    """``marked_code`` replaces string delimiters with STRING_MARK, keeping contents.
+
+    This is the view the literal-fix tasks match against: a structural token flush
+    against the mark proves it operates on the literal, which a flat text view
+    cannot show — there a token inside an unrelated string reads identically.
+    """
+
+    def test_delimiters_become_marks_contents_kept(self) -> None:
+        d = diff("if (key === '__proto__') { continue; }")
+        m = marked_code(d, "javascript", added=True)
+        assert f"=== {STRING_MARK}__proto__{STRING_MARK}" in m
+
+    def test_a_string_token_is_flanked_by_marks_not_bare(self) -> None:
+        # The whole dead line is one string: the guard tokens inside it sit
+        # between the outer marks, never flush against a mark of their own.
+        d = diff('const D = "if (key === \'__proto__\') continue";')
+        m = marked_code(d, "javascript", added=True)
+        assert f"=== {STRING_MARK}__proto__" not in m
+        assert m.startswith("const D = " + STRING_MARK)
+
+    def test_comment_stripped_before_marking(self) -> None:
+        d = diff("x = 1  // note '__proto__'")
+        assert STRING_MARK not in marked_code(d, "javascript", added=True)
+
+    def test_input_mark_byte_is_sanitized(self) -> None:
+        # An agent cannot plant a raw STRING_MARK to forge a string edge: any in
+        # the input is stripped, so every mark in the view is one _scan wrote.
+        d = diff(f"key === {STRING_MARK}__proto__{STRING_MARK}")  # bare, not a string
+        m = marked_code(d, "javascript", added=True)
+        assert STRING_MARK not in m
+
+    def test_multiline_blob_keeps_a_wrapped_fix_adjacent(self) -> None:
+        # Lines join with '\n', so a structural token and its literal wrapped
+        # across lines are still separated only by whitespace.
+        d = diff("if (key ===", "    '__proto__') continue;")
+        m = marked_code(d, "javascript", added=True)
+        assert re.search(rf"===\s*{re.escape(STRING_MARK)}__proto__", m)
 
 
 class TestRustLifetimesAreNotStrings:

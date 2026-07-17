@@ -205,3 +205,36 @@ def test_partial_answer_scores_partial(task: EvidenceTask, tmp_path: Path) -> No
         f"{task.task_id}: naming 1 of {len(required)} required files scored "
         f"{verdict['score']} — {verdict['detail']}"
     )
+
+
+def test_bare_basename_dump_scores_below_pass(task: EvidenceTask, tmp_path: Path) -> None:
+    """Residual B: a filename dictionary is not localization.
+
+    Listing the oracle files by BARE basename names a file in every repo — the
+    directory is the evidence the agent read the tree. So a basename dump must
+    fall below pass. A repo-root oracle (follow-redirects' index.js) is the one
+    file whose bare name is the truthful spelling, so it is credited — but it is
+    one of several required files, so the dump still fails.
+    """
+    basenames = [Path(f["path"]).name for f in task.gt["required_files"]]
+    verdict = task.score(tmp_path / "ws", json.dumps({"source_files": basenames}))
+    assert verdict["passed"] is False, (
+        f"{task.task_id}: a bare-basename dump {basenames} passed on "
+        f"{task.check.name} — {verdict['detail']}"
+    )
+
+
+def test_overlisted_answer_scores_below_pass(task: EvidenceTask, tmp_path: Path) -> None:
+    """Residual B: over-listing must dilute precision below pass.
+
+    The oracle paths, correct and dir-qualified, drowned in 200 junk paths — the
+    ``find /workspace -type f`` shape. Recall is perfect; precision is not, so F1
+    lands below pass.
+    """
+    real = [f["path"] for f in task.gt["required_files"]]
+    junk = [f"pkg/module/generated_{i}.py" for i in range(200)]
+    verdict = task.score(tmp_path / "ws", json.dumps({"source_files": real + junk}))
+    assert verdict["passed"] is False, (
+        f"{task.task_id}: {len(real)} real paths + {len(junk)} junk passed on "
+        f"{task.check.name} — {verdict['detail']}"
+    )
