@@ -47,8 +47,27 @@ except ImportError:
 
 try:
     from .runner_cli import add_passthrough_args
+    from .results_io import PHASE_COMPLETE, write_results_json
 except ImportError:
     from runner_cli import add_passthrough_args
+    from results_io import PHASE_COMPLETE, write_results_json
+
+
+def resolve_task_dir(task_path: Path) -> Path:
+    """Normalize a task.toml FILE or a task DIRECTORY to the task directory.
+
+    run_benchmark dispatches every runner as ``<runner> <task.toml path>``
+    (run_benchmark.py:320 — its task list comes from an ``rglob("task.toml")``),
+    but this runner's positional was declared and consumed as a directory. So
+    every run_benchmark dispatch resolved ``.../task.toml/task.toml`` and died
+    with FileNotFoundError before it could score anything, which disabled the
+    session_type outright (EnterpriseBench-78zt5).
+
+    Accepting both is what makes that safe to fix: the usage in this module's
+    docstring passes a directory, and hand-run invocations depend on it.
+    """
+    resolved = task_path.resolve()
+    return resolved.parent if resolved.is_file() else resolved
 
 
 def load_task_config(task_dir: Path) -> dict:
@@ -150,7 +169,11 @@ def print_report(result: ScoreResult) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Event-replay runner and scorer")
-    parser.add_argument("task_dir", type=Path, help="Path to task directory")
+    parser.add_argument(
+        "task_dir",
+        type=Path,
+        help="Path to task directory, or to its task.toml (both accepted)",
+    )
     parser.add_argument(
         "--agent-actions", type=Path, default=None,
         help="Path to agent's actions.jsonl (for offline scoring)"
@@ -165,39 +188,72 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main():
+def main() -> int:
     args = build_parser().parse_args()
 
-    task_dir = args.task_dir.resolve()
+    task_dir = resolve_task_dir(args.task_dir)
 
     # Load task config
     config = load_task_config(task_dir)
     events_path, oracle_path = resolve_paths(task_dir, config)
 
     if args.agent_actions is None:
-        # In a real run, we would:
-        # 1. Set up sandbox with repos
-        # 2. Copy events.jsonl into sandbox
-        # 3. Run the agent with the task prompt
-        # 4. Wait for agent to produce actions.jsonl
-        # 5. Score the result
+        # No sandbox integration exists yet (EnterpriseBench-ia157, the
+        # event_replay sibling of EnterpriseBench-02bdi): nothing clones the
+        # declared repos or runs an agent, so there is no actions.jsonl to score.
         #
-        # For now, just print what would happen.
+        # Exiting nonzero is the whole point. run_benchmark forwards no
+        # --agent-actions (it is not in runner_cli.PASSTHROUGH_FLAGS), so every
+        # dispatched event_replay task lands here; returning 0 had run_benchmark
+        # record status="completed" with score None — a stub reported as a real
+        # run that scored nothing. Nonzero routes it to run_benchmark's existing
+        # error channel (run_benchmark.py:333) instead, with no special-casing of
+        # this runner there.
         print("Event-replay runner (sandbox integration not yet implemented)")
         print(f"  Task: {config['task']['id']}")
         print(f"  Events: {events_path} ({len(load_events(events_path))} events)")
         print(f"  Oracle: {oracle_path} ({len(load_actions(oracle_path))} actions)")
         print()
         print("To score an agent's output, re-run with --agent-actions <path>")
-        return
+        return 1
 
     # Score mode
     agent_path = args.agent_actions.resolve()
     if not agent_path.exists():
         print(f"Agent actions file not found: {agent_path}", file=sys.stderr)
-        sys.exit(1)
+        return 1
 
     result = run_scoring(events_path, oracle_path, agent_path)
+
+    # Durable result, in the shape every runner writes (results_io). The score
+    # was printed to stdout and nowhere else before EnterpriseBench-78zt5, so a
+    # caller reading results.json saw None no matter how the agent did.
+    task_meta = config.get("task", {})
+    write_results_json(
+        task_dir,
+        task_id=task_meta.get("id", ""),
+        success=True,
+        # The headline aggregators filter on phase == complete AND success.
+        phase=PHASE_COMPLETE,
+        scores={
+            "task_score": result.total,
+            "correctness": result.correctness,
+            "completeness": result.completeness,
+            "timeliness": result.timeliness,
+            "ordering": result.ordering,
+            "extra_actions": result.extra_actions,
+        },
+        # Offline scoring of an actions file the agent already wrote: this
+        # process spends no tokens, so it reports none.
+        tool_usage={},
+        config={"mode": args.mode, "agent_actions": str(agent_path)},
+        task_metadata={
+            "suite": task_meta.get("suite", ""),
+            "task_type": task_meta.get("task_type", ""),
+            "difficulty": task_meta.get("difficulty", ""),
+            "languages": config.get("metadata", {}).get("languages", []),
+        },
+    )
 
     if args.json:
         indent = 2 if args.pretty else None
@@ -205,6 +261,9 @@ def main():
     else:
         print_report(result)
 
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    # main()'s return value was discarded, so even an explicit failure exited 0.
+    sys.exit(main())

@@ -107,11 +107,22 @@ from agents.harnesses.claude.cli.sgx import (
 sys.path.insert(0, str(REPO_ROOT / "lib"))
 from eb_verify.scorer_guard import InfraError, guard_verifier_output
 
+# RUN_STATUS_INVALID and PHASE_COMPLETE are defined in results_io: both are part
+# of the written results.json shape, and the other runners must be able to say
+# them without importing this module. Importing them here binds them into this
+# module's namespace, so the ~12 sites below that set result.status/result.phase
+# read the same way they did when the constants were defined in this file.
 try:
     from orchestration.runner_cli import assert_accepts_passthrough
+    from orchestration.results_io import (
+        PHASE_COMPLETE,
+        RUN_STATUS_INVALID,
+        write_results_json,
+    )
 except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from runner_cli import assert_accepts_passthrough
+    from results_io import PHASE_COMPLETE, RUN_STATUS_INVALID, write_results_json
 
 logger = logging.getLogger(__name__)
 
@@ -164,12 +175,6 @@ class TaskRunConfig:
     ablation_variant: str | None = None
     min_disk_gb: float = 10.0
 
-
-# Status marker for runs that must not be scored (e.g. MCP pre-flight failure,
-# a broken grading-asset seal). Whether such a run is re-runnable is decided by
-# failure_class, not by this marker: verifier_infra_error earns a fresh attempt,
-# integrity_violation never does.
-RUN_STATUS_INVALID = "invalid"
 
 # The directory holding both the agent's tree and the grading assets. It must be
 # root-owned so the agent cannot unlink/rename the sealed entries inside it.
@@ -2022,33 +2027,34 @@ def _save_results(
     status = _effective_status(result)
 
     # --- results.json (backward compatible) ---
-    results_path = output_dir / "results.json"
-    payload = {
-        "task_id": result.task_id,
-        "success": result.success,
-        "phase": result.phase,
-        "status": status,
-        "error": result.error,
-        "failure_class": result.failure_class,
-        "image_tag": result.image_tag,
-        "scores": result.scores,
-        "timing": result.timing,
-        "tool_usage": result.tool_usage,
-        "config": {
+    # Shape is authored in results_io, which chain_runner and event_replay call
+    # too — the readers see one contract regardless of which runner ran the task.
+    results_path = write_results_json(
+        output_dir,
+        task_id=result.task_id,
+        success=result.success,
+        phase=result.phase,
+        status=status,
+        error=result.error,
+        failure_class=result.failure_class,
+        image_tag=result.image_tag,
+        scores=result.scores,
+        timing=result.timing,
+        tool_usage=result.tool_usage,
+        config={
             "source": config.source,
             "agent_command": config.agent_command,
             "timeout": config.timeout,
             "dry_run": config.dry_run,
             "mode": config.mode,
         },
-        "task_metadata": {
+        task_metadata={
             "suite": task_data.get("task", {}).get("suite", ""),
             "task_type": task_data.get("task", {}).get("task_type", ""),
             "difficulty": task_data.get("task", {}).get("difficulty", ""),
             "languages": task_data.get("metadata", {}).get("languages", []),
         },
-    }
-    results_path.write_text(json.dumps(payload, indent=2) + "\n")
+    )
 
     # --- config.json — run configuration snapshot ---
     config_payload = {
@@ -2831,7 +2837,7 @@ def _effective_status(result: "TaskRunResult") -> str:
     """
     if result.status:
         return result.status
-    if result.success or result.phase == "complete":
+    if result.success or result.phase == PHASE_COMPLETE:
         return ""
     return RUN_STATUS_INVALID
 
@@ -3364,7 +3370,7 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         # Those inline-flagged phases (agent/verifier infra errors, and a broken
         # grading-asset seal) must never be overwritten with complete/success.
         if result.phase not in NON_COMPLETE_PHASES:
-            result.phase = "complete"
+            result.phase = PHASE_COMPLETE
             result.success = True
         result.timing = timings
         _save_results(result, task_data, output_dir, config)

@@ -34,6 +34,12 @@ except ImportError:
 from orchestration.session import SessionConfig, SessionResult, run_session
 from orchestration.milestone import SessionScore, run_session_milestones
 from orchestration.runner_cli import add_passthrough_args
+from orchestration.results_io import (
+    PHASE_COMPLETE,
+    RESULTS_FILENAME,
+    RUN_STATUS_INVALID,
+    write_results_json,
+)
 from eb_verify.scorer_guard import InfraError
 
 logger = logging.getLogger(__name__)
@@ -510,7 +516,7 @@ def main():
     # rich artifact. Both are unlinked here so a raise cannot leave either stale.
     result_path = Path(task_dir) / "chain_result.json"
     result_path.unlink(missing_ok=True)
-    score_path = Path(task_dir) / "results.json"
+    score_path = Path(task_dir) / RESULTS_FILENAME
     score_path.unlink(missing_ok=True)
 
     task_def = parse_chain_task(args.task_toml)
@@ -546,11 +552,40 @@ def main():
         json.dump(payload, f, indent=2)
     print(f"\nResult written to: {result_path}")
 
-    # The reader-facing score file, in the shape run_benchmark reads. A null
-    # total_score reaches here only for a valid chain that produced no score: an
-    # invalid run exits nonzero below and is read at run_benchmark's error channel.
-    with open(score_path, "w") as f:
-        json.dump({"scores": {"task_score": result.total_score}}, f, indent=2)
+    # The reader-facing file, in the shape every runner writes (results_io). It
+    # carried only {"scores": {"task_score": ...}} before EnterpriseBench-78zt5,
+    # which satisfied the score reader but left this run invisible to
+    # skip-completed and worth 0.0 to every cost rollup.
+    #
+    # `success` is "this run produced a score", not "this run did not crash":
+    # run_sweep maps it straight to scored/failed, and a chain that ran cleanly
+    # but scored nothing (no milestones — chain_runner.py:442) belongs in
+    # `failed`, not in the results table with a null. A null total_score reaches
+    # here only that way; an invalid run exits nonzero below and is read at
+    # run_benchmark's error channel instead.
+    scored = not result.is_invalid and result.total_score is not None
+    write_results_json(
+        Path(task_dir),
+        task_id=result.task_id,
+        success=scored,
+        # The headline aggregators filter on phase == complete AND success, so a
+        # scored chain has to say both or it drops out of the headline.
+        phase=PHASE_COMPLETE if scored else "",
+        status=RUN_STATUS_INVALID if result.is_invalid else "",
+        scores={"task_score": result.total_score},
+        # No agent-level token/cost accounting exists for chains yet: sessions
+        # are run per-milestone and their usage is never aggregated. Reported
+        # empty rather than zero — extract_task_cost reads a missing cost_usd as
+        # 0.0 either way, but {} does not claim the run was free.
+        tool_usage={},
+        config={"mode": args.mode, "dry_run": args.dry_run, "simulated": result.simulated},
+        task_metadata={
+            "suite": task_def.suite,
+            "task_type": "",
+            "difficulty": task_def.difficulty,
+            "languages": task_def.metadata.get("languages", []),
+        },
+    )
 
     if result.is_invalid:
         # Nonzero exit routes the run to run_benchmark's error channel, so an
