@@ -1765,20 +1765,45 @@ def _open_agent_output_for_scoring(container_id: str) -> tuple[bool, str]:
     be exploited: the agent is no longer executing and /workspace is already
     closed. It grants group+other READ and traverse only, never write, so the
     scorer (still 'other', no write bit) cannot forge an answer — the
-    forge-prevention seal is untouched. Owner bits are left alone, so the agent
-    keeps full access in a later chain session.
+    forge-prevention seal is untouched. Owner bits are forced to ``u=rwX`` (never
+    dropped), so the agent keeps full access in a later chain session.
 
     Returns (ok, error_message):
       - Absent agent_output is a legitimate empty answer, not this gate's concern
         -> (True, '').
+      - agent_output is a symlink, not the real directory the agent was told to
+        create -> (False, err); see below.
       - agent_output (or answer.json) present but still unreadable by the scorer
         after the grant -> (False, err), so the caller routes a
         VERIFIER_INFRA_ERROR instead of recording the false 0.0 this bug produces.
     """
-    exists = _docker_exec(
-        container_id, ["test", "-d", AGENT_OUTPUT_DIR], timeout=30, user="root"
+    # Only a real directory the agent mkdir'd is safe to open. A *symlinked*
+    # agent_output must be rejected BEFORE any chmod: both ``test -d`` and
+    # ``chmod -R`` dereference a top-level symlink (only symlinks encountered
+    # mid-recursion are skipped). During its session /workspace is 1777, so the
+    # agent can ``rm -rf agent_output && ln -s /workspace/.task agent_output``;
+    # this root chmod would then follow into the sealed grading assets and widen
+    # ground_truth.json to o=rX, defeating _seal_grading_assets and leaking the
+    # answer key into a later chain session. The instruction appendix tells the
+    # agent to ``mkdir`` a real directory — a symlink here is never legitimate.
+    q = shlex.quote(AGENT_OUTPUT_DIR)
+    real_dir = _docker_exec(
+        container_id,
+        ["bash", "-c", f"[ -d {q} ] && [ ! -L {q} ]"],
+        timeout=30,
+        user="root",
     )
-    if exists.returncode != 0:
+    if real_dir.returncode != 0:
+        is_symlink = _docker_exec(
+            container_id, ["test", "-L", AGENT_OUTPUT_DIR], timeout=30, user="root"
+        )
+        if is_symlink.returncode == 0:
+            return False, (
+                f"{AGENT_OUTPUT_DIR} is a symlink, not the directory the agent "
+                "was told to create; refusing to open it — chmod would follow it "
+                "and could widen permissions on its target (e.g. the sealed "
+                "grading assets)"
+            )
         # Agent wrote no output directory: an empty answer scores 0.0 on its own
         # merits. Nothing for this gate to open.
         return True, ""

@@ -1358,6 +1358,7 @@ class TestForgeAttackEndToEnd:
 
 def _open_exec(
     *,
+    dir_is_symlink: bool = False,
     dir_exists: bool = True,
     chmod_ok: bool = True,
     dir_readable: bool = True,
@@ -1373,8 +1374,12 @@ def _open_exec(
 
     def fake_exec(container_id, cmd, **kwargs):
         calls.append(cmd)
-        if cmd[:2] == ["test", "-d"] and cmd[2] == AGENT_OUTPUT_DIR:
-            return _ok() if dir_exists else _fail()
+        # The combined "real directory, not a symlink" probe: rc 0 only when the
+        # dir exists AND is not a symlink (the happy path this gate opens).
+        if cmd[0] == "bash" and AGENT_OUTPUT_DIR in cmd[-1] and "-d" in cmd[-1]:
+            return _ok() if (dir_exists and not dir_is_symlink) else _fail()
+        if cmd[:2] == ["test", "-L"] and cmd[2] == AGENT_OUTPUT_DIR:
+            return _ok() if dir_is_symlink else _fail()
         if cmd[0] == "chmod":
             return _ok() if chmod_ok else _fail("chmod: denied")
         if cmd[:2] == ["test", "-r"] and cmd[2] == AGENT_OUTPUT_DIR:
@@ -1404,6 +1409,19 @@ class TestOpenAgentOutputForScoring:
         assert ok is True and err == ""
         assert not any(c[0] == "chmod" for c in calls), (
             "opened a directory the agent never created"
+        )
+
+    def test_symlinked_agent_output_is_infra_and_never_chmods(self) -> None:
+        # An agent that replaces agent_output with a symlink (to the sealed
+        # grading assets, say) must not get this root chmod to follow it: both
+        # `test -d` and `chmod -R` dereference a top-level symlink, which would
+        # widen ground_truth.json to o=rX. It must fail to infra BEFORE any chmod.
+        fake, calls = _open_exec(dir_is_symlink=True)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            ok, err = _open_agent_output_for_scoring("cid")
+        assert ok is False and "symlink" in err
+        assert not any(c[0] == "chmod" for c in calls), (
+            "followed a symlinked agent_output through a root chmod"
         )
 
     def test_readable_answer_passes(self) -> None:
@@ -1600,5 +1618,63 @@ class TestUmaskDoesNotUnderCreditTheScorer:
             ok, err = _open_agent_output_for_scoring(cid)
             assert ok is True, err
             assert self._scorer_sees_answer(cid)
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+    def test_symlinked_agent_output_does_not_widen_the_grading_seal(self) -> None:
+        # Attack: during its 1777 session the agent swaps its output dir for a
+        # symlink aimed at the sealed grading assets. A bare `chmod -R` follows a
+        # top-level symlink, so without the guard this root chmod would widen
+        # ground_truth.json to o=rX and leak the answer key into a chain session.
+        # The guard must reject the symlink -> infra error, seal untouched.
+        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+            pytest.skip("docker daemon unavailable")
+
+        cid = subprocess.run(
+            ["docker", "run", "-d", "--rm", "debian:bookworm-slim", "sleep", "300"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        try:
+            subprocess.run(
+                ["docker", "exec", cid, "bash", "-c",
+                 "useradd -m -s /bin/bash agent; "
+                 f"groupadd {SCORING_GROUP}; "
+                 f"useradd -M -s /bin/bash -g {SCORING_GROUP} {SCORING_USER}; "
+                 # /workspace world-writable + sticky, as WORKSPACE_MODE_SESSION.
+                 "mkdir -p /workspace && chmod 1777 /workspace; "
+                 # Sealed grading assets: root-owned, group-read, no 'other'
+                 # access — mirrors _seal_grading_assets (u=rwX,g=rX,o=).
+                 "mkdir -p /workspace/.task; "
+                 'echo \'{"answer": "42"}\' > /workspace/.task/ground_truth.json; '
+                 f"chown -R root:{SCORING_GROUP} /workspace/.task; "
+                 "chmod 750 /workspace/.task; "
+                 "chmod 640 /workspace/.task/ground_truth.json"],
+                capture_output=True, check=True,
+            )
+            # The agent owns the entry in the sticky dir, so it can unlink its own
+            # output dir and point the name at the sealed assets.
+            subprocess.run(
+                ["docker", "exec", "-u", "agent", cid, "bash", "-c",
+                 "ln -s /workspace/.task /workspace/agent_output"],
+                capture_output=True, check=True,
+            )
+
+            rt._close_workspace_for_scoring(cid)
+            ok, err = _open_agent_output_for_scoring(cid)
+            assert ok is False and "symlink" in err, (
+                f"symlinked agent_output was not rejected: ok={ok} err={err!r}"
+            )
+
+            # The seal is intact: ground_truth.json never gained 'other' read.
+            mode = subprocess.run(
+                ["docker", "exec", cid, "stat", "-c", "%a",
+                 "/workspace/.task/ground_truth.json"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            assert mode == "640", (
+                f"the grading seal was widened through the symlink: "
+                f"ground_truth.json is now {mode}, not 640 — the answer key "
+                "leaked to 'other'"
+            )
         finally:
             subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
