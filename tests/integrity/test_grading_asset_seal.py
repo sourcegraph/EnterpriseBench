@@ -85,6 +85,11 @@ def _reap_is(cmd: list) -> bool:
     return bool(cmd) and cmd[0] == "bash" and "kill -9" in cmd[-1] and "id -u agent" in cmd[-1]
 
 
+def _classify_is(cmd: list) -> bool:
+    """True if this exec is _open_agent_output_for_scoring's agent_output classify probe."""
+    return bool(cmd) and cmd[0] == "bash" and "echo symlink" in cmd[-1]
+
+
 def _run_scoring_capturing(stdout: str = '{"task_score": 0.5}'):
     """Drive _run_scoring past the seal gate and return the _docker_exec mock.
 
@@ -92,10 +97,18 @@ def _run_scoring_capturing(stdout: str = '{"task_score": 0.5}'):
     so the exec of interest is neither first nor last — use _scoring_call() to
     find it. The reap fails closed unless it reports zero survivors, so the mock
     returns that sentinel for the reap call and the caller's stdout otherwise.
+
+    These tests are about the verifier exec, not the agent's output, so the
+    classify probe answers "absent" — the one word that opens nothing and routes
+    nowhere, leaving _run_scoring to reach test.sh. A blanket stdout would be read
+    as an unclassifiable agent_output and (correctly) routed to an infra error
+    before scoring ran.
     """
     def fake_exec(container_id, cmd, **kwargs):
         if _reap_is(cmd):
             return _ok(stdout="agent_procs_remaining=0")
+        if _classify_is(cmd):
+            return _ok(stdout="absent")
         return _ok(stdout=stdout)
 
     with patch.object(rt, "_assert_grading_assets_sealed", return_value=(True, "")):
@@ -452,6 +465,8 @@ class TestRunScoringUnderTheSeal:
             calls.append(cmd)
             if _reap_is(cmd):
                 return _ok(stdout="agent_procs_remaining=0")
+            if _classify_is(cmd):
+                return _ok(stdout="absent")
             if cmd[0] == "bash" and rt.TEST_SH in cmd[-1]:
                 raise subprocess.TimeoutExpired(cmd="test.sh", timeout=600)
             return _ok()
@@ -1356,12 +1371,19 @@ class TestForgeAttackEndToEnd:
             subprocess.run(["docker", "kill", cid], capture_output=True)
 
 
+def _seal_probe_is(cmd: list) -> bool:
+    """True if this exec is the grading-asset other-readable snapshot."""
+    return bool(cmd) and cmd[0] == "bash" and "-perm /004" in cmd[-1]
+
+
 def _open_exec(
     *,
     kind: str = "dir",
+    classify_ok: bool = True,
     answer_is_symlink: bool = False,
     chmod_ok: bool = True,
-    grading_agent_readable: bool = False,
+    grading_widened: bool = False,
+    seal_probe_ok: bool = True,
     answer_present: bool = True,
     answer_readable: bool = True,
 ):
@@ -1369,24 +1391,33 @@ def _open_exec(
 
     Returns (fake_exec, calls) so a test can both steer each probe's outcome and
     assert on the exact commands issued (e.g. that the grant carries no write
-    bit). ``kind`` is the classify word ("dir"|"symlink"|"file"|"absent");
-    ``grading_agent_readable`` simulates a hard link that widened a grading inode
-    to agent-readable after the chmod.
+    bit). ``kind`` is the classify word ("dir"|"symlink"|"file"|"absent").
+
+    ``grading_widened`` simulates a hard link that aimed the chmod at a sealed
+    asset: the seal snapshot is empty BEFORE the grant and names test.sh AFTER,
+    which is exactly the delta the real probe reports for a widened inode.
     """
     calls: list[list] = []
+    seal_probes = {"n": 0}
 
     def fake_exec(container_id, cmd, **kwargs):
         calls.append(cmd)
         # The classify probe: one bash that echoes symlink/dir/file/absent.
-        if cmd[0] == "bash" and AGENT_OUTPUT_DIR in cmd[-1] and "echo symlink" in cmd[-1]:
-            return _ok(stdout=kind)
+        if _classify_is(cmd):
+            return _ok(stdout=kind) if classify_ok else _fail("docker: no such container")
+        # The seal snapshot, issued either side of the chmod. First call is the
+        # BEFORE state, second the AFTER state.
+        if _seal_probe_is(cmd):
+            if not seal_probe_ok:
+                return _fail("find: cannot read")
+            seal_probes["n"] += 1
+            if seal_probes["n"] >= 2 and grading_widened:
+                return _ok(stdout=f"{rt.TEST_SH}\n")
+            return _ok(stdout="")
         if cmd[:2] == ["test", "-L"] and cmd[2] == ANSWER_ARTIFACT_PATH:
             return _ok() if answer_is_symlink else _fail()
         if cmd[0] == "chmod":
             return _ok() if chmod_ok else _fail("chmod: denied")
-        # _can_read(grading asset, user=agent): the post-chmod hard-link probe.
-        if cmd[:2] == ["test", "-r"] and cmd[2] in (rt.GROUND_TRUTH, rt.TEST_SH):
-            return _ok() if grading_agent_readable else _fail()
         if cmd[:2] == ["test", "-e"] and cmd[2] == ANSWER_ARTIFACT_PATH:
             return _ok() if answer_present else _fail()
         if cmd[:2] == ["test", "-r"] and cmd[2] == ANSWER_ARTIFACT_PATH:
@@ -1463,31 +1494,113 @@ class TestOpenAgentOutputForScoring:
             "chmod'd a directory holding a symlinked answer.json"
         )
 
-    def test_plain_file_agent_output_is_infra_not_silent_zero(self) -> None:
-        # The agent replaced its output dir with a plain file. Old behaviour
-        # laundered this into ok/0.0 ("agent wrote nothing"); it must surface as
-        # infra instead, and never chmod a non-directory.
+    def test_plain_file_agent_output_is_not_a_rerun_mulligan(self) -> None:
+        """A plain-file agent_output must not reach the re-run channel.
+
+        /workspace is 1777 during the session, so `echo x > /workspace/agent_output`
+        is a move any agent can make. verifier_infra_error "earns a fresh attempt",
+        so routing this agent-controlled shape there would hand every agent a
+        re-run button — an incentive inversion (g5k5s) that main does not have.
+        No answer.json can live inside a file, so the honest verdict is the same
+        as an absent agent_output: score it on the agent's merits, and log it.
+        """
         fake, calls = _open_exec(kind="file")
         with patch.object(rt, "_docker_exec", side_effect=fake):
-            result = _open_agent_output_for_scoring("cid")
-        assert "plain file" in _infra_detail(result)
-        assert "integrity_violation" not in result
-        assert not any(c[0] == "chmod" for c in calls)
+            with patch.object(rt, "logger") as log:
+                result = _open_agent_output_for_scoring("cid")
+        assert result is None, f"plain-file agent_output routed to a channel: {result}"
+        assert not any(c[0] == "chmod" for c in calls), "nothing to open in a file"
+        assert log.warning.called, "the anomaly must be surfaced, not silent"
 
     def test_hardlinked_grading_asset_widened_by_chmod_is_integrity_violation(
         self,
     ) -> None:
         # A hard link inside agent_output shares the grading asset's inode, so
-        # `chmod -R` widens the real file. The seal proved the agent could not
-        # read it before; if it can now, this open widened it -> tamper, never a
-        # re-run.
-        fake, _ = _open_exec(grading_agent_readable=True)
+        # `chmod -R` widens the real file. The asset was not other-readable before
+        # the grant and is after; that delta is this open's doing -> tamper, never
+        # a re-run.
+        fake, _ = _open_exec(grading_widened=True)
         with patch.object(rt, "_docker_exec", side_effect=fake):
             result = _open_agent_output_for_scoring("cid")
         violation = result["integrity_violation"]
         assert violation["reason"] == "agent_output_tampered"
         assert "hard link" in violation["detail"]
+        assert rt.TEST_SH in violation["detail"]
         assert "verifier_infra_error" not in result
+
+    def test_seal_is_checked_across_every_grading_path_not_just_two_files(
+        self,
+    ) -> None:
+        """The re-verify must cover all of GRADING_PATHS.
+
+        Only test.sh is link-able by a real agent today — .verifiers, .task and
+        .eb_verify sit under 0750 dirs it cannot traverse, so `ln` fails EACCES
+        before protected_hardlinks is even consulted. That safety lives in
+        _seal_grading_assets, not here, so a re-verify scoped to two file
+        constants would silently stop covering them the day the seal is loosened.
+        Probing by MODE as root (not "can the agent read it") is what makes the
+        check see inside those dirs at all.
+        """
+        fake, calls = _open_exec()
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            _open_agent_output_for_scoring("cid")
+        seal_probes = [c for c in calls if _seal_probe_is(c)]
+        assert len(seal_probes) == 2, "seal must be snapshotted before AND after"
+        for probe in seal_probes:
+            for path in rt.GRADING_PATHS:
+                assert path in probe[-1], f"{path} is never re-verified"
+
+    def test_preexisting_other_readable_asset_is_not_a_false_tamper(self) -> None:
+        """Only a delta across the chmod is tampering.
+
+        If a grading path is already other-readable before the grant, this open
+        did not widen it. Flagging it would fail a correct agent as a saboteur —
+        an under-credit, the exact class this bead exists to kill.
+        """
+        calls: list[list] = []
+
+        def fake(container_id, cmd, **kwargs):
+            calls.append(cmd)
+            if _classify_is(cmd):
+                return _ok(stdout="dir")
+            if _seal_probe_is(cmd):
+                # Same non-empty listing before and after: no delta, no tamper.
+                return _ok(stdout=f"{rt.TEST_SH}\n")
+            if cmd[:2] == ["test", "-L"]:
+                return _fail()
+            return _ok()
+
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        assert result is None, f"pre-existing seal state flagged as tamper: {result}"
+
+    def test_failed_classify_probe_is_infra_not_a_silent_absent(self) -> None:
+        """A probe that could not run is not evidence the agent wrote nothing.
+
+        Falling through to "absent" would let the checks score a correct answer
+        0.0 on a docker hiccup — this bead's own bug class from the other side.
+        """
+        fake, calls = _open_exec(classify_ok=False)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        assert "could not classify" in _infra_detail(result)
+        assert "integrity_violation" not in result
+        assert not any(c[0] == "chmod" for c in calls)
+
+    def test_unexpected_classify_output_is_infra_not_a_silent_absent(self) -> None:
+        fake, calls = _open_exec(kind="{}")
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        assert "unexpected probe result" in _infra_detail(result)
+        assert not any(c[0] == "chmod" for c in calls)
+
+    def test_failed_seal_probe_is_infra_not_a_pass(self) -> None:
+        """Unable to verify the seal is not the same as the seal holding."""
+        fake, _ = _open_exec(seal_probe_ok=False)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        assert "grading-asset seal" in _infra_detail(result)
+        assert "integrity_violation" not in result
 
     def test_readable_answer_passes(self) -> None:
         fake, _ = _open_exec()
@@ -1643,9 +1756,11 @@ class TestUmaskDoesNotUnderCreditTheScorer:
         """A container mirroring the real seal: 1777 /workspace, root-owned
         grading assets group-readable by the scorer, no 'other' access.
 
-        Reproduces _seal_grading_assets' end state (u=rwX,g=rX,o=) for both
-        ground_truth.json (under .task) and test.sh (at the workspace root), so
-        the tamper tests can prove neither is widened to the agent.
+        Reproduces _seal_grading_assets' end state (u=rwX,g=rX,o=) across ALL of
+        GRADING_PATHS — .verifiers, .task, .eb_verify and test.sh — not just the
+        two the single-file constants name. A fixture that sealed only the latter
+        could not tell a re-verify covering the whole sealed set from one covering
+        two paths, which is how the gap in that check went unseen.
         """
         cid = subprocess.run(
             ["docker", "run", "-d", "--rm", "debian:bookworm-slim", "sleep", "300"],
@@ -1659,12 +1774,15 @@ class TestUmaskDoesNotUnderCreditTheScorer:
              # /workspace world-writable + sticky, as WORKSPACE_MODE_SESSION.
              "mkdir -p /workspace && chmod 1777 /workspace; "
              # Sealed grading assets: root-owned, group-read, no 'other' access.
-             "mkdir -p /workspace/.task; "
+             "mkdir -p /workspace/.task /workspace/.verifiers /workspace/.eb_verify; "
              'echo \'{"answer": "42"}\' > /workspace/.task/ground_truth.json; '
+             'echo \'grep -q EXPECTED_TOKEN\' > /workspace/.verifiers/check1.sh; '
+             'echo \'SECRET_PLUGIN_LOGIC\' > /workspace/.eb_verify/plugin.py; '
              'echo \'#!/bin/bash\' > /workspace/test.sh; '
-             f"chown -R root:{SCORING_GROUP} /workspace/.task /workspace/test.sh; "
-             "chmod 750 /workspace/.task; "
-             "chmod 640 /workspace/.task/ground_truth.json /workspace/test.sh"],
+             f"chown -R root:{SCORING_GROUP} /workspace/.task /workspace/.verifiers "
+             f"/workspace/.eb_verify /workspace/test.sh; "
+             "chmod -R u=rwX,g=rX,o= /workspace/.task /workspace/.verifiers "
+             "/workspace/.eb_verify /workspace/test.sh"],
             capture_output=True, check=True,
         )
         return cid
@@ -1867,5 +1985,49 @@ class TestUmaskDoesNotUnderCreditTheScorer:
             assert "verifier_infra_error" not in result, (
                 "grading-asset tampering was handed the re-run mulligan channel"
             )
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+    def test_hardlink_into_verifiers_or_eb_verify_is_caught_too(self) -> None:
+        """The re-verify covers the whole sealed set, not just the two files.
+
+        A check script embeds the literal token its checkpoint greps for, and an
+        eb_verify plugin is the grading logic itself; widening either to the agent
+        leaks answer-adjacent material just as ground_truth.json would. A re-verify
+        that iterated only (GROUND_TRUTH, TEST_SH) returned "proceed, nothing
+        wrong" here while the chmod had in fact widened both inodes.
+
+        Planted as root deliberately: a real agent cannot reach these at all
+        (0750 dirs -> `ln` fails EACCES before protected_hardlinks is consulted),
+        so this pins the check itself rather than the seal that currently keeps
+        the vector out of reach.
+        """
+        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+            pytest.skip("docker daemon unavailable")
+
+        cid = self._seal_cid()
+        try:
+            subprocess.run(
+                ["docker", "exec", cid, "bash", "-c",
+                 "mkdir -p /workspace/agent_output && chown agent:agent "
+                 "/workspace/agent_output; "
+                 "ln /workspace/.verifiers/check1.sh /workspace/agent_output/x; "
+                 "ln /workspace/.eb_verify/plugin.py /workspace/agent_output/y"],
+                capture_output=True, check=True,
+            )
+            rt._close_workspace_for_scoring(cid)
+            result = _open_agent_output_for_scoring(cid)
+
+            violation = result.get("integrity_violation", {}) if result else {}
+            assert violation.get("reason") == "agent_output_tampered", (
+                "a hard link that widened .verifiers/.eb_verify was not caught: "
+                f"{result!r}"
+            )
+            assert "verifier_infra_error" not in result, (
+                "grading-asset tampering was handed the re-run mulligan channel"
+            )
+            # The specific widened paths are named, not just "something changed".
+            assert "/workspace/.verifiers/check1.sh" in violation["detail"]
+            assert "/workspace/.eb_verify/plugin.py" in violation["detail"]
         finally:
             subprocess.run(["docker", "rm", "-f", cid], capture_output=True)

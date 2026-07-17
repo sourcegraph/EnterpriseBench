@@ -1783,6 +1783,35 @@ def _agent_output_infra(detail: str) -> dict:
     }
 
 
+def _other_readable_grading_assets(container_id: str) -> subprocess.CompletedProcess:
+    """Every path under the sealed grading assets that is other-readable.
+
+    Snapshot this either side of the ``agent_output`` chmod: the seal leaves all
+    of GRADING_PATHS ``o=`` (_seal_grading_assets, u=rwX,g=rX,o=), so a path that
+    gains an other-read bit ACROSS the chmod was widened BY it — via a hard link
+    inside agent_output that shares the asset's inode.
+
+    Probes the assets' MODE as root rather than asking "can the agent read this",
+    which is what makes it cover all four sealed paths. .verifiers/.task/.eb_verify
+    are 0750 dirs, so an agent-identity probe cannot traverse them to name a file
+    inside and reports "unreadable" for a widened inode it merely cannot reach —
+    a check that passes for the wrong reason. Root sees the mode regardless of the
+    directory it sits in.
+    """
+    return _docker_exec(
+        container_id,
+        [
+            "bash",
+            "-c",
+            f"for f in {_GRADING_PATHS_SH}; do "
+            'if [ -e "$f" ]; then find "$f" -perm /004 -print; fi; '
+            "done",
+        ],
+        timeout=60,
+        user="root",
+    )
+
+
 def _open_agent_output_for_scoring(container_id: str) -> dict | None:
     """Make agent_output/ readable by the scorer regardless of the agent's umask.
 
@@ -1808,12 +1837,14 @@ def _open_agent_output_for_scoring(container_id: str) -> dict | None:
         read) at the sealed grading assets: a symlinked agent_output, a symlinked
         answer.json, or a hard link that widened a grading inode. Tampering is
         INVALID and never re-run (bead g5k5s).
-      * ``verifier_infra_error`` — the scorer genuinely could not read a present
-        answer (chmod failed, still unreadable, or agent_output is a plain file,
-        not the directory the agent was told to create). Surfaced as infra, never
-        the false 0.0 this bug produces.
-      * absent agent_output -> None: a legitimate empty answer scores 0.0 on its
-        own merits, not this gate's concern.
+      * ``verifier_infra_error`` — the harness could not carry out or verify the
+        grant (a probe or the chmod failed), or the scorer still cannot read a
+        PRESENT answer. Surfaced as infra, never the false 0.0 this bug produces.
+      * None — nothing to open: agent_output is absent, or is a plain file that
+        cannot hold an answer.json. Either way the agent produced no gradeable
+        answer and scores 0.0 on its own merits, which is not this gate's concern.
+        Both stay off the infra channel on purpose: they are agent-controlled
+        shapes, and that channel earns a fresh attempt (g5k5s).
     """
     q = shlex.quote(AGENT_OUTPUT_DIR)
     # Classify agent_output WITHOUT dereferencing a top-level symlink (-L is
@@ -1824,7 +1855,7 @@ def _open_agent_output_for_scoring(container_id: str) -> dict | None:
     # chmod would then widen ground_truth.json to o=rX and leak the answer key
     # into a chain session. A symlink here is never the output the agent was told
     # to create.
-    kind = _docker_exec(
+    kind_probe = _docker_exec(
         container_id,
         [
             "bash",
@@ -1836,7 +1867,17 @@ def _open_agent_output_for_scoring(container_id: str) -> dict | None:
         ],
         timeout=30,
         user="root",
-    ).stdout.strip()
+    )
+    # A failed probe is not evidence of an absent agent_output. Falling through to
+    # "absent" on a dead container or a docker hiccup would let the checks run
+    # against an output dir nobody classified and score a correct answer 0.0 —
+    # this bead's own bug class, arrived at from the other direction.
+    if kind_probe.returncode != 0:
+        return _agent_output_infra(
+            f"could not classify {AGENT_OUTPUT_DIR}: "
+            f"{kind_probe.stderr.strip() or 'unknown error'}"
+        )
+    kind = kind_probe.stdout.strip()
 
     if kind == "symlink":
         return _agent_output_tampered(
@@ -1845,17 +1886,35 @@ def _open_agent_output_for_scoring(container_id: str) -> dict | None:
             "its target (e.g. the sealed grading assets)"
         )
     if kind == "file":
-        # The agent replaced its output dir with a plain file — no answer.json can
-        # live inside it. Surface it as infra rather than laundering the anomaly
-        # into a silent 0.0 that reads as a legitimate agent failure.
-        return _agent_output_infra(
-            f"{AGENT_OUTPUT_DIR} is a plain file, not the directory the agent was "
-            "told to create — cannot open it for the scorer"
+        # The agent replaced its output dir with a plain file. No answer.json can
+        # live inside it, so there is nothing to open and nothing to grade: the
+        # same gradeable outcome as an absent agent_output, and an honest 0.0 on
+        # the agent's own merits.
+        #
+        # Deliberately NOT verifier_infra_error. /workspace is 1777 during the
+        # session, so `echo x > /workspace/agent_output` is a move any agent can
+        # make, and that channel "earns a fresh attempt" (RUN_STATUS_INVALID
+        # comment, ~line 170) — routing an agent-controlled shape there would hand
+        # every agent a re-run button it does not have on main, the incentive
+        # inversion bead EnterpriseBench-g5k5s denies. It is not integrity_violation
+        # either: no grading asset was touched, and a clumsy agent is not a
+        # saboteur. Log it loudly so the anomaly is visible rather than silent.
+        logger.warning(
+            "%s is a plain file, not the directory the agent was told to create — "
+            "no answer.json can exist inside it; scoring on its merits",
+            AGENT_OUTPUT_DIR,
         )
-    if kind != "dir":
-        # absent: the agent wrote no output directory. An empty answer scores 0.0
-        # on its own merits; nothing for this gate to open.
         return None
+    if kind == "absent":
+        # The agent wrote no output directory. An empty answer scores 0.0 on its
+        # own merits; nothing for this gate to open.
+        return None
+    if kind != "dir":
+        # rc==0 but not one of the four words the probe can emit. Something other
+        # than the probe wrote to stdout; do not guess which branch was meant.
+        return _agent_output_infra(
+            f"could not classify {AGENT_OUTPUT_DIR}: unexpected probe result {kind!r}"
+        )
 
     # A symlinked answer.json redirects the ~119 grep checks' ``cat answer.json``
     # at the symlink target. Pointed at the sealed ground_truth.json (readable by
@@ -1871,6 +1930,18 @@ def _open_agent_output_for_scoring(container_id: str) -> dict | None:
             f"{ANSWER_ARTIFACT_PATH} is a symlink — the checks would read its "
             "target (e.g. the sealed answer key) instead of an agent-authored "
             "answer"
+        )
+
+    # Snapshot the seal's other-readable set before the grant, so the check after
+    # it measures what THIS chmod changed rather than asserting a clean-seal state
+    # it does not own. A pre-existing o+r path (a future task setup, a seal change)
+    # then reads as the status quo, not as tampering — a false tamper verdict is an
+    # under-credit, the exact failure this bead exists to kill.
+    sealed_before = _other_readable_grading_assets(container_id)
+    if sealed_before.returncode != 0:
+        return _agent_output_infra(
+            f"could not read the grading-asset seal before opening "
+            f"{AGENT_OUTPUT_DIR}: {sealed_before.stderr.strip() or 'unknown error'}"
         )
 
     # go=rX: read + traverse, no write bit; owner keeps u=rwX for chain sessions.
@@ -1890,18 +1961,30 @@ def _open_agent_output_for_scoring(container_id: str) -> dict | None:
 
     # Post-chmod seal re-verify. ``chmod -R`` changes the shared inode of a HARD
     # LINK, so ``ln /workspace/test.sh agent_output/x`` (or the answer key) would
-    # let this grant widen a grading asset to agent-readable — a hard link is
-    # indistinguishable from the real file to the recursion, and unlike a symlink
-    # it is followed. The seal already proved the agent could not read these
-    # before the chmod, so if either is agent-readable now, this open widened it:
-    # tampering, not a scoreable run.
-    for asset in (GROUND_TRUTH, TEST_SH):
-        if _can_read(container_id, asset, user=AGENT_USER):
-            return _agent_output_tampered(
-                f"opening {AGENT_OUTPUT_DIR} made {asset} readable by the agent — "
-                "a hard link inside agent_output aimed the read grant at a sealed "
-                "grading asset"
-            )
+    # let this grant widen a grading asset — a hard link is indistinguishable from
+    # the real file to the recursion, and unlike a symlink it is followed. Any
+    # sealed path that gained an other-read bit across the chmod was widened BY it.
+    #
+    # Covers all four sealed paths, not just the two file constants: today only
+    # test.sh is even link-able by the agent (the other three sit under 0750 dirs
+    # it cannot traverse, so `ln` fails EACCES before protected_hardlinks is
+    # consulted), but that safety lives in _seal_grading_assets, not here. Checking
+    # the whole sealed set keeps this honest if the seal is ever loosened.
+    sealed_after = _other_readable_grading_assets(container_id)
+    if sealed_after.returncode != 0:
+        return _agent_output_infra(
+            f"could not re-read the grading-asset seal after opening "
+            f"{AGENT_OUTPUT_DIR}: {sealed_after.stderr.strip() or 'unknown error'}"
+        )
+    widened = sorted(
+        set(sealed_after.stdout.splitlines()) - set(sealed_before.stdout.splitlines())
+    )
+    if widened:
+        return _agent_output_tampered(
+            f"opening {AGENT_OUTPUT_DIR} widened sealed grading assets to "
+            f"other-readable ({', '.join(widened)}) — a hard link inside "
+            "agent_output aimed the read grant at a sealed grading asset"
+        )
 
     # answer.json present-but-unreadable is the exact false-0.0 vector: the file
     # exists (the agent answered), but the scorer's `[[ -f ]]`/open() cannot reach
