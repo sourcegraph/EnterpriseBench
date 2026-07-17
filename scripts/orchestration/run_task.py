@@ -1750,7 +1750,40 @@ def _record_agent_trace(
         )
 
 
-def _open_agent_output_for_scoring(container_id: str) -> tuple[bool, str]:
+def _agent_output_tampered(detail: str) -> dict:
+    """A ``scores`` fragment routing an agent_output tamper to the INVALID channel.
+
+    A symlink or hard link aimed at the sealed grading assets is grading-asset
+    tampering, so it takes the ``integrity_violation`` path (INVALID, never
+    re-scored). Routing it to ``verifier_infra_error`` instead would hand the
+    saboteur the re-run mulligan that channel grants — the exact incentive
+    inversion bead EnterpriseBench-g5k5s denies.
+    """
+    return {
+        "integrity_violation": {
+            "reason": "agent_output_tampered",
+            "detail": detail,
+        }
+    }
+
+
+def _agent_output_infra(detail: str) -> dict:
+    """A ``scores`` fragment routing an unreadable agent_output to the re-run channel.
+
+    A genuine "the scorer cannot read a present answer" (chmod failed, still
+    unreadable, or agent_output is not the directory the agent was told to make)
+    is infrastructure, not a real 0.0 — the false zero this bug produces.
+    """
+    return {
+        "verifier_infra_error": InfraError(
+            reason="agent_output_unreadable_by_scorer",
+            stage="deterministic_scoring",
+            detail=detail,
+        ).as_verifier_error()
+    }
+
+
+def _open_agent_output_for_scoring(container_id: str) -> dict | None:
     """Make agent_output/ readable by the scorer regardless of the agent's umask.
 
     The agent creates ``/workspace/agent_output`` itself (run_task's instruction
@@ -1768,45 +1801,82 @@ def _open_agent_output_for_scoring(container_id: str) -> tuple[bool, str]:
     forge-prevention seal is untouched. Owner bits are forced to ``u=rwX`` (never
     dropped), so the agent keeps full access in a later chain session.
 
-    Returns (ok, error_message):
-      - Absent agent_output is a legitimate empty answer, not this gate's concern
-        -> (True, '').
-      - agent_output is a symlink, not the real directory the agent was told to
-        create -> (False, err); see below.
-      - answer.json present but still unreadable by the scorer after the grant
-        -> (False, err), so the caller routes a VERIFIER_INFRA_ERROR instead of
-        recording the false 0.0 this bug produces.
+    Returns None when the scorer can now read agent_output (proceed to scoring),
+    or a ``scores`` fragment naming the channel the run must route to:
+
+      * ``integrity_violation`` — the agent aimed this root chmod (or the checks'
+        read) at the sealed grading assets: a symlinked agent_output, a symlinked
+        answer.json, or a hard link that widened a grading inode. Tampering is
+        INVALID and never re-run (bead g5k5s).
+      * ``verifier_infra_error`` — the scorer genuinely could not read a present
+        answer (chmod failed, still unreadable, or agent_output is a plain file,
+        not the directory the agent was told to create). Surfaced as infra, never
+        the false 0.0 this bug produces.
+      * absent agent_output -> None: a legitimate empty answer scores 0.0 on its
+        own merits, not this gate's concern.
     """
-    # Only a real directory the agent mkdir'd is safe to open. A *symlinked*
-    # agent_output must be rejected BEFORE any chmod: both ``test -d`` and
-    # ``chmod -R`` dereference a top-level symlink (only symlinks encountered
-    # mid-recursion are skipped). During its session /workspace is 1777, so the
-    # agent can ``rm -rf agent_output && ln -s /workspace/.task agent_output``;
-    # this root chmod would then follow into the sealed grading assets and widen
-    # ground_truth.json to o=rX, defeating _seal_grading_assets and leaking the
-    # answer key into a later chain session. The instruction appendix tells the
-    # agent to ``mkdir`` a real directory — a symlink here is never legitimate.
     q = shlex.quote(AGENT_OUTPUT_DIR)
-    real_dir = _docker_exec(
+    # Classify agent_output WITHOUT dereferencing a top-level symlink (-L is
+    # tested first, before -d/-e follow it). Only a real directory the agent
+    # mkdir'd is safe to ``chmod -R``: both ``test -d`` and ``chmod -R`` FOLLOW a
+    # top-level symlink. During its session /workspace is 1777, so the agent can
+    # ``rm -rf agent_output && ln -s /workspace/.task agent_output``; a bare root
+    # chmod would then widen ground_truth.json to o=rX and leak the answer key
+    # into a chain session. A symlink here is never the output the agent was told
+    # to create.
+    kind = _docker_exec(
         container_id,
-        ["bash", "-c", f"[ -d {q} ] && [ ! -L {q} ]"],
+        [
+            "bash",
+            "-c",
+            f"if [ -L {q} ]; then echo symlink; "
+            f"elif [ -d {q} ]; then echo dir; "
+            f"elif [ -e {q} ]; then echo file; "
+            f"else echo absent; fi",
+        ],
         timeout=30,
         user="root",
-    )
-    if real_dir.returncode != 0:
-        is_symlink = _docker_exec(
-            container_id, ["test", "-L", AGENT_OUTPUT_DIR], timeout=30, user="root"
+    ).stdout.strip()
+
+    if kind == "symlink":
+        return _agent_output_tampered(
+            f"{AGENT_OUTPUT_DIR} is a symlink, not the directory the agent was "
+            "told to create — chmod -R would follow it and widen permissions on "
+            "its target (e.g. the sealed grading assets)"
         )
-        if is_symlink.returncode == 0:
-            return False, (
-                f"{AGENT_OUTPUT_DIR} is a symlink, not the directory the agent "
-                "was told to create; refusing to open it — chmod would follow it "
-                "and could widen permissions on its target (e.g. the sealed "
-                "grading assets)"
-            )
-        # Agent wrote no output directory: an empty answer scores 0.0 on its own
-        # merits. Nothing for this gate to open.
-        return True, ""
+    if kind == "file":
+        # The agent replaced its output dir with a plain file — no answer.json can
+        # live inside it. Surface it as infra rather than laundering the anomaly
+        # into a silent 0.0 that reads as a legitimate agent failure.
+        return _agent_output_infra(
+            f"{AGENT_OUTPUT_DIR} is a plain file, not the directory the agent was "
+            "told to create — cannot open it for the scorer"
+        )
+    if kind != "dir":
+        # absent: the agent wrote no output directory. An empty answer scores 0.0
+        # on its own merits; nothing for this gate to open.
+        return None
+
+    # A symlinked answer.json redirects the ~119 grep checks' ``cat answer.json``
+    # at the symlink target. Pointed at the sealed ground_truth.json (readable by
+    # the scorer's group) it forges a perfect score from the answer key, even
+    # though ``chmod -R`` would NOT follow this NESTED symlink. The agent was told
+    # to WRITE answer.json, so a symlink there is never legitimate — reject it on
+    # the same tamper channel as a symlinked agent_output.
+    if (
+        _docker_exec(
+            container_id,
+            ["test", "-L", ANSWER_ARTIFACT_PATH],
+            timeout=30,
+            user="root",
+        ).returncode
+        == 0
+    ):
+        return _agent_output_tampered(
+            f"{ANSWER_ARTIFACT_PATH} is a symlink — the checks would read its "
+            "target (e.g. the sealed answer key) instead of an agent-authored "
+            "answer"
+        )
 
     # go=rX: read + traverse, no write bit; owner keeps u=rwX for chain sessions.
     # Capital X sets execute only where it already applies (dirs, already-exec
@@ -1818,27 +1888,41 @@ def _open_agent_output_for_scoring(container_id: str) -> tuple[bool, str]:
         user="root",
     )
     if chmod.returncode != 0:
-        return False, (
+        return _agent_output_infra(
             f"could not open {AGENT_OUTPUT_DIR} for the scorer: "
             f"{chmod.stderr.strip() or 'unknown error'}"
         )
 
+    # Post-chmod seal re-verify. ``chmod -R`` changes the shared inode of a HARD
+    # LINK, so ``ln /workspace/test.sh agent_output/x`` (or the answer key) would
+    # let this grant widen a grading asset to agent-readable — a hard link is
+    # indistinguishable from the real file to the recursion, and unlike a symlink
+    # it is followed. The seal already proved the agent could not read these
+    # before the chmod, so if either is agent-readable now, this open widened it:
+    # tampering, not a scoreable run.
+    for asset in (GROUND_TRUTH, TEST_SH):
+        if _can_read(container_id, asset, user=AGENT_USER):
+            return _agent_output_tampered(
+                f"opening {AGENT_OUTPUT_DIR} made {asset} readable by the agent — "
+                "a hard link inside agent_output aimed the read grant at a sealed "
+                "grading asset"
+            )
+
     # answer.json present-but-unreadable is the exact false-0.0 vector: the file
     # exists (the agent answered), but the scorer's `[[ -f ]]`/open() cannot reach
-    # it. This end-to-end read probe requires both traverse on the dir and read on
-    # the file, so a pass here means the scorer can actually load the answer — it
-    # subsumes a separate dir-readable check (an unreadable dir fails this too).
+    # it. answer.json is a real file here (the symlink is rejected above), so this
+    # is a genuine permission miss -> infra, never a silent 0.0.
     answer_present = _docker_exec(
         container_id, ["test", "-e", ANSWER_ARTIFACT_PATH], timeout=30, user="root"
     )
     if answer_present.returncode == 0 and not _can_read(
         container_id, ANSWER_ARTIFACT_PATH, user=SCORING_USER
     ):
-        return False, (
+        return _agent_output_infra(
             f"{ANSWER_ARTIFACT_PATH} is present but unreadable by {SCORING_USER} "
             "after the read grant — a correct answer would score a false 0.0"
         )
-    return True, ""
+    return None
 
 
 def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
@@ -1873,20 +1957,15 @@ def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
     _close_workspace_for_scoring(container_id)
     try:
         # Undo any restrictive agent umask on agent_output/ so the scorer can read
-        # its own answer.json. Present-but-unreadable becomes an infra error, never
-        # a false 0.0 (bead EnterpriseBench-qx4pg). Inside the try so the finally
-        # still reopens /workspace for a later chain session.
-        opened, open_err = _open_agent_output_for_scoring(container_id)
-        if not opened:
-            return {
-                "task_score": 0.0,
-                "all_passed": False,
-                "verifier_infra_error": InfraError(
-                    reason="agent_output_unreadable_by_scorer",
-                    stage="deterministic_scoring",
-                    detail=open_err,
-                ).as_verifier_error(),
-            }
+        # its own answer.json. A present-but-unreadable answer becomes an infra
+        # error and a symlink/hard link aimed at the seal becomes an
+        # integrity_violation — never the false 0.0 this bug produces (bead
+        # EnterpriseBench-qx4pg). The fragment names its own channel; the caller's
+        # routers dispatch it. Inside the try so the finally still reopens
+        # /workspace for a later chain session.
+        open_result = _open_agent_output_for_scoring(container_id)
+        if open_result is not None:
+            return {"task_score": 0.0, "all_passed": False, **open_result}
         result = _docker_exec(
             container_id,
             [

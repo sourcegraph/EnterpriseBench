@@ -1358,29 +1358,35 @@ class TestForgeAttackEndToEnd:
 
 def _open_exec(
     *,
-    dir_is_symlink: bool = False,
-    dir_exists: bool = True,
+    kind: str = "dir",
+    answer_is_symlink: bool = False,
     chmod_ok: bool = True,
+    grading_agent_readable: bool = False,
     answer_present: bool = True,
     answer_readable: bool = True,
 ):
     """A _docker_exec stand-in for _open_agent_output_for_scoring's probes.
 
     Returns (fake_exec, calls) so a test can both steer each probe's outcome and
-    assert on the exact commands issued (e.g. that the grant carries no write bit).
+    assert on the exact commands issued (e.g. that the grant carries no write
+    bit). ``kind`` is the classify word ("dir"|"symlink"|"file"|"absent");
+    ``grading_agent_readable`` simulates a hard link that widened a grading inode
+    to agent-readable after the chmod.
     """
     calls: list[list] = []
 
     def fake_exec(container_id, cmd, **kwargs):
         calls.append(cmd)
-        # The combined "real directory, not a symlink" probe: rc 0 only when the
-        # dir exists AND is not a symlink (the happy path this gate opens).
-        if cmd[0] == "bash" and AGENT_OUTPUT_DIR in cmd[-1] and "-d" in cmd[-1]:
-            return _ok() if (dir_exists and not dir_is_symlink) else _fail()
-        if cmd[:2] == ["test", "-L"] and cmd[2] == AGENT_OUTPUT_DIR:
-            return _ok() if dir_is_symlink else _fail()
+        # The classify probe: one bash that echoes symlink/dir/file/absent.
+        if cmd[0] == "bash" and AGENT_OUTPUT_DIR in cmd[-1] and "echo symlink" in cmd[-1]:
+            return _ok(stdout=kind)
+        if cmd[:2] == ["test", "-L"] and cmd[2] == ANSWER_ARTIFACT_PATH:
+            return _ok() if answer_is_symlink else _fail()
         if cmd[0] == "chmod":
             return _ok() if chmod_ok else _fail("chmod: denied")
+        # _can_read(grading asset, user=agent): the post-chmod hard-link probe.
+        if cmd[:2] == ["test", "-r"] and cmd[2] in (rt.GROUND_TRUTH, rt.TEST_SH):
+            return _ok() if grading_agent_readable else _fail()
         if cmd[:2] == ["test", "-e"] and cmd[2] == ANSWER_ARTIFACT_PATH:
             return _ok() if answer_present else _fail()
         if cmd[:2] == ["test", "-r"] and cmd[2] == ANSWER_ARTIFACT_PATH:
@@ -1390,42 +1396,99 @@ def _open_exec(
     return fake_exec, calls
 
 
+def _infra_reason(result: dict | None) -> str:
+    """The verifier_infra_error detail from an _open_agent_output_for_scoring result."""
+    return result["verifier_infra_error"]["detail"]
+
+
 class TestOpenAgentOutputForScoring:
     """Unit-level: the umask under-credit gate (bead EnterpriseBench-qx4pg).
 
     A correct agent must not score a false 0.0 because a restrictive umask left
-    agent_output/ unreadable to the third-identity scorer.
+    agent_output/ unreadable to the third-identity scorer. The gate returns None
+    to proceed, or a scores fragment naming its channel: a symlink/hard link at
+    the seal is an ``integrity_violation`` (INVALID, never re-run), a genuine
+    unreadable answer is a ``verifier_infra_error`` (re-run), never a false 0.0.
     """
 
     def test_absent_agent_output_is_a_pass_and_opens_nothing(self) -> None:
         # No output directory means an empty answer, which scores 0.0 on its own
         # merits. Nothing for this gate to open, and no chmod to issue.
-        fake, calls = _open_exec(dir_exists=False)
+        fake, calls = _open_exec(kind="absent")
         with patch.object(rt, "_docker_exec", side_effect=fake):
-            ok, err = _open_agent_output_for_scoring("cid")
-        assert ok is True and err == ""
+            result = _open_agent_output_for_scoring("cid")
+        assert result is None
         assert not any(c[0] == "chmod" for c in calls), (
             "opened a directory the agent never created"
         )
 
-    def test_symlinked_agent_output_is_infra_and_never_chmods(self) -> None:
+    def test_symlinked_agent_output_is_integrity_violation_and_never_chmods(
+        self,
+    ) -> None:
         # An agent that replaces agent_output with a symlink (to the sealed
         # grading assets, say) must not get this root chmod to follow it: both
         # `test -d` and `chmod -R` dereference a top-level symlink, which would
-        # widen ground_truth.json to o=rX. It must fail to infra BEFORE any chmod.
-        fake, calls = _open_exec(dir_is_symlink=True)
+        # widen ground_truth.json to o=rX. It is grading-asset tampering, so it
+        # takes the INVALID channel (never a re-run mulligan), BEFORE any chmod.
+        fake, calls = _open_exec(kind="symlink")
         with patch.object(rt, "_docker_exec", side_effect=fake):
-            ok, err = _open_agent_output_for_scoring("cid")
-        assert ok is False and "symlink" in err
+            result = _open_agent_output_for_scoring("cid")
+        violation = result["integrity_violation"]
+        assert violation["reason"] == "agent_output_tampered"
+        assert "symlink" in violation["detail"]
+        assert "verifier_infra_error" not in result, "tamper must not be a re-run"
         assert not any(c[0] == "chmod" for c in calls), (
             "followed a symlinked agent_output through a root chmod"
         )
 
+    def test_symlinked_answer_json_is_integrity_violation_and_never_chmods(
+        self,
+    ) -> None:
+        # The nested-symlink forge: agent_output is a real dir, but answer.json is
+        # a symlink aimed at the sealed ground_truth.json. `chmod -R` does not
+        # follow it, but the ~119 grep checks `cat answer.json` would read the
+        # answer key through it. Reject on the tamper channel before any chmod.
+        fake, calls = _open_exec(answer_is_symlink=True)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        violation = result["integrity_violation"]
+        assert violation["reason"] == "agent_output_tampered"
+        assert "answer.json" in violation["detail"] and "symlink" in violation["detail"]
+        assert "verifier_infra_error" not in result
+        assert not any(c[0] == "chmod" for c in calls), (
+            "chmod'd a directory holding a symlinked answer.json"
+        )
+
+    def test_plain_file_agent_output_is_infra_not_silent_zero(self) -> None:
+        # The agent replaced its output dir with a plain file. Old behaviour
+        # laundered this into ok/0.0 ("agent wrote nothing"); it must surface as
+        # infra instead, and never chmod a non-directory.
+        fake, calls = _open_exec(kind="file")
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        assert "plain file" in _infra_reason(result)
+        assert "integrity_violation" not in result
+        assert not any(c[0] == "chmod" for c in calls)
+
+    def test_hardlinked_grading_asset_widened_by_chmod_is_integrity_violation(
+        self,
+    ) -> None:
+        # A hard link inside agent_output shares the grading asset's inode, so
+        # `chmod -R` widens the real file. The seal proved the agent could not
+        # read it before; if it can now, this open widened it -> tamper, never a
+        # re-run.
+        fake, _ = _open_exec(grading_agent_readable=True)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        violation = result["integrity_violation"]
+        assert violation["reason"] == "agent_output_tampered"
+        assert "hard link" in violation["detail"]
+        assert "verifier_infra_error" not in result
+
     def test_readable_answer_passes(self) -> None:
         fake, _ = _open_exec()
         with patch.object(rt, "_docker_exec", side_effect=fake):
-            ok, err = _open_agent_output_for_scoring("cid")
-        assert ok is True and err == ""
+            assert _open_agent_output_for_scoring("cid") is None
 
     def test_grant_is_read_and_traverse_only_never_write(self) -> None:
         fake, calls = _open_exec()
@@ -1441,39 +1504,37 @@ class TestOpenAgentOutputForScoring:
     def test_chmod_failure_is_infra_not_pass(self) -> None:
         fake, _ = _open_exec(chmod_ok=False)
         with patch.object(rt, "_docker_exec", side_effect=fake):
-            ok, err = _open_agent_output_for_scoring("cid")
-        assert ok is False and "chmod: denied" in err
+            result = _open_agent_output_for_scoring("cid")
+        assert "chmod: denied" in _infra_reason(result)
+        assert "integrity_violation" not in result
 
     def test_present_but_unreadable_answer_is_infra_not_false_zero(self) -> None:
         # The exact bug: answer.json exists (the agent answered) but the scorer
         # cannot read it. Must be VERIFIER_INFRA_ERROR, never a silent 0.0.
         fake, _ = _open_exec(answer_readable=False)
         with patch.object(rt, "_docker_exec", side_effect=fake):
-            ok, err = _open_agent_output_for_scoring("cid")
-        assert ok is False and "answer.json" in err
+            result = _open_agent_output_for_scoring("cid")
+        assert "answer.json" in _infra_reason(result)
+        assert "integrity_violation" not in result
 
     def test_absent_answer_json_is_not_flagged(self) -> None:
         # agent_output/ exists but holds no answer.json (agent wrote some other
         # artifact, or nothing): a genuine empty answer, not this gate's concern.
         fake, _ = _open_exec(answer_present=False, answer_readable=False)
         with patch.object(rt, "_docker_exec", side_effect=fake):
-            ok, err = _open_agent_output_for_scoring("cid")
-        assert ok is True and err == ""
+            assert _open_agent_output_for_scoring("cid") is None
 
 
 class TestRunScoringRoutesUnreadableAgentOutput:
-    """The gate is wired into _run_scoring, and it fails to INFRA, not a 0.0."""
+    """The gate is wired into _run_scoring; each failure keeps its own channel."""
 
-    def test_unreadable_agent_output_becomes_infra_error_and_reopens(self) -> None:
-        reopened: list[str] = []
+    def _drive(self, open_result: dict, reopened: list[str]):
         with patch.object(
             rt, "_assert_grading_assets_sealed", return_value=(True, "")
         ), patch.object(rt, "_reap_agent_processes"), patch.object(
             rt, "_close_workspace_for_scoring"
         ), patch.object(
-            rt,
-            "_open_agent_output_for_scoring",
-            return_value=(False, "scorer cannot read answer.json"),
+            rt, "_open_agent_output_for_scoring", return_value=open_result
         ), patch.object(
             rt,
             "_reopen_workspace_for_agent",
@@ -1482,12 +1543,20 @@ class TestRunScoringRoutesUnreadableAgentOutput:
             rt, "_docker_exec", return_value=_ok(stdout='{"task_score": 1.0}')
         ) as exec_:
             scores = _run_scoring("cid")
+        return scores, exec_
+
+    def test_unreadable_agent_output_becomes_infra_error_and_reopens(self) -> None:
+        reopened: list[str] = []
+        scores, exec_ = self._drive(
+            rt._agent_output_infra("scorer cannot read answer.json"), reopened
+        )
 
         assert scores["task_score"] == 0.0
         assert scores["all_passed"] is False
         infra = scores["verifier_infra_error"]
         assert infra["reason"] == "agent_output_unreadable_by_scorer"
         assert infra["stage"] == "deterministic_scoring"
+        assert "integrity_violation" not in scores
         # The finally block must still reopen the workspace for a chain's next
         # session, even though we returned early inside the try.
         assert reopened == ["cid"]
@@ -1497,6 +1566,27 @@ class TestRunScoringRoutesUnreadableAgentOutput:
             call.args[1][0] == "bash" and rt.TEST_SH in call.args[1][-1]
             for call in exec_.call_args_list
         ), "scoring ran test.sh despite unreadable agent output"
+
+    def test_tampered_agent_output_becomes_integrity_violation_not_a_rerun(
+        self,
+    ) -> None:
+        # A symlink/hard link aimed at the seal must reach the INVALID channel, so
+        # the top-level router marks the run invalid and never re-scores it. The
+        # verifier_infra_error re-run channel would be a free mulligan (g5k5s).
+        reopened: list[str] = []
+        scores, exec_ = self._drive(
+            rt._agent_output_tampered("answer.json is a symlink"), reopened
+        )
+
+        assert scores["task_score"] == 0.0
+        assert scores["all_passed"] is False
+        assert scores["integrity_violation"]["reason"] == "agent_output_tampered"
+        assert "verifier_infra_error" not in scores
+        assert reopened == ["cid"]
+        assert not any(
+            call.args[1][0] == "bash" and rt.TEST_SH in call.args[1][-1]
+            for call in exec_.call_args_list
+        ), "scoring ran test.sh despite a tampered agent_output"
 
 
 @pytest.mark.docker
@@ -1545,6 +1635,43 @@ class TestUmaskDoesNotUnderCreditTheScorer:
         )
         return out.returncode == 0 and "42" in out.stdout
 
+    def _seal_cid(self) -> str:
+        """A container mirroring the real seal: 1777 /workspace, root-owned
+        grading assets group-readable by the scorer, no 'other' access.
+
+        Reproduces _seal_grading_assets' end state (u=rwX,g=rX,o=) for both
+        ground_truth.json (under .task) and test.sh (at the workspace root), so
+        the tamper tests can prove neither is widened to the agent.
+        """
+        cid = subprocess.run(
+            ["docker", "run", "-d", "--rm", "debian:bookworm-slim", "sleep", "300"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        subprocess.run(
+            ["docker", "exec", cid, "bash", "-c",
+             "useradd -m -s /bin/bash agent; "
+             f"groupadd {SCORING_GROUP}; "
+             f"useradd -M -s /bin/bash -g {SCORING_GROUP} {SCORING_USER}; "
+             # /workspace world-writable + sticky, as WORKSPACE_MODE_SESSION.
+             "mkdir -p /workspace && chmod 1777 /workspace; "
+             # Sealed grading assets: root-owned, group-read, no 'other' access.
+             "mkdir -p /workspace/.task; "
+             'echo \'{"answer": "42"}\' > /workspace/.task/ground_truth.json; '
+             'echo \'#!/bin/bash\' > /workspace/test.sh; '
+             f"chown -R root:{SCORING_GROUP} /workspace/.task /workspace/test.sh; "
+             "chmod 750 /workspace/.task; "
+             "chmod 640 /workspace/.task/ground_truth.json /workspace/test.sh"],
+            capture_output=True, check=True,
+        )
+        return cid
+
+    @staticmethod
+    def _mode(cid: str, path: str) -> str:
+        return subprocess.run(
+            ["docker", "exec", cid, "stat", "-c", "%a", path],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+
     def test_umask_077_correct_answer_is_readable_after_the_open(self) -> None:
         if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
             pytest.skip("docker daemon unavailable")
@@ -1558,8 +1685,8 @@ class TestUmaskDoesNotUnderCreditTheScorer:
             )
 
             rt._close_workspace_for_scoring(cid)
-            ok, err = _open_agent_output_for_scoring(cid)
-            assert ok is True, err
+            result = _open_agent_output_for_scoring(cid)
+            assert result is None, result
 
             # Fixed: the scorer can now read the answer it must grade -> 1.0, not
             # a false 0.0.
@@ -1606,8 +1733,8 @@ class TestUmaskDoesNotUnderCreditTheScorer:
                 "the baseline the suite relies on is broken"
             )
             rt._close_workspace_for_scoring(cid)
-            ok, err = _open_agent_output_for_scoring(cid)
-            assert ok is True, err
+            result = _open_agent_output_for_scoring(cid)
+            assert result is None, result
             assert self._scorer_sees_answer(cid)
         finally:
             subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
@@ -1617,31 +1744,13 @@ class TestUmaskDoesNotUnderCreditTheScorer:
         # symlink aimed at the sealed grading assets. A bare `chmod -R` follows a
         # top-level symlink, so without the guard this root chmod would widen
         # ground_truth.json to o=rX and leak the answer key into a chain session.
-        # The guard must reject the symlink -> infra error, seal untouched.
+        # The guard must reject the symlink -> integrity_violation (INVALID, never
+        # a re-run mulligan), seal untouched.
         if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
             pytest.skip("docker daemon unavailable")
 
-        cid = subprocess.run(
-            ["docker", "run", "-d", "--rm", "debian:bookworm-slim", "sleep", "300"],
-            capture_output=True, text=True, check=True,
-        ).stdout.strip()
+        cid = self._seal_cid()
         try:
-            subprocess.run(
-                ["docker", "exec", cid, "bash", "-c",
-                 "useradd -m -s /bin/bash agent; "
-                 f"groupadd {SCORING_GROUP}; "
-                 f"useradd -M -s /bin/bash -g {SCORING_GROUP} {SCORING_USER}; "
-                 # /workspace world-writable + sticky, as WORKSPACE_MODE_SESSION.
-                 "mkdir -p /workspace && chmod 1777 /workspace; "
-                 # Sealed grading assets: root-owned, group-read, no 'other'
-                 # access — mirrors _seal_grading_assets (u=rwX,g=rX,o=).
-                 "mkdir -p /workspace/.task; "
-                 'echo \'{"answer": "42"}\' > /workspace/.task/ground_truth.json; '
-                 f"chown -R root:{SCORING_GROUP} /workspace/.task; "
-                 "chmod 750 /workspace/.task; "
-                 "chmod 640 /workspace/.task/ground_truth.json"],
-                capture_output=True, check=True,
-            )
             # The agent owns the entry in the sticky dir, so it can unlink its own
             # output dir and point the name at the sealed assets.
             subprocess.run(
@@ -1651,21 +1760,108 @@ class TestUmaskDoesNotUnderCreditTheScorer:
             )
 
             rt._close_workspace_for_scoring(cid)
-            ok, err = _open_agent_output_for_scoring(cid)
-            assert ok is False and "symlink" in err, (
-                f"symlinked agent_output was not rejected: ok={ok} err={err!r}"
+            result = _open_agent_output_for_scoring(cid)
+            violation = result.get("integrity_violation", {})
+            assert violation.get("reason") == "agent_output_tampered", (
+                f"symlinked agent_output was not routed to integrity_violation: "
+                f"{result!r}"
+            )
+            assert "symlink" in violation["detail"]
+            assert "verifier_infra_error" not in result, (
+                "grading-asset tampering was handed the re-run mulligan channel"
             )
 
             # The seal is intact: ground_truth.json never gained 'other' read.
-            mode = subprocess.run(
-                ["docker", "exec", cid, "stat", "-c", "%a",
-                 "/workspace/.task/ground_truth.json"],
-                capture_output=True, text=True, check=True,
-            ).stdout.strip()
+            mode = self._mode(cid, "/workspace/.task/ground_truth.json")
             assert mode == "640", (
                 f"the grading seal was widened through the symlink: "
                 f"ground_truth.json is now {mode}, not 640 — the answer key "
                 "leaked to 'other'"
+            )
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+    def test_nested_symlinked_answer_json_does_not_leak_the_answer_key(self) -> None:
+        # The nested-symlink forge (review reject #1): agent_output is a real dir
+        # `chmod -R` will not follow, but answer.json inside it is a symlink aimed
+        # at the sealed ground_truth.json. The ~119 grep checks `cat answer.json`
+        # would read the answer key through it and score a false HIGH. The guard
+        # must reject the symlinked answer.json -> integrity_violation (INVALID,
+        # never scored), before any chmod, so those checks never run.
+        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+            pytest.skip("docker daemon unavailable")
+
+        cid = self._seal_cid()
+        try:
+            subprocess.run(
+                ["docker", "exec", "-u", "agent", cid, "bash", "-c",
+                 "mkdir -p /workspace/agent_output; "
+                 "ln -s /workspace/.task/ground_truth.json "
+                 "/workspace/agent_output/answer.json"],
+                capture_output=True, check=True,
+            )
+
+            rt._close_workspace_for_scoring(cid)
+            result = _open_agent_output_for_scoring(cid)
+            violation = result.get("integrity_violation", {})
+            assert violation.get("reason") == "agent_output_tampered", (
+                f"symlinked answer.json was not routed to integrity_violation: "
+                f"{result!r}"
+            )
+            assert "answer.json" in violation["detail"] and "symlink" in violation[
+                "detail"
+            ]
+            assert "verifier_infra_error" not in result, (
+                "grading-asset tampering was handed the re-run mulligan channel"
+            )
+
+            # Rejected before any chmod ran, so nothing was widened: the seal on
+            # the answer key the symlink targets is intact (still 640, no 'other').
+            assert self._mode(cid, "/workspace/.task/ground_truth.json") == "640"
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+    def test_hardlinked_grading_asset_widened_by_chmod_is_caught(self) -> None:
+        # `chmod -R` follows a HARD LINK (unlike a symlink, it is the file), so a
+        # hard link inside agent_output pointing at test.sh would let the read
+        # grant widen the sealed inode to agent-readable. fs.protected_hardlinks
+        # normally stops the agent making the link, so we plant it as root to
+        # exercise the post-chmod seal re-verify directly: after the grant, if a
+        # grading asset is agent-readable, this open widened it -> tamper, never a
+        # scoreable run.
+        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+            pytest.skip("docker daemon unavailable")
+
+        cid = self._seal_cid()
+        try:
+            subprocess.run(
+                ["docker", "exec", cid, "bash", "-c",
+                 "mkdir -p /workspace/agent_output && chown agent:agent "
+                 "/workspace/agent_output; "
+                 "ln /workspace/test.sh /workspace/agent_output/x"],
+                capture_output=True, check=True,
+            )
+            # Precondition: the agent cannot read the sealed test.sh before the open.
+            pre = subprocess.run(
+                ["docker", "exec", "-u", "agent", cid, "test", "-r",
+                 "/workspace/test.sh"],
+                capture_output=True,
+            )
+            assert pre.returncode != 0, (
+                "test.sh was agent-readable before the open — the seal precondition "
+                "the re-verify relies on is already broken"
+            )
+
+            rt._close_workspace_for_scoring(cid)
+            result = _open_agent_output_for_scoring(cid)
+            violation = result.get("integrity_violation", {})
+            assert violation.get("reason") == "agent_output_tampered", (
+                f"a hard link that widened a grading inode was not caught: "
+                f"{result!r}"
+            )
+            assert "hard link" in violation["detail"]
+            assert "verifier_infra_error" not in result, (
+                "grading-asset tampering was handed the re-run mulligan channel"
             )
         finally:
             subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
