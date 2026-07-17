@@ -8,7 +8,11 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-from eb_verify.agent_git import GIT_NO_EXEC_FLAGS, git_diff_argv
+# _git_diff_argv is the one sanctioned git-diff argv builder; the no-execute
+# flags and why they are mandatory live in eb_verify.agent_git, shared with
+# patch_evidence. A private copy here is exactly how the second call site came
+# to omit them (bead jn73.2.7); the seal test enforces no other hand-built argv.
+from eb_verify.agent_git import git_diff_argv as _git_diff_argv
 from eb_verify.plugins import ValidationResult
 from eb_verify.scorer_guard import INFRA_SENTINEL, DiffProbeError
 
@@ -16,14 +20,6 @@ from eb_verify.scorer_guard import INFRA_SENTINEL, DiffProbeError
 # Diff size thresholds (in lines of diff output)
 DEFAULT_MAX_DIFF_LINES = 10_000
 DEFAULT_MIN_DIFF_LINES = 1
-
-
-# The no-execute flags and the reason they are mandatory now live in
-# eb_verify.agent_git, shared with patch_evidence: the rule only holds if every
-# module that diffs an agent repo attaches them, and this module having its own
-# private copy is exactly how the second one came to omit them (bead jn73.2.7).
-_GIT_NO_EXEC_FLAGS = GIT_NO_EXEC_FLAGS
-_git_diff_argv = git_diff_argv
 
 
 def _run_git_diff(args: list[str], repo_path: Path) -> str:

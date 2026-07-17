@@ -37,7 +37,7 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, NoReturn
+from typing import List
 
 from eb_verify.agent_git import git_diff_argv
 from eb_verify.patch_diff import (
@@ -47,7 +47,7 @@ from eb_verify.patch_diff import (
     language_for,
     removed_code,
 )
-from eb_verify.plugins.file_extraction import HarnessError, emit
+from eb_verify.plugins.file_extraction import HarnessError, _JsonErrorParser, emit
 from eb_verify.scorer_guard import INFRA_SENTINEL
 
 # A fix-site diff is small; a repo-wide one is bounded by the agent's own edits.
@@ -147,17 +147,6 @@ def _print_code(repo: Path, paths: List[str], lang: str, *, added: bool) -> int:
     diff = _diff(repo, paths)
     print(added_code(diff, lang) if added else removed_code(diff, lang))
     return 0
-
-
-class _JsonErrorParser(argparse.ArgumentParser):
-    """argparse that raises instead of exiting — see file_extraction's copy.
-
-    Stock argparse answers a bad flag with usage on stderr and exit 2; for the
-    ``site`` path that would reach ``runner.py`` as a non-JSON verdict.
-    """
-
-    def error(self, message: str) -> NoReturn:  # noqa: D102 — argparse hook
-        raise HarnessError(f"bad verifier invocation: {message}")
 
 
 def build_parser() -> argparse.ArgumentParser:
