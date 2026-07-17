@@ -3,10 +3,17 @@
 The point of this module is the reader-contract class below. results_io only
 matters if what it writes is what the real readers read, so those tests call the
 actual reader functions (``run_benchmark.is_task_completed``,
-``run_benchmark.extract_task_cost``, ``run_sweep._check_results_file``) against a
-file the helper produced, rather than re-asserting the helper's own dict back at
-itself. A key dropped from the payload fails here instead of surfacing as a task
-that silently re-runs or a cost that silently reads 0.0 (EnterpriseBench-78zt5).
+``run_benchmark.extract_task_cost``, ``run_sweep._check_results_file``,
+``aggregate_mcp_clean.load_mode``) against a file the helper produced, rather
+than re-asserting the helper's own dict back at itself. A key dropped from the
+payload fails here instead of surfacing as a task that silently re-runs or a cost
+that silently reads 0.0 (EnterpriseBench-78zt5).
+
+Two readers are re-typed rather than called, and only because they are
+expressions rather than functions: run_benchmark's score read (run_benchmark.py:
+353) and the headline predicate (scripts/analysis/recompute_headline_*). A
+transcribed reader guards nothing a rename would not break silently — extracting
+those two so this class can call them is EnterpriseBench-fl5eu.
 """
 
 from __future__ import annotations
@@ -17,12 +24,15 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-sys.path.insert(
-    0, str(Path(__file__).resolve().parent.parent / "scripts" / "orchestration")
-)
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+# aggregate_mcp_clean.py lives in results/analysis/, imported the same way its
+# tracked consumers (scripts/analysis/recompute_headline_*.py) import it.
+sys.path.insert(0, str(REPO_ROOT / "results" / "analysis"))
 
-from results_io import (  # noqa: E402
+import aggregate_mcp_clean as amc  # noqa: E402
+
+from orchestration.results_io import (  # noqa: E402
     PHASE_COMPLETE,
     RESULTS_FIELDS,
     RESULTS_FILENAME,
@@ -169,17 +179,34 @@ class TestReaderContract:
         d = json.loads(path.read_text())
         assert d.get("phase") == "complete" and d.get("success") is True
 
-    def test_invalid_status_is_readable_by_the_aggregator(self, tmp_path: Path) -> None:
-        """analysis/aggregate_mcp_clean drops rows whose status is "invalid"."""
-        path = _write_for_reader(
+    def test_aggregator_classes_an_invalid_run_invalid(self, tmp_path: Path) -> None:
+        """Called, not transcribed: load_mode's ``.upper()`` normalization is the
+        thing under test, and reading our own write back would never run it. That
+        case-drift is exactly the te9ah incident (run_task writes lowercase
+        "invalid"; the legacy schema wrote "INVALID"), so a test that skips the
+        normalization would not have caught the bug it exists for.
+        """
+        _write_for_reader(
+            tmp_path,
+            "t-1",
+            "baseline",
+            success=False,
+            status=RUN_STATUS_INVALID,
+            tool_usage={"num_turns": 6},
+        )
+        assert amc.load_mode(tmp_path / "t-1", "baseline")["class"] == "INVALID"
+
+    def test_aggregator_reads_num_turns_before_status(self, tmp_path: Path) -> None:
+        """The order is contract, and it is why the runners' ``tool_usage={}`` is
+        load-bearing: chain_runner and event_replay spend no tokens, so their
+        invalid runs land NO-OP and ``status`` is never reached. Both classes sit
+        outside the clean set, so nothing is miscounted — but ``status`` alone
+        does not carry a run out of it, and results_io's reader map says so.
+        """
+        _write_for_reader(
             tmp_path, "t-1", "baseline", success=False, status=RUN_STATUS_INVALID
         )
-        assert json.loads(path.read_text())["status"] == "invalid"
-
-    def test_every_reader_field_is_declared_in_the_contract(self) -> None:
-        """Drift guard: the fields the readers above touch are all top-level keys."""
-        reader_fields = {"success", "scores", "tool_usage", "phase", "status"}
-        assert reader_fields <= set(RESULTS_FIELDS)
+        assert amc.load_mode(tmp_path / "t-1", "baseline")["class"] == "NO-OP"
 
     def test_contract_values_match_the_literals_readers_compare_against(self) -> None:
         """The VALUES are contract, not just the keys.

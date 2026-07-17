@@ -28,7 +28,6 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
-sys.path.insert(0, str(REPO_ROOT / "scripts" / "orchestration"))
 
 from orchestration.chain_runner import (  # noqa: E402
     ChainResult,
@@ -39,7 +38,11 @@ from orchestration.chain_runner import (  # noqa: E402
 )
 from eb_metrics.trace_quality_adapter import metrics_from_eb_record  # noqa: E402
 from eb_verify.scorer_guard import InfraError  # noqa: E402
-from results_io import RESULTS_FIELDS, RESULTS_FILENAME, RUN_STATUS_INVALID  # noqa: E402
+from orchestration.results_io import (  # noqa: E402
+    RESULTS_FIELDS,
+    RESULTS_FILENAME,
+    RUN_STATUS_INVALID,
+)
 
 
 def _task_def() -> ChainTaskDefinition:

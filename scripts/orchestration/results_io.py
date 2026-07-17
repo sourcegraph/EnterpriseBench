@@ -5,12 +5,22 @@
 one file: ``results.json``. Its readers each reach for a different field, and no
 runner sees the whole set:
 
-  * ``run_benchmark.run_task``          — ``scores.task_score``    (the score)
-  * ``run_benchmark.is_task_completed`` — ``success``              (skip-completed)
-  * ``run_benchmark.extract_task_cost`` — ``tool_usage.cost_usd``  (cost rollup)
-  * ``run_sweep._check_results_file``   — ``success``              (scored/failed)
-  * ``analysis/recompute_headline_*``   — ``phase`` + ``success``  (headline filter)
-  * ``analysis/aggregate_mcp_clean``    — ``status``               (drops "invalid")
+  * ``run_benchmark.run_task``           — ``scores.task_score``   (the score)
+  * ``run_benchmark.is_task_completed``  — ``success``             (skip-completed)
+  * ``run_benchmark.extract_task_cost``  — ``tool_usage.cost_usd`` (cost rollup)
+  * ``run_sweep._check_results_file``    — ``success``             (scored/failed)
+  * ``scripts/analysis/recompute_headline_*``  — ``phase`` + ``success``
+  * ``results/analysis/aggregate_mcp_clean.load_mode`` — ``tool_usage.num_turns``,
+    THEN ``status``
+
+The last one reads two fields in that order, and the order is the contract: it
+classes ``num_turns in (0, None)`` as NO-OP *before* it looks at ``status``, so a
+runner reporting ``tool_usage={}`` (chain_runner and event_replay both do — they
+spend no tokens) is classed NO-OP and its ``status`` is never read. Both NO-OP
+and INVALID sit outside the clean set, so nothing is miscounted today; the point
+is that ``status`` alone does not carry a run out of that set. This map is only
+worth having if it is exact — the readers are listed here, but each one is bound
+to this module by execution in tests/test_results_io.py, not by this prose.
 
 Declaring the shape once here is what stops a runner from satisfying the reader
 it happened to be tested against while silently starving the rest — an absent key

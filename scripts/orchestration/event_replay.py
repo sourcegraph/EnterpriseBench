@@ -53,6 +53,16 @@ except ImportError:
     from runner_cli import add_passthrough_args
     from results_io import PHASE_COMPLETE, RUN_STATUS_INVALID, write_results_json
 
+# The verifier_infra_error channel scrubs its text with this one function, so no
+# producer on the channel carries a secret or an unbounded blob to a sink
+# (tests/integrity/test_invalidity_channel_redaction.py: "one rule, not two").
+# run_task and chain_runner reach it through InfraError, which calls it on
+# construction; this runner writes a flat ``error`` string rather than a
+# structured verifier error, so it calls the rule directly instead of building an
+# InfraError to throw three of its four fields away.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "lib"))
+from eb_verify.redact import safe_detail  # noqa: E402
+
 
 def load_task_config(task_dir: Path) -> dict:
     """Load and validate the task.toml file."""
@@ -107,8 +117,7 @@ def run_scoring(
     The agent's action file is validated as a WARNING and scored regardless: a
     malformed action is the agent's own failure, and routing it anywhere but the
     scorer would let a broken agent escape the 0 it earned. The task's own event
-    fixture is the caller's precondition, checked in main() — the asymmetry is
-    deliberate, so the two validators do not sit side by side.
+    fixture is this function's precondition, checked by the caller.
     """
     action_errors = validate_action_file(agent_path)
     if action_errors:
@@ -243,7 +252,7 @@ def main() -> int:
             success=False,
             phase="",
             status=RUN_STATUS_INVALID,
-            error="; ".join(fixture_errors),
+            error=safe_detail("; ".join(fixture_errors)),
             # The name run_task gives the same cause (run_task.py:1549): one
             # vocabulary classifies every runner's infra failure.
             failure_class="verifier_infra_error",

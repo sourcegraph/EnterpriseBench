@@ -38,9 +38,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 RUNNER = REPO_ROOT / "scripts" / "orchestration" / "event_replay.py"
 
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
-sys.path.insert(0, str(REPO_ROOT / "scripts" / "orchestration"))
+sys.path.insert(0, str(REPO_ROOT / "lib"))
 
-from results_io import RESULTS_FIELDS, RESULTS_FILENAME  # noqa: E402
+from eb_verify.redact import MAX_DETAIL_CHARS  # noqa: E402
+from orchestration.results_io import RESULTS_FIELDS, RESULTS_FILENAME  # noqa: E402
 
 
 TASK_TOML = """\
@@ -195,8 +196,14 @@ class TestScoreModeWritesResults:
     def test_results_json_is_written(self, scored_dir: Path) -> None:
         assert (scored_dir / RESULTS_FILENAME).exists()
 
-    def test_results_carry_the_shared_shape(self, scored: dict) -> None:
-        """Same contract every other runner writes — not an event_replay dialect."""
+    def test_routed_through_the_shared_writer(self, scored: dict) -> None:
+        """Every key, including the ones no assertion below names.
+
+        This asserts the runner called write_results_json rather than rolling its
+        own payload — it cannot fail while it does, since the helper builds an
+        unconditional literal. That is the whole claim; the tests below carry the
+        values.
+        """
         assert tuple(scored) == RESULTS_FIELDS
 
     def test_score_is_durable_not_just_printed(self, scored: dict) -> None:
@@ -244,23 +251,28 @@ class TestBrokenFixtureIsInvalidNotScored:
     re-run channel rather than the results table.
     """
 
-    @pytest.fixture
-    def broken_fixture_run(self, task_dir: Path) -> tuple:
+    @pytest.fixture(scope="module")
+    def broken_fixture_run(self, tmp_path_factory: pytest.TempPathFactory) -> tuple:
         """Non-monotonic timestamps: the ordering the scorer's timeliness axis is
-        computed against does not hold, so no verdict it reaches is trustworthy."""
+        computed against does not hold, so no verdict it reaches is trustworthy.
+
+        Module-scoped for the same reason as ``dispatched`` and ``scored_dir``:
+        its consumers read one run from different angles.
+        """
+        d = _make_task_dir(tmp_path_factory.mktemp("broken") / "er-test-001")
         _write_jsonl(
-            task_dir / "events.jsonl",
+            d / "events.jsonl",
             [EVENTS[0], {**EVENTS[0], "timestamp_ms": -5000, "id": "evt-002"}],
         )
-        agent = _write_jsonl(task_dir / "agent_actions.jsonl", ORACLE_ACTIONS)
+        agent = _write_jsonl(d / "agent_actions.jsonl", ORACLE_ACTIONS)
         proc = _run(
-            str(task_dir / "task.toml"),
+            str(d / "task.toml"),
             "--agent-actions",
             str(agent),
             "--mode",
             "baseline",
         )
-        payload_path = task_dir / RESULTS_FILENAME
+        payload_path = d / RESULTS_FILENAME
         payload = json.loads(payload_path.read_text()) if payload_path.exists() else {}
         return proc, payload
 
@@ -285,11 +297,52 @@ class TestBrokenFixtureIsInvalidNotScored:
         assert payload["failure_class"] == "verifier_infra_error"
         assert "timestamp" in payload["error"]
 
-    def test_broken_fixture_carries_the_shared_shape(self, broken_fixture_run: tuple) -> None:
+    def test_broken_fixture_still_identifies_the_run(self, broken_fixture_run: tuple) -> None:
         """The invalid write is the same contract as the scored one, not a
-        stripped-down variant that starves the readers it skips."""
+        stripped-down variant that starves the readers it skips.
+
+        Asserted on the two fields only this branch could drop — ``tuple(payload)
+        == RESULTS_FIELDS`` would not catch it, because write_results_json builds
+        an unconditional dict literal, so the key tuple is identical for every
+        call and cannot fail. task_id and task_metadata are what a run_facts
+        regression would actually take out.
+        """
         _, payload = broken_fixture_run
-        assert tuple(payload) == RESULTS_FIELDS
+        assert payload["task_id"] == "er-test-001"
+        assert payload["task_metadata"]["suite"] == "incident_response"
+
+
+class TestTheInvalidityChannelIsBounded:
+    """This runner is the third producer on ``verifier_infra_error``, and the
+    channel's rule is one rule, not three: text reaching a sink is scrubbed
+    (tests/integrity/test_invalidity_channel_redaction.py). run_task and
+    chain_runner get it from InfraError's constructor; this runner writes a flat
+    ``error`` string and calls ``safe_detail`` itself, so the cap needs its own
+    guard here — nothing else makes this producer obey it.
+    """
+
+    @pytest.fixture(scope="module")
+    def oversized_fixture_run(self, tmp_path_factory: pytest.TempPathFactory) -> dict:
+        """Every event malformed: one error per event, far past the cap."""
+        d = _make_task_dir(tmp_path_factory.mktemp("oversized") / "er-test-001")
+        _write_jsonl(
+            d / "events.jsonl",
+            [
+                {**EVENTS[0], "timestamp_ms": -i, "id": f"evt-{i:04d}"}
+                for i in range(1, 400)
+            ],
+        )
+        agent = _write_jsonl(d / "agent_actions.jsonl", ORACLE_ACTIONS)
+        _run(str(d / "task.toml"), "--agent-actions", str(agent), "--mode", "baseline")
+        return json.loads((d / RESULTS_FILENAME).read_text())
+
+    def test_error_is_capped(self, oversized_fixture_run: dict) -> None:
+        assert len(oversized_fixture_run["error"]) <= MAX_DETAIL_CHARS
+
+    def test_capped_error_still_names_the_cause(self, oversized_fixture_run: dict) -> None:
+        """Bounded, not gutted: a cap that destroyed the diagnosis would trade
+        one unusable payload for another."""
+        assert "timestamp" in oversized_fixture_run["error"]
 
 
 class TestBadAgentActionsAreStillScored:
