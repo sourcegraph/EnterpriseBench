@@ -12,10 +12,9 @@ These tests assert the shape chain_runner emits, using the real ChainResult /
 ChainTaskDefinition dataclasses so a field rename breaks them rather than
 sliding past a hand-rolled double.
 
-Shape alone turned out to be too weak a claim: the payload can carry every key a
-reader wants and still tell it a simulation was a real agent trial. So the
-validity tests below assert what the run means, once through the adapter that
-actually consumes the payload.
+Shape alone is too weak a claim: a payload can carry every key a reader wants and
+still tell it a simulation was a real agent trial, so the validity tests assert
+through the adapter that consumes it.
 """
 
 from __future__ import annotations
@@ -56,9 +55,7 @@ def _task_def() -> ChainTaskDefinition:
     )
 
 
-def _run_main(
-    tmp_path: Path, result: ChainResult, *argv: str
-) -> tuple[int, dict]:
+def _run_main(tmp_path: Path, result: ChainResult, *argv: str) -> tuple[int, dict]:
     """Run chain_runner.main against *result* and return (exit_code, results.json)."""
     task_toml = tmp_path / "task.toml"
     task_toml.write_text("# fixture\n")
@@ -75,6 +72,23 @@ def _run_main(
 
 def _scored_result() -> ChainResult:
     return ChainResult(task_id="chain-test-001", total_sessions=2, total_score=0.75)
+
+
+# The three causes ChainResult distinguishes, built by the real factories so a
+# change to the cause payload breaks these tests rather than sliding past a
+# hand-rolled dict.
+INVALIDITY_CAUSES = [
+    (
+        "verifier_infra_error",
+        InfraError(
+            reason="verifier_infra_error",
+            stage="verify",
+            detail="verifier never reached a verdict",
+        ).as_verifier_error(),
+    ),
+    ("session_failure", _session_failure(1, "session never completed")),
+    ("agent_not_configured", _no_agent_configured()),
+]
 
 
 class TestScoredChain:
@@ -133,30 +147,12 @@ class TestUnscoredChain:
         assert payload["phase"] == ""
         assert payload["scores"]["task_score"] is None
 
-    @pytest.mark.parametrize(
-        "channel, cause",
-        [
-            (
-                "verifier_infra_error",
-                InfraError(
-                    reason="verifier_infra_error",
-                    stage="verify",
-                    detail="verifier never reached a verdict",
-                ).as_verifier_error(),
-            ),
-            ("session_failure", _session_failure(1, "session never completed")),
-            ("agent_not_configured", _no_agent_configured()),
-        ],
-    )
+    @pytest.mark.parametrize("channel, cause", INVALIDITY_CAUSES)
     def test_every_invalidity_channel_is_marked_invalid_and_exits_nonzero(
         self, tmp_path: Path, channel: str, cause: dict
     ) -> None:
         """status=invalid is what the aggregator drops on; nonzero routes it to
-        run_benchmark's error channel so it is never recorded as completed.
-
-        The causes come from the real factories, so a change to the payload shape
-        breaks this test rather than sliding past a hand-rolled dict.
-        """
+        run_benchmark's error channel so it is never recorded as completed."""
         code, payload = _run_main(
             tmp_path,
             ChainResult(task_id="chain-test-001", total_score=None, **{channel: cause}),
@@ -167,33 +163,14 @@ class TestUnscoredChain:
         # A reader must never be handed a number from a run that did not score.
         assert payload["scores"]["task_score"] is None
 
-    @pytest.mark.parametrize(
-        "channel, cause",
-        [
-            (
-                "verifier_infra_error",
-                InfraError(
-                    reason="verifier_infra_error",
-                    stage="verify",
-                    detail="verifier never reached a verdict",
-                ).as_verifier_error(),
-            ),
-            ("session_failure", _session_failure(1, "session never completed")),
-            ("agent_not_configured", _no_agent_configured()),
-        ],
-    )
+    @pytest.mark.parametrize("channel, cause", INVALIDITY_CAUSES)
     def test_every_invalidity_channel_reports_its_own_cause(
         self, tmp_path: Path, channel: str, cause: dict
     ) -> None:
-        """Which cause, not just that there was one.
-
-        Every invalid chain landed failure_class=null / error="" before this, so
-        the three causes ChainResult already distinguishes collapsed into one
-        bucket and triage read validity_reason="unknown" for all of them — and
-        their remedies differ: a verifier fault earns a re-run, a missing agent
-        needs a harness. run_task pairs every status=invalid with a
-        failure_class; chain_runner was the only writer that did not.
-        """
+        """Which cause, not just that there was one: the remedies differ — a
+        verifier fault earns a re-run, a missing agent needs a harness — so a
+        reader handed only status=invalid cannot triage. run_task pairs every
+        status=invalid with a failure_class."""
         _, payload = _run_main(
             tmp_path,
             ChainResult(task_id="chain-test-001", total_score=None, **{channel: cause}),
@@ -225,47 +202,53 @@ class TestUnscoredChain:
 class TestSimulatedChain:
     """A simulation scores marker files the scaffold wrote, not agent work.
 
-    The runner recorded `simulated` under `config` only, which no validity reader
-    consults — so a simulated chain wrote success=true / phase=complete and a real
-    task_score, and projected as a genuine agent trial. That was strictly worse
-    than the bare payload it replaced: the old one at least failed loudly at the
-    adapter and could not enter the scored population at all.
+    `simulated` under `config` alone reaches no validity reader, so unless the
+    payload says it through failure_class/status/success/phase, a simulation
+    projects as a genuine agent trial.
     """
 
-    def _simulated(self) -> ChainResult:
-        return ChainResult(task_id="chain-test-001", total_score=0.87, simulated=True)
+    @pytest.fixture
+    def simulated_run(self, tmp_path: Path) -> tuple[int, dict]:
+        return _run_main(
+            tmp_path,
+            ChainResult(task_id="chain-test-001", total_score=0.87, simulated=True),
+            "--simulate",
+        )
 
-    def test_simulation_is_not_a_successful_run(self, tmp_path: Path) -> None:
-        _, payload = _run_main(tmp_path, self._simulated(), "--simulate")
+    def test_simulation_is_not_a_successful_run(self, simulated_run: tuple) -> None:
+        _, payload = simulated_run
         assert payload["success"] is False
         assert payload["phase"] == ""
         assert payload["status"] == RUN_STATUS_INVALID
 
-    def test_simulation_names_itself_where_a_reader_looks(self, tmp_path: Path) -> None:
-        """failure_class is the channel every validity reader already reads. A new
-        top-level field would only reach readers that opt in to consulting it —
-        which is this bead's own bug restated."""
-        _, payload = _run_main(tmp_path, self._simulated(), "--simulate")
+    def test_simulation_names_itself_where_a_reader_looks(
+        self, simulated_run: tuple
+    ) -> None:
+        """failure_class is the channel every validity reader already reads; a new
+        top-level field would only reach readers that opt in to consulting it."""
+        _, payload = simulated_run
         assert payload["failure_class"] == "simulated"
         assert "simulate" in payload["error"]
 
-    def test_simulation_exits_zero(self, tmp_path: Path) -> None:
+    def test_simulation_exits_zero(self, simulated_run: tuple) -> None:
         """The scaffold ran exactly as asked. Its run is unscoreable, not failed —
         and run_benchmark never forwards --simulate, so nothing dispatches here."""
-        code, _ = _run_main(tmp_path, self._simulated(), "--simulate")
+        code, _ = simulated_run
         assert code == 0
 
-    def test_the_scaffold_score_is_still_reported(self, tmp_path: Path) -> None:
-        """It is a real number about the scaffold, kept for whoever ran the
-        simulation on purpose. The validity fields, not a missing score, are what
-        keep it out of the results table."""
-        _, payload = _run_main(tmp_path, self._simulated(), "--simulate")
+    def test_the_scaffold_score_is_still_reported(self, simulated_run: tuple) -> None:
+        """A real number about the scaffold, kept for whoever ran the simulation on
+        purpose. The validity fields, not a missing score, are what keep it out of
+        the results table."""
+        _, payload = simulated_run
         assert payload["scores"]["task_score"] == pytest.approx(0.87)
 
-    def test_simulation_cannot_enter_the_scored_population(self, tmp_path: Path) -> None:
+    def test_simulation_cannot_enter_the_scored_population(
+        self, simulated_run: tuple
+    ) -> None:
         """The end-to-end claim, asserted through the real consumer: shape tests
         passed while this projected as validity="valid" score=0.87."""
-        _, payload = _run_main(tmp_path, self._simulated(), "--simulate")
+        _, payload = simulated_run
         metrics = metrics_from_eb_record(payload, run_name="test-run")
         assert metrics.validity == "invalid"
         assert metrics.score is None

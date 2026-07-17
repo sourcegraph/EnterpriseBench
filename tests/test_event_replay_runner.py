@@ -16,11 +16,8 @@ two independent reasons that this module pins down:
      ``__main__`` guard, so the process exited 0 — run_benchmark recorded
      status="completed" with score None. A stub reported as a real run.
 
-A third concern joined them once the runner could write results at all: it
-reported success unconditionally, so a task whose OWN fixtures were malformed was
-recorded as a valid completed run scoring whatever the scorer made of the
-wreckage. The last two classes below split that from its mirror image — a broken
-AGENT must still earn its low score rather than escape into the re-run channel.
+The last two classes pin the asymmetry the runner has to hold: a broken TASK
+fixture is invalid and re-run, a broken AGENT still earns the low score it made.
 
 The exit-code tests run the runner as a real subprocess on purpose. Calling
 ``main()`` in-process would return 1 happily even while the shipped entrypoint
@@ -242,11 +239,9 @@ class TestScoreModeWritesResults:
 class TestBrokenFixtureIsInvalidNotScored:
     """The events file is a TASK FIXTURE the agent did not author.
 
-    Its validation errors were printed to stderr and discarded, so a task whose
-    own fixture was malformed still wrote success=true / phase=complete and
-    whatever score the scorer computed from the wreckage. run_task's contract is
-    the opposite: a verifier that cannot reach a verdict reports
-    verifier_infra_error + status=invalid, and the run goes to the re-run channel.
+    A malformed one breaks the verifier's own inputs, so it takes run_task's
+    contract: verifier_infra_error + status=invalid, and the run goes to the
+    re-run channel rather than the results table.
     """
 
     @pytest.fixture
@@ -300,9 +295,9 @@ class TestBrokenFixtureIsInvalidNotScored:
 class TestBadAgentActionsAreStillScored:
     """The agent's action file is AGENT OUTPUT, and the opposite call.
 
-    Routing its validation errors to `invalid` too would be a new integrity hole
-    pointing the other way: a broken agent would escape the low score it earned
-    into the re-run channel. Only the task's own fixtures invalidate a run.
+    Routing its validation errors to `invalid` would let a broken agent escape
+    the low score it earned into the re-run channel — the integrity hole above,
+    pointing the other way. Only the task's own fixtures invalidate a run.
     """
 
     def test_unknown_action_type_warns_but_scores(self, task_dir: Path) -> None:

@@ -53,11 +53,6 @@ except ImportError:
     from runner_cli import add_passthrough_args
     from results_io import PHASE_COMPLETE, RUN_STATUS_INVALID, write_results_json
 
-# A verifier could not reach a verdict, so there is no score to record. Same name
-# run_task reports the same cause under (run_task.py:1549) — a reader classifies
-# every runner's infra failure by one vocabulary.
-VERIFIER_INFRA_ERROR = "verifier_infra_error"
-
 
 def load_task_config(task_dir: Path) -> dict:
     """Load and validate the task.toml file."""
@@ -111,11 +106,9 @@ def run_scoring(
 
     The agent's action file is validated as a WARNING and scored regardless: a
     malformed action is the agent's own failure, and routing it anywhere but the
-    scorer would let a broken agent escape the 0 it earned.
-
-    The task's own event fixture is the caller's precondition and is not checked
-    here — the asymmetry is the point, and it is why the two validators no longer
-    sit side by side.
+    scorer would let a broken agent escape the 0 it earned. The task's own event
+    fixture is the caller's precondition, checked in main() — the asymmetry is
+    deliberate, so the two validators do not sit side by side.
     """
     action_errors = validate_action_file(agent_path)
     if action_errors:
@@ -233,10 +226,9 @@ def main() -> int:
 
     # The events file is the task's OWN fixture, not agent output: if it is
     # malformed the verifier's inputs are broken, so no verdict it reaches about
-    # the agent is trustworthy and the run belongs in the invalid/re-run channel
-    # rather than the results table with whatever the scorer computed from the
-    # wreckage. This is why it is checked here and not beside the agent-action
-    # validator inside run_scoring, which warns and scores on purpose.
+    # the agent is trustworthy and the run is invalid rather than scored. Checked
+    # here and not beside the agent-action validator inside run_scoring, which
+    # warns and scores on purpose.
     fixture_errors = validate_event_file(events_path)
     if fixture_errors:
         print(
@@ -252,12 +244,14 @@ def main() -> int:
             phase="",
             status=RUN_STATUS_INVALID,
             error="; ".join(fixture_errors),
-            failure_class=VERIFIER_INFRA_ERROR,
+            # The name run_task gives the same cause (run_task.py:1549): one
+            # vocabulary classifies every runner's infra failure.
+            failure_class="verifier_infra_error",
             **run_facts,
         )
-        # Nonzero routes the run to run_benchmark's error channel, which it
-        # reads BEFORE scores.task_score (run_benchmark.py:333 vs :353) — the
-        # exit code, not the payload, is what keeps this out of the results table.
+        # Nonzero routes the run to run_benchmark's error channel, which it reads
+        # BEFORE its unguarded read of scores.task_score (run_benchmark.py:333 vs
+        # :353) — the exit code, not the payload, is the gate.
         return 1
 
     result = run_scoring(events_path, oracle_path, agent_path)

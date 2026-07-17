@@ -47,21 +47,12 @@ logger = logging.getLogger(__name__)
 SESSION_FAILURE_REASON = "session_failed"
 NO_AGENT_REASON = "no_agent_configured"
 
-# ChainResult's invalidity channels, in the order a cause is reported. The channel
-# name is the ``failure_class`` a reader sees, so the three keep their distinct
-# remedies instead of collapsing into one bucket.
+# ChainResult's invalidity channels, in the order a cause is reported. Each name
+# is also the ``failure_class`` a reader sees, so the three causes stay apart.
 INVALID_CHANNELS: tuple[str, ...] = (
     "verifier_infra_error",
     "session_failure",
     "agent_not_configured",
-)
-
-# ``failure_class`` for a --simulate run. Not one of the channels above: a
-# simulation is a healthy run of the scaffold, it is simply not an agent trial.
-SIMULATED_FAILURE_CLASS = "simulated"
-SIMULATED_DETAIL = (
-    "chain run with --simulate — the score came from marker files the simulation "
-    "scaffold wrote, not from agent work, so it is not a scoreable trial."
 )
 
 
@@ -293,18 +284,22 @@ def _validate_chain_task(task_def: ChainTaskDefinition) -> None:
 def _validity_cause(chain_result: ChainResult) -> tuple[Optional[str], str]:
     """The ``(failure_class, error)`` results.json records for this chain.
 
-    ``(None, "")`` only for a real agent run, which is the sole state a reader may
-    score. A validity reader decides from ``failure_class``/``status``/``success``/
-    ``phase`` and consults nothing else, so every reason this chain's score is not
-    a trustworthy agent result has to arrive through one of them — recording it
-    under ``config`` instead leaves it invisible (EnterpriseBench-78zt5).
+    ``(None, "")`` only for a real agent run, the one state a reader may score. A
+    validity reader decides from ``failure_class``/``status``/``success``/``phase``
+    and consults nothing else, so a reason recorded anywhere else — under
+    ``config``, say — is a reason no reader sees.
     """
     for channel in INVALID_CHANNELS:
         cause = getattr(chain_result, channel)
         if cause is not None:
             return channel, cause["detail"]
     if chain_result.simulated:
-        return SIMULATED_FAILURE_CLASS, SIMULATED_DETAIL
+        # Not an invalidity channel: the scaffold ran exactly as asked, it is
+        # simply not an agent trial, so main() still exits 0 for it.
+        return "simulated", (
+            "chain run with --simulate — the score came from marker files the "
+            "simulation scaffold wrote, not from agent work."
+        )
     return None, ""
 
 
