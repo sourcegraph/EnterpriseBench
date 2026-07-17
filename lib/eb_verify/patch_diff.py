@@ -350,7 +350,8 @@ def _side_lines(section: List[str], prefix: str) -> List[tuple[str, bool]]:
     return out
 
 
-def _code_lines(diff: str, lang: str, prefix: str) -> List[CodeLine]:
+def _substantive_lines(diff: str, lang: str, *, added: bool) -> List[CodeLine]:
+    """The substantive added (or removed) lines, comment-stripped, in file order."""
     try:
         syntax = SYNTAX[lang]
     except KeyError:
@@ -358,24 +359,15 @@ def _code_lines(diff: str, lang: str, prefix: str) -> List[CodeLine]:
             f"no comment syntax registered for language {lang!r}; "
             f"known: {', '.join(sorted(SYNTAX))}"
         ) from None
+    prefix = "+" if added else "-"
     out: List[CodeLine] = []
     for section in _file_sections(diff):
         state = _State()
         for text, is_target in _side_lines(section, prefix):
             scanned = _scan(text, syntax, state)
-            if is_target:
+            if is_target and scanned.is_substantive:
                 out.append(scanned)
     return out
-
-
-def code_lines(diff: str, lang: str, *, added: bool) -> List[CodeLine]:
-    """The substantive added (or removed) lines, comment-stripped, in file order.
-
-    Public so a caller that needs a view :func:`added_code` cannot flatten to —
-    the per-line ``marked`` text, where a structural token's adjacency to a
-    string literal is legible — can reach each line's fields directly.
-    """
-    return [cl for cl in _code_lines(diff, lang, "+" if added else "-") if cl.is_substantive]
 
 
 # The per-view field selectors, named so :func:`_emit`'s callers read as their
@@ -407,7 +399,7 @@ def marked_code(diff: str, lang: str, *, added: bool) -> str:
     idiomatic fix wrapped across lines still reads as adjacent under a
     whitespace-spanning match.
     """
-    return _emit(code_lines(diff, lang, added=added), _MARKED)
+    return _emit(_substantive_lines(diff, lang, added=added), _MARKED)
 
 
 def added_code(diff: str, lang: str, *, include_strings: bool = False) -> str:
@@ -420,13 +412,13 @@ def added_code(diff: str, lang: str, *, include_strings: bool = False) -> str:
     for ``has_code_change`` — a string-only edit is still real code.
     """
     view = _CODE if include_strings else _BARE
-    return _emit(code_lines(diff, lang, added=True), view)
+    return _emit(_substantive_lines(diff, lang, added=True), view)
 
 
 def removed_code(diff: str, lang: str, *, include_strings: bool = False) -> str:
     """The removed lines that carried code, comments stripped, one per line."""
     view = _CODE if include_strings else _BARE
-    return _emit(code_lines(diff, lang, added=False), view)
+    return _emit(_substantive_lines(diff, lang, added=False), view)
 
 
 def has_code_change(diff: str, lang: str) -> bool:

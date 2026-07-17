@@ -40,20 +40,16 @@ enterprise-hard tasks pay for precise localization, not recall.
 from __future__ import annotations
 
 import argparse
-import os
 from typing import List
 
 from eb_verify.plugins.file_extraction import (
-    AgentFault,
-    HarnessError,
     PASS_THRESHOLD,
+    _InputsEmitted,
     _JsonErrorParser,
     _matches_parts,
-    agent_files,
     components,
     emit,
-    ground_truth_files,
-    load_json,
+    load_scoring_inputs,
     score_answer,
 )
 
@@ -83,17 +79,21 @@ def score_localization(
     Precision divides productive answers by *all* answers, so padding the list
     with bare basenames or junk paths costs credit rather than being free.
     """
-    gt_component_set = {tuple(components(gt)) for gt in gt_paths}
-    qualified = [af for af in found if _directory_qualified(components(af), gt_component_set)]
+    # Split each path into components once; both the qualified filter and the
+    # productive count read these rather than re-parsing per (answer, gt) pair.
+    gt_parts = {gt: components(gt) for gt in gt_paths}
+    found_parts = {af: components(af) for af in found}
+    gt_component_set = {tuple(parts) for parts in gt_parts.values()}
+
+    qualified = [af for af in found if _directory_qualified(found_parts[af], gt_component_set)]
 
     matched, _ambiguous = score_answer(gt_paths, qualified)
     recall = len(matched) / len(gt_paths)
 
-    gt_parts = {gt: components(gt) for gt in gt_paths}
     productive = [
         af
         for af in qualified
-        if any(_matches_parts(gt_parts[gt], components(af)) for gt in gt_paths)
+        if any(_matches_parts(gt_parts[gt], found_parts[af]) for gt in gt_paths)
     ]
     # Denominator is every answer, including the bare basenames dropped from
     # `qualified`: a dictionary dump must dilute precision, not be filtered free.
@@ -120,25 +120,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: List[str] | None = None) -> int:
     try:
-        args = build_parser().parse_args(argv)
-        keys = [k.strip() for k in args.keys.split(",") if k.strip()]
-        if not keys:
-            raise HarnessError("--keys resolved to no usable keys")
-        gt_paths = ground_truth_files(os.environ.get("GT_FILE", ""))
-    except HarnessError as exc:
-        return emit(0.0, str(exc), infra=True)
-
-    # AgentFault must precede HarnessError — it is a subclass.
-    try:
-        answer = load_json(os.environ.get("ANSWER_FILE", ""), "answer.json")
-    except AgentFault as exc:
-        return emit(0.0, f"No usable agent answer ({exc})")
-    except HarnessError as exc:
-        return emit(0.0, str(exc), infra=True)
-
-    found = agent_files(answer, keys)
-    if not found:
-        return emit(0.0, f"Agent answer names no files under any of: {', '.join(keys)}")
+        _keys, gt_paths, found = load_scoring_inputs(argv, build_parser())
+    except _InputsEmitted as done:
+        return done.code
 
     f1, precision, recall, matched = score_localization(gt_paths, found)
     missed = [gt for gt in gt_paths if gt not in matched]

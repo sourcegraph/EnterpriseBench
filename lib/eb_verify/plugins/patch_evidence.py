@@ -156,7 +156,8 @@ def _print_code(repo: Path, paths: List[str], lang: str, *, added: bool) -> int:
     assignment, not a fix, so it reads as absent (residual A). This is what the
     tasks whose fix is a bare token (a method call, identifier or operator) match.
     """
-    print((added_code if added else removed_code)(_diff(repo, paths), lang))
+    diff = _diff(repo, paths)
+    print(added_code(diff, lang) if added else removed_code(diff, lang))
     return 0
 
 

@@ -375,28 +375,61 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: List[str] | None = None) -> int:
+class _InputsEmitted(Exception):
+    """Loading the scoring inputs already emitted a verdict; carry its exit code.
+
+    Raised by :func:`load_scoring_inputs` so a scorer's ``main`` can share the
+    load-and-classify prologue without also copying its three emit call sites —
+    and, more importantly, without copying the AgentFault-before-HarnessError
+    ordering, the one subtlety that must not drift between two scorers.
+    """
+
+    def __init__(self, code: int) -> None:
+        self.code = code
+
+
+def load_scoring_inputs(
+    argv: List[str] | None, parser: argparse.ArgumentParser
+) -> tuple[List[str], List[str], List[str]]:
+    """Parse ``--keys``, load ground truth and the answer, return ``(keys, gt_paths, found)``.
+
+    Every failure path emits the verdict itself (infra for a harness fault, a
+    plain agent 0.0 for a missing/empty answer) and raises :class:`_InputsEmitted`
+    with that exit code, so both file-scoring plugins share one copy of the
+    fault-channel discipline. Shared by :func:`main` and
+    :mod:`eb_verify.plugins.localization_evidence`.
+    """
     try:
-        args = build_parser().parse_args(argv)
+        args = parser.parse_args(argv)
         keys = [k.strip() for k in args.keys.split(",") if k.strip()]
         if not keys:
             raise HarnessError("--keys resolved to no usable keys")
         gt_paths = ground_truth_files(os.environ.get("GT_FILE", ""))
     except HarnessError as exc:
-        return emit(0.0, str(exc), infra=True)
+        raise _InputsEmitted(emit(0.0, str(exc), infra=True)) from exc
 
     # AgentFault must precede HarnessError — it is a subclass, and Python takes the
     # first matching clause.
     try:
         answer = load_json(os.environ.get("ANSWER_FILE", ""), "answer.json")
     except AgentFault as exc:
-        return emit(0.0, f"No usable agent answer ({exc})")
+        raise _InputsEmitted(emit(0.0, f"No usable agent answer ({exc})")) from exc
     except HarnessError as exc:
-        return emit(0.0, str(exc), infra=True)
+        raise _InputsEmitted(emit(0.0, str(exc), infra=True)) from exc
 
     found = agent_files(answer, keys)
     if not found:
-        return emit(0.0, f"Agent answer names no files under any of: {', '.join(keys)}")
+        raise _InputsEmitted(
+            emit(0.0, f"Agent answer names no files under any of: {', '.join(keys)}")
+        )
+    return keys, gt_paths, found
+
+
+def main(argv: List[str] | None = None) -> int:
+    try:
+        _keys, gt_paths, found = load_scoring_inputs(argv, build_parser())
+    except _InputsEmitted as done:
+        return done.code
 
     matched, ambiguous = score_answer(gt_paths, found)
     score = len(matched) / len(gt_paths)
