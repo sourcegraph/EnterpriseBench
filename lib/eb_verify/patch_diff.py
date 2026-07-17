@@ -79,7 +79,17 @@ SYNTAX: dict[str, _Syntax] = {
     # swallow the rest of every generic signature. Char literals are the cost:
     # a "//" *inside* one would read as a comment. No real one contains it.
     "rust": _Syntax(line=("//",), block=(("/*", "*/"),), strings=('"',)),
-    "java": _Syntax(line=("//",), block=(("/*", "*/"),), strings=_C_LIKE_STRINGS),
+    # Java's text block is a real multiline literal, so its interior is prose:
+    # without the rule, `String NOTES = """ ... """` holding the fix's text reads
+    # as bare code and scores full credit for a constant (bead jn73.2.7). Rust's
+    # multi-line `"` strings and Ruby's heredocs are the same class and are still
+    # open — EnterpriseBench-jn73.2.7.6.
+    "java": _Syntax(
+        line=("//",),
+        block=(("/*", "*/"),),
+        strings=_C_LIKE_STRINGS,
+        multiline_strings=('"""',),
+    ),
     "javascript": _Syntax(
         line=("//",),
         block=(("/*", "*/"),),
@@ -293,10 +303,19 @@ def _file_sections(diff: str) -> List[List[str]]:
     repeatable), and a delimiter left open at the end of one file's hunks says
     nothing about the next file. Letting it carry would swallow the next file's
     real code as "still inside a comment" — under-crediting an honest agent.
+
+    Split on ``\\n`` and nothing else, because that is the only thing git ends a
+    diff line with. ``str.splitlines`` also breaks on ``\\v \\f \\x1c \\x1d \\x1e
+    \\x85 \\u2028 \\u2029`` and a lone ``\\r``, none of which git treats as a line
+    ending — so it reads one line git emitted as several, and the agent picks
+    what the extras say. A form feed inside a comment (``# notes\\x0c+CONTENT_
+    DECODERS = [...]``) then mints an added line carrying a fix that was never
+    written, in a file that still parses. The grammar below is only as sound as
+    the line stream it runs on (bead jn73.2.7).
     """
     sections: List[List[str]] = []
     current: List[str] = []
-    for line in diff.splitlines():
+    for line in diff.split("\n"):
         if line.startswith("diff --git ") and current:
             sections.append(current)
             current = []

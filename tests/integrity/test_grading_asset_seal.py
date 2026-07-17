@@ -651,6 +651,66 @@ class TestAgentCodeExecutionDuringScoring:
                 "diff.external is the same forgery via another config key"
             )
 
+    def test_patch_evidence_diffs_request_whole_file_context(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        """Context width is scoring policy, not a tuning knob.
+
+        patch_diff decides "comment or code" by scanning from the top of the
+        file, so the opener of a block the agent edited *inside* has to be in the
+        diff. At any bounded width, a docstring opening further up than that is
+        invisible, the scanner starts with no state, and prose inside it reads as
+        code — the agent types the fix's exact text into a docstring the file
+        already had and collects 60-65% of task weight on all 14 tasks (bead
+        jn73.2.7, defect A).
+
+        Pinned on the argv, and on a width no real source file reaches, because
+        the integrity suites cannot see this: they seed a small file, so every
+        width past their opener distance passes. -U20 keeps the whole suite green
+        while defect A reopens on markupsafe's real 34-line class docstring. The
+        pressure to shrink it is real — _code_changed_elsewhere runs one diff per
+        changed file — so the guard has to sit where that pressure lands.
+        """
+        import re as _re
+
+        from eb_verify.plugins import patch_evidence
+
+        seen: list[list[str]] = []
+
+        class _Proc:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        def _fake_run(argv, **kwargs):
+            seen.append(argv)
+            return _Proc()
+
+        monkeypatch.setattr(patch_evidence.subprocess, "run", _fake_run)
+        repo = tmp_path / "urllib3"
+        (repo / ".git").mkdir(parents=True)
+
+        patch_evidence._diff(repo, ["src/urllib3/response.py"])
+
+        assert seen, "no git invocation was captured"
+        widths = [
+            int(m.group(1))
+            for argv in seen
+            for arg in argv
+            if (m := _re.fullmatch(r"-U(\d+)", arg))
+        ]
+        assert widths, (
+            f"patch_evidence._diff ran a diff at git's DEFAULT context: {seen[0]} — "
+            "a comment opening more than three lines above the agent's edit is then "
+            "outside the hunk, and the prose inside it scores as code"
+        )
+        assert min(widths) >= 100_000, (
+            f"patch_evidence._diff asks for only {min(widths)} lines of context — "
+            "a docstring or license header opening further above the edit than that "
+            "is invisible to the scanner, and fix-shaped prose inside it scores full "
+            "credit. This width is scoring policy; it is not free to tune down."
+        )
+
     def test_no_module_builds_a_git_diff_argv_outside_agent_git(self) -> None:
         """agent_git is the one place the flags are attached; keep it that way.
 

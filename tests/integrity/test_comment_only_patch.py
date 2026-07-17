@@ -235,6 +235,28 @@ WRONG_TARGET_DECOYS: list[tuple[str, str, tuple[str, ...]]] = [
     ("urllib3 elements pooled across statements",
      "err-provenance-dual-urllib3-xgzip-001",
      ("CONTENT_DECODERS = ('x-gzip',)", "x = ('gzip',)")),
+    # Live, parsing, behaviour-neutral code — NOT the reachability floor. Every
+    # line runs; none of them fixes anything. `mode in (["gzip", "x-gzip"],)`
+    # tests membership against a 1-tuple holding a list and is always False, so
+    # the element window must not descend into a nested collection.
+    ("urllib3 nested collection, membership always False",
+     "err-provenance-dual-urllib3-xgzip-001",
+     ('if mode in (["gzip", "x-gzip"],):', "    pass")),
+    # `CONTENT_DECODERS=` also spells a keyword argument. The registry anchor has
+    # to be an assignment, not any text shaped like one.
+    ("urllib3 registry name as a kwarg",
+     "err-provenance-dual-urllib3-xgzip-001",
+     ('_ = dict(CONTENT_DECODERS=["gzip", "x-gzip", "deflate"])',)),
+    ("urllib3 nested + kwarg combined",
+     "err-provenance-dual-urllib3-xgzip-001",
+     ('if mode in (["gzip", "x-gzip"],):', "    pass",
+      '_ = dict(CONTENT_DECODERS=["gzip", "x-gzip", "deflate"])')),
+    # Only ADDED lines are scored, so a collection left open on the added line
+    # has its closer dropped with the context — and the window would run on into
+    # a later statement and borrow its element. The collection must close here.
+    ("urllib3 open collection pooling a later statement",
+     "err-provenance-dual-urllib3-xgzip-001",
+     ('CONTENT_DECODERS = ["gzip"', 'x = a, "x-gzip"')),
 ]
 
 # How each language spells "the rest of this line is prose".

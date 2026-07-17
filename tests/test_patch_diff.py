@@ -15,6 +15,7 @@ import pytest
 from eb_verify.patch_diff import (
     STRING_MARK,
     UnknownLanguage,
+    _side_lines,
     added_code,
     has_code_change,
     marked_code,
@@ -47,6 +48,123 @@ class TestFileHeadersAreNotContent:
         assert "context line" not in added_code(diff("x = 1"), "python")
 
 
+# Everything Python's str.splitlines() breaks on that git does not end a diff
+# line with. Git terminates lines on "\n" alone, so each of these arrives as an
+# ordinary character INSIDE a line the agent wrote.
+_NON_GIT_SEPARATORS = [
+    pytest.param("\v", id="vertical-tab"),
+    pytest.param("\f", id="form-feed"),
+    pytest.param("\x1c", id="file-separator"),
+    pytest.param("\x1d", id="group-separator"),
+    pytest.param("\x1e", id="record-separator"),
+    pytest.param("\x85", id="next-line"),
+    pytest.param(" ", id="line-separator"),
+    pytest.param(" ", id="paragraph-separator"),
+    pytest.param("\r", id="lone-carriage-return"),
+]
+
+
+class TestOnlyNewlineEndsADiffLine:
+    """The grammar is only as sound as the line stream it runs on.
+
+    ``str.splitlines`` breaks on nine separators git does not, so it reads one
+    line git emitted as several — and the agent, who writes the file, chooses
+    what the extras say. A form feed inside a comment mints an added line
+    carrying a fix that was never written, in a file that still parses and still
+    has the vulnerability. Every rule below this — the hunk gate, the comment
+    stripper — is downstream of the split and cannot see past it (bead jn73.2.7).
+    """
+
+    @pytest.mark.parametrize("sep", _NON_GIT_SEPARATORS)
+    def test_separator_in_a_comment_cannot_mint_an_added_line(self, sep: str) -> None:
+        """One comment git emitted must not become a comment AND a fix."""
+        forged = 'CONTENT_DECODERS = ["gzip", "x-gzip"]'
+        d = diff(f"# perf notes{sep}+{forged}")
+
+        assert added_code(d, "python") == "", (
+            f"a comment carrying {sep!r} minted an added code line: "
+            f"{added_code(d, 'python')!r}"
+        )
+        assert has_code_change(d, "python") is False
+
+    @pytest.mark.parametrize("sep", _NON_GIT_SEPARATORS)
+    def test_separator_in_a_context_line_cannot_mint_an_added_line(self, sep: str) -> None:
+        """The same, from the baseline the agent committed rather than its edit.
+
+        Whole-file context puts every line the agent ever committed into the
+        diff, so a poisoned baseline line is a forgery site for any diff that
+        touches the file — the agent's own edit can then be one honest comment
+        a thousand lines away.
+        """
+        forged = 'CONTENT_DECODERS = ["gzip", "x-gzip"]'
+        d = (
+            "diff --git a/f.py b/f.py\n"
+            "index 1111111..2222222 100644\n"
+            "--- a/f.py\n"
+            "+++ b/f.py\n"
+            "@@ -1,3 +1,4 @@\n"
+            f" # perf notes{sep}+{forged}\n"
+            " import io\n"
+            "+# done\n"
+        )
+        assert added_code(d, "python") == "", (
+            f"a CONTEXT line carrying {sep!r} minted an added code line: "
+            f"{added_code(d, 'python')!r}"
+        )
+        assert has_code_change(d, "python") is False
+
+    def test_a_real_fix_still_reads_across_ordinary_newlines(self) -> None:
+        """The control: splitting on "\\n" alone must not lose real added lines."""
+        d = diff("x = 1", "y = 2")
+        assert added_code(d, "python") == "x = 1\ny = 2"
+
+
+class TestJavaTextBlockIsProse:
+    """A Java text block is a string, so its interior is not code.
+
+    Same rule as a lone Python docstring, and the same bypass without it: the
+    agent adds one ``String`` constant whose text block spells the fix, touches
+    nothing else, and the token reads as bare code (bead jn73.2.7). Rust's
+    multi-line ``"`` strings and Ruby's heredocs are the same class and are NOT
+    closed — see EnterpriseBench-jn73.2.7.6.
+    """
+
+    def test_text_block_interior_is_not_code(self) -> None:
+        d = diff(
+            '  static final String NOTES = """',
+            "      xlen = xlen1 | xlen2 << 8;",
+            '      """;',
+        )
+        assert "xlen1" not in added_code(d, "java"), added_code(d, "java")
+
+    def test_code_after_the_text_block_closes_is_code(self) -> None:
+        """The positive control: the rule must not swallow the rest of the file."""
+        d = diff(
+            '  static final String NOTES = """',
+            "      notes",
+            '      """;',
+            "  xlen = xlen1 | xlen2 << 8;",
+        )
+        assert "xlen1" in added_code(d, "java")
+
+    def test_ordinary_java_strings_still_read(self) -> None:
+        """A lone quote still opens a one-line string; the new rule did not shadow it.
+
+        Read on the strings-included view: the default bare one drops interiors
+        on purpose, so it cannot tell "the string closed" from "the string ate
+        the file".
+        """
+        d = diff('x = "gzip";')
+        assert added_code(d, "java", include_strings=True) == 'x = "gzip";'
+        assert added_code(d, "java") == 'x = "";'  # bare view: interior dropped
+
+    def test_empty_string_does_not_open_a_text_block(self) -> None:
+        """`""` is two delimiters, not the first two thirds of one."""
+        assert added_code(diff('String s = "";', "int n = 1;"), "java") == (
+            'String s = "";\nint n = 1;'
+        )
+
+
 class TestIncrementLinesAreContentNotHeaders:
     """``++counter;`` is a pre-increment, not the ``+++ b/f`` file header.
 
@@ -73,9 +191,25 @@ class TestIncrementLinesAreContentNotHeaders:
         """The control: admitting ``++counter;`` must not admit ``+++ b/f``."""
         assert "b/f" not in added_code(diff("++counter;"), "javascript")
 
-    def test_no_newline_marker_is_not_content(self) -> None:
-        """The one non-content line that lives INSIDE a hunk, so the gate misses it."""
-        assert added_code(diff("x = 1") + "\\ No newline at end of file\n", "python") == "x = 1"
+    def test_no_newline_marker_is_kept_out_of_the_line_stream(self) -> None:
+        """git's own prose is not a line of the file, on either side.
+
+        Asserted through ``_side_lines`` rather than ``added_code``: the marker
+        carries no ``+``/``-``, so it lands on the CONTEXT branch, and context is
+        never emitted as added code. A test at the public API therefore passes
+        with the guard deleted. What the guard actually buys is that the marker
+        is not fed to the scanner as if it were a line the file contains — inert
+        for every language registered today, wrong in principle, and the sort of
+        thing that stops being inert when a language is added.
+        """
+        section = (diff("x = 1") + "\\ No newline at end of file\n").split("\n")
+
+        for prefix in ("+", "-"):
+            texts = [text for text, _ in _side_lines(section, prefix)]
+            assert not any("No newline" in t for t in texts), (
+                f"git's no-newline marker reached the scanner as a {prefix!r}-side "
+                f"line: {texts}"
+            )
 
     def test_binary_section_yields_no_content(self) -> None:
         """No hunk, so nothing in it is content — including git's own prose."""
