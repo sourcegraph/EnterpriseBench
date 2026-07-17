@@ -1773,9 +1773,9 @@ def _open_agent_output_for_scoring(container_id: str) -> tuple[bool, str]:
         -> (True, '').
       - agent_output is a symlink, not the real directory the agent was told to
         create -> (False, err); see below.
-      - agent_output (or answer.json) present but still unreadable by the scorer
-        after the grant -> (False, err), so the caller routes a
-        VERIFIER_INFRA_ERROR instead of recording the false 0.0 this bug produces.
+      - answer.json present but still unreadable by the scorer after the grant
+        -> (False, err), so the caller routes a VERIFIER_INFRA_ERROR instead of
+        recording the false 0.0 this bug produces.
     """
     # Only a real directory the agent mkdir'd is safe to open. A *symlinked*
     # agent_output must be rejected BEFORE any chmod: both ``test -d`` and
@@ -1823,16 +1823,11 @@ def _open_agent_output_for_scoring(container_id: str) -> tuple[bool, str]:
             f"{chmod.stderr.strip() or 'unknown error'}"
         )
 
-    if not _can_read(container_id, AGENT_OUTPUT_DIR, user=SCORING_USER):
-        return False, (
-            f"{AGENT_OUTPUT_DIR} is present but unreadable by {SCORING_USER} "
-            "after the read grant — the scorer would see no answer.json"
-        )
-
     # answer.json present-but-unreadable is the exact false-0.0 vector: the file
     # exists (the agent answered), but the scorer's `[[ -f ]]`/open() cannot reach
     # it. This end-to-end read probe requires both traverse on the dir and read on
-    # the file, so a pass here means the scorer can actually load the answer.
+    # the file, so a pass here means the scorer can actually load the answer — it
+    # subsumes a separate dir-readable check (an unreadable dir fails this too).
     answer_present = _docker_exec(
         container_id, ["test", "-e", ANSWER_ARTIFACT_PATH], timeout=30, user="root"
     )

@@ -1361,7 +1361,6 @@ def _open_exec(
     dir_is_symlink: bool = False,
     dir_exists: bool = True,
     chmod_ok: bool = True,
-    dir_readable: bool = True,
     answer_present: bool = True,
     answer_readable: bool = True,
 ):
@@ -1382,8 +1381,6 @@ def _open_exec(
             return _ok() if dir_is_symlink else _fail()
         if cmd[0] == "chmod":
             return _ok() if chmod_ok else _fail("chmod: denied")
-        if cmd[:2] == ["test", "-r"] and cmd[2] == AGENT_OUTPUT_DIR:
-            return _ok() if dir_readable else _fail()
         if cmd[:2] == ["test", "-e"] and cmd[2] == ANSWER_ARTIFACT_PATH:
             return _ok() if answer_present else _fail()
         if cmd[:2] == ["test", "-r"] and cmd[2] == ANSWER_ARTIFACT_PATH:
@@ -1446,12 +1443,6 @@ class TestOpenAgentOutputForScoring:
         with patch.object(rt, "_docker_exec", side_effect=fake):
             ok, err = _open_agent_output_for_scoring("cid")
         assert ok is False and "chmod: denied" in err
-
-    def test_dir_unreadable_after_grant_is_infra(self) -> None:
-        fake, _ = _open_exec(dir_readable=False)
-        with patch.object(rt, "_docker_exec", side_effect=fake):
-            ok, err = _open_agent_output_for_scoring("cid")
-        assert ok is False and SCORING_USER in err
 
     def test_present_but_unreadable_answer_is_infra_not_false_zero(self) -> None:
         # The exact bug: answer.json exists (the agent answered) but the scorer
