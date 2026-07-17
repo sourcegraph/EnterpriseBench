@@ -24,28 +24,46 @@ exercised the checks:
     vacuous    NO check returned a verdict                   -> clean is VACUOUS
     leak       some check credited the echo (> 0)            -> real leak
 
---json-echo then answers the follow-on question: for the checks the md vector
-never exercised, what does an HONEST vector score? It marshals text into the
-answer shape (the prompt's ```json fence when it publishes one, otherwise the
-shape its checks actually read) and scores every check, three times:
+--json-echo then asks the follow-on question: for the checks the md vector never
+exercised, what does an HONEST vector score? It marshals text into the answer
+shape (the prompt's ```json fence when it publishes one, otherwise the shape its
+checks actually read) and scores every check, once per arm:
 
     treatment  this task's own prompt     what a prompt echo can score
-    filler     lorem ipsum, same shape    structural credit — any well-formed
-                                          answer of this shape earns it
-    foreign    ANOTHER task's real prompt domain-prose credit — English, same
-                                          register, none of this task's ground truth
+    nonsense   "zzz"                      probe integrity — credit here came from
+                                          the scaffold THIS TOOL built
+    filler     lorem ipsum                structural — any well-formed answer of
+                                          this shape earns it
+    foreign    a real prompt from another domain prose — English, same register,
+               task of the SAME TYPE      same check family, not this task
 
-Only credit beyond BOTH controls is attributable to this prompt's vocabulary.
-The foreign arm is load-bearing: these checks match English ground-truth
-substrings, so Latin filler cannot score them for reasons having nothing to do
-with echo, and controlling against filler alone credits "the answer is English
-prose" as a leak — overstating the delta and mis-ranking which tasks are worst.
+Each control strips one explanation away; only credit surviving ALL THREE is
+attributable to this prompt's own vocabulary.
 
-Deltas are compared SHAPE BY SHAPE and then maxed, never maxed per arm and
-subtracted: an unrelated shape where a control happened to score must not erase
-a real leak visible on another. Where no control produced a verdict the delta is
-None, not 0 — unknown is not "no leak", and an `or 0` there would reproduce
-inside this tool the exact None-is-zero conflation it exists to expose.
+Read the arms as a ladder, and read the CONTROLS, not just the treatment. What
+this tool can honestly say is "N tasks credit content that isn't an answer";
+what it cannot say is "N tasks violate the invariant". The invariant's stated
+property is scoped to ITS vector (`cp instruction.md`); the treatment here is a
+synthesized JSON scaffold, a vector the invariant never made a claim about, so an
+uncontrolled treatment count is not a violation count.
+
+Three lessons are wired in as mechanism, each learned the hard way when this tool
+reproduced the very defect it exists to expose:
+
+  - the nonsense arm exists because the key scrape once lifted ground-truth match
+    strings out of list literals in the checks and injected them as answer keys;
+    "zzz" then scored 0.6 on a task with no prompt text present. Keys are NOT
+    inert — checks match against json.dumps(answer), which contains every key.
+  - deltas are compared SHAPE BY SHAPE then maxed, never maxed per arm and
+    subtracted, and the task figure is the WORST CHECK, never a mean: averaging
+    signed deltas lets a check the controls win cancel a real leak on another,
+    and it sorted genuine leakers to the bottom of the table.
+  - where no control produced a verdict the delta is None, not 0. Unknown is not
+    "no leak", and an `or 0` there is exactly the None-is-zero conflation
+    indicted above.
+
+Every mean here is over the checks that RAN, not over the checks the task grades;
+rows carry n_scored/n_checks so the denominator travels with the number.
 
 Measurement only. This tool changes no verdict and enforces nothing; it
 quantifies what the existing invariant does and does not cover.
@@ -63,6 +81,7 @@ import json
 import re
 import sys
 import tempfile
+import tomllib
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -79,10 +98,17 @@ JSON_FENCE_RE = re.compile(r"```json\s*\n(.*?)```", re.DOTALL)
 # Any string key a check pulls out of a dict: `x.get('path')` or `e["symbol"]`.
 # Deliberately NOT anchored to the identifier `answer`: checks bind the parsed
 # deliverable to whatever name they like (`report`, `claimed`, `data`), and
-# anchoring to one name silently shrinks the probe on the rest — the very failure
-# this tool exists to expose.
+# anchoring to one name silently shrinks the probe on the rest.
+#
+# The subscript alternative REQUIRES a preceding identifier/paren/bracket. Without
+# that lookbehind it also matches a bare single-element list literal — and the
+# checks are full of them, holding GROUND-TRUTH match strings
+# (`'reraise_mechanism': ['_reraise_as_remote_protocol_error']`). Scraping those
+# as answer keys injects the check's own answers into the body it then greps, so
+# the probe scores itself. Keys are NOT inert: checks match against
+# `json.dumps(answer)`, which contains every key name.
 KEY_ACCESS_RE = re.compile(
-    r"""\.get\(\s*['"]([^'"]+)['"]|\[\s*['"]([^'"]+)['"]\s*\]"""
+    r"""\.get\(\s*['"]([^'"]+)['"]|(?<=[\w\)\]])\[\s*['"]([^'"]+)['"]\s*\]"""
 )
 
 # os.environ['REPORT'] and friends are shell/env reads, not answer fields. They
@@ -91,14 +117,28 @@ KEY_ACCESS_RE = re.compile(
 # env vars are SCREAMING_CASE.
 ENV_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
+# A key is an identifier. Anything with a space, a slash or a file extension is
+# a ground-truth match string that slipped through, not a field the answer
+# declares — a second net under the lookbehind above.
+FIELD_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]*$", re.IGNORECASE)
+
 # Always offered, never merely fallen back to: a check reading `f['path']` via an
 # idiom the scrape misses must still find the field present.
 DEFAULT_LEAF_FIELDS = ("path", "file", "name", "description", "reason", "detail",
                        "symbol", "evidence")
 
-# Control arm 1 — shape-only. Same JSON shape, same bulk, no natural language at
-# all. Credit surviving this is structural: any well-formed answer earns it.
+# Control arm — prose-shaped but meaningless. Credit surviving this is structural:
+# any well-formed answer of this shape earns it.
 FILLER = "lorem ipsum dolor sit amet consectetur adipiscing elit " * 40
+
+# Probe-integrity arm. Content carrying no words at all, so ANY credit it earns
+# came from the scaffold this tool synthesized — the shape or the key names — and
+# not from content. A check that scores here is measuring the probe, not the
+# answer, and its credit must never be attributed to a prompt echo. This arm
+# exists because the scrape once pulled ground-truth strings out of list literals
+# in the checks and injected them as keys, and "zzz" scored 0.6 on a task with no
+# prompt text present.
+NONSENSE = "zzz"
 
 
 def deliverable_kind(deliverables: list[str]) -> str:
@@ -184,7 +224,7 @@ def accessed_keys(task_dir: Path) -> tuple[str, ...]:
     for sh in sorted((task_dir / "checks").glob("*.sh")):
         for a, b in KEY_ACCESS_RE.findall(sh.read_text(errors="replace")):
             name = a or b
-            if not ENV_NAME_RE.match(name):
+            if not ENV_NAME_RE.match(name) and FIELD_NAME_RE.match(name):
                 found.add(name)
     return tuple(sorted(found))
 
@@ -253,6 +293,17 @@ def best_per_check(per_shape: list[dict]) -> dict:
     return best
 
 
+def scored_above_zero(scores: dict, check: str) -> bool:
+    """Did this check actually run AND earn credit?
+
+    Explicit rather than `(scores.get(k) or 0) > 0`: that idiom reads a check that
+    THREW as one that scored zero, which is the conflation this whole tool exists
+    to expose. Absent and zero are different facts and must not share a branch.
+    """
+    v = scores.get(check)
+    return v is not None and v > 0
+
+
 def mean(scores: dict) -> float | None:
     """Mean over the checks that produced a verdict. None if none did.
 
@@ -277,14 +328,15 @@ def per_check_echo_delta(arms: dict) -> dict:
     """
     out: dict[str, float | None] = {}
     checks = {k for scores in arms["treatment"] for k in scores}
+    controls = [name for name in arms if name != "treatment"]
     for k in checks:
         deltas = []
         for i, t_scores in enumerate(arms["treatment"]):
             t = t_scores.get(k)
             if t is None:
                 continue
-            baselines = [arm[i].get(k) for arm in
-                         (arms["filler"], arms["foreign"]) if arm[i].get(k) is not None]
+            baselines = [arms[c][i].get(k) for c in controls
+                         if arms[c][i].get(k) is not None]
             if not baselines:
                 continue
             deltas.append(t - max(baselines))
@@ -292,22 +344,25 @@ def per_check_echo_delta(arms: dict) -> dict:
     return out
 
 
-def measure_json_echo(task_dir: Path, foreign: str) -> dict:
-    """Treatment vs TWO controls, in the answer shape the checks actually read.
+def measure_json_echo(task_dir: Path, foreign: str, foreign_id: str = "") -> dict:
+    """Treatment vs three controls, in the answer shape the checks actually read.
 
-    treatment  this task's own prompt      — what an echo can score
-    filler     lorem ipsum, same shape     — structural credit: any well-formed answer
-    foreign    ANOTHER task's real prompt  — domain-prose credit: English, right
-                                             register, none of this task's ground truth
+    treatment  this task's own prompt     — what an echo can score
+    nonsense   "zzz"                      — probe integrity: credit here came from
+                                            the scaffold THIS TOOL built, not content
+    filler     lorem ipsum                — structural: any well-formed answer earns it
+    foreign    another task's real prompt — domain prose: English, same register,
+                                            not this task
 
-    The foreign arm is what makes the attribution honest. These checks match
-    English ground-truth substrings, so Latin filler cannot score them for reasons
-    that have nothing to do with prompt vocabulary — controlling only against
-    filler credits "the answer is English prose" as an echo leak. Only credit
-    beyond BOTH controls is attributable to this prompt.
+    Each control strips one explanation away, and only credit surviving ALL THREE
+    is attributable to this prompt's own vocabulary. The nonsense arm is the one
+    that keeps this tool honest about itself: the scrape once lifted ground-truth
+    strings out of list literals in the checks and injected them as answer keys,
+    and "zzz" scored 0.6 on a task with no prompt text present. Any check the
+    nonsense arm scores is measuring the probe, not the answer.
     """
     rel = str(task_dir.relative_to(gate.BENCH))
-    row: dict = {"task": rel, "suite": rel.split("/")[0]}
+    row: dict = {"task": rel, "suite": rel.split("/")[0], "foreign_control": foreign_id}
     prompt = prompt_text(task_dir)
     if prompt is None:
         return row | {"probe": "no_instruction_md"}
@@ -315,8 +370,8 @@ def measure_json_echo(task_dir: Path, foreign: str) -> dict:
     deliverables = gate.deliverable_paths(task_dir)
     arms = {
         name: [probe_shape(task_dir, text, tpl, deliverables) for tpl in templates]
-        for name, text in (("treatment", prompt), ("filler", FILLER),
-                           ("foreign", foreign))
+        for name, text in (("treatment", prompt), ("nonsense", NONSENSE),
+                           ("filler", FILLER), ("foreign", foreign))
     }
     best = {name: best_per_check(shapes) for name, shapes in arms.items()}
     t_mean = mean(best["treatment"])
@@ -324,38 +379,60 @@ def measure_json_echo(task_dir: Path, foreign: str) -> dict:
         return row | {"probe": "checks_still_threw",
                       "n_checks": len(best["treatment"])}
     deltas = per_check_echo_delta(arms)
-    scored = [v for v in deltas.values() if v is not None]
+    leaking = sorted(k for k, d in deltas.items() if d is not None and d > 0)
     return row | {
         "probe": "probed",
         "n_checks": len(best["treatment"]),
         "n_scored": sum(1 for v in best["treatment"].values() if v is not None),
         "n_threw": sum(1 for v in best["treatment"].values() if v is None),
         "treatment_mean": t_mean,
+        "nonsense_mean": mean(best["nonsense"]),
         "filler_mean": mean(best["filler"]),
         "foreign_mean": mean(best["foreign"]),
-        "echo_delta": round(sum(scored) / len(scored), 3) if scored else None,
+        # Worst single check, NOT a mean over checks. Averaging signed deltas lets
+        # a check the controls win cancel a real leak on another check — the same
+        # erasure per_check_echo_delta() prevents across shapes, reintroduced one
+        # level up. It also sorted genuine leakers to the bottom of the table.
+        "max_check_delta": round(max(deltas[k] for k in leaking), 3)
+        if leaking else None,
+        "n_leaking_checks": len(leaking),
         "treatment": best["treatment"],
+        "nonsense": best["nonsense"],
         "filler": best["filler"],
         "foreign": best["foreign"],
         "per_check_delta": deltas,
-        # THE INVARIANT'S OWN PROPERTY: "a prompt copy must earn ZERO credit on
-        # EVERY check". That is an absolute threshold — any check the echo scores
-        # above 0 violates it, whatever a control does. No control needed, and no
-        # dependence on which foreign prompt got picked.
-        "checks_crediting_echo": sorted(k for k, v in best["treatment"].items()
-                                        if v is not None and v > 0),
-        # scores beyond BOTH controls on some shape: this prompt's vocabulary
-        "echo_leaking_checks": sorted(k for k, d in deltas.items()
-                                      if d is not None and d > 0),
-        # scores, but no better than a control: credit any answer of this shape earns
+        # Credits content carrying no words at all. Once the key scrape stopped
+        # injecting ground-truth strings, the keys left are field names a real
+        # answer would plausibly carry — so this is the BENCHMARK's structural
+        # floor, not an artifact of this tool. Kept as the strictest control.
+        "credits_nonsense_checks": sorted(k for k, v in best["nonsense"].items()
+                                          if v is not None and v > 0),
+        # Probe-integrity alarm proper: meaningless content should never beat
+        # meaningless prose. If it does, the KEY NAMES are carrying meaning and
+        # the scrape is injecting answers again. Claimed only when BOTH arms
+        # produced a verdict — an absent filler score is not a zero one.
+        "probe_artifact_checks": sorted(
+            k for k, v in best["nonsense"].items()
+            if v is not None and v > 0
+            and best["filler"].get(k) is not None and v > best["filler"][k]
+        ),
+        # survives all three controls on some shape: this prompt's own vocabulary
+        "echo_leaking_checks": leaking,
+        # scores, but no better than a control: credit any answer of this kind earns
         "structural_freebie_checks": sorted(
             k for k, d in deltas.items()
-            if d is not None and d <= 0 and (best["treatment"].get(k) or 0) > 0
+            if d is not None and d <= 0 and scored_above_zero(best["filler"], k)
+        ),
+        "domain_prose_checks": sorted(
+            k for k, d in deltas.items()
+            if d is not None and d <= 0 and not scored_above_zero(best["filler"], k)
+            and scored_above_zero(best["foreign"], k)
         ),
         # treatment scored but no control ever ran: attribution unknown, not zero
         "control_inconclusive_checks": sorted(
             k for k, d in deltas.items()
-            if d is None and (best["treatment"].get(k) or 0) > 0
+            if d is None and best["treatment"].get(k) is not None
+            and best["treatment"][k] > 0
         ),
     }
 
@@ -373,34 +450,43 @@ def prompt_text(task_dir: Path) -> str | None:
     return instr.read_text(errors="replace")
 
 
-def foreign_prompt(task_dir: Path, pool: list[Path]) -> str | None:
-    """A real prompt from a DIFFERENT task, preferring the SAME suite.
+def task_type(task_dir: Path) -> str:
+    """The task's declared type, which is what determines its checks."""
+    toml = task_dir / "task.toml"
+    if not toml.exists():
+        return ""
+    try:
+        with open(toml, "rb") as fh:
+            return str(tomllib.load(fh).get("task", {}).get("task_type", ""))
+    except (tomllib.TOMLDecodeError, OSError):
+        return ""
 
-    The domain-prose control: English, written to the same template, about the
-    same kind of problem — but not this task. Same-suite is deliberate and is the
-    CONSERVATIVE choice: a sibling shares this task's domain vocabulary, so any
-    credit it earns is credit generic prose earns, and only what the real prompt
-    scores BEYOND it is task-specific. Picking a distant suite would make the
-    control nearly as inert as Latin filler and inflate the delta.
 
-    It errs toward understating: if a sibling happens to share ground-truth
-    terms, the control scores high and the leak is reported smaller than it is.
-    For a number backing an escalation, understating is the safe direction.
+def foreign_prompt(task_dir: Path, pool: list[Path]) -> tuple[str, str] | None:
+    """A real prompt from a different task of the SAME TASK TYPE.
 
-    Deterministic — offset halfway around the sorted pool, so pairings are stable
-    across runs and no task controls against itself.
+    The domain-prose control: English, same register, written against the same
+    check family — but not this task. Task type, not suite: suites here are
+    workflow clusters spanning several types (customer_escalation holds
+    error_provenance AND support_code_mapping AND calibration), while the checks
+    are type-specific. Controlling an error_provenance task against a calibration
+    prompt measures almost nothing and inflates the delta.
+
+    Picks the NEAREST sibling by name rather than a fixed rotation: sorting the
+    pool by path makes same-type tasks contiguous, so a rotation lands on the
+    alphabetically-first sibling for every task in the group and collapses the
+    control onto one prompt. Returns (text, id) so the pick is auditable — the
+    delta is sensitive to it, and a control nobody can see is a number nobody can
+    check.
     """
-    ordered = sorted((d for d in pool if d != task_dir), key=str)
-    if not ordered:
-        return None
-    start = len(ordered) // 2
-    rotated = ordered[start:] + ordered[:start]
-    for same_suite in (True, False):
-        for cand in rotated:
-            if (cand.parent == task_dir.parent) is same_suite:
-                text = prompt_text(cand)
-                if text:
-                    return text
+    my_type = task_type(task_dir)
+    peers = [d for d in pool if d != task_dir and my_type and task_type(d) == my_type]
+    if not peers:
+        peers = [d for d in pool if d != task_dir and d.parent == task_dir.parent]
+    for cand in sorted(peers, key=lambda d: (abs(len(d.name) - len(task_dir.name)), str(d))):
+        text = prompt_text(cand)
+        if text:
+            return text, str(cand.relative_to(gate.BENCH))
     return None
 
 
@@ -418,40 +504,51 @@ def run_json_echo(rows: list[dict], workers: int, as_json: bool) -> int:
 
     def run(r: dict) -> dict:
         task_dir = gate.BENCH / r["task"]
-        foreign = foreign_prompt(task_dir, pool)
-        if foreign is None:
+        picked = foreign_prompt(task_dir, pool)
+        if picked is None:
             return {"task": r["task"], "suite": r["task"].split("/")[0],
                     "probe": "no_foreign_control"}
-        return measure_json_echo(task_dir, foreign) | {
+        text, fid = picked
+        return measure_json_echo(task_dir, text, fid) | {
             "quarantined": r["quarantined"], "md_verdict": r["verdict"]}
 
     with ThreadPoolExecutor(max_workers=workers) as ex:
         out = list(ex.map(run, targets))
-    out.sort(key=lambda r: -(r.get("echo_delta") or 0))
+    # None sorts last: an unknown delta is not a zero one.
+    out.sort(key=lambda r: (r.get("max_check_delta") is None,
+                            -(r.get("max_check_delta") or 0.0)))
 
     if as_json:
         print(json.dumps(out, indent=2))
         return 0
 
-    print(f"{'task':<52} {'treat':>6} {'fill':>6} {'frgn':>6} {'delta':>6} "
-          f"{'ran':>5}  status")
-    print("-" * 104)
+    print(f"{'task':<48} {'treat':>6} {'zzz':>5} {'fill':>5} {'frgn':>5} "
+          f"{'delta':>6} {'ran':>5}  status")
+    print("-" * 108)
     for r in out:
         if r["probe"] != "probed":
-            print(f"{r['task']:<52} {'—':>6} {'—':>6} {'—':>6} {'—':>6} "
-                  f"{'—':>5}  {r['probe']}")
+            print(f"{r['task']:<48} {'—':>6} {'—':>5} {'—':>5} {'—':>5} "
+                  f"{'—':>6} {'—':>5}  {r['probe']}")
             continue
-        status = "ECHO-LEAK" if r["echo_leaking_checks"] else "no echo credit"
+        status = ("ECHO-LEAK" if r["echo_leaking_checks"] else "no echo credit")
+        if r["credits_nonsense_checks"]:
+            status += " +credits-garbage"
+        if r["probe_artifact_checks"]:
+            status += " !PROBE-ARTIFACT"
         if r["control_inconclusive_checks"]:
             status += " (+inconclusive)"
-        print(f"{r['task']:<52} {r['treatment_mean']:>6} "
-              f"{str(r['filler_mean']):>6} {str(r['foreign_mean']):>6} "
-              f"{str(r['echo_delta']):>6} {r['n_scored']}/{r['n_checks']:<3}  {status}")
+        # "—" not "None": no leaking check is a measured absence, not an unknown.
+        delta = "—" if r["max_check_delta"] is None else r["max_check_delta"]
+        print(f"{r['task']:<48} {r['treatment_mean']:>6} "
+              f"{str(r['nonsense_mean']):>5} {str(r['filler_mean']):>5} "
+              f"{str(r['foreign_mean']):>5} {str(delta):>6} "
+              f"{r['n_scored']}/{r['n_checks']:<3}  {status}")
 
     probed = [r for r in out if r["probe"] == "probed"]
-    crediting = [r for r in probed if r["checks_crediting_echo"]]
     leaking = [r for r in probed if r["echo_leaking_checks"]]
-    print("-" * 104)
+    artifact = [r for r in probed if r["probe_artifact_checks"]]
+    garbage = [r for r in probed if r["credits_nonsense_checks"]]
+    print("-" * 108)
     print(f"cohort (>=1 check the md vector never exercised) : {len(targets)}")
     print(f"probed                                          : {len(probed)}")
     for reason in ("checks_still_threw", "no_instruction_md", "no_foreign_control"):
@@ -460,30 +557,45 @@ def run_json_echo(rows: list[dict], workers: int, as_json: bool) -> int:
             print(f"  unprobeable ({reason}): {n}")
     partial = [r for r in probed if r["n_threw"]]
     if partial:
-        print(f"  NB {len(partial)} probed rows average over a SUBSET of their "
-              f"checks (see ran column)")
+        print(f"  NB {len(partial)} rows score over a SUBSET of their checks "
+              f"(ran column); their means are over what ran, not what is graded")
 
-    # Headline: the invariant's OWN property, which needs no control.
-    print(f"\nVIOLATE THE INVARIANT'S STATED PROPERTY  : {len(crediting)}")
-    print('  ("a prompt copy must earn ZERO credit on every check" — these score >0)')
-    for suite, n in Counter(r["suite"] for r in crediting).most_common():
+    # What each arm scores, uncontrolled. NOT a count of invariant violations:
+    # the invariant's stated property is scoped to ITS vector (cp instruction.md),
+    # and this treatment is a synthesized JSON scaffold it never made a claim
+    # about. Reported as a baseline ladder so the controls are visible, not as a
+    # verdict.
+    print("\nscores >0 on at least one check, by arm (uncontrolled):")
+    for arm in ("nonsense", "filler", "foreign", "treatment"):
+        n = len([r for r in probed
+                 if any(v is not None and v > 0 for v in r[arm].values())])
+        print(f"  {arm:<10} {n:>3} / {len(probed)}")
+    print("  (nonsense ≈ filler is the healthy reading: both are meaningless, so"
+          " credit\n   they share is the benchmark's structural floor. nonsense"
+          " ABOVE filler would\n   mean the key names carry meaning — i.e. this"
+          " tool injecting answers.)")
+
+    print(f"\nECHO-LEAK — credit surviving ALL THREE controls : {len(leaking)}")
+    for suite, n in Counter(r["suite"] for r in leaking).most_common():
         print(f"  {suite:<28} {n}")
-
-    # Attribution: of that credit, how much is the PROMPT and not the shape.
-    print(f"\nof those, credit beyond BOTH controls (task-specific vocabulary) : "
-          f"{len(leaking)}")
     freebie = [r for r in probed if r["structural_freebie_checks"]]
+    prose = [r for r in probed if r["domain_prose_checks"]]
     incon = [r for r in probed if r["control_inconclusive_checks"]]
-    print(f"structural freebies (credit a control also earns)                : "
-          f"{len(freebie)}")
+    print(f"CREDITS GARBAGE — literal \"zzz\" scores            : {len(garbage)}")
+    print(f"structural freebie  (Latin filler also earns it) : {len(freebie)}")
+    print(f"domain-prose credit (a real foreign prompt earns it, filler does not) "
+          f": {len(prose)}")
+    if artifact:
+        print(f"!! PROBE ARTIFACT (nonsense BEAT filler — the key scrape is "
+              f"injecting answers; these rows are this tool's fault, discount "
+              f"them) : {len(artifact)}")
     if incon:
-        print(f"control-inconclusive (attribution unknown, NOT zero)             : "
-              f"{len(incon)}")
-    deltas = [r["echo_delta"] for r in probed if r["echo_delta"] is not None]
+        print(f"control-inconclusive (unknown, NOT zero)        : {len(incon)}")
+    deltas = [r["max_check_delta"] for r in leaking
+              if r["max_check_delta"] is not None]
     if deltas:
-        print(f"\nmean echo delta over probed cohort: "
-              f"{round(sum(deltas)/len(deltas), 3)}")
-        print(f"max  echo delta: {max(deltas)}")
+        print(f"\nworst single check per task, over the {len(deltas)} leakers: "
+              f"median {sorted(deltas)[len(deltas)//2]}  max {max(deltas)}")
     return 0
 
 
@@ -526,8 +638,12 @@ def main() -> int:
         print(f"{v:<20}: {len(sel)}")
 
     # The headline: tasks the invariant certifies clean without testing them.
-    uncovered = [r for r in rows if r["verdict"] in ("vacuous", "partial")
-                 and not r["quarantined"]]
+    # Selected on n_threw, NOT on the verdict label or the quarantine flag —
+    # classify() lets `leak` win, hiding a task that leaks on one check while five
+    # throw, and a quarantine entry records one known leak while saying nothing
+    # about whether the task's other checks were ever exercised. Both filters read
+    # as correct today only because leak==0 and the quarantine file is empty.
+    uncovered = [r for r in rows if r["n_threw"] > 0]
     print(f"\nCERTIFIED-BUT-UNEXERCISED (unquarantined, vacuous or partial): "
           f"{len(uncovered)}")
     for suite, n in Counter(r["suite"] for r in uncovered).most_common():
