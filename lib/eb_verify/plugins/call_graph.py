@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import FrozenSet, Sequence
 
-from eb_verify.artifact_io import safe_read
+from eb_verify.artifact_io import safe_read, select_unique
 from eb_verify.plugins import ValidationResult
 
 
@@ -156,15 +156,19 @@ class CallGraphValidator:
 
     def validate(self, workspace: Path) -> ValidationResult:
         """Validate dead code claims in the workspace."""
-        # Find agent's report
-        report_paths = list(workspace.glob("**/dead_code_report.json"))
-        if not report_paths:
+        # Find agent's report (decoy-shadow-safe: reject >1 candidate as
+        # ambiguous). Only the agent report is globbed; the sealed ground_truth/
+        # reads below stay direct so a planted file cannot shadow the truth.
+        report_path, sel_err = select_unique(workspace, ["dead_code_report.json"])
+        if sel_err is not None:
+            return ValidationResult(valid=False, detail=sel_err)
+        if report_path is None:
             return ValidationResult(
                 valid=False, detail="No dead_code_report.json found"
             )
 
         try:
-            claimed = json.loads(safe_read(report_paths[0], workspace))
+            claimed = json.loads(safe_read(report_path, workspace))
         except (json.JSONDecodeError, ValueError) as e:
             return ValidationResult(valid=False, detail=f"Invalid report JSON: {e}")
 

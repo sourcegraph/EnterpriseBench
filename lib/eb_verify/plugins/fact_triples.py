@@ -50,7 +50,7 @@ from eb_verify.fact_coverage import (
     load_scoring_deps,
 )
 from eb_verify.groundedness import Citation, check_groundedness
-from eb_verify.artifact_io import safe_read
+from eb_verify.artifact_io import safe_read, select_unique
 from eb_verify.plugins import ValidationResult
 
 DEFAULT_ALPHA = 0.3
@@ -361,17 +361,20 @@ class FactTriplesValidator:
         tasks can set ground_truth.require_grounded_citations with a
         fact_triples artifact without a false 'unsupported' failure.
         """
-        # Agent artifact: facts.json anywhere in the workspace except ground_truth/
-        gt_dir = (workspace / "ground_truth").resolve()
-        candidates = [
-            p for p in sorted(workspace.glob("**/facts.json"))
-            if not p.resolve().is_relative_to(gt_dir)
-        ]
-        if not candidates:
+        # Agent artifact: facts.json anywhere in the workspace except
+        # ground_truth/. Decoy-shadow-safe: reject >1 candidate as ambiguous
+        # rather than grading candidates[0] (a workspace-root decoy sorts first
+        # under sorted(glob(...)), so the old code was shadowable).
+        report_path, sel_err = select_unique(
+            workspace, ["facts.json"], exclude_dir=workspace / "ground_truth"
+        )
+        if sel_err is not None:
+            return ValidationResult(valid=False, detail=sel_err)
+        if report_path is None:
             return ValidationResult(valid=False, detail="No facts.json found")
 
         try:
-            data = json.loads(safe_read(candidates[0], workspace))
+            data = json.loads(safe_read(report_path, workspace))
         except (json.JSONDecodeError, ValueError) as e:
             return ValidationResult(valid=False, detail=f"Invalid facts.json: {e}")
 

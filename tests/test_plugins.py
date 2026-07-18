@@ -11,7 +11,12 @@ from pathlib import Path
 
 import pytest
 
-from eb_verify.artifact_io import FileTooLargeError, MAX_ARTIFACT_BYTES, safe_read
+from eb_verify.artifact_io import (
+    FileTooLargeError,
+    MAX_ARTIFACT_BYTES,
+    safe_read,
+    select_unique,
+)
 from eb_verify.plugins import (
     ValidationResult,
     get_validator,
@@ -378,6 +383,126 @@ class TestAnswerValidator:
         assert result.valid is False
         assert "ambiguous" in result.detail.lower()
 
+    def test_ambiguous_answer_message_keeps_pinned_hint(self, tmp_path):
+        # The generic select_unique message drops the "write to agent_output/"
+        # remedy; the answer validator must restore it.
+        (tmp_path / "answer.json").write_text('{"a": 1}')
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (sub / "answer.json").write_text('{"b": 2}')
+        result = AnswerValidator().validate(tmp_path)
+        assert result.valid is False
+        assert "agent_output/answer.json" in result.detail
+
+
+# ---------------------------------------------------------------------------
+# select_unique (shared decoy-shadow-safe artifact selector)
+# ---------------------------------------------------------------------------
+
+class TestSelectUnique:
+    def test_no_candidate_returns_none_none(self, tmp_path):
+        path, err = select_unique(tmp_path, ["x.json"])
+        assert path is None and err is None
+
+    def test_single_candidate_in_subdir(self, tmp_path):
+        sub = tmp_path / "out"
+        sub.mkdir()
+        (sub / "x.json").write_text("{}")
+        path, err = select_unique(tmp_path, ["x.json"])
+        assert err is None
+        assert path == sub / "x.json"
+
+    def test_root_decoy_plus_subdir_real_is_ambiguous(self, tmp_path):
+        # The decoy-shadow scenario: pathlib globs the anchor dir first, so the
+        # old candidates[0] would silently grade the root decoy. Reject instead.
+        (tmp_path / "x.json").write_text("decoy")
+        sub = tmp_path / "out"
+        sub.mkdir()
+        (sub / "x.json").write_text("real")
+        path, err = select_unique(tmp_path, ["x.json"])
+        assert path is None
+        assert err is not None and "ambiguous" in err.lower()
+
+    def test_superset_subset_patterns_do_not_manufacture_ambiguity(self, tmp_path):
+        # A single file under out/ matches BOTH "x.json" (**/x.json) and
+        # "out/x.json" (**/out/x.json). Dedup-by-resolved-path must count it once.
+        sub = tmp_path / "out"
+        sub.mkdir()
+        (sub / "x.json").write_text("{}")
+        path, err = select_unique(tmp_path, ["x.json", "out/x.json"])
+        assert err is None
+        assert path == sub / "x.json"
+
+    def test_symlink_alias_deduped_to_target(self, tmp_path):
+        # A symlink and its target resolve to the same path -> one candidate.
+        real_dir = tmp_path / "out"
+        real_dir.mkdir()
+        target = real_dir / "x.json"
+        target.write_text("{}")
+        link = tmp_path / "x.json"
+        link.symlink_to(target)
+        path, err = select_unique(tmp_path, ["x.json"])
+        assert err is None
+        assert path is not None
+
+    def test_two_distinct_real_files_is_ambiguous(self, tmp_path):
+        a = tmp_path / "a"
+        b = tmp_path / "b"
+        a.mkdir()
+        b.mkdir()
+        (a / "x.json").write_text("1")
+        (b / "x.json").write_text("2")
+        path, err = select_unique(tmp_path, ["x.json"])
+        assert path is None
+        assert "ambiguous" in err.lower()
+
+    def test_directory_named_like_artifact_is_not_selected(self, tmp_path):
+        # A directory matching the pattern must not be selected (is_file filter);
+        # otherwise safe_read would crash on it. With only the dir present the
+        # result is "not found", not a false selection.
+        (tmp_path / "x.json").mkdir()
+        path, err = select_unique(tmp_path, ["x.json"])
+        assert path is None and err is None
+
+    def test_exclude_dir_skips_candidates_inside_it(self, tmp_path):
+        # A file in the excluded subtree is ignored; the lone agent file wins.
+        gt = tmp_path / "ground_truth"
+        gt.mkdir()
+        (gt / "x.json").write_text("sealed")
+        agent = tmp_path / "out"
+        agent.mkdir()
+        (agent / "x.json").write_text("agent")
+        path, err = select_unique(tmp_path, ["x.json"], exclude_dir=gt)
+        assert err is None
+        assert path == agent / "x.json"
+
+    def test_exclude_dir_only_leaves_not_found(self, tmp_path):
+        gt = tmp_path / "ground_truth"
+        gt.mkdir()
+        (gt / "x.json").write_text("sealed")
+        path, err = select_unique(tmp_path, ["x.json"], exclude_dir=gt)
+        assert path is None and err is None
+
+    def test_absolute_or_traversal_pattern_rejected(self, tmp_path):
+        with pytest.raises(ValueError):
+            select_unique(tmp_path, ["../secret.json"])
+        with pytest.raises(ValueError):
+            select_unique(tmp_path, ["/etc/passwd"])
+
+    def test_ambiguous_message_lists_names_readably(self, tmp_path):
+        # Multi-pattern message must not read like a single path.
+        a = tmp_path / "a"
+        b = tmp_path / "b"
+        a.mkdir()
+        b.mkdir()
+        (a / "incident_report.json").write_text("1")
+        (b / "incident-report.json").write_text("2")
+        _, err = select_unique(
+            tmp_path, ["incident_report.json", "incident-report.json"]
+        )
+        assert err is not None
+        assert "incident_report.json, incident-report.json" in err
+
 
 # ---------------------------------------------------------------------------
 # CodePatchValidator
@@ -514,6 +639,21 @@ class TestSecurityAssessmentValidator:
         result = v.validate(tmp_path)
         assert result.valid is True
 
+    def test_root_decoy_shadows_are_rejected(self, tmp_path):
+        data = {
+            "vulnerabilities": [],
+            "severity_summary": {},
+            "recommendations": [],
+        }
+        (tmp_path / "security_assessment.json").write_text('{"decoy": true}')
+        sub = tmp_path / "audit"
+        sub.mkdir()
+        (sub / "security_assessment.json").write_text(json.dumps(data))
+        v = SecurityAssessmentValidator()
+        result = v.validate(tmp_path)
+        assert result.valid is False
+        assert "ambiguous" in result.detail.lower()
+
 
 # ---------------------------------------------------------------------------
 # IncidentReportValidator (detailed)
@@ -611,6 +751,35 @@ class TestIncidentReportValidatorDetailed:
         result = v.validate(tmp_path)
         assert result.valid is True
 
+    def _valid_data(self):
+        return {
+            "timeline": [],
+            "root_cause": "x",
+            "remediation": "y",
+            "affected_services": [],
+        }
+
+    def test_single_report_in_output_subdir_not_ambiguous(self, tmp_path):
+        # Locks the dedup fix: the old **/incident_report.json +
+        # **/output/incident_report.json globs both matched a lone
+        # output/incident_report.json -> false ambiguity.
+        out = tmp_path / "output"
+        out.mkdir()
+        (out / "incident_report.json").write_text(json.dumps(self._valid_data()))
+        v = IncidentReportValidator()
+        result = v.validate(tmp_path)
+        assert result.valid is True
+
+    def test_root_decoy_shadows_are_rejected(self, tmp_path):
+        (tmp_path / "incident_report.json").write_text('{"decoy": true}')
+        sub = tmp_path / "kubernetes"
+        sub.mkdir()
+        (sub / "incident_report.json").write_text(json.dumps(self._valid_data()))
+        v = IncidentReportValidator()
+        result = v.validate(tmp_path)
+        assert result.valid is False
+        assert "ambiguous" in result.detail.lower()
+
 
 # ---------------------------------------------------------------------------
 # RunbookValidator (detailed)
@@ -645,6 +814,27 @@ class TestRunbookValidatorDetailed:
         v = RunbookValidator()
         result = v.validate(tmp_path)
         assert result.valid is True
+
+    def test_single_runbook_in_output_subdir_not_ambiguous(self, tmp_path):
+        # Locks the dedup fix: the old **/runbook.md + **/output/runbook.md
+        # globs both matched a lone output/runbook.md -> false ambiguity.
+        out = tmp_path / "output"
+        out.mkdir()
+        (out / "runbook.md").write_text("# Overview\nX\n# Steps\nY\n# Rollback\nZ\n")
+        v = RunbookValidator()
+        result = v.validate(tmp_path)
+        assert result.valid is True
+
+    def test_root_decoy_shadows_are_rejected(self, tmp_path):
+        good = "# Overview\nX\n# Steps\nY\n# Rollback\nZ\n"
+        (tmp_path / "runbook.md").write_text("# decoy\n")
+        sub = tmp_path / "docs"
+        sub.mkdir()
+        (sub / "runbook.md").write_text(good)
+        v = RunbookValidator()
+        result = v.validate(tmp_path)
+        assert result.valid is False
+        assert "ambiguous" in result.detail.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -686,6 +876,22 @@ class TestReproductionScriptValidatorDetailed:
         v = ReproductionScriptValidator()
         result = v.validate(tmp_path)
         assert result.valid is True
+
+    def test_root_decoy_shadows_are_rejected(self, tmp_path):
+        import stat as _stat
+        # A workspace-root decoy alongside the real script -> ambiguous, not a
+        # silent candidates[0] grade of the decoy. (Also documents the accepted
+        # trade-off: a repo that ships its own repro.py collides here.)
+        (tmp_path / "reproduce.sh").write_text("#!/bin/bash\n")
+        sub = tmp_path / "agent"
+        sub.mkdir()
+        real = sub / "reproduce.sh"
+        real.write_text("#!/bin/bash\necho hi\n")
+        real.chmod(real.stat().st_mode | _stat.S_IEXEC)
+        v = ReproductionScriptValidator()
+        result = v.validate(tmp_path)
+        assert result.valid is False
+        assert "ambiguous" in result.detail.lower()
 
 
 # ---------------------------------------------------------------------------

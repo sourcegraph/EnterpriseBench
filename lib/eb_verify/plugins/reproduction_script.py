@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from eb_verify.artifact_io import safe_read
+from eb_verify.artifact_io import safe_read, select_unique
 from eb_verify.plugins import ValidationResult
 
 
@@ -15,16 +15,19 @@ class ReproductionScriptValidator:
     artifact_type = "reproduction_script"
 
     def validate(self, workspace: Path) -> ValidationResult:
-        candidates = list(workspace.glob("**/reproduce.*")) + \
-                     list(workspace.glob("**/reproduction.*")) + \
-                     list(workspace.glob("**/repro.*"))
-
-        if not candidates:
+        # Decoy-shadow-safe selection: reject >1 candidate as ambiguous. The
+        # X_OK check below stays here (reproduction-specific policy), after the
+        # safe_read symlink-containment check.
+        script, sel_err = select_unique(
+            workspace, ["reproduce.*", "reproduction.*", "repro.*"]
+        )
+        if sel_err is not None:
+            return ValidationResult(valid=False, detail=sel_err)
+        if script is None:
             return ValidationResult(
                 valid=False, detail="No reproduction script found"
             )
 
-        script = candidates[0]
         try:
             # Verify path doesn't escape workspace via symlink
             safe_read(script, workspace)

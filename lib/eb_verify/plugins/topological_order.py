@@ -15,7 +15,7 @@ from collections import deque
 from pathlib import Path
 from typing import Dict, Iterable, List
 
-from eb_verify.artifact_io import safe_read
+from eb_verify.artifact_io import safe_read, select_unique
 from eb_verify.plugins import ValidationResult
 
 # Agents write the required "numbered list of repos in order" as either:
@@ -326,14 +326,17 @@ class TopologicalOrderValidator:
     def validate(self, workspace: Path) -> ValidationResult:
         import json
 
-        candidates = list(workspace.glob("**/ordering.json"))
-        if not candidates:
+        # Decoy-shadow-safe selection: reject >1 candidate as ambiguous.
+        path, sel_err = select_unique(workspace, ["ordering.json"])
+        if sel_err is not None:
+            return ValidationResult(valid=False, detail=sel_err)
+        if path is None:
             return ValidationResult(
                 valid=False, detail="No ordering.json found in workspace"
             )
 
         try:
-            data = json.loads(safe_read(candidates[0], workspace))
+            data = json.loads(safe_read(path, workspace))
         except (json.JSONDecodeError, ValueError) as e:
             return ValidationResult(valid=False, detail=f"ordering.json invalid: {e}")
 

@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from eb_verify.groundedness import CitationParseError, ground_citations
-from eb_verify.artifact_io import safe_read
+from eb_verify.artifact_io import safe_read, select_unique
 from eb_verify.plugins import ValidationResult
 from eb_verify.plugins.path_match import extract_claimed_paths, path_match_score
 
@@ -47,16 +47,15 @@ def _select_answer_file(workspace: Path, name: str) -> tuple[Optional[Path], Opt
     pinned = workspace / PINNED_ANSWER_SUBDIR / name
     if pinned.is_file():
         return pinned, None
-    candidates = list(workspace.glob(f"**/{name}"))
-    if not candidates:
-        return None, None
-    if len(candidates) > 1:
-        rels = sorted(str(c.relative_to(workspace)) for c in candidates)
-        return None, (
-            f"ambiguous {name}: multiple candidates {rels}; "
-            f"write the graded answer to {PINNED_ANSWER_SUBDIR}/{name}"
-        )
-    return candidates[0], None
+    # No pinned file: fall back to the shared decoy-shadow-safe selector, which
+    # rejects >1 glob candidate as ambiguous rather than grading candidates[0].
+    path, err = select_unique(workspace, [name])
+    if err is not None:
+        # Restore the pinned-subdir remedy the generic message omits: for the
+        # answer artifact the fix is "write it to agent_output/", discoverable
+        # from the pin convention, not merely "write exactly one".
+        err = f"{err} (write the graded answer to {PINNED_ANSWER_SUBDIR}/{name})"
+    return path, err
 
 
 def _normalize(text: str) -> str:
