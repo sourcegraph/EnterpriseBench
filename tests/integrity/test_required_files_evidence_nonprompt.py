@@ -58,6 +58,7 @@ prompt cannot be cashed in and is not a leak.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
@@ -199,10 +200,30 @@ def test_graded_file_path_absent_from_prompt(task_dir: Path) -> None:
 def test_the_invariant_is_actually_covering_tasks() -> None:
     """Guard against a silently empty sweep: if _graded_path_fields stops matching
     the check idioms (a scorer rename, a jq-to-python rewrite), every test above
-    vanishes and the suite still goes green."""
-    assert len(TASK_DIRS) >= 60, (
-        f"only {len(TASK_DIRS)} tasks were found to grade file paths; 63 did when "
-        f"this was written. A drop means _graded_path_fields no longer reads how the "
-        f"checks consume required_files/sufficient_files, or _gt_body stopped "
+    vanishes and the suite still goes green.
+
+    The 2026-07 reanchor migrated most tasks from grading required_files paths to
+    grading ground_truth scoring_evidence (covered by
+    test_scoring_evidence_is_nonprompt.py), so the floors are split: a small one
+    for this sweep's own non-vacuity, and a combined floor so evidence cannot
+    silently vanish from BOTH gates at once."""
+    assert len(TASK_DIRS) >= 20, (
+        f"only {len(TASK_DIRS)} tasks were found to grade file paths; 29 did after "
+        f"the 2026-07 reanchor. A drop means _graded_path_fields no longer reads how "
+        f"the checks consume required_files/sufficient_files, or _gt_body stopped "
         f"unwrapping the nested ground_truth key — the sweep is passing vacuously."
+    )
+
+    sibling = importlib.util.spec_from_file_location(
+        "scoring_evidence_gate",
+        Path(__file__).parent / "test_scoring_evidence_is_nonprompt.py",
+    )
+    mod = importlib.util.module_from_spec(sibling)
+    sibling.loader.exec_module(mod)
+    combined = {str(d) for d in TASK_DIRS} | {str(d) for d in mod.TASK_DIRS}
+    assert len(combined) >= 130, (
+        f"only {len(combined)} tasks are covered by the path gate and the "
+        f"scoring_evidence gate combined; 141 active tasks yielded 133+29 with "
+        f"overlap after the reanchor. A drop means graded evidence is leaving both "
+        f"gates — re-anchoring must not shrink total non-prompt-grading coverage."
     )
