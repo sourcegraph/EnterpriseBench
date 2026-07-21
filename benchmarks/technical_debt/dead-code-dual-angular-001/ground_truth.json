@@ -15,13 +15,13 @@
   ],
   "required_files": [
     {
-      "path": "packages/core/src/public_api.ts",
+      "path": "packages/core/public_api.ts",
       "repo": "angular",
       "confidence": 0.95,
       "source": "deterministic"
     },
     {
-      "path": "packages/common/src/public_api.ts",
+      "path": "packages/common/public_api.ts",
       "repo": "angular",
       "confidence": 0.9,
       "source": "deterministic"
@@ -35,15 +35,33 @@
   ],
   "sufficient_files": [
     {
-      "path": "packages/forms/src/public_api.ts",
+      "path": "packages/forms/public_api.ts",
       "repo": "angular",
       "confidence": 0.85
     },
     {
-      "path": "src/material/public-api.ts",
+      "path": "src/material/core/public-api.ts",
       "repo": "components",
       "confidence": 0.8
     }
   ],
-  "dead_code_categories": ["truly_dead", "components_only", "test_only"]
+  "dead_code_categories": ["truly_dead", "components_only", "test_only"],
+  "scoring_evidence": {
+    "dead_code_identified": [
+      "packages/core/public_api.ts",
+      "packages/common/public_api.ts",
+      "packages/forms/public_api.ts"
+    ],
+    "cross_repo_usage": [
+      "packages/core/public_api.ts",
+      "packages/common/public_api.ts",
+      "packages/forms/public_api.ts",
+      "src/cdk/",
+      "src/material/"
+    ],
+    "removal_impact": [
+      "src/cdk/",
+      "src/material/"
+    ]
+  }
 }

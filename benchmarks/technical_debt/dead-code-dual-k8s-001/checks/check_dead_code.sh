@@ -1,78 +1,60 @@
 #!/usr/bin/env bash
-# check_dead_code.sh — Verify dead code identification using call_graph plugin.
-# Precision-weighted: FP heavily penalized.
-# Env: WORKSPACE, TASK_DIR, TASK_ID
+# check_dead_code.sh — checkpoint "dead_code"
+#
+# Re-anchored to ground_truth.json:scoring_evidence[dead_code]
+# (EnterpriseBench-jn73.2.7.3.1.4). The gen-1 body was a byte-copy of
+# dead-code-001's React check: it graded ${WORKSPACE}/react/dead_code_report.json
+# (a path this kubernetes/client-go task never produces — the instruction says
+# /workspace/dead_code_report.json) against ground-truth keys this task's
+# ground_truth.json does not have, so a correct answer scored 0. Credit now
+# requires identifying the deprecated API group (flowcontrol/v1beta2) and its
+# kubernetes-repo evidence file at the pinned rev — tokens absent from the
+# instruction, which never names the group. Structure alone earns 0.
+# Env: WORKSPACE, TASK_DIR
 set -euo pipefail
 
-REPORT="${WORKSPACE}/react/dead_code_report.json"
-GT_DIR="${TASK_DIR}/ground_truth.json"
+CHECKPOINT="dead_code"
+WORKSPACE="${WORKSPACE:-/workspace}"
+REPORT="$WORKSPACE/dead_code_report.json"
+if [[ ! -f "$REPORT" && -f "$WORKSPACE/agent_output/answer.json" ]]; then
+  REPORT="$WORKSPACE/agent_output/answer.json"
+fi
+GT="${TASK_DIR:-}/ground_truth.json"
+MAX_REPORT_BYTES=1048576
 
+verdict() { printf '{"score": %s, "passed": %s, "detail": "%s"}\n' "$1" "$2" "$3"; exit 0; }
+
+if [[ ! -f "$GT" ]]; then
+  verdict 0.0 false "VERIFIER_INFRA_ERROR: ground_truth.json not found at $GT"
+fi
+if [[ -L "$REPORT" ]]; then
+  verdict 0.0 false "dead_code_report.json is a symlink, not a regular file"
+fi
 if [[ ! -f "$REPORT" ]]; then
-    echo '{"score": 0.0, "detail": "No dead_code_report.json found"}'
-    exit 0
+  verdict 0.0 false "No dead_code_report.json found"
+fi
+if [[ "$(wc -c <"$REPORT")" -gt "$MAX_REPORT_BYTES" ]]; then
+  verdict 0.0 false "dead_code_report.json exceeds ${MAX_REPORT_BYTES} bytes"
 fi
 
-if [[ ! -f "$GT_DIR" ]]; then
-    echo '{"score": 0.0, "detail": "Ground truth not found"}'
-    exit 0
-fi
+export REPORT GT CHECKPOINT
+python3 -c '
+import json, os
 
-python3 - "$REPORT" "$GT_DIR" <<'PYEOF'
-import json
-import sys
+def verdict(score, detail):
+    print(json.dumps({"score": round(score, 4), "passed": score >= 0.5, "detail": detail}))
+    raise SystemExit(0)
 
-report_path = sys.argv[1]
-gt_path = sys.argv[2]
+with open(os.environ["GT"]) as fh:
+    gt = json.load(fh)
+evidence = (gt.get("scoring_evidence") or {}).get(os.environ["CHECKPOINT"]) or []
+if not evidence:
+    verdict(0.0, "VERIFIER_INFRA_ERROR: no scoring_evidence for " + os.environ["CHECKPOINT"])
 
-with open(report_path) as f:
-    claimed = json.load(f)
+with open(os.environ["REPORT"], encoding="utf-8", errors="replace") as fh:
+    text = fh.read().lower()
 
-with open(gt_path) as f:
-    gt = json.load(f)
-
-gt_dead = gt.get("dead_code", [])
-gt_live = gt.get("live_code", [])
-
-# Normalize to (file, symbol) tuples
-def normalize(items):
-    return {(e["file"], e["symbol"]) for e in items}
-
-claimed_set = normalize(claimed)
-dead_set = normalize(gt_dead)
-live_set = normalize(gt_live)
-
-tp = claimed_set & dead_set
-fp = claimed_set & live_set
-fn = dead_set - claimed_set
-
-tp_count = len(tp)
-fp_count = len(fp)
-fn_count = len(fn)
-
-# Precision-weighted F-score (beta=0.5 favors precision)
-beta = 0.5
-beta_sq = beta ** 2
-
-precision = tp_count / (tp_count + fp_count) if (tp_count + fp_count) > 0 else 0.0
-recall = tp_count / (tp_count + fn_count) if (tp_count + fn_count) > 0 else 0.0
-
-if precision + recall > 0:
-    f_score = (1 + beta_sq) * (precision * recall) / (beta_sq * precision + recall)
-else:
-    f_score = 0.0
-
-# Apply threshold gates
-if precision < 0.9:
-    score = f_score * 0.7  # penalty for low precision
-elif recall < 0.6:
-    score = f_score * 0.85  # mild penalty for low recall
-else:
-    score = f_score
-
-detail = (
-    f"precision={precision:.3f} recall={recall:.3f} f0.5={f_score:.3f} "
-    f"TP={tp_count} FP={fp_count} FN={fn_count}"
-)
-
-print(json.dumps({"score": round(score, 4), "detail": detail}))
-PYEOF
+found = sum(1 for token in evidence if token.lower() in text)
+verdict(found / len(evidence),
+        "Identified %d/%d deprecated-group anchors" % (found, len(evidence)))
+'

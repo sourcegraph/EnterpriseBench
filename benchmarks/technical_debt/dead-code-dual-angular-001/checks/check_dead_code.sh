@@ -1,44 +1,59 @@
 #!/usr/bin/env bash
-# check_dead_code.sh — verify agent identifies dead exported APIs
+# check_dead_code.sh — checkpoint "dead_code_identified"
+#
+# Re-anchored to ground_truth.json:scoring_evidence[dead_code_identified]
+# (EnterpriseBench-jn73.2.7.3.1.4). The gen-1 body paid 0.6 for schema-valid
+# keys existing (symbol/category — structure, not investigation) and 0.4 for
+# the literal package names '@angular/core|common|forms' the prompt hands
+# over; the structured prompt echo scored 0.4. Credit now requires resolving
+# the actual public-surface files at angular/angular@18.0.0
+# (packages/<pkg>/public_api.ts — full paths the prompt never gives; it only
+# says "public_api.ts files"). Structure alone earns 0.
+# Env: WORKSPACE, TASK_DIR
 set -euo pipefail
 
-export ANSWER_FILE="${WORKSPACE:-/workspace}/agent_output/answer.json"
-export GT_FILE="$TASK_DIR/ground_truth.json"
+CHECKPOINT="dead_code_identified"
+WORKSPACE="${WORKSPACE:-/workspace}"
+REPORT="$WORKSPACE/agent_output/answer.json"
+if [[ ! -f "$REPORT" && -f "$WORKSPACE/DEAD_CODE_REPORT.json" ]]; then
+  REPORT="$WORKSPACE/DEAD_CODE_REPORT.json"
+fi
+GT="${TASK_DIR:-}/ground_truth.json"
+MAX_REPORT_BYTES=1048576
 
-if [[ ! -f "$ANSWER_FILE" ]]; then
-  printf '{"score": 0.0, "passed": false, "detail": "No answer.json found"}\n'
-  exit 0
+verdict() { printf '{"score": %s, "passed": %s, "detail": "%s"}\n' "$1" "$2" "$3"; exit 0; }
+
+if [[ ! -f "$GT" ]]; then
+  verdict 0.0 false "VERIFIER_INFRA_ERROR: ground_truth.json not found at $GT"
+fi
+if [[ -L "$REPORT" ]]; then
+  verdict 0.0 false "answer is a symlink, not a regular file"
+fi
+if [[ ! -f "$REPORT" ]]; then
+  verdict 0.0 false "No answer.json found"
+fi
+if [[ "$(wc -c <"$REPORT")" -gt "$MAX_REPORT_BYTES" ]]; then
+  verdict 0.0 false "answer exceeds ${MAX_REPORT_BYTES} bytes"
 fi
 
-python3 -c "
+export REPORT GT CHECKPOINT
+python3 -c '
 import json, os
 
-answer = json.load(open(os.environ['ANSWER_FILE']))
-gt = json.load(open(os.environ['GT_FILE']))
+def verdict(score, detail):
+    print(json.dumps({"score": round(score, 4), "passed": score >= 0.5, "detail": detail}))
+    raise SystemExit(0)
 
-exports = answer.get('dead_exports', answer.get('exports', answer.get('symbols', [])))
+with open(os.environ["GT"]) as fh:
+    gt = json.load(fh)
+evidence = (gt.get("scoring_evidence") or {}).get(os.environ["CHECKPOINT"]) or []
+if not evidence:
+    verdict(0.0, "VERIFIER_INFRA_ERROR: no scoring_evidence for " + os.environ["CHECKPOINT"])
 
-if not isinstance(exports, list) or len(exports) == 0:
-    print(json.dumps({'score': 0.0, 'passed': False, 'detail': 'No dead exports identified'}))
-else:
-    # Check structure quality
-    valid = 0
-    for e in exports:
-        if isinstance(e, dict) and 'symbol' in e and 'category' in e:
-            valid += 1
-        elif isinstance(e, dict) and ('name' in e or 'export' in e):
-            valid += 0.5
+with open(os.environ["REPORT"], encoding="utf-8", errors="replace") as fh:
+    text = fh.read().lower()
 
-    # Check that angular packages are covered
-    answer_text = json.dumps(exports).lower()
-    packages = ['@angular/core', '@angular/common', '@angular/forms']
-    pkg_covered = sum(1 for p in packages if p in answer_text)
-
-    struct_score = min(1.0, valid / max(len(exports), 1))
-    pkg_score = pkg_covered / len(packages)
-    score = round(struct_score * 0.6 + pkg_score * 0.4, 2)
-    passed = valid >= 1 and pkg_covered >= 1
-
-    detail = f'{int(valid)}/{len(exports)} well-structured exports, {pkg_covered}/{len(packages)} packages covered'
-    print(json.dumps({'score': score, 'passed': passed, 'detail': detail}))
-"
+found = sum(1 for token in evidence if token.lower() in text)
+verdict(found / len(evidence),
+        "Resolved %d/%d framework public-surface anchors" % (found, len(evidence)))
+'
