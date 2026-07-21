@@ -1,33 +1,58 @@
 #!/usr/bin/env bash
-# check_ownership.sh — verify agent identified responsible code area
+# check_ownership.sh — checkpoint "ownership"
+#
+# Re-anchored to ground_truth.json:scoring_evidence[ownership]
+# (EnterpriseBench-jn73.2.7.3.1.4). Credits ONLY non-prompt evidence — symbols
+# that exist in the pinned repo and are absent from every instruction*.md — so
+# a schema-shape-valid deliverable whose only content is prompt text scores 0.
+# Key presence alone earns nothing: credit requires naming the responsible
+# code, which requires reading the repo. ground_truth.json is sealed root-only.
 set -euo pipefail
 
-export ANSWER_FILE="${WORKSPACE}/agent_output/answer.json"
-export GT_FILE="${TASK_DIR}/ground_truth.json"
+CHECKPOINT="ownership"
+WORKSPACE="${WORKSPACE:-/workspace}"
+ANSWER="$WORKSPACE/agent_output/answer.json"
+GT="${TASK_DIR:-}/ground_truth.json"
+MAX_ANSWER_BYTES=1048576
 
-if [[ ! -f "$ANSWER_FILE" ]]; then
-    echo '{"score": 0.0, "passed": false, "detail": "No answer.json found"}'
-    exit 1
+verdict() { printf '{"score": %s, "passed": %s, "detail": "%s"}\n' "$1" "$2" "$3"; exit 0; }
+
+if [[ ! -f "$GT" ]]; then
+  verdict 0.0 false "VERIFIER_INFRA_ERROR: ground_truth.json not found at $GT"
+fi
+if [[ -L "$ANSWER" ]]; then
+  verdict 0.0 false "answer.json is a symlink, not a regular file"
+fi
+if [[ ! -f "$ANSWER" ]]; then
+  verdict 0.0 false "No answer.json found"
+fi
+if [[ "$(wc -c <"$ANSWER")" -gt "$MAX_ANSWER_BYTES" ]]; then
+  verdict 0.0 false "answer.json exceeds ${MAX_ANSWER_BYTES} bytes"
 fi
 
-if [[ ! -f "$GT_FILE" ]]; then
-    echo '{"score": 0.0, "passed": false, "detail": "No ground_truth.json found"}'
-    exit 1
-fi
-
-python3 -c "
+export ANSWER GT CHECKPOINT
+python3 -c '
 import json, os
 
-gt = json.load(open(os.environ['GT_FILE']))
-answer = json.load(open(os.environ['ANSWER_FILE']))
+def verdict(score, detail):
+    print(json.dumps({"score": round(score, 2), "passed": score >= 0.5, "detail": detail}))
+    raise SystemExit(0)
 
-keywords = gt.get('ownership_keywords', [])
-agent_text = json.dumps(answer.get('ownership', answer.get('responsible_area', ''))).lower()
+with open(os.environ["GT"]) as fh:
+    gt = json.load(fh)
+evidence = (gt.get("scoring_evidence") or {}).get(os.environ["CHECKPOINT"]) or []
+if not evidence:
+    verdict(0.0, "VERIFIER_INFRA_ERROR: no scoring_evidence for " + os.environ["CHECKPOINT"])
 
-if not keywords:
-    print(json.dumps({'score': 1.0, 'passed': True, 'detail': 'No ownership keywords to check'}))
-else:
-    matched = sum(1 for kw in keywords if kw.lower() in agent_text)
-    score = round(matched / len(keywords), 2)
-    print(json.dumps({'score': score, 'passed': score >= 0.3, 'detail': f'Matched {matched}/{len(keywords)} ownership keywords'}))
-"
+with open(os.environ["ANSWER"], encoding="utf-8", errors="replace") as fh:
+    raw = fh.read()
+try:
+    json.loads(raw)
+except ValueError:
+    verdict(0.0, "answer.json is not valid JSON")
+
+text = raw.lower()
+found = sum(1 for token in evidence if token.lower() in text)
+verdict(found / len(evidence),
+        "Cited %d/%d non-prompt evidence tokens for %s" % (found, len(evidence), os.environ["CHECKPOINT"]))
+'
