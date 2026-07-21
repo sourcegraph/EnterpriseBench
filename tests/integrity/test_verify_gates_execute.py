@@ -20,6 +20,7 @@ See EnterpriseBench Lane A audit.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import textwrap
@@ -162,12 +163,12 @@ class TestVerifyExpectedSolutions:
             f"verify-expected-solutions hit argparse's usage error instead of "
             f"running\n{out}"
         )
-        assert "of 141 tasks)" in out or " tasks)" in out, (
+        summary = re.search(r"\(of (\d+) tasks\)", out)
+        assert summary is not None, (
             f"no per-task summary line — the walk never reached the corpus\n{out}"
         )
-        assert "passed" in out and "0 tasks)" not in out, (
-            f"reported walking zero tasks\n{out}"
-        )
+        assert "passed" in out, f"no pass/fail summary\n{out}"
+        assert int(summary.group(1)) > 0, f"reported walking zero tasks\n{out}"
 
     def test_empty_tree_fails_loudly(self, tmp_path: Path) -> None:
         empty = tmp_path / "no_tasks_here"
