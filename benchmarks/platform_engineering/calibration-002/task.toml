@@ -29,21 +29,21 @@ multi_repo_pattern = "enforce"
 name = "identify_drift_points"
 weight = 0.40
 verifier = "checks/check_drift_points.sh"
-description = "Agent identifies parameter resolution drift points"
+description = "Agent identifies both drift points and locates them in src/click/core.py"
 timeout_seconds = 60
 
 [[checkpoints]]
 name = "determine_expected_values"
 weight = 0.35
 verifier = "checks/check_expected_values.sh"
-description = "Agent correctly determines parameter source precedence"
+description = "Agent explains resolution through the real mechanism (resolve_envvar_value None fall-through, prompt_required gate)"
 timeout_seconds = 60
 
 [[checkpoints]]
 name = "validate_corrected_config"
 weight = 0.25
 verifier = "checks/check_config_valid.sh"
-description = "Agent explains the resolution chain correctly"
+description = "Agent's resolution chain and fix carry the repo-anchored chain facts, not just the template keys"
 timeout_seconds = 60
 
 [artifacts]

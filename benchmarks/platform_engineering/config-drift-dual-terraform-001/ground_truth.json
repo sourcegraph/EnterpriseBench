@@ -15,38 +15,88 @@
   ],
   "required_files": [
     {
-      "path": "internal/terraform/eval_diff.go",
+      "path": "internal/terraform/node_resource_plan_instance.go",
       "repo": "terraform",
-      "confidence": 0.95,
-      "source": "deterministic"
+      "confidence": 0.9,
+      "source": "deterministic",
+      "rationale": "Per-instance plan/diff orchestration in terraform core at v1.7.0 (the eval_diff.go/eval_refresh.go files of older cores no longer exist)"
     },
     {
-      "path": "internal/services/ec2/resource_aws_security_group.go",
+      "path": "internal/service/iam/policy.go",
       "repo": "terraform-provider-aws",
-      "confidence": 0.85,
-      "source": "deterministic"
+      "confidence": 0.9,
+      "source": "deterministic",
+      "rationale": "aws_iam_policy schema with the policy-document normalization hooks"
+    },
+    {
+      "path": "internal/service/ec2/vpc_security_group.go",
+      "repo": "terraform-provider-aws",
+      "confidence": 0.9,
+      "source": "deterministic",
+      "rationale": "aws_security_group Read and the ingress/egress rule-set schema (the pre-v4 aws/resource_aws_security_group.go layout is gone)"
     }
   ],
   "sufficient_files": [
     {
-      "path": "internal/terraform/eval_refresh.go",
+      "path": "internal/plans/objchange/objchange.go",
       "repo": "terraform",
-      "confidence": 0.85
+      "confidence": 0.85,
+      "rationale": "ProposedNew: how core merges prior state and config into the planned value"
     },
     {
-      "path": "internal/services/iam/resource_aws_iam_policy.go",
-      "repo": "terraform-provider-aws",
-      "confidence": 0.8
+      "path": "internal/terraform/context_plan.go",
+      "repo": "terraform",
+      "confidence": 0.8,
+      "rationale": "Plan entry point that drives refresh + diff"
     }
   ],
   "drift_points": [
     {
-      "description": "Terraform core attribute comparison normalizes differently than AWS provider Read output for JSON policy documents",
-      "repos_involved": ["terraform", "terraform-provider-aws"]
+      "config_key": "iam_policy_json_normalization",
+      "provider_file": "internal/service/iam/policy.go",
+      "terraform_core_file": "internal/terraform/node_resource_plan_instance.go",
+      "description": "aws_iam_policy stores the policy document as a string; AWS returns it canonicalized, so the Read value differs byte-for-byte from config. The schema counters with DiffSuppressFunc verify.SuppressEquivalentPolicyDiffs, DiffSuppressOnRefresh, and a StateFunc that runs structure.NormalizeJsonString; core's plan compares the values structurally and shows a phantom diff whenever the suppression layer and AWS canonicalization drift",
+      "repos_involved": ["terraform", "terraform-provider-aws"],
+      "evidence_tokens": {
+        "identifies": ["policy"],
+        "located": ["internal/service/iam/policy.go"],
+        "mechanism": ["SuppressEquivalentPolicyDiffs"]
+      }
     },
     {
-      "description": "Set vs list ordering for security group ingress/egress rules",
-      "repos_involved": ["terraform", "terraform-provider-aws"]
+      "config_key": "security_group_rule_set_ordering",
+      "provider_file": "internal/service/ec2/vpc_security_group.go",
+      "terraform_core_file": "internal/plans/objchange/objchange.go",
+      "description": "aws_security_group ingress/egress are schema.TypeSet blocks hashed by SecurityGroupRuleHash; the provider Read returns rules in AWS order and MatchRules re-aligns them with config. When the hash inputs and the returned rule shape disagree (rule fields added or aggregated differently), the set hash changes and core plans a phantom update even though nothing material changed",
+      "repos_involved": ["terraform", "terraform-provider-aws"],
+      "evidence_tokens": {
+        "identifies": ["security_group"],
+        "located": ["internal/service/ec2/vpc_security_group.go"],
+        "mechanism": ["SecurityGroupRuleHash"]
+      }
     }
-  ]
+  ],
+  "scoring_evidence": {
+    "_comment": "Every graded token is ABSENT from instruction.md (checked raw and whitespace-stripped, both lowercased) and verified PRESENT at the pinned revs: SuppressEquivalentPolicyDiffs + DiffSuppressOnRefresh + NormalizeJsonString StateFunc at internal/service/iam/policy.go:85-91 and PolicyToSet at policy.go:208 (provider v5.31.0); SecurityGroupRuleHash as the ingress/egress Set function at internal/service/ec2/vpc_security_group.go:128; ProposedNew at internal/plans/objchange/objchange.go:31 and AssertObjectCompatible at internal/plans/objchange/compatible.go:29 (terraform v1.7.0). The prompt DOES supply aws_iam_policy, aws_security_group, aws_lambda_function, phantom diff, JSON normalization, set vs list ordering and the terraform/ package name -- none of those may be graded alone. File-existence context: internal/terraform/eval_diff.go and eval_refresh.go do NOT exist at v1.7.0; they were the old required_files and graded nothing real.",
+    "config_valid_core_files": [
+      "internal/terraform/node_resource_plan_instance.go",
+      "internal/terraform/context_plan.go",
+      "internal/plans/objchange/objchange.go"
+    ],
+    "config_valid_provider_files": [
+      "internal/service/iam/policy.go",
+      "internal/service/ec2/vpc_security_group.go",
+      "internal/service/lambda/function.go"
+    ],
+    "expected_values_core_mechanism": [
+      "objchange",
+      "AssertObjectCompatible",
+      "ProposedNew"
+    ],
+    "expected_values_provider_mechanism": [
+      "NormalizeJsonString",
+      "PolicyToSet",
+      "DiffSuppressOnRefresh"
+    ]
+  }
 }

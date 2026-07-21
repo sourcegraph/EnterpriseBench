@@ -29,21 +29,21 @@ multi_repo_pattern = "enforce"
 name = "identify_drift_points"
 weight = 0.40
 verifier = "checks/check_drift_points.sh"
-description = "Agent identifies config layering drift points"
+description = "Agent identifies both drifted keys and locates them in src/flask/config.py"
 timeout_seconds = 60
 
 [[checkpoints]]
 name = "determine_expected_values"
 weight = 0.35
 verifier = "checks/check_expected_values.sh"
-description = "Agent correctly determines expected config resolution behavior"
+description = "Agent explains resolution through the real mechanism (from_pyfile delegation, make_config seeding)"
 timeout_seconds = 60
 
 [[checkpoints]]
 name = "validate_corrected_config"
 weight = 0.25
 verifier = "checks/check_config_valid.sh"
-description = "Agent explains the override chain correctly"
+description = "Agent's override chain and fix carry the repo-anchored chain facts, not just the template keys"
 timeout_seconds = 60
 
 [artifacts]
@@ -69,7 +69,9 @@ repo = "flask"
 confidence = 0.85
 source = "deterministic"
 
+# src/flask/scaffold.py does not exist at tag 3.1.0; the config seeding lives
+# in the sansio App base (make_config), so that is the sufficient file.
 [[ground_truth.sufficient_files]]
-path = "src/flask/scaffold.py"
+path = "src/flask/sansio/app.py"
 repo = "flask"
 confidence = 0.60

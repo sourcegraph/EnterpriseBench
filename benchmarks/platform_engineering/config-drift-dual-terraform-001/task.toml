@@ -78,21 +78,21 @@ multi_repo_pattern = "investigate"
 name = "config_valid"
 weight = 0.20
 verifier = "checks/check_config_valid.sh"
-description = "Agent produces valid drift report JSON"
+description = "Agent's drift report is grounded in real files at the pinned revs (core and provider side)"
 timeout_seconds = 60
 
 [[checkpoints]]
 name = "drift_points"
 weight = 0.45
 verifier = "checks/check_drift_points.sh"
-description = "Agent identifies drift points between core and provider"
+description = "Agent identifies both drift points with the real provider Read path and its normalization hook"
 timeout_seconds = 120
 
 [[checkpoints]]
 name = "expected_values"
 weight = 0.35
 verifier = "checks/check_expected_values.sh"
-description = "Agent documents correct root cause for phantom diffs"
+description = "Agent grounds the phantom-diff root cause in core comparison machinery and provider schema hooks"
 timeout_seconds = 120
 
 [artifacts]
@@ -106,24 +106,34 @@ mcp_benefit_rationale = "Tracing state comparison logic in Terraform core and ma
 [ground_truth]
 tiers = ["deterministic"]
 
+# The original file list predated v1.7.0/v5.31.0 reality: eval_diff.go and
+# eval_refresh.go do not exist in terraform v1.7.0, and the provider moved off
+# the internal/services/*/resource_aws_* layout before v4. Paths below are
+# verified present at the pinned revs.
 [[ground_truth.required_files]]
-path = "internal/terraform/eval_diff.go"
+path = "internal/terraform/node_resource_plan_instance.go"
 repo = "terraform"
-confidence = 0.95
+confidence = 0.90
 source = "deterministic"
 
 [[ground_truth.required_files]]
-path = "internal/services/ec2/resource_aws_security_group.go"
+path = "internal/service/iam/policy.go"
 repo = "terraform-provider-aws"
-confidence = 0.85
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "internal/service/ec2/vpc_security_group.go"
+repo = "terraform-provider-aws"
+confidence = 0.90
 source = "deterministic"
 
 [[ground_truth.sufficient_files]]
-path = "internal/terraform/eval_refresh.go"
+path = "internal/plans/objchange/objchange.go"
 repo = "terraform"
 confidence = 0.85
 
 [[ground_truth.sufficient_files]]
-path = "internal/services/iam/resource_aws_iam_policy.go"
-repo = "terraform-provider-aws"
+path = "internal/terraform/context_plan.go"
+repo = "terraform"
 confidence = 0.80
