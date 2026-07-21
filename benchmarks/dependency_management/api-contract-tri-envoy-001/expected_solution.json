@@ -2,25 +2,27 @@
   "task_id": "api-contract-tri-envoy-001",
   "checkpoints": {
     "contract_source": {
-      "expected_solution": "Agent identifies xDS API definitions in Envoy The answer must reference the canonical artifact(s) for this checkpoint at the pinned revision (basenames: grpc_subscription_impl.cc and subscription_base.h). The judge looks for the following concept tokens in the agent output: xds, discovery, subscription, grpc, ads, config.",
+      "expected_solution": "Envoy v1.28.0 implements its xDS client under source/extensions/config_subscription/grpc/ (the config_subscription extension tree, where this code moved from source/common/config in earlier releases): grpc_subscription_impl.cc defines GrpcSubscriptionImpl, which layers per-type subscription bookkeeping on a shared GrpcMux that owns the ADS stream, resource type URL bookkeeping, and version/nonce acking. source/common/config/subscription_base.h provides the SubscriptionBase template that typed config consumers derive from for resource decoding.",
       "evaluation_criteria": [
-        "Cites at least one canonical file by basename (grpc_subscription_impl.cc and subscription_base.h) in the agent output",
-        "Mentions at least three of the canonical concept tokens: discovery, subscription, grpc, and config"
+        "Cites grpc_subscription_impl.cc under the config_subscription extension tree at v1.28.0",
+        "Names GrpcSubscriptionImpl and the GrpcMux it delegates the shared ADS stream to",
+        "Cites subscription_base.h as the typed subscription base"
       ]
     },
     "direct_consumers": {
-      "expected_solution": "Agent finds Istio and go-control-plane xDS implementations The answer must reference the canonical artifact(s) for this checkpoint at the pinned revision (basenames: ads.go, delta.go, server.go, and snapshot.go). The judge looks for the following concept tokens in the agent output: path.",
+      "expected_solution": "Istio 1.20.0 serves xDS from pilot/pkg/xds: ads.go implements the state-of-the-world DiscoveryStream handling for CDS/EDS/LDS/RDS pushes and delta.go the incremental variant. go-control-plane v0.12.0 provides the reference server in pkg/server/v3 (server.go, the ADS stream handler) backed by versioned resource snapshots from pkg/cache/v3 (snapshot.go, NewSnapshot/Consistent/GetVersion).",
       "evaluation_criteria": [
-        "Cites at least one canonical file by basename (ads.go, delta.go, server.go, and snapshot.go) in the agent output",
-        "Mentions at least three of the canonical concept tokens: path",
-        "Connects the source artifacts to their downstream impact in the consumer code path"
+        "Cites pilot/pkg/xds/ads.go and pilot/pkg/xds/delta.go for Istio pilot's xDS server",
+        "Cites pkg/server/v3/server.go for go-control-plane's ADS stream handler",
+        "Cites pkg/cache/v3/snapshot.go for the versioned snapshot cache"
       ]
     },
     "transitive_impact": {
-      "expected_solution": "Agent traces xDS contract divergence across all three repos The answer must reference the canonical artifact(s) for this checkpoint at the pinned revision (basenames: grpc_subscription_impl.cc, ads.go, server.go, subscription_base.h, delta.go, and snapshot.go). The judge looks for the following concept tokens in the agent output: version, nonce, type_url, incremental, state-of-the-world, sotw, delta, cds.",
+      "expected_solution": "All three implementations meet on the ADS RPC StreamAggregatedResources (and its incremental twin DeltaAggregatedResources). The divergence surface is version/nonce bookkeeping: Istio's ads.go decides whether to respond by comparing the request's ResponseNonce against the last nonce it sent and inspecting VersionInfo; go-control-plane tracks per-type snapshot versions handed out by pkg/cache/v3; Envoy's GrpcMux acks with the VersionInfo/nonce pair it last accepted. Mismatched expectations in that handshake — a stale ResponseNonce after reconnect, per-type versus per-snapshot VersionInfo semantics — are what reject pushes and surface as intermittent 503s during config updates.",
       "evaluation_criteria": [
-        "Cites at least one canonical file by basename (grpc_subscription_impl.cc, ads.go, server.go, subscription_base.h, delta.go, and snapshot.go) in the agent output",
-        "Mentions at least three of the canonical concept tokens: version, nonce, type_url, incremental, and state-of-the-world"
+        "Names StreamAggregatedResources / DeltaAggregatedResources as the shared ADS contract surface",
+        "Traces the ResponseNonce comparison in Istio pilot's should-respond logic",
+        "Explains the VersionInfo handling divergence across the three implementations"
       ]
     }
   }

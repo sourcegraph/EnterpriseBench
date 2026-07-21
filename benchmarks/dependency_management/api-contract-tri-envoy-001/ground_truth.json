@@ -20,7 +20,7 @@
   ],
   "required_files": [
     {
-      "path": "source/common/config/grpc_subscription_impl.cc",
+      "path": "source/extensions/config_subscription/grpc/grpc_subscription_impl.cc",
       "repo": "envoy",
       "confidence": 0.9,
       "source": "deterministic"
@@ -60,5 +60,28 @@
     "Istio pilot receives request and generates DiscoveryResponse with updated resources",
     "go-control-plane snapshot cache provides versioned resource snapshots to the server",
     "Contract divergence in version/nonce handling between Envoy expectations and Istio responses"
-  ]
+  ],
+  "scoring_evidence": {
+    "contract_source": [
+      "grpc_subscription_impl.cc",
+      "subscription_base.h",
+      "config_subscription",
+      "GrpcSubscriptionImpl",
+      "GrpcMux"
+    ],
+    "direct_consumers": [
+      "ads.go",
+      "delta.go",
+      "pilot/pkg/xds",
+      "server.go",
+      "snapshot.go",
+      "pkg/cache/v3"
+    ],
+    "transitive_impact": [
+      "StreamAggregatedResources",
+      "DeltaAggregatedResources",
+      "ResponseNonce",
+      "VersionInfo"
+    ]
+  }
 }

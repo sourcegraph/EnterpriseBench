@@ -1,37 +1,57 @@
 #!/usr/bin/env bash
-# check_direct_consumers.sh — verify agent finds Istio and go-control-plane xDS implementations
+# check_direct_consumers.sh — checkpoint "direct_consumers"
+#
+# Re-anchored to ground_truth.json:scoring_evidence[direct_consumers]
+# (EnterpriseBench-jn73.2.7.3.1.4). Credits ONLY non-prompt evidence: every
+# graded token is absent from instruction.md and present in the pinned repos
+# (istio 1.20.0 pilot/pkg/xds + go-control-plane v0.12.0 paths),
+# so a schema-shape-valid deliverable whose only content is prompt text scores
+# 0. Structure alone earns nothing — only investigation-derived values count.
 set -euo pipefail
 
-export ANSWER_FILE="${WORKSPACE:-/workspace}/agent_output/answer.json"
-export GT_FILE="$TASK_DIR/ground_truth.json"
+CHECKPOINT="direct_consumers"
+WORKSPACE="${WORKSPACE:-/workspace}"
+ANSWER_FILE="$WORKSPACE/agent_output/answer.json"
+GT="${TASK_DIR:-}/ground_truth.json"
+MAX_ANSWER_BYTES=1048576
 
+verdict() { printf '{"score": %s, "passed": %s, "detail": "%s"}\n' "$1" "$2" "$3"; exit 0; }
+
+if [[ ! -f "$GT" ]]; then
+  verdict 0.0 false "VERIFIER_INFRA_ERROR: ground_truth.json not found at $GT"
+fi
+if [[ -L "$ANSWER_FILE" ]]; then
+  verdict 0.0 false "answer.json is a symlink, not a regular file"
+fi
 if [[ ! -f "$ANSWER_FILE" ]]; then
-  printf '{"score": 0.0, "passed": false, "detail": "No answer.json found"}\n'
-  exit 0
+  verdict 0.0 false "No answer.json found"
+fi
+if [[ "$(wc -c <"$ANSWER_FILE")" -gt "$MAX_ANSWER_BYTES" ]]; then
+  verdict 0.0 false "answer.json exceeds ${MAX_ANSWER_BYTES} bytes"
 fi
 
-python3 -c "
+export ANSWER_FILE GT CHECKPOINT
+python3 -c '
 import json, os
 
-gt = json.load(open(os.environ['GT_FILE']))
-answer = json.load(open(os.environ['ANSWER_FILE']))
+def verdict(score, detail):
+    print(json.dumps({"score": round(score, 2), "passed": score >= 0.5, "detail": detail}))
+    raise SystemExit(0)
 
-answer_text = json.dumps(answer).lower()
+with open(os.environ["GT"]) as fh:
+    gt = json.load(fh)
+evidence = (gt.get("scoring_evidence") or {}).get(os.environ["CHECKPOINT"]) or []
+if not evidence:
+    verdict(0.0, "VERIFIER_INFRA_ERROR: no scoring_evidence for " + os.environ["CHECKPOINT"])
 
-# Check for Istio references
-istio_files = [f['path'] for f in gt.get('required_files', []) + gt.get('sufficient_files', []) if f.get('repo') == 'istio']
-istio_found = sum(1 for f in istio_files if f.lower() in answer_text or f.split('/')[-1].lower() in answer_text)
-has_istio = istio_found > 0 or 'pilot' in answer_text or 'istio' in answer_text
+try:
+    with open(os.environ["ANSWER_FILE"], encoding="utf-8", errors="replace") as fh:
+        answer = json.load(fh)
+except json.JSONDecodeError:
+    verdict(0.0, "answer.json is not valid JSON")
 
-# Check for go-control-plane references
-gcp_files = [f['path'] for f in gt.get('required_files', []) + gt.get('sufficient_files', []) if f.get('repo') == 'go-control-plane']
-gcp_found = sum(1 for f in gcp_files if f.lower() in answer_text or f.split('/')[-1].lower() in answer_text)
-has_gcp = gcp_found > 0 or 'control-plane' in answer_text or 'snapshot' in answer_text
-
-repos_covered = sum([has_istio, has_gcp])
-score = round(repos_covered / 2.0, 2)
-passed = has_istio and has_gcp
-
-detail = f'Istio refs: {has_istio} ({istio_found} files), go-control-plane refs: {has_gcp} ({gcp_found} files)'
-print(json.dumps({'score': score, 'passed': passed, 'detail': detail}))
-"
+text = json.dumps(answer).lower()
+found = sum(1 for token in evidence if token.lower() in text)
+verdict(found / len(evidence),
+        "Cited %d/%d pinned-repo evidence tokens for %s" % (found, len(evidence), os.environ["CHECKPOINT"]))
+'
