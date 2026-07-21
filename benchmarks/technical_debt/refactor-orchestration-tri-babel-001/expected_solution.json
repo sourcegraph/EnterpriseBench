@@ -1,0 +1,30 @@
+{
+  "task_id": "refactor-orchestration-tri-babel-001",
+  "checkpoints": {
+    "identify_repos": {
+      "expected_solution": "Three repos cascade: babel (upstream — adds the DecoratorMetadata AST node to @babel/parser at v7.22.9 and ripples through @babel/types and @babel/traverse), webpack (intermediary at v5.88.2 — updates babel-loader's parser-options passthrough and tree-shaking to recognise decorator side effects on the new AST node), and Next.js (consumer at v13.4.12 — updates Babel/SWC config plus the next/font and next/image plugins that walk JS AST). REFACTOR_PLAN.md must mention 'babel', 'webpack', and one of {next.js, nextjs, next js} so check_repo_set.sh's three greps fire.",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must mention 'babel', 'webpack', and one of {next.js, nextjs, next js} — the three grep targets in check_repo_set.sh",
+        "Plan must distinguish roles: babel adds the AST node, webpack absorbs it via babel-loader and tree-shaking, Next.js consumes it via SWC/Babel config and the AST-aware plugins",
+        "Plan should reference packages/babel-parser/package.json (babel side) and the webpack root package.json — the GT required-file anchors that the validator can verify; the Next.js side anchors at the packages/next entry but the package.json path is not validator-checkable due to the .js repo suffix"
+      ]
+    },
+    "topological_order": {
+      "expected_solution": "Strict linear cascade: (1) babel adds the DecoratorMetadata AST node to @babel/parser and updates @babel/types / @babel/traverse; (2) webpack updates babel-loader parser-options passthrough and tree-shaking to handle decorator side effects with the new AST node; (3) Next.js updates its SWC/Babel configuration to support the new decorator syntax and updates next/font and next/image's AST parsing. The numbered list must use canonical identifiers (babel/babel, webpack/webpack, vercel/next dot js) so check_topo_order.sh's tokeniser matches dependency_graph keys; the verifier's regex matches '@\\w/.-' tokens, so the canonical org-slash-repo form is what the verifier expects.",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must contain a three-entry numbered list naming babel, webpack, and Next.js in that order",
+        "Order must respect the dependency graph: babel before webpack before Next.js — the consumer (Next.js) depends on both upstream nodes",
+        "Each step must articulate the specific change being absorbed: AST node addition (babel), babel-loader + tree-shaking update (webpack), SWC/Babel config + AST plugin update (Next.js)",
+        "Repo identifiers in the numbered list must use the canonical org-slash-repo form ('babel/babel', 'webpack/webpack', and the Next.js identifier in vercel-slash-next-dot-js form) so the verifier's tokeniser can match dependency_graph keys"
+      ]
+    },
+    "parallelism": {
+      "expected_solution": "No parallelizable steps — the chain is strictly linear. The plan should explicitly state 'no parallelizable steps' under a Parallelization heading and call out the breaking-change list from ground_truth.json: AST node addition risks plugin incompatibility, babel-loader config changes ripple to webpack.config.js consumers, and Next.js's next.config.js Babel configuration changes affect SWC fallback.",
+      "evaluation_criteria": [
+        "Plan must explicitly state that no steps are parallelizable (ground truth's parallelizable_steps is empty)",
+        "Must NOT claim that webpack and Next.js can run in parallel — the consumer depends on both babel AND webpack directly",
+        "Plan should enumerate the breaking-change risk per repo (AST plugin compat, babel-loader config, next.config.js Babel config) so the risk-assessment side of the prompt is satisfied"
+      ]
+    }
+  }
+}

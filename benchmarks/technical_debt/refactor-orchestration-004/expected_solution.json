@@ -1,0 +1,29 @@
+{
+  "task_id": "refactor-orch-004",
+  "checkpoints": {
+    "identify_repos": {
+      "expected_solution": "Three repos cascade: protocolbuffers/protobuf-go (upstream — google.golang.org/protobuf v1.32.0 is the canonical v2 module, already released), grpc/grpc-go (intermediary — migrates all imports from github.com/golang/protobuf to google.golang.org/protobuf in PR grpc/grpc-go#6919 merged 2024-01-30), and etcd-io/etcd (consumer — updates to grpc-go with new protobuf imports and migrates its own protobuf usage). REFACTOR_PLAN.md must mention 'protobuf-go' (or 'google.golang.org/protobuf' or 'protocolbuffers'), 'grpc-go', and 'etcd' so check_repo_set.sh's three greps fire.",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must mention one of {protobuf-go, protocolbuffers, google.golang.org/protobuf} AND 'grpc-go' (or 'grpc.go') AND 'etcd' — the three grep targets",
+        "Plan must distinguish roles: protobuf-go provides the v2 module, grpc-go migrates its imports, etcd consumes the updated grpc-go",
+        "Plan must reference the import-path migration (github.com/golang/protobuf → google.golang.org/protobuf) and where it surfaces in each repo's go.mod"
+      ]
+    },
+    "topological_order": {
+      "expected_solution": "Strict linear cascade: (1) protocolbuffers/protobuf-go publishes v1.32.0 (already released — provides the canonical v2 module), (2) grpc/grpc-go#6919 migrates imports from github.com/golang/protobuf to google.golang.org/protobuf (merged 2024-01-30), (3) etcd-io/etcd updates to the new grpc-go and migrates its own protobuf usage. The numbered list must use canonical org/repo identifiers. dependency_graph: protocolbuffers/protobuf-go: [], grpc/grpc-go: [protocolbuffers/protobuf-go], etcd-io/etcd: [grpc/grpc-go, protocolbuffers/protobuf-go].",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must contain a three-entry numbered list ('1. protocolbuffers/protobuf-go', '2. grpc/grpc-go', '3. etcd-io/etcd')",
+        "Order must respect the dependency graph: protobuf-go before grpc-go (which depends on it) before etcd (which depends on both)",
+        "Each step must articulate the import-path change (github.com/golang/protobuf → google.golang.org/protobuf) and what migrates inside each repo",
+        "Repo identifiers must use canonical org/repo form so the verifier's tokeniser can match dependency_graph keys"
+      ]
+    },
+    "parallelism": {
+      "expected_solution": "No parallelizable steps — every node in the chain has a hard dependency on its predecessor. The plan should explicitly state 'no parallelizable steps' under a Parallelization heading.",
+      "evaluation_criteria": [
+        "Plan must explicitly state that no steps can run in parallel (ground truth's parallelizable_steps is empty)",
+        "Must NOT claim that grpc-go and etcd-io/etcd can run in parallel — etcd depends on both protobuf-go and grpc-go directly"
+      ]
+    }
+  }
+}

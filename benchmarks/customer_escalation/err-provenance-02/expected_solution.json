@@ -1,0 +1,33 @@
+{
+  "task_id": "error-trace-k8s-nftables-sync-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "Primary error source: pkg/proxy/nftables/proxier.go \u2014 Contains the kube-proxy nftables sync logic that logs 'Failed to list existing sets' and 'nftables sync failed'. The error wrapping originates here.. Supporting: nftables.go \u2014 The underlying knftables library that crashes with segfault when encountering sets with udata. Fix bumps this dependency.. Surface error: Failed to list existing sets.",
+      "evaluation_criteria": [
+        "Must identify pkg/proxy/nftables/proxier.go as part of the error source",
+        "Must identify nftables.go as part of the error source",
+        "Must reference the surface error message ('Failed to list existing sets') or its origin",
+        "Must reference a specific function, type, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Error propagation chain: (1) kube-proxy starts nftables sync loop \u2192 (2) proxier.go calls knftables to list existing nft sets \u2192 (3) knftables library invokes nft CLI which segfaults on sets with udata \u2192 (4) knftables returns error with 'segmentation fault' detail \u2192 (5) proxier.go wraps as 'Failed to list existing sets' and logs \u2192 (6) Outer sync loop logs 'nftables sync failed' and retries.",
+      "evaluation_criteria": [
+        "Must describe the step: 'kube-proxy starts nftables sync loop'",
+        "Must describe the propagation: 'Outer sync loop logs 'nftables sync failed' and retries'",
+        "Must include all intermediate steps in the correct order",
+        "Must reference the chain in causal order (source \u2192 surface)",
+        "Must cite at least one file from the propagation path (e.g. pkg/proxy/nftables/proxier.go)"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Host has nftables >= 1.1.3 which creates sets with udata; (2) Another process (firewalld, nftables rules) created sets with udata in the same namespace; (3) kube-proxy is configured to use nftables mode.",
+      "evaluation_criteria": [
+        "Must identify the condition: 'Host has nftables >= 1.1.3 which creates sets with udata'",
+        "Must identify the condition: 'Another process (firewalld, nftables rules) created sets with udata in the same '",
+        "Must identify the condition: 'kube-proxy is configured to use nftables mode'",
+        "Must explain the combined conditions necessary to reproduce the error"
+      ]
+    }
+  }
+}

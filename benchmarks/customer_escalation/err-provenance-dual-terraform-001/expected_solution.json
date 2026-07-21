@@ -1,0 +1,33 @@
+{
+  "task_id": "err-provenance-dual-terraform-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "Primary error source: internal/command/plan.go. Supporting: internal/service/ec2/ec2_instance.go. Surface error: Trace Terraform plan 'InvalidParameterValue' error to AWS provider resource implementation.",
+      "evaluation_criteria": [
+        "Must identify internal/command/plan.go as part of the error source",
+        "Must identify internal/service/ec2/ec2_instance.go as part of the error source",
+        "Must reference the surface error message ('Trace Terraform plan 'InvalidParameterValue' error to AWS provider resource impl') or its origin",
+        "Must reference a specific function, type, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Error propagation chain: (1) User runs terraform plan with an AWS resource configuration \u2192 (2) Terraform core evaluates the configuration and calls provider plugin \u2192 (3) terraform-provider-aws receives the plan request via gRPC \u2192 (4) Provider validates resource attributes in internal/service validation \u2192 (5) Provider returns validation error via gRPC to Terraform core \u2192 (6) Terraform core formats and displays the error with provider attribution.",
+      "evaluation_criteria": [
+        "Must describe the step: 'User runs terraform plan with an AWS resource configuration'",
+        "Must describe the propagation: 'Terraform core formats and displays the error with provider attribution'",
+        "Must include all intermediate steps in the correct order",
+        "Must reference the chain in causal order (source \u2192 surface)",
+        "Must cite at least one file from the propagation path (e.g. internal/command/plan.go)"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Resource configuration uses a deprecated or invalid attribute combination; (2) Provider-side validation catches the invalid combination in CustomizeDiff or Validate; (3) The error message from the provider is generic and doesn't indicate which specific attribute pair conflicts.",
+      "evaluation_criteria": [
+        "Must identify the condition: 'Resource configuration uses a deprecated or invalid attribute combination'",
+        "Must identify the condition: 'Provider-side validation catches the invalid combination in CustomizeDiff or Val'",
+        "Must identify the condition: 'The error message from the provider is generic and doesn't indicate which specif'",
+        "Must explain the combined conditions necessary to reproduce the error"
+      ]
+    }
+  }
+}

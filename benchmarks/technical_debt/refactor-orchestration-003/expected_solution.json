@@ -1,0 +1,29 @@
+{
+  "task_id": "refactor-orch-003",
+  "checkpoints": {
+    "identify_repos": {
+      "expected_solution": "Three repos cascade: grpc/grpc-go (upstream — releases v1.72.1 with the ServiceRegistrar interface change on 2025-05-14), etcd-io/etcd (intermediary — updates grpc-go and fixes mock-server compilation against the new interface), and kubernetes/kubernetes (consumer — bumps google.golang.org/grpc to v1.72.1 in go.mod via PR kubernetes/kubernetes#131838 merged 2025-05-20). REFACTOR_PLAN.md must mention 'grpc-go', 'etcd', and 'kubernetes' so check_repo_set.sh's three greps succeed.",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must mention 'grpc-go' (or 'grpc.go'), 'etcd', and 'kubernetes' — the three grep targets in check_repo_set.sh",
+        "Plan must distinguish the role of each repo: grpc/grpc-go ships the breaking ServiceRegistrar change, etcd-io/etcd absorbs it and fixes its mock servers, kubernetes/kubernetes pins to the new version",
+        "Plan should reference the relevant go.mod files (etcd-io/etcd's go.mod and kubernetes/kubernetes' go.mod) where the google.golang.org/grpc require directive is updated"
+      ]
+    },
+    "topological_order": {
+      "expected_solution": "Strict linear cascade: (1) grpc/grpc-go cuts v1.72.1, (2) etcd-io/etcd updates its grpc dependency and fixes mock-server compilation, (3) kubernetes/kubernetes bumps google.golang.org/grpc and fixes test mock implementations (PR kubernetes/kubernetes#131838 merged 2025-05-20). The plan must use a numbered list with canonical org/repo identifiers so check_topo_order.sh extracts the order. dependency_graph: grpc/grpc-go: [], etcd-io/etcd: [grpc/grpc-go], kubernetes/kubernetes: [grpc/grpc-go, etcd-io/etcd].",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must contain a numbered list with three entries ('1. grpc/grpc-go', '2. etcd-io/etcd', '3. kubernetes/kubernetes') so the verifier's regex extracts the order",
+        "Order must respect the dependency graph: grpc/grpc-go before etcd-io/etcd before kubernetes/kubernetes — kubernetes depends on both upstream nodes",
+        "Each step's narrative must call out the specific change being absorbed (ServiceRegistrar interface, mock-server compilation, test-mock implementations) so a reviewer can trace the actual breakage propagation",
+        "Repo identifiers in the numbered list must use canonical org/repo form so the verifier's token tokeniser can match dependency_graph keys"
+      ]
+    },
+    "parallelism": {
+      "expected_solution": "No parallelizable steps — the cascade is a strict linear chain. The plan should explicitly state 'no parallelizable steps' under the Parallelization heading. Claiming etcd-io/etcd and kubernetes/kubernetes can run in parallel would violate the kubernetes → etcd dependency edge.",
+      "evaluation_criteria": [
+        "Plan must explicitly note that no steps are parallelizable (ground truth's parallelizable_steps is empty)",
+        "Must NOT claim that etcd-io/etcd and kubernetes/kubernetes (or grpc-go and etcd-io/etcd) can be updated in parallel — both adjacent edges in the chain are blocking dependencies"
+      ]
+    }
+  }
+}

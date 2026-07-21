@@ -1,0 +1,30 @@
+{
+  "task_id": "refactor-orchestration-tri-spring-001",
+  "checkpoints": {
+    "identify_repos": {
+      "expected_solution": "Three repos cascade: spring-projects/spring-framework (upstream at v6.0.11 — confirms or extends MessageListenerContainer / SmartLifecycle messaging abstractions to support concurrency configuration, anchored at spring-messaging/src/main/java/org/springframework/messaging/handler/annotation/support/MessageHandlerMethodFactory.java), spring-projects/spring-kafka (intermediary at v3.0.9 — refactors KafkaMessageListenerContainer to ConcurrentMessageListenerContainer with configurable concurrency in spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java and updates @KafkaListener annotation processing), and spring-projects/spring-boot (consumer at v3.1.2 — updates KafkaAutoConfiguration and KafkaProperties at spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfiguration.java to expose concurrency defaults). REFACTOR_PLAN.md must mention 'spring-kafka', 'spring-framework', and 'spring-boot' so check_repo_set.sh's three greps fire.",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must mention 'spring-kafka' (or 'spring.kafka'), 'spring-framework' (or 'spring.framework'), and 'spring-boot' (or 'spring.boot') — the three grep targets",
+        "Plan must distinguish roles: spring-framework owns the abstractions, spring-kafka implements ConcurrentMessageListenerContainer, spring-boot autowires it via KafkaAutoConfiguration",
+        "Plan should reference the GT required-file anchors: spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java, spring-messaging/src/main/java/org/springframework/messaging/handler/annotation/support/MessageHandlerMethodFactory.java, and spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfiguration.java"
+      ]
+    },
+    "topological_order": {
+      "expected_solution": "Strict linear cascade: (1) spring-projects/spring-framework lands or confirms the messaging-abstraction support for concurrency (SmartLifecycle / MessageListenerContainer surfaces); (2) spring-projects/spring-kafka refactors KafkaMessageListenerContainer to ConcurrentMessageListenerContainer with configurable concurrency and updates @KafkaListener annotation processing; (3) spring-projects/spring-boot updates KafkaAutoConfiguration and KafkaProperties to expose concurrency defaults and wire the new container. dependency_graph: spring-framework: [], spring-kafka: [spring-framework], spring-boot: [spring-framework, spring-kafka]. The numbered list must use canonical org/repo identifiers.",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must contain a three-entry numbered list ('1. spring-projects/spring-framework', '2. spring-projects/spring-kafka', '3. spring-projects/spring-boot')",
+        "Order must respect the dependency graph: spring-framework before spring-kafka before spring-boot — spring-boot depends on both upstream nodes",
+        "Each step must articulate the change being absorbed: messaging abstraction confirmation (spring-framework), ConcurrentMessageListenerContainer + @KafkaListener processing (spring-kafka), KafkaAutoConfiguration + KafkaProperties (spring-boot)",
+        "Repo identifiers must use canonical org/repo form ('spring-projects/spring-framework', 'spring-projects/spring-kafka', 'spring-projects/spring-boot') so the verifier's tokeniser can match dependency_graph keys"
+      ]
+    },
+    "parallelism": {
+      "expected_solution": "No parallelizable steps — the chain is strictly linear. The plan should explicitly state 'no parallelizable steps' under a Parallelization heading and surface the breaking-change risks: changing the default container type from KafkaMessageListenerContainer to ConcurrentMessageListenerContainer alters partition assignment behaviour, and the new KafkaProperties.listener.concurrency default may change behaviour for existing applications.",
+      "evaluation_criteria": [
+        "Plan must explicitly state that no steps are parallelizable (ground truth's parallelizable_steps is empty)",
+        "Must NOT claim that spring-kafka and spring-boot can run in parallel — spring-boot's KafkaAutoConfiguration depends on spring-kafka's ConcurrentMessageListenerContainer being available",
+        "Plan should call out the partition-assignment behaviour change and the new concurrency default as breaking-change risks for existing applications"
+      ]
+    }
+  }
+}
