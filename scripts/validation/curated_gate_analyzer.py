@@ -59,11 +59,13 @@ CHECK_TIMEOUT = 45
 DELIV_RE = re.compile(r"\$\{?WORKSPACE(?::-[^}]*)?\}?/([^\"'\s\)`]+)")
 
 # Known partial/full-echo tasks still open under jn73.2.7.3 (handoff gate 3).
-KNOWN_ECHO_EXCLUDE = {
-    "rbac-audit-001",
-    "camel-routing-arch-001",
-    "ceph-rgw-auth-secure-001",
-}
+# 2026-07-21: emptied. rbac-audit-001, camel-routing-arch-001 and
+# ceph-rgw-auth-secure-001 were re-anchored onto ground_truth.json
+# scoring_evidence and are pinned fixed by
+# tests/integrity/test_heterogeneous_prompt_echo.py — keeping them here
+# hard-failed three clean tasks on every gate re-run. The mechanism stays for
+# the next confirmed-but-unfixed leak.
+KNOWN_ECHO_EXCLUDE: set[str] = set()
 
 # Gate 2: paths under these segments are not source a Sourcegraph mirror serves.
 # NB: a `build`/`vendor` segment inside a `src/` tree (e.g. Next.js
