@@ -104,10 +104,25 @@ def check_set_flags(script_path):
     return ["Missing 'set -euo pipefail' or 'set -uo pipefail'"]
 
 
+# A check that delegates scoring to a shared eb_verify module (e.g.
+# `exec python3 -m eb_verify.scorers.file_extraction`) emits no JSON of its
+# own — the library module prints the {"score", "passed", "detail"} verdict.
+# The wrapper's text therefore legitimately contains none of those keys.
+_EB_VERIFY_DELEGATION_RE = re.compile(r"python3?\s+-m\s+eb_verify\.")
+
+
 def check_json_output(script_path):
-    """Check that scripts produce JSON with 'score' and 'passed' keys."""
+    """Check that scripts produce JSON with 'score' and 'passed' keys.
+
+    Delegation to an eb_verify module counts as JSON-emitting: the delegated
+    scorer owns the verdict (its output contract is pinned by the eb_verify
+    test suite), so the shell wrapper is not required to spell the keys.
+    """
     content = script_path.read_text()
     violations = []
+
+    if _EB_VERIFY_DELEGATION_RE.search(content):
+        return violations
 
     # Look for output patterns — printf/echo with JSON
     has_score = bool(re.search(r'["\']score["\']', content))
