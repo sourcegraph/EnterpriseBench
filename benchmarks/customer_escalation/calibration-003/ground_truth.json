@@ -44,5 +44,25 @@
     "Proxy-Authorization header is manually set",
     "Request goes through HTTPS proxy (CONNECT tunnel)",
     "Header stripping logic in utils treats it as sensitive header to remove on redirect"
-  ]
+  ],
+  "scoring_evidence": {
+    "error_chain": [
+      [
+        "utils.py",
+        "sessions.py"
+      ],
+      "PreparedRequest",
+      "Session.request"
+    ],
+    "trigger_conditions": [
+      [
+        "rebuild_proxies",
+        "should_strip_auth"
+      ],
+      [
+        "utils.py",
+        "sessions.py"
+      ]
+    ]
+  }
 }

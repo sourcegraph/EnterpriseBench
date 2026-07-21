@@ -57,5 +57,17 @@
     "error_origin": "Kombu connection pool exhaustion in kombu/connection.py when broker rejects new connections",
     "retry_mechanism": "Celery autoretry_for in celery/app/task.py treats all Exception subclasses equally without distinguishing transport errors",
     "root_cause": "The autoretry_for mechanism has no built-in exception classification to exclude broker/transport errors from retry eligibility"
+  },
+  "scoring_evidence": {
+    "error_chain": [
+      "kombu/connection.py",
+      "kombu/transport/pyamqp.py",
+      "celery/worker/request.py",
+      "celery/app/task.py"
+    ],
+    "trigger_conditions": [
+      "celery/app/task.py",
+      "kombu/connection.py"
+    ]
   }
 }

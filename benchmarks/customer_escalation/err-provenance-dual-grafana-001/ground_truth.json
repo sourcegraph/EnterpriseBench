@@ -56,5 +56,22 @@
     "error_origin": "Prometheus PromQL engine timeout in promql/engine.go when query evaluation exceeds context deadline",
     "error_translation": "Grafana datasource proxy in pkg/api/datasource_proxy.go translates upstream HTTP 503 to generic Bad Gateway without preserving error body",
     "root_cause": "The datasource proxy does not forward the Prometheus error response body to the frontend, losing the specific timeout context"
+  },
+  "scoring_evidence": {
+    "error_chain": [
+      "promql/engine.go",
+      "web/api/v1/api.go",
+      [
+        "pkg/api/datasource_proxy.go",
+        "ds_proxy.go"
+      ]
+    ],
+    "trigger_conditions": [
+      [
+        "pkg/api/datasource_proxy.go",
+        "ds_proxy.go"
+      ],
+      "promql/engine.go"
+    ]
   }
 }

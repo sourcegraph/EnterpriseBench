@@ -78,5 +78,12 @@
     "wiring": "httpx AsyncHTTPTransport (httpx/httpx/_transports/default.py, self._pool = httpcore.AsyncHTTPProxy(...) for http/https proxy schemes) -> httpcore AsyncTunnelHTTPConnection (httpcore/httpcore/_async/http_proxy.py) issues CONNECT and wraps the tunneled stream in AsyncHTTP11Connection -> AsyncHTTP11Connection (httpcore/httpcore/_async/http11.py) sets self._h11_state = h11.Connection(our_role=h11.CLIENT)",
     "translation": "httpcore wraps next_event() in map_exceptions({h11.RemoteProtocolError: RemoteProtocolError}) in httpcore/httpcore/_async/http11.py; httpx wraps every pool call in map_httpcore_exceptions() which uses HTTPCORE_EXC_MAP in httpx/httpx/_transports/default.py to re-raise httpcore.RemoteProtocolError as httpx.RemoteProtocolError",
     "root_cause": "The corporate proxy terminates the tunneled TCP connection mid-response (data caps, content inspection, or connection-lifetime limits on long CONNECT tunnels). From h11's perspective the closing 'peer' is whatever sits on the other end of the tunneled socket -- here the proxy, not the vendor origin, which explains the vendor's clean access logs and the clean direct-path downloads"
+  },
+  "scoring_evidence": {
+    "trigger_conditions": [
+      "_receive_event",
+      "SEND_RESPONSE",
+      "_receive_buffer_closed"
+    ]
   }
 }

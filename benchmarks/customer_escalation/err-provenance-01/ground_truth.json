@@ -26,8 +26,8 @@
     {
       "path": "pkg/registry/batch/job/strategy_test.go",
       "repo": "kubernetes",
-      "confidence": 0.60,
-      "rationale": "Registry strategy test also updated in fix — validates end-to-end Job update behavior."
+      "confidence": 0.6,
+      "rationale": "Registry strategy test also updated in fix \u2014 validates end-to-end Job update behavior."
     }
   ],
   "error_chain": [
@@ -40,5 +40,16 @@
     "Job has session_type=single and is not suspended",
     "User or controller modifies status.startTime (not just removes it)",
     "The validation incorrectly treats any change as removal"
-  ]
+  ],
+  "scoring_evidence": {
+    "error_chain": [
+      "pkg/registry/batch/job/strategy.go",
+      "pkg/apis/batch/validation/validation.go",
+      "field.Required"
+    ],
+    "trigger_conditions": [
+      "ValidateJobStatusUpdate",
+      "validation.go"
+    ]
+  }
 }

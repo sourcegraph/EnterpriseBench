@@ -69,7 +69,7 @@ except Exception:
     # RecursionError/MemoryError (a RuntimeError, NOT a ValueError) which a
     # narrow except would leak, re-crashing this check to empty stdout --
     # the exact no-verdict failure this template exists to prevent.
-    print(json.dumps({"score": 0.0, "passed": False, "detail": "Malformed answer.json"}))
+    print(json.dumps({"score": 0.0, "passed": False, "detail": "Malformed answer.json: not a JSON object"}))
     sys.exit(0)
 if not isinstance(answer, dict):
     answer = {}

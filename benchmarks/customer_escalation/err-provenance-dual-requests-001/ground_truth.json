@@ -57,5 +57,18 @@
     "error_origin": "Python ssl module SSLCertVerificationError when the CA bundle does not contain the issuer certificate",
     "ca_resolution": "requests merge_environment_settings in adapters.py resolves CA bundle with specific precedence: explicit verify param > REQUESTS_CA_BUNDLE > CURL_CA_BUNDLE > certifi default",
     "root_cause": "When verify=True is passed explicitly (not as default), it takes precedence over REQUESTS_CA_BUNDLE, causing the env var to be silently ignored and falling back to certifi bundle"
+  },
+  "scoring_evidence": {
+    "error_chain": [
+      "src/urllib3/connectionpool.py",
+      "src/requests/adapters.py"
+    ],
+    "trigger_conditions": [
+      "CURL_CA_BUNDLE",
+      [
+        "src/urllib3/util/ssl_.py",
+        "ssl_.py"
+      ]
+    ]
   }
 }
