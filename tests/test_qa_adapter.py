@@ -121,9 +121,14 @@ class TestLeakageDetection:
         report = run_qa_checks(load_task_inputs(task_toml))
         assert "F2" not in {f.code for f in report.findings}
 
-    def test_partial_path_is_not_a_word_boundary_match(self, tmp_path: Path):
-        # "src/foo.py" inside "other/src/foo.py" must not match: \b matching
-        # is on the whole token.
+    def test_token_embedded_in_longer_word_does_not_match(self, tmp_path: Path):
+        # \b matching only blocks tokens embedded in a longer WORD run:
+        # "foo.py" inside "foo.pyx" does not match (y->x is not a boundary).
+        # It does NOT block path-suffix hits — "src/foo.py" inside
+        # "other/src/foo.py" WOULD match, since "/" is a non-word character
+        # and thus itself a boundary. That direction only over-flags
+        # (a mention of a different file sharing the oracle path's suffix),
+        # so it is conservative for a leakage check, not a missed leak.
         task_toml = _write_task(
             tmp_path,
             ground_truth={
