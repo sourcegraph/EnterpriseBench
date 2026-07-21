@@ -1,0 +1,30 @@
+{
+  "task_id": "refactor-orch-008",
+  "checkpoints": {
+    "identify_repos": {
+      "expected_solution": "The cascade involves four mention targets even though only three repos are nodes in the dependency graph: grpc-ecosystem/go-grpc-middleware (deprecated upstream — v1 archived), etcd-io/etcd (intermediary — has TWO PRs: #20420 migrating logging interceptors v1→v2 merged 2025-08-07, then #21295 dropping the v1 dependency entirely merged 2026-02-12), kubernetes/kubernetes (consumer — drops go-grpc-prometheus which transitively held middleware v1, replacing it with OpenTelemetry gRPC metrics in PR #135538 merged 2025-12-18). REFACTOR_PLAN.md must mention 'go-grpc-middleware' (or 'grpc.middleware'), 'etcd', 'kubernetes', and 'grpc-prometheus' (or 'go-grpc-prometheus') so check_repo_set.sh's four greps each fire.",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must mention 'go-grpc-middleware' (or 'grpc.middleware'), 'etcd', 'kubernetes', AND 'grpc-prometheus' (or 'go-grpc-prometheus') — these are the four grep targets in check_repo_set.sh",
+        "Plan must distinguish the four artefacts: middleware v1 (archived upstream), etcd's two-step migration (interceptor v1→v2, then dependency removal), and kubernetes' replacement of go-grpc-prometheus with OpenTelemetry",
+        "Plan should reference etcd's interceptor files and kubernetes' metrics integration points so a downstream maintainer can locate the diffs"
+      ]
+    },
+    "topological_order": {
+      "expected_solution": "Multi-step cascade — etcd has TWO ordered PRs. The dependency_graph treats etcd as one node, but the plan should narrate the two etcd PRs as sub-steps. Order: (1) etcd-io/etcd#20420 — migrate grpc-logging interceptors from middleware v1 to v2 (merged 2025-08-07); (2) kubernetes/kubernetes#135538 — drop go-grpc-prometheus, replace with OpenTelemetry gRPC metrics (merged 2025-12-18); (3) etcd-io/etcd#21295 — remove the go-grpc-middleware v1 dependency entirely (merged 2026-02-12). Note kubernetes' removal happens between etcd's two PRs because etcd's #21295 depends on the consumer (kubernetes) no longer transitively holding v1 via go-grpc-prometheus. dependency_graph keys: grpc-ecosystem/go-grpc-middleware, etcd-io/etcd, kubernetes/kubernetes. Plan must use a numbered list with these org/repo identifiers.",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must contain a numbered list naming etcd-io/etcd at least once and kubernetes/kubernetes at least once",
+        "Order must respect the dependency_graph: kubernetes/kubernetes depends on etcd-io/etcd AND grpc-ecosystem/go-grpc-middleware, so kubernetes cannot precede etcd's first migration step",
+        "Plan must call out that etcd has two PRs (interceptor v1→v2 then dependency removal) and that kubernetes' grpc-prometheus removal lands between them — this is the load-bearing detail of the cascade",
+        "Repo identifiers in the numbered list must use canonical org/repo form ('grpc-ecosystem/go-grpc-middleware', 'etcd-io/etcd', 'kubernetes/kubernetes') so the verifier's tokeniser matches dependency_graph keys"
+      ]
+    },
+    "parallelism": {
+      "expected_solution": "No parallelizable steps — every step has a hard dependency on the previous. The plan should explicitly state 'no parallelizable steps' under a Parallelization heading and explain why etcd's two PRs cannot run together (the second depends on kubernetes having removed grpc-prometheus first).",
+      "evaluation_criteria": [
+        "Plan must explicitly state that no steps are parallelizable (ground truth's parallelizable_steps is empty)",
+        "Must NOT claim that etcd's two PRs can run in parallel — etcd-io/etcd#21295 depends on kubernetes-side removal of go-grpc-prometheus which depends on etcd's #20420",
+        "Must NOT claim that etcd-io/etcd and kubernetes/kubernetes can be updated in parallel — the dependency edge makes parallel claims a verifier violation"
+      ]
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "task_id": "dead-code-dual-angular-001",
+  "checkpoints": {
+    "dead_code_identified": {
+      "expected_solution": "An ideal answer enumerates public exports from @angular/core, @angular/common, and @angular/forms (the three framework packages named in the prompt) that have zero references inside angular/angular@18.0.0 outside their public_api.ts declarations and tests. The agent must read the public surface from packages/core/public_api.ts, packages/common/public_api.ts, and packages/forms/public_api.ts (Angular consolidated these to the package root in 18.x), then for each candidate run a cross-tree symbol search across the framework repo. Each entry in dead_exports must be a JSON object carrying at minimum `symbol`, `package` (one of @angular/core / @angular/common / @angular/forms), `export_file`, and `category`. Multiple candidate clusters are acceptable as long as all three packages appear in the report.",
+      "evaluation_criteria": [
+        "answer.json must contain a non-empty dead_exports array of objects, each carrying both `symbol` and `category` fields (the verifier requires this structure)",
+        "All three framework packages must be represented in the report: @angular/core, @angular/common, and @angular/forms — the verifier greps for these literal strings",
+        "Candidate exports must be resolved against the framework's public surface declared in packages/core/public_api.ts, packages/common/public_api.ts, and packages/forms/public_api.ts at the 18.0.0 revision"
+      ]
+    },
+    "cross_repo_usage": {
+      "expected_solution": "For each framework-orphan export, the agent must search angular/components@18.0.0 for consumers and assign one of three categories: truly_dead (used in neither repo), components_only (only consumed by angular/components packages such as @angular/material or @angular/cdk), or test_only (only referenced from test files in either repo). The answer must show evidence of cross-repo searching — referencing public_api.ts in angular/angular and the components CDK surface at src/cdk/public-api.ts — so check_cross_repo_usage.sh's grep for both repos succeeds. The category set used in the report must include at least one of {truly_dead, components_only, test_only}.",
+      "evaluation_criteria": [
+        "Answer text must reference the angular framework public surface (e.g., packages/core/public_api.ts) AND the components CDK surface at src/cdk/public-api.ts — the verifier greps for both repos",
+        "Each dead export entry must carry a category drawn from {truly_dead, components_only, test_only}; entries with components_only must populate components_usage with concrete paths inside angular/components@18.0.0",
+        "Cross-repo evidence must show how absence of consumers in angular/angular was confirmed AND how angular/components was searched (e.g., grep -RIn '<symbol>' across both repo trees, excluding tests for the framework search)"
+      ]
+    },
+    "removal_impact": {
+      "expected_solution": "For every export classified as components_only, the answer must populate `removal_impact` with a sentence-length explanation naming the affected components packages (e.g., '@angular/material would lose support for X if removed') AND populate `components_usage` with a non-empty list of concrete file paths inside angular/components (such as files under src/cdk/ or src/material/). For truly_dead entries the impact may state 'no consumers — safe to remove'. Skipping either field for components_only entries is the most common verifier failure.",
+      "evaluation_criteria": [
+        "Every dead_exports entry must populate the `removal_impact` field with a non-trivial string (the verifier requires length > 5 characters)",
+        "At least one components_only entry must populate `components_usage` with concrete paths inside angular/components — paths under src/cdk/ or src/material/ are the canonical anchors",
+        "Removal impact must name the specific consumer package (@angular/cdk, @angular/material, etc.) so a release engineer can identify breakage scope before removal"
+      ]
+    }
+  }
+}

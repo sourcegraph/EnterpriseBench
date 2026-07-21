@@ -1,0 +1,29 @@
+{
+  "task_id": "config-drift-dual-terraform-001",
+  "checkpoints": {
+    "config_valid": {
+      "expected_solution": "Valid drift report covers Terraform v1.7.0 core and terraform-provider-aws v5.31.0. Each entry must include config_key (the resource attribute causing phantom diff), terraform_core_behavior with terraform_core_file from the terraform repo (e.g., internal/terraform/node_resource_plan_instance.go or internal/terraform/context_plan.go), provider_behavior with provider_file from the aws provider (e.g., internal/service/ec2/vpc_security_group.go or internal/service/iam/policy.go), and an impact statement describing the phantom diff. The report must be valid JSON.",
+      "evaluation_criteria": [
+        "Must produce valid JSON parsable by json.loads with a top-level drift_points array",
+        "Must reference both repos by path: terraform-side under internal/terraform/ and provider-side under internal/service/",
+        "Each drift_point must contain config_key, terraform_core_behavior, terraform_core_file, provider_behavior, provider_file, impact"
+      ]
+    },
+    "drift_points": {
+      "expected_solution": "Drift points between Terraform core v1.7.0 and terraform-provider-aws v5.31.0. (1) JSON policy normalization: aws_iam_policy and aws_iam_role_policy in internal/service/iam/policy.go store the policy document as a string; on Read, the provider sends back the AWS-canonicalized JSON (whitespace, key ordering normalized by AWS), but Terraform core's diff in internal/terraform/node_resource_plan_instance.go compares strings byte-for-byte unless the schema marks DiffSuppressFunc. The schema uses suppressEquivalentAwsPolicyDiffs but core's plan still sees the difference until the provider applies the suppress function — phantom diff appears when provider versions or AWS canonicalization rules drift. (2) Set vs list ordering: aws_security_group ingress/egress rules in internal/service/ec2/vpc_security_group.go are declared as schema.TypeSet; core's diff compares set hashes, but the provider Read in vpc_security_group.go returns rules in a different order than user-declared. If the hash function changes (e.g., addition of optional fields like `description`), core sees a phantom diff. (3) Computed default attribute drift: aws_lambda_function and similar resources have attributes that AWS sets to non-null defaults server-side; the provider Read populates them, but if the user did not set them in config, core's plan in context_plan.go shows them as 'computed -> known' on every refresh.",
+      "evaluation_criteria": [
+        "Must reference internal/terraform/node_resource_plan_instance.go (or context_plan.go / context_refresh.go) as the core diff/plan location",
+        "Must reference internal/service/iam/policy.go and internal/service/ec2/vpc_security_group.go as provider Read implementations",
+        "Must call out at least two specific drift mechanisms (JSON normalization, set vs list ordering, computed defaults)"
+      ]
+    },
+    "expected_values": {
+      "expected_solution": "Expected behavior: (1) JSON policy attributes should round-trip via DiffSuppressFunc=suppressEquivalentAwsPolicyDiffs and StateFunc=verify.PolicyToJSON so the stored state and AWS-returned canonical JSON compare equal; the provider in internal/service/iam/policy.go is responsible for applying these schema hooks, while terraform core in internal/terraform/node_resource_plan_instance.go must respect the suppress signal. (2) Security group rules should hash deterministically — the schema.HashResource function in internal/service/ec2/vpc_security_group.go must include all rule fields (cidr_blocks, ipv6_cidr_blocks, prefix_list_ids, security_groups, self, description) so Terraform core's set-diff in context_plan.go produces zero-change output when nothing material changed. (3) Computed attributes should be marked Computed:true (not Optional+Computed without DiffSuppress) so core's plan does not propose changes when the user has not set them. The override chain is: provider schema/Read in internal/service/<type>/*.go -> state stored on disk -> Terraform core diff in internal/terraform/node_resource_plan_instance.go + context_plan.go -> rendered plan output.",
+      "evaluation_criteria": [
+        "Must specify the schema-level fixes: DiffSuppressFunc / StateFunc for JSON policies, HashResource completeness for sets, Computed flag for server-side defaults",
+        "Must reference both core files (e.g., node_resource_plan_instance.go) and provider files (e.g., vpc_security_group.go, policy.go)",
+        "Must explain the override chain: provider Read -> state -> core diff -> plan output"
+      ]
+    }
+  }
+}

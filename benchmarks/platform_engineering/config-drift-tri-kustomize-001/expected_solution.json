@@ -1,0 +1,30 @@
+{
+  "task_id": "config-drift-tri-kustomize-001",
+  "checkpoints": {
+    "config_valid": {
+      "expected_solution": "Valid drift report covers kustomize kustomize/v5.3.0, argo-cd v2.9.0, and flux2 v2.2.0. Each drift_points entry must include config_key, kustomize_behavior with kustomize_source_file (api/types/kustomization.go), argocd_behavior with argocd_source_file (util/argo/normalizers/diff_normalizer.go), flux_behavior with flux_source_file (internal/build/build.go in flux2 — the kustomize build logic in the CLI), and an impact statement. The report must be valid JSON.",
+      "evaluation_criteria": [
+        "Must produce valid JSON with a top-level drift_points array",
+        "Must reference all three repos by path: api/types/kustomization.go (kustomize), util/argo/normalizers/diff_normalizer.go (argo-cd), internal/build/build.go (flux2)",
+        "Each drift_point must contain config_key, kustomize_behavior, kustomize_source_file, argocd_behavior, argocd_source_file, flux_behavior, flux_source_file, impact"
+      ]
+    },
+    "drift_points": {
+      "expected_solution": "Drift between kustomize, ArgoCD's normalizer, and Flux's kustomize build. (1) Strategic merge patch list ordering: kustomize's strategic merge transformer in api/types/kustomization.go (and the underlying patch package it delegates to) preserves the order specified in the merge key (e.g., container `name`, volumeMount `mountPath`); ArgoCD's util/argo/normalizers/diff_normalizer.go applies its own normalization that may sort or de-dup list entries before computing the diff, so a user-specified ordering can survive kustomize but get reordered in ArgoCD's diff view. Flux's internal/build/build.go invokes the kustomize Go API directly via krusty.Kustomizer, which preserves order — but Flux's downstream apply phase (server-side apply via SSA) re-orders fields per the OpenAPI schema's listMapKey, so the actually-applied state can differ from `flux build` output. (2) Resource tracking annotations: ArgoCD attaches argocd.argoproj.io/tracking-id annotations on every managed resource, then strips them in diff_normalizer.go before comparing; Flux uses a different annotation (kustomize.toolkit.fluxcd.io/inventory) that lives outside the resource. The two systems disagree on what counts as 'desired state' vs 'tracking metadata'. (3) Order of patches vs replacements: kustomize processes patches before replacements (per kustomization.go ordering), but ArgoCD's normalizer may reapply a known-good kustomize build, while Flux's internal/build/build.go runs the Kustomizer build but then layers post-build substitutions, which can reorder operations relative to standalone kustomize.",
+      "evaluation_criteria": [
+        "Must reference api/types/kustomization.go as the kustomize-side schema/ordering source",
+        "Must reference util/argo/normalizers/diff_normalizer.go as the ArgoCD normalization source",
+        "Must reference internal/build/build.go as the Flux2 CLI kustomize build wrapper",
+        "Must call out at least two specific drift mechanisms (list ordering, tracking annotations, post-build substitutions)"
+      ]
+    },
+    "cross_repo_impact": {
+      "expected_solution": "Cross-repo impact: a Helm/Kustomize-based deployment that renders correctly with `kustomize build` may show diffs in ArgoCD's UI (because diff_normalizer.go re-orders or strips fields) AND apply differently via Flux (because internal/build/build.go's post-build substitutions or SSA semantics reorder fields server-side). Symptom: the same source repo produces three different views — kustomize CLI output, ArgoCD's `Diff` view, and Flux's reconciled cluster state. Operationally this manifests as: (a) ArgoCD reporting OutOfSync when the cluster is actually correct, because the normalizer disagrees with kustomize; (b) Flux applying ordered list mutations in a different order than ArgoCD, leading to environment variable reorderings in containers; (c) drift detection alarms misfiring because each tool's notion of 'desired state' differs. Resolution: pin all three tools to compatible versions, configure ArgoCD's `ignoreDifferences` to skip ordering-sensitive fields, set Flux's `decryption.provider` and `postBuild.substituteFrom` carefully, and treat `kustomize build` as the single source of truth — feed its output to both ArgoCD and Flux without re-running kustomize inside each tool.",
+      "evaluation_criteria": [
+        "Must explain how a single source repo can produce three different views (kustomize CLI, ArgoCD diff, Flux applied state)",
+        "Must reference the three source files (api/types/kustomization.go, util/argo/normalizers/diff_normalizer.go, internal/build/build.go) when describing the impact",
+        "Must give at least one mitigation (e.g., pin versions, configure ignoreDifferences, treat kustomize build as source of truth)"
+      ]
+    }
+  }
+}

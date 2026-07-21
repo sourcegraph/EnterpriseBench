@@ -1,6 +1,6 @@
 # API Contract Boundary: gRPC-Go balancer.ClientConn embedding requirement
 
-difficulty_stratum = "dual_repo"
+difficulty_stratum = "large_single"
 mcp_suite = "eb_v1"
 repo_set_id = "kubernetes-ecosystem"
 org_scale = true
@@ -13,23 +13,26 @@ task_type = "api_contract"
 difficulty = "hard"
 estimated_duration_minutes = 35
 session_type = "single"
-description = "Trace impact of gRPC-Go balancer.ClientConn embedding requirement on etcd"
+description = "Trace impact of gRPC-Go balancer.ClientConn embedding requirement on grpc-go's own internal implementors"
 prompt = """
 The gRPC-Go v1.71.0 release added an internal method to the
 `balancer.ClientConn` interface (PR #8026), requiring all implementors
-to embed a delegate implementation. This ensures gRPC-Go can add new
-methods without breaking builds. However, any consumer that directly
-implements `balancer.ClientConn` without embedding will fail to compile.
+to embed an unexported delegate field to keep satisfying the interface.
+This ensures gRPC-Go can add new methods without breaking builds. However,
+any type that directly implements `balancer.ClientConn` without embedding
+will fail to compile.
 
 Your task:
 1. Identify the exact change in `grpc-go/balancer/balancer.go` that
-   enforces embedding.
-2. Find all types in etcd that implement `balancer.ClientConn` and would
-   break.
-3. Check if etcd has any test mocks or fakes of `balancer.ClientConn`
-   that would also need updating.
-4. Assess whether etcd can simply add embedding or needs to restructure
-   its balancer integration.
+   enforces embedding, and name the internal marker interface it
+   relies on.
+2. Find all types within the grpc-go repository itself (internal
+   balancer implementations and xds implementations) that implement
+   `balancer.ClientConn` and had to add the embed to keep compiling.
+3. Check whether grpc-go's own test mocks/fakes of `balancer.ClientConn`
+   (used across the balancer test suite) also needed updating.
+4. Assess whether these internal implementors could simply add embedding
+   or needed to restructure their balancer integration.
 
 Write your analysis to /workspace/analysis/IMPACT_REPORT.md.
 """
@@ -40,16 +43,10 @@ rev = "v1.71.0"
 path = "grpc-go"
 role = "primary"
 
-[[repos]]
-url = "https://github.com/etcd-io/etcd"
-rev = "v3.5.17"
-path = "etcd"
-role = "consumer"
-
 [metadata]
 languages = ["go"]
 total_loc = 500_000
-dependency_depth = 2
+dependency_depth = 1
 frameworks = ["grpc"]
 multi_repo_pattern = "propagate"
 
@@ -64,14 +61,14 @@ timeout_seconds = 60
 name = "find_direct_consumers"
 weight = 0.35
 verifier = "checks/check_direct_consumers.sh"
-description = "Agent finds all etcd types implementing balancer.ClientConn"
+description = "Agent finds internal grpc-go types (gracefulswitch, xds outlierdetection) implementing balancer.ClientConn"
 timeout_seconds = 60
 
 [[checkpoints]]
 name = "trace_transitive_impact"
 weight = 0.30
 verifier = "checks/check_transitive_impact.sh"
-description = "Agent finds test mocks and fakes also affected"
+description = "Agent finds the internal test mocks/fakes also affected"
 timeout_seconds = 60
 
 [[checkpoints]]
@@ -87,8 +84,8 @@ optional = ["migration_guide"]
 
 [tool_access]
 sourcegraph_mirror_config = "configs/sg_mirrors/api-contract-grpc-clientconn-004.json"
-expected_mcp_benefit = "high"
-mcp_benefit_rationale = "Interface implementation search across repos requires semantic understanding of Go interface satisfaction rules"
+expected_mcp_benefit = "medium"
+mcp_benefit_rationale = "Single-repo, but finding every internal implementor of a Go interface across balancer, internal/, and xds/ packages requires semantic search over Go interface satisfaction, not just grep for the interface name"
 
 [ground_truth]
 tiers = ["deterministic"]
@@ -111,12 +108,25 @@ repo = "grpc-go"
 confidence = 0.90
 source = "deterministic"
 
-[[ground_truth.sufficient_files]]
+[[ground_truth.required_files]]
 path = "internal/internal.go"
 repo = "grpc-go"
-confidence = 0.80
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "internal/balancer/gracefulswitch/gracefulswitch.go"
+repo = "grpc-go"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "internal/testutils/balancer.go"
+repo = "grpc-go"
+confidence = 0.85
+source = "deterministic"
 
 [[ground_truth.sufficient_files]]
-path = "internal/testutils/balancer.go"
+path = "xds/internal/balancer/outlierdetection/balancer.go"
 repo = "grpc-go"
 confidence = 0.80

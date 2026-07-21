@@ -73,6 +73,13 @@ class TaskInfo:
     session_type: str
     task_type: str
     toml_path: Path
+    # Top-level task.toml `paper_scope` value. "excluded" marks a task that is
+    # corpus-preserved but out of the publish-matrix sweep (e.g. a
+    # session_type that isn't "single" and therefore isn't agent-runnable
+    # under the 3-arm baseline/mcp_only/cli comparison). Consumed by
+    # scripts/run_sweep.py --matrix publish; every other caller ignores it
+    # and sees the full task corpus.
+    paper_scope: str = "included"
 
 
 VALID_MODES = ("baseline", "mcp_only", "hybrid", "cli")
@@ -168,6 +175,7 @@ def _parse_task_meta(toml_path: Path) -> TaskInfo | None:
         session_type=task.get("session_type", "single"),
         task_type=task.get("task_type", ""),
         toml_path=toml_path.resolve(),
+        paper_scope=data.get("paper_scope", "included"),
     )
 
 

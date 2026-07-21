@@ -15,6 +15,7 @@ from run_benchmark import (
     TaskInfo,
     TaskResult,
     TokenBudget,
+    _parse_task_meta,
     is_task_completed,
     filter_completed_tasks,
     build_parser,
@@ -370,3 +371,33 @@ class TestExtractCostFromResult:
             results_dir=tmp_path / "results" / "runs",
             mode="mcp_only",
         ) == pytest.approx(2.50)
+
+
+class TestParseTaskMetaPaperScope:
+    """paper_scope defaults to "included"; task.toml can opt a task out of
+    the publish sweep matrix without archiving it (EnterpriseBench Lane E)."""
+
+    def _write_toml(self, tmp_path: Path, extra: str = "") -> Path:
+        toml_path = tmp_path / "task.toml"
+        toml_path.write_text(
+            f"""
+{extra}
+[task]
+id = "t-001"
+suite = "customer_escalation"
+difficulty = "hard"
+session_type = "single"
+task_type = "error_provenance"
+"""
+        )
+        return toml_path
+
+    def test_paper_scope_defaults_to_included(self, tmp_path: Path) -> None:
+        info = _parse_task_meta(self._write_toml(tmp_path))
+        assert info is not None
+        assert info.paper_scope == "included"
+
+    def test_paper_scope_excluded_is_parsed(self, tmp_path: Path) -> None:
+        info = _parse_task_meta(self._write_toml(tmp_path, extra='paper_scope = "excluded"\n'))
+        assert info is not None
+        assert info.paper_scope == "excluded"

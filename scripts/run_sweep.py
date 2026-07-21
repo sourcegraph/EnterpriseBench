@@ -18,9 +18,11 @@ Usage:
     # Custom results dirs
     python3 scripts/run_sweep.py --results-dir results/runs --results-dir results/mcp_batch
 
-    # Publish sweep: baseline/mcp_only/cli (hybrid cut), pinned model. The
-    # default matrix is still the old 3-mode one — a publish run MUST pass
-    # --matrix publish explicitly, it is never inferred.
+    # Publish sweep: arms baseline/mcp_only/cli (hybrid cut), tasks filtered
+    # to paper_scope != "excluded" (corpus-preserved non-single session_type
+    # tasks are skipped), pinned model. The default matrix is still the old
+    # 3-mode all-task one — a publish run MUST pass --matrix publish
+    # explicitly, it is never inferred.
     python3 scripts/run_sweep.py --matrix publish --model claude-sonnet-5 \\
         --execute --account 1-5
 """
@@ -64,7 +66,9 @@ DEFAULT_SWEEP_MODES = ("baseline", "mcp_only", "hybrid")
 MATRIX_PRESETS: dict[str, tuple[str, ...]] = {
     # arXiv-grade publish matrix: hybrid is cut (mcp_only + cli cover the tool-
     # access ablation; hybrid's incremental signal isn't worth its cost at
-    # publish scale).
+    # publish scale). A preset names more than its arm tuple: --matrix publish
+    # ALSO filters the task set to paper_scope != "excluded" in
+    # build_sweep_matrix, so the same flag scopes both axes of the matrix.
     "publish": ("baseline", "mcp_only", "cli"),
 }
 
@@ -108,10 +112,21 @@ def discover_all_tasks(benchmarks_dir: Path | None = None) -> list[TaskInfo]:
 def build_sweep_matrix(
     tasks: list[TaskInfo],
     modes: list[str] | None = None,
+    matrix: str = "all",
 ) -> list[SweepItem]:
-    """Create all task x mode combinations as pending SweepItems."""
+    """Create all task x mode combinations as pending SweepItems.
+
+    matrix="publish" drops tasks with task.toml `paper_scope = "excluded"`
+    (corpus-preserved but not agent-runnable under the 3-arm publish
+    comparison, e.g. session_type != "single"). matrix="all" (default) keeps
+    every task discover_all_tasks() returned.
+    """
     if modes is None:
         modes = list(DEFAULT_SWEEP_MODES)
+    if matrix == "publish":
+        tasks = [t for t in tasks if t.paper_scope != "excluded"]
+    elif matrix != "all":
+        raise ValueError(f"Unknown matrix scope: {matrix!r} (expected 'all' or 'publish')")
     items: list[SweepItem] = []
     for task in tasks:
         for mode in modes:
@@ -340,10 +355,13 @@ def build_parser() -> argparse.ArgumentParser:
         choices=sorted(MATRIX_PRESETS),
         default=None,
         help=(
-            "Named mode-matrix preset instead of --modes. 'publish' = "
-            "baseline,mcp_only,cli (the arXiv-grade sweep matrix, hybrid cut) "
-            "— publish sweeps MUST pass --matrix publish; it is not the "
-            "default. Mutually exclusive with --modes."
+            "Named sweep-matrix preset instead of --modes. 'publish' = "
+            "arms baseline,mcp_only,cli (the arXiv-grade matrix, hybrid cut) "
+            "AND drops tasks marked task.toml paper_scope = \"excluded\" "
+            "(corpus-preserved, non-single session_type tasks that aren't "
+            "agent-runnable under the 3-arm comparison). Publish sweeps MUST "
+            "pass --matrix publish; it is never inferred. Mutually exclusive "
+            "with --modes."
         ),
     )
     parser.add_argument(
@@ -430,11 +448,13 @@ def main(argv: list[str] | None = None) -> int:
     logger.info("Found %d tasks", len(tasks))
 
     # 2. Build sweep matrix
-    sweep_items = build_sweep_matrix(tasks, modes)
+    sweep_items = build_sweep_matrix(tasks, modes, matrix=args.matrix or "all")
+    swept_task_count = len({item.task_id for item in sweep_items})
     logger.info(
-        "Sweep matrix: %d combinations (%d tasks x %d modes)",
+        "Sweep matrix (%s): %d combinations (%d tasks x %d modes)",
+        args.matrix or "all",
         len(sweep_items),
-        len(tasks),
+        swept_task_count,
         len(modes),
     )
 

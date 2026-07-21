@@ -1,6 +1,6 @@
 # Incident Investigation: Grafana Prometheus Response Parsing Silent Failure
 
-difficulty_stratum = "dual_repo"
+difficulty_stratum = "large_single"
 mcp_suite = "eb_v1"
 repo_set_id = "observability-ecosystem"
 org_scale = true
@@ -48,12 +48,6 @@ rev = "v10.1.0"
 path = "grafana"
 role = "primary"
 
-[[repos]]
-url = "https://github.com/prometheus/prometheus"
-rev = "v2.46.0"
-path = "prometheus"
-role = "dependency"
-
 [metadata]
 languages = ["go", "typescript"]
 total_loc = 3_500_000
@@ -96,7 +90,7 @@ optional = ["code_patch"]
 [tool_access]
 sourcegraph_mirror_config = "configs/sg_mirrors/incident-inv-prom-parse-003.json"
 expected_mcp_benefit = "high"
-mcp_benefit_rationale = "Cross-repo investigation: understanding how Prometheus API response format interacts with Grafana's response parsing requires navigating both codebases to understand the data flow"
+mcp_benefit_rationale = "Single-repo investigation, but the root cause spans a multi-hop call chain (data proxy -> datasource plugin -> jsoniter converter) inside a 3.5M LOC codebase, requiring semantic tracing rather than a single grep"
 
 [ground_truth]
 tiers = ["deterministic"]
@@ -117,8 +111,3 @@ source = "deterministic"
 path = "pkg/tsdb/prometheus/healthcheck_test.go"
 repo = "grafana"
 confidence = 0.70
-
-[[ground_truth.sufficient_files]]
-path = "web/api/v1/api.go"
-repo = "prometheus"
-confidence = 0.65

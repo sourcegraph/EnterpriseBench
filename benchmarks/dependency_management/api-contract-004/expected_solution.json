@@ -2,36 +2,36 @@
   "task_id": "api-contract-grpc-clientconn-004",
   "checkpoints": {
     "identify_breaking_api": {
-      "expected_solution": "Agent must identify the breaking change in producer `grpc/grpc-go` introduced by grpc/grpc-go#8026. The IMPACT_REPORT.md must name the legacy symbols (balancer.ClientConn) and their replacements ((none)), and point to producer-side artifacts (balancer/balancer.go, balancer/subconn.go, balancer_wrapper.go, internal/balancer/gracefulswitch/gracefulswitch.go, internal/internal.go, internal/testutils/balancer.go, and xds/internal/balancer/outlierdetection/balancer.go).",
+      "expected_solution": "Agent must identify the breaking change in `grpc/grpc-go` introduced by grpc/grpc-go#8026. The IMPACT_REPORT.md must name the legacy symbol (balancer.ClientConn), the enforcement mechanism (internal.EnforceClientConnEmbedding), and point to the defining files (balancer/balancer.go, internal/internal.go).",
       "evaluation_criteria": [
-        "Names the producer repository `grpc/grpc-go` and the breaking PR/commit (grpc/grpc-go#8026)",
-        "Lists the deprecated/removed symbols: balancer.ClientConn",
-        "Lists the replacement symbols: (none)",
-        "References at least one producer-side file (basename: balancer.go, subconn.go, balancer_wrapper.go, gracefulswitch.go, and internal.go)"
+        "Names the repository `grpc/grpc-go` and the breaking PR/commit (grpc/grpc-go#8026)",
+        "Names the interface: balancer.ClientConn",
+        "Names the enforcement marker: internal.EnforceClientConnEmbedding",
+        "References at least one defining file (basename: balancer.go, subconn.go, balancer_wrapper.go, or internal.go)"
       ]
     },
     "find_direct_consumers": {
-      "expected_solution": "Agent must enumerate every consumer file in etcd-io/etcd that uses the deprecated symbols (balancer.ClientConn). Per ground_truth: etcd: server/etcdserver/api/rafthttp/http.go. The report must cite each consumer file by name and indicate which deprecated symbol it depends on.",
+      "expected_solution": "Agent must enumerate every internal grpc-go type that implements balancer.ClientConn and had to add the embed. Per ground_truth: internal/balancer/gracefulswitch/gracefulswitch.go (wrappedBalancer) and xds/internal/balancer/outlierdetection/balancer.go (outlierDetectionBalancer). The report must cite each implementor file by name and which type embeds the interface.",
       "evaluation_criteria": [
-        "Cites each consumer file by name (basenames: http.go)",
-        "For each cited consumer, names which deprecated symbol from balancer.ClientConn it uses",
-        "Distinguishes files with compile-time dependencies from files that only forward/proxy the symbol"
+        "Cites each implementor file by name (basenames: gracefulswitch.go, balancer.go under xds/internal/balancer/outlierdetection)",
+        "Names the implementing type for at least one file (wrappedBalancer or outlierDetectionBalancer)",
+        "Correctly scopes the search to grpc-go's own tree rather than an external consumer repo"
       ]
     },
     "trace_transitive_impact": {
-      "expected_solution": "Agent must trace transitive impact: which downstream code paths in etcd-io/etcd indirectly observe the producer change. The answer must identify forwarding/middleware/interceptor code that propagates the affected types and explain why the type or contract change cascades beyond the directly-importing files. Reference the consumer fix PR(s) (etcd-io/etcd#19780) where applicable.",
+      "expected_solution": "Agent must trace the test-side impact: grpc-go's own test fake in internal/testutils/balancer.go (BalancerClientConn) also had to add the internal.EnforceClientConnEmbedding embed to keep implementing balancer.ClientConn under the new interface.",
       "evaluation_criteria": [
-        "Identifies at least one transitive code path beyond the direct importers (interceptor/middleware/wrapper)",
-        "Explains the propagation mechanism (type changes, signature changes, behavior drift) for balancer.ClientConn",
-        "Cross-references the consumer-side fix PR(s) (etcd-io/etcd#19780) or the migration pattern they encode"
+        "Identifies internal/testutils/balancer.go as a test mock affected by the change",
+        "Names the mock type (BalancerClientConn) and the embed it required (EnforceClientConnEmbedding)",
+        "Explains that both production and test implementors of the interface needed the same fix"
       ]
     },
     "classify_breakage": {
-      "expected_solution": "Agent must classify each affected file by failure mode. The ground-truth breakage type is `compile_error`. For `compile_and_runtime` cases the report must identify both compile-time breakage (undefined functions, signature mismatches) and runtime behavior changes (silent metadata loss, semantic shifts). For `compile_only` or `runtime_only` cases, justify why only one class applies.",
+      "expected_solution": "Agent must classify the breakage as a compile-time error: any type implementing balancer.ClientConn without the embed fails to compile against grpc-go v1.71.0. There is no runtime-only variant here since Go interface satisfaction is checked at compile time.",
       "evaluation_criteria": [
         "States the canonical breakage classification: `compile_error`",
-        "Distinguishes compile-time failures (undefined functions, type errors) from runtime behavior changes (silent semantics drift)",
-        "Identifies at least one specific consumer file per failure class consistent with the classification"
+        "Explains why this is compile-time (missing method set / interface satisfaction failure), not runtime",
+        "Assesses that adding the embed is a mechanical one-line fix, not a restructure, for all three internal implementors"
       ]
     }
   }

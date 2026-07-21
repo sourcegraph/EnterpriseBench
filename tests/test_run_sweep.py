@@ -38,6 +38,7 @@ def _make_task(
     difficulty: str = "medium",
     session_type: str = "single",
     task_type: str = "error_provenance",
+    paper_scope: str = "included",
 ) -> TaskInfo:
     return TaskInfo(
         task_id=task_id,
@@ -46,6 +47,7 @@ def _make_task(
         session_type=session_type,
         task_type=task_type,
         toml_path=Path(f"/fake/benchmarks/{suite}/{task_id}/task.toml"),
+        paper_scope=paper_scope,
     )
 
 
@@ -82,6 +84,31 @@ class TestBuildSweepMatrix:
     def test_empty_tasks(self) -> None:
         items = build_sweep_matrix([])
         assert items == []
+
+    def test_matrix_all_keeps_excluded_tasks(self) -> None:
+        tasks = [_make_task("t1"), _make_task("t2", paper_scope="excluded")]
+        items = build_sweep_matrix(tasks, modes=["baseline"], matrix="all")
+        assert {item.task_id for item in items} == {"t1", "t2"}
+
+    def test_matrix_publish_drops_excluded_tasks(self) -> None:
+        tasks = [
+            _make_task("t1"),
+            _make_task("t2", paper_scope="excluded"),
+            _make_task("t3"),
+        ]
+        items = build_sweep_matrix(tasks, modes=["baseline"], matrix="publish")
+        assert {item.task_id for item in items} == {"t1", "t3"}
+
+    def test_matrix_publish_default_included_task_kept(self) -> None:
+        # paper_scope defaults to "included" when a task.toml omits the field.
+        task = _make_task("t1")
+        assert task.paper_scope == "included"
+        items = build_sweep_matrix([task], modes=["baseline"], matrix="publish")
+        assert len(items) == 1
+
+    def test_unknown_matrix_scope_raises(self) -> None:
+        with pytest.raises(ValueError, match="Unknown matrix scope"):
+            build_sweep_matrix([_make_task("t1")], matrix="bogus")
 
     def test_empty_modes(self) -> None:
         items = build_sweep_matrix([_make_task()], modes=[])

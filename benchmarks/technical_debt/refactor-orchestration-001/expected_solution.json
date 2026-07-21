@@ -1,0 +1,29 @@
+{
+  "task_id": "refactor-orch-001",
+  "checkpoints": {
+    "identify_repos": {
+      "expected_solution": "Two repos appear in the cascade: etcd-io/etcd (upstream — releases v3.6 client libraries with 247-package dependency graph) and kubernetes/kubernetes (consumer — bumps go.mod to etcd 3.6 and drops the cloud-library transitive deps). Both names must appear verbatim in REFACTOR_PLAN.md so check_repo_set.sh's 'etcd' and 'kubernetes' greps both succeed.",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must mention both 'etcd' and 'kubernetes' as repos in the cascade — these are the literal grep targets in check_repo_set.sh",
+        "Plan must locate each repo's role: etcd-io/etcd as upstream releasing v3.6 client libs, kubernetes/kubernetes as consumer updating go.mod",
+        "Plan should reference the relevant go.mod in each repo (etcd's release-3.6 branch and kubernetes/kubernetes' top-level go.mod) to anchor the dependency claim"
+      ]
+    },
+    "topological_order": {
+      "expected_solution": "The cascade is strictly linear: (1) etcd-io/etcd cuts the v3.6.0 client release first, then (2) kubernetes/kubernetes consumes it via go.mod (PR kubernetes/kubernetes#128419, merged 2025-05-16). The plan must use a numbered markdown list ('1. etcd-io/etcd' then '2. kubernetes/kubernetes') so check_topo_order.sh can extract the order — the regex matches lines starting with '<number>. <token>'. The dependency_graph contract is etcd-io/etcd: [], kubernetes/kubernetes: [etcd-io/etcd].",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must contain a numbered list ('1. etcd-io/etcd' / '2. kubernetes/kubernetes') so the verifier's regex `^\\s*[0-9]+\\.\\s+\\S+` extracts the order",
+        "Order must respect the dependency graph: etcd-io/etcd (no deps) must come before kubernetes/kubernetes (depends on etcd-io/etcd)",
+        "Each step must explain why it precedes the next — etcd v3.6 must be released before kubernetes can pin to it",
+        "Repo identifiers in the numbered list must use the canonical org/repo form ('etcd-io/etcd', 'kubernetes/kubernetes') so the verifier's token tokeniser can match dependency_graph keys"
+      ]
+    },
+    "parallelism": {
+      "expected_solution": "There are no parallelizable steps in this cascade — the dependency graph is a strict chain (etcd → kubernetes). The plan should explicitly state 'no parallelizable steps' under a 'Parallelization' heading. Claiming parallelism between etcd and kubernetes would violate the dependency edge and lower the score.",
+      "evaluation_criteria": [
+        "Plan must explicitly state that there are no parallelizable steps (ground truth's parallelizable_steps array is empty)",
+        "Must NOT claim that etcd-io/etcd and kubernetes/kubernetes can be updated in parallel — the dependency edge etcd → kubernetes means parallel claims would register as a verifier violation"
+      ]
+    }
+  }
+}

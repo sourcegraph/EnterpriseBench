@@ -10,6 +10,15 @@ repo_set_id = "python-web-ecosystem"
 org_scale = false
 verification_modes = ["deterministic"]
 
+# session_type = "event_replay" scores offline with no sandbox -- it isn't
+# agent-runnable under the single-session 3-arm (baseline/mcp_only/cli)
+# publish comparison. Corpus-preserved (do not archive), but excluded from
+# the paper's sweep matrix. incident_investigation has single-session
+# siblings, so this is a scope flag, not evidence the task is broken.
+# Consumed by scripts/run_sweep.py --matrix publish (EnterpriseBench Lane E,
+# CRNT/corpus repair pass).
+paper_scope = "excluded"
+
 [task]
 id = "event-replay-click-ci-001"
 suite = "incident_response"
