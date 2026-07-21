@@ -24,12 +24,13 @@ import argparse
 import json
 import logging
 import math
+import statistics
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from lib.shared import load_task_index, strip_mode_suffix
+from lib.shared import VALID_MODES, load_task_index, strip_mode_suffix
 
 logger = logging.getLogger(__name__)
 
@@ -561,8 +562,11 @@ def _parse_dir_identity(dir_path: Path) -> tuple[str, str]:
     parent_name = dir_path.parent.name
     grandparent_name = dir_path.parent.parent.name if dir_path.parent.parent else ""
 
-    # Multi-mode layout: results/runs/<task_id>/<mode>/
-    if name in ("baseline", "mcp_only", "hybrid") and grandparent_name == "runs":
+    # Multi-mode layout: results/runs/<task_id>/<mode>/. VALID_MODES is the
+    # single source of truth for the arm set (was a hand-copied 3-tuple that
+    # silently dropped "cli": a results/runs/<id>/cli/ directory fell through
+    # to strip_mode_suffix, which mis-parsed "cli" itself as the task_id).
+    if name in VALID_MODES and grandparent_name == "runs":
         return parent_name, name
 
     # Legacy single-mode: results/runs/<task_id>/
@@ -667,6 +671,44 @@ def _reconcile(items: list[TaskCost]) -> dict[str, Any]:
     }
 
 
+def _percentile(values: list[float], pct: float) -> float:
+    """Linear-interpolation percentile (numpy's default "linear" method).
+
+    No numpy dependency here — cost_tracker.py runs in the numpy-less canonical
+    install (see CLAUDE.md: numpy/scikit-learn must stay optional).
+    """
+    if not values:
+        return 0.0
+    s = sorted(values)
+    if len(s) == 1:
+        return s[0]
+    k = (len(s) - 1) * pct
+    f = math.floor(k)
+    c = math.ceil(k)
+    if f == c:
+        return s[int(k)]
+    return s[int(f)] * (c - k) + s[int(c)] * (k - f)
+
+
+def _latency_stats(items: list[TaskCost]) -> dict[str, Any]:
+    """Per-arm wall-clock latency (agent_duration_seconds), median/p90 alongside cost.
+
+    A record with no recorded duration reads as 0.0 (scan_results_dirs' default
+    when task_metrics.json is absent or unreadable) — excluded here so a batch of
+    missing-metrics runs cannot masquerade as a fleet of instant ones and pull
+    the median/p90 down to zero.
+    """
+    durations = [t.agent_duration_seconds for t in items if t.agent_duration_seconds > 0]
+    if not durations:
+        return {"count": 0, "mean": None, "median": None, "p90": None}
+    return {
+        "count": len(durations),
+        "mean": round(statistics.mean(durations), 2),
+        "median": round(statistics.median(durations), 2),
+        "p90": round(_percentile(durations, 0.90), 2),
+    }
+
+
 def _bucket_stats(items: list[TaskCost]) -> dict[str, Any]:
     """Compute summary stats for a list of TaskCost records."""
 
@@ -681,6 +723,7 @@ def _bucket_stats(items: list[TaskCost]) -> dict[str, Any]:
         "total_input_tokens": total_input,
         "total_output_tokens": total_output,
         "reconciliation": _reconcile(items),
+        "latency_seconds": _latency_stats(items),
     }
 
 

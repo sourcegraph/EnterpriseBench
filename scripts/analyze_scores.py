@@ -24,6 +24,9 @@ try:
 except ImportError:
     import tomli as tomllib  # type: ignore[no-redefine]
 
+from lib.shared import MODE_ORDER, MODE_SUFFIXES, VALID_MODES
+from lib.shared import ordered_modes
+
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -66,7 +69,13 @@ class TaskResult:
 
 
 def infer_mode(result_path: Path, data: dict[str, Any]) -> str:
-    """Infer the run mode from directory structure and config."""
+    """Infer the run mode from directory structure and config.
+
+    The arm set (MODE_SUFFIXES / VALID_MODES) is shared with lib.shared and
+    cost_tracker.py — a single source of truth, so an arm added there (e.g.
+    "cli") is recognized here too instead of silently falling through to the
+    "baseline" default.
+    """
     # Check config.mode first
     config_mode = data.get("config", {}).get("mode")
     if config_mode:
@@ -74,7 +83,7 @@ def infer_mode(result_path: Path, data: dict[str, Any]) -> str:
 
     # Infer from parent directory name
     parent = result_path.parent.name
-    for suffix in ("_hybrid", "_mcp_only", "_baseline"):
+    for suffix in MODE_SUFFIXES:
         if parent.endswith(suffix):
             return suffix.lstrip("_")
 
@@ -82,17 +91,19 @@ def infer_mode(result_path: Path, data: dict[str, Any]) -> str:
     grandparent = result_path.parent.parent.name
     if grandparent.startswith("mcp_batch"):
         # Directory name should contain mode suffix
-        for suffix in ("_hybrid", "_mcp_only", "_baseline"):
+        for suffix in MODE_SUFFIXES:
             if parent.endswith(suffix):
                 return suffix.lstrip("_")
-        # If in mcp_batch but no suffix, check if dirname contains mode hint
-        if "hybrid" in parent:
-            return "hybrid"
-        if "mcp" in parent:
-            return "mcp_only"
+        # If in mcp_batch but no suffix, check if dirname contains a mode hint
+        for mode in VALID_MODES:
+            if mode == "baseline":
+                continue
+            hint = "mcp" if mode == "mcp_only" else mode
+            if hint in parent:
+                return mode
 
     # Multi-mode layout: results/runs/<task_id>/<mode>/results.json
-    if parent in ("baseline", "mcp_only", "hybrid"):
+    if parent in VALID_MODES:
         return parent
 
     # Default for results/runs/ (legacy single-mode layout)
@@ -106,6 +117,8 @@ def infer_mode(result_path: Path, data: dict[str, Any]) -> str:
                 return "hybrid"
             if "mcp" in p:
                 return "mcp_only"
+            if "cli" in p:
+                return "cli"
 
     return "baseline"
 
@@ -268,11 +281,54 @@ def _dist_stats(results: list[TaskResult]) -> dict[str, Any]:
     }
 
 
+def _percentile(values: list[float], pct: float) -> float:
+    """Linear-interpolation percentile (numpy's default "linear" method).
+
+    No numpy dependency here — analyze_scores.py runs in the numpy-less
+    canonical install (see CLAUDE.md: numpy/scikit-learn must stay optional).
+    """
+    if not values:
+        return 0.0
+    s = sorted(values)
+    if len(s) == 1:
+        return s[0]
+    k = (len(s) - 1) * pct
+    f = math.floor(k)
+    c = math.ceil(k)
+    if f == c:
+        return s[int(k)]
+    return s[int(f)] * (c - k) + s[int(c)] * (k - f)
+
+
+def _latency_stats(results: list[TaskResult]) -> dict[str, Any]:
+    """Per-arm wall-clock latency, sourced from TaskResult.agent_time (which is
+    read from results.json's "timing"."agent" field — the field run_task.py
+    actually writes via `timings["agent"] = agent_duration`).
+    """
+    durations = [r.agent_time for r in results if r.agent_time is not None]
+    if not durations:
+        return {"count": 0, "mean": None, "median": None, "p90": None}
+    return {
+        "count": len(durations),
+        "mean": round(statistics.mean(durations), 2),
+        "median": round(statistics.median(durations), 2),
+        "p90": round(_percentile(durations, 0.90), 2),
+    }
+
+
 def by_mode(results: list[TaskResult]) -> dict[str, dict[str, Any]]:
     buckets: dict[str, list[TaskResult]] = {}
     for r in results:
         buckets.setdefault(r.mode, []).append(r)
-    return {mode: _dist_stats(rs) for mode, rs in sorted(buckets.items())}
+    return {mode: _dist_stats(buckets[mode]) for mode in ordered_modes(buckets)}
+
+
+def latency_by_mode(results: list[TaskResult]) -> dict[str, dict[str, Any]]:
+    """Per-arm agent wall-clock latency (seconds): count/mean/median/p90."""
+    buckets: dict[str, list[TaskResult]] = {}
+    for r in results:
+        buckets.setdefault(r.mode, []).append(r)
+    return {mode: _latency_stats(buckets[mode]) for mode in ordered_modes(buckets)}
 
 
 def by_group_and_mode(
@@ -285,7 +341,7 @@ def by_group_and_mode(
         grp = getattr(r, group_key)
         outer.setdefault(grp, {}).setdefault(r.mode, []).append(r)
     return {
-        grp: {mode: _dist_stats(rs) for mode, rs in sorted(modes.items())}
+        grp: {mode: _dist_stats(modes[mode]) for mode in ordered_modes(modes)}
         for grp, modes in sorted(outer.items())
     }
 
@@ -380,9 +436,18 @@ def _statistical_tests(
 
 
 def mcp_deltas(results: list[TaskResult]) -> dict[str, dict[str, Any]]:
+    """Compute a paired delta-vs-baseline for every non-baseline arm present.
+
+    Data-driven: previously this hard-coded exactly {hybrid, mcp_only}, which
+    both dropped "cli" from a publish sweep's delta report and left it silently
+    mislabeled if it appeared under another key. Any non-baseline mode found in
+    the loaded results gets a "<mode>_vs_baseline" entry, ordered per MODE_ORDER
+    (baseline, mcp_only, cli, hybrid-if-present, then anything else).
+    """
+    modes_present = {r.mode for r in results if r.mode != "baseline"}
     return {
-        "hybrid_vs_baseline": _compute_delta(results, "hybrid"),
-        "mcp_only_vs_baseline": _compute_delta(results, "mcp_only"),
+        f"{mode}_vs_baseline": _compute_delta(results, mode)
+        for mode in ordered_modes(modes_present)
     }
 
 
@@ -445,6 +510,7 @@ def per_task_summary(results: list[TaskResult]) -> list[dict[str, Any]]:
                 "task_type": r.task_type,
                 "scores": {},
                 "checkpoints": {},
+                "latency_seconds": {},
                 "is_calibration": r.task_id.startswith("cal-"),
             }
         entry = tasks[r.task_id]
@@ -453,6 +519,8 @@ def per_task_summary(results: list[TaskResult]) -> list[dict[str, Any]]:
             "passed": r.checkpoints_passed,
             "total": r.checkpoints_total,
         }
+        if r.agent_time is not None:
+            entry["latency_seconds"][r.mode] = round(r.agent_time, 2)
 
     return sorted(tasks.values(), key=lambda t: t["task_id"])
 
@@ -475,6 +543,7 @@ def analyze(
         "by_suite": by_group_and_mode(results, "suite"),
         "by_difficulty": by_group_and_mode(results, "difficulty"),
         "by_task_type": by_group_and_mode(results, "task_type"),
+        "latency_by_mode": latency_by_mode(results),
         "mcp_delta": mcp_deltas(results),
         "calibration_bias": calibration_bias(results),
         "per_task": per_task_summary(results),
@@ -562,11 +631,9 @@ def main(argv: list[str] | None = None) -> None:
     print()
 
     delta = report["mcp_delta"]
-    for label, key in [
-        ("hybrid vs baseline", "hybrid_vs_baseline"),
-        ("mcp_only vs baseline", "mcp_only_vs_baseline"),
-    ]:
-        d = delta[key]
+    for key, d in delta.items():
+        mode = key.removesuffix("_vs_baseline")
+        label = f"{mode} vs baseline"
         if d["n_paired"] > 0:
             print(
                 f"  {label}: n={d['n_paired']}  "
@@ -577,6 +644,15 @@ def main(argv: list[str] | None = None) -> None:
             )
         else:
             print(f"  {label}: no paired tasks")
+    print()
+
+    latency = report.get("latency_by_mode", {})
+    for mode, lat in latency.items():
+        if lat["count"] > 0:
+            print(
+                f"  latency[{mode}]: n={lat['count']}  "
+                f"median={lat['median']:.1f}s  p90={lat['p90']:.1f}s"
+            )
     print()
 
     cb = report["calibration_bias"]

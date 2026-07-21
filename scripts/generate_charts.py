@@ -25,21 +25,35 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import seaborn as sns  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lib.shared import MODE_ORDER, ordered_modes as _order_present  # noqa: E402
+
 logger = logging.getLogger(__name__)
 
 # ── Palette ──────────────────────────────────────────────────────────────────
+# MODE_ORDER (canonical arm ordering: baseline, mcp_only, cli, hybrid-if-
+# present) is the single source of truth in lib.shared, shared with
+# analyze_scores.py and generate_report.py — a color is chart-specific so it
+# stays local, but the ordering it renders in must not drift from theirs.
 MODE_COLORS: dict[str, str] = {
     "baseline": "#4C72B0",
-    "hybrid": "#DD8452",
     "mcp_only": "#55A868",
+    "cli": "#8172B2",
+    "hybrid": "#DD8452",
 }
-MODE_ORDER: list[str] = ["baseline", "hybrid", "mcp_only"]
 DPI = 150
+
+_FALLBACK_COLOR = "#888888"
+
+
+def _mode_color(mode: str) -> str:
+    """Color for a mode, with a stable fallback for an arm outside MODE_COLORS."""
+    return MODE_COLORS.get(mode, _FALLBACK_COLOR)
 
 
 def _modes_present(data: dict[str, Any]) -> list[str]:
-    """Return MODE_ORDER filtered to modes that actually appear in by_mode."""
-    return [m for m in MODE_ORDER if m in data.get("by_mode", {})]
+    """Return arms present in by_mode, ordered per MODE_ORDER (unknown arms last)."""
+    return _order_present(data.get("by_mode", {}))
 
 
 def _setup_style() -> None:
@@ -52,11 +66,11 @@ def _setup_style() -> None:
 def chart_score_by_mode(data: dict[str, Any], out: Path) -> Path:
     """Grouped bar chart: mean normalized score per mode with error bars."""
     by_mode = data["by_mode"]
-    modes = [m for m in MODE_ORDER if m in by_mode]
+    modes = _modes_present(data)
     means = [by_mode[m]["mean"] for m in modes]
     stds = [by_mode[m]["std"] for m in modes]
     counts = [by_mode[m]["count"] for m in modes]
-    colors = [MODE_COLORS[m] for m in modes]
+    colors = [_mode_color(m) for m in modes]
 
     fig, ax = plt.subplots(figsize=(10, 6))
     bars = ax.bar(modes, means, yerr=stds, color=colors, capsize=5, edgecolor="white")
@@ -151,7 +165,7 @@ def chart_difficulty_distribution(data: dict[str, Any], out: Path) -> Path:
             width,
             yerr=stds,
             label=mode,
-            color=MODE_COLORS[mode],
+            color=_mode_color(mode),
             capsize=3,
         )
 
@@ -189,7 +203,7 @@ def chart_task_type_scores(data: dict[str, Any], out: Path) -> Path:
             vals,
             height,
             label=mode,
-            color=MODE_COLORS[mode],
+            color=_mode_color(mode),
         )
 
     ax.set_yticks(y + height * (len(modes) - 1) / 2)
@@ -206,6 +220,25 @@ def chart_task_type_scores(data: dict[str, Any], out: Path) -> Path:
     return dest
 
 
+def _delta_comparisons(mcp_delta: dict[str, Any]) -> list[tuple[str, str, str]]:
+    """(key, label, color) for every "<mode>_vs_baseline" entry mcp_delta carries.
+
+    Data-driven from the analysis output rather than a hard-coded
+    {hybrid, mcp_only} pair — an arm like "cli" (or any future arm) shows up
+    here automatically instead of being dropped from the chart, ordered per
+    MODE_ORDER.
+    """
+    modes = {
+        key.removesuffix("_vs_baseline")
+        for key in mcp_delta
+        if key.endswith("_vs_baseline")
+    }
+    return [
+        (f"{mode}_vs_baseline", f"{mode} - baseline", _mode_color(mode))
+        for mode in _order_present(modes)
+    ]
+
+
 def chart_mcp_delta(data: dict[str, Any], out: Path) -> Path:
     """Bar chart of mean deltas with scatter overlay of per-task deltas."""
     mcp_delta = data.get("mcp_delta", {})
@@ -214,10 +247,7 @@ def chart_mcp_delta(data: dict[str, Any], out: Path) -> Path:
     labels: list[str] = []
     means: list[float] = []
     colors_list: list[str] = []
-    comparisons = [
-        ("hybrid_vs_baseline", "hybrid - baseline", MODE_COLORS["hybrid"]),
-        ("mcp_only_vs_baseline", "mcp_only - baseline", MODE_COLORS["mcp_only"]),
-    ]
+    comparisons = _delta_comparisons(mcp_delta)
     for key, label, color in comparisons:
         if key in mcp_delta:
             labels.append(label)
@@ -270,9 +300,9 @@ def chart_mcp_delta(data: dict[str, Any], out: Path) -> Path:
 def chart_pass_rate_comparison(data: dict[str, Any], out: Path) -> Path:
     """Bar chart: pass rate per mode."""
     by_mode = data["by_mode"]
-    modes = [m for m in MODE_ORDER if m in by_mode]
+    modes = _modes_present(data)
     rates = [by_mode[m]["pass_rate"] for m in modes]
-    colors = [MODE_COLORS[m] for m in modes]
+    colors = [_mode_color(m) for m in modes]
 
     fig, ax = plt.subplots(figsize=(10, 6))
     bars = ax.bar(modes, rates, color=colors, edgecolor="white")
@@ -321,7 +351,7 @@ def chart_per_task_scores(data: dict[str, Any], out: Path) -> Path:
             if score is not None:
                 xs.append(score)
                 ys.append(i)
-        ax.scatter(xs, ys, label=mode, color=MODE_COLORS[mode], s=25, zorder=3)
+        ax.scatter(xs, ys, label=mode, color=_mode_color(mode), s=25, zorder=3)
 
     ax.set_yticks(y_pos)
     ax.set_yticklabels(y_labels, fontsize=6)
@@ -368,7 +398,7 @@ def chart_calibration_check(data: dict[str, Any], out: Path) -> Path:
             [cal_mean, non_cal_mean],
             width,
             label=mode,
-            color=MODE_COLORS[mode],
+            color=_mode_color(mode),
         )
 
     ax.set_xticks(x + width * (len(modes) - 1) / 2)
@@ -408,7 +438,7 @@ def chart_cost_per_task(
                 xs.append(score)
                 ys.append(cost)
         if xs:
-            ax.scatter(xs, ys, label=mode, color=MODE_COLORS[mode], alpha=0.7, s=50)
+            ax.scatter(xs, ys, label=mode, color=_mode_color(mode), alpha=0.7, s=50)
 
     ax.set_xlabel("Normalized Score")
     ax.set_ylabel("Cost (USD)")
@@ -427,12 +457,12 @@ def chart_cost_by_mode(
 ) -> Path:
     """Bar chart: total cost per mode."""
     by_mode_cost = cost_data.get("by_mode", {})
-    modes = [m for m in MODE_ORDER if m in by_mode_cost]
+    modes = _order_present(by_mode_cost)
     totals = [
         by_mode_cost[m].get("total_cost", by_mode_cost[m].get("total_cost_usd", 0))
         for m in modes
     ]
-    colors = [MODE_COLORS[m] for m in modes]
+    colors = [_mode_color(m) for m in modes]
 
     fig, ax = plt.subplots(figsize=(10, 6))
     bars = ax.bar(modes, totals, color=colors, edgecolor="white")
