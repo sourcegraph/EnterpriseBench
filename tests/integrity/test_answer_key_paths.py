@@ -42,6 +42,7 @@ VERIFIED_TASKS = [
     # the pinned revs and every extracted path stat()'d locally before landing.
     "customer_escalation/support-mapping-dual-flask-001",
     "customer_escalation/support-mapping-dual-grafana-001",
+    "technical_debt/refactor-orchestration-tri-tokio-001",
 ]
 
 

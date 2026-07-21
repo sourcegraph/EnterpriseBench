@@ -1,0 +1,31 @@
+{
+  "task_id": "refactor-orchestration-tri-tokio-001",
+  "checkpoints": {
+    "identify_repos": {
+      "expected_solution": "All three vendored repos are in scope for the tokio Runtime-builder change, but the evidence for WHY must come from the manifests, not the ecosystem's reputation. tokio (tokio/Cargo.toml in the tokio repo) is the upstream making the breaking change. hyper is in scope because its workspace-root Cargo.toml declares tokio = { version = \"1\", features = [\"sync\"] } (line 35 at v1.0.0-rc.4). axum is in scope DIRECTLY, not via hyper: axum/Cargo.toml (the axum crate manifest inside the axum workspace) declares tokio = { package = \"tokio\", version = \"1.25.0\", features = [\"time\"], optional = true } (line 63 at axum-v0.6.19). Citing that 1.25.0 requirement is the discriminator between a plan that read the manifests and one that recited the well-known tokio -> hyper -> axum chain; '1.25.0' appears nowhere in the instructions. REFACTOR_PLAN.md must name tokio, hyper, and axum AND quote axum's tokio requirement 1.25.0 for check_repo_set.sh to award credit.",
+      "evaluation_criteria": [
+        "Must name all three repos (tokio, hyper, axum) as requiring changes",
+        "Must cite axum's own manifest-declared tokio requirement — version 1.25.0 in axum/Cargo.toml — as the edge that puts axum in scope directly",
+        "Must justify hyper's inclusion from its root Cargo.toml tokio dependency (version \"1\", features [\"sync\"]), not from general ecosystem knowledge",
+        "Must NOT justify axum's inclusion through hyper: at these revisions the tokio change does not reach axum via hyper at all"
+      ]
+    },
+    "topological_order": {
+      "expected_solution": "The real dependency graph at the pinned revisions is a FAN-OUT from tokio, not the ecosystem's tokio -> hyper -> axum chain: hyper depends on tokio (root Cargo.toml line 35), axum depends on tokio directly (axum/Cargo.toml line 63), and the axum -> hyper edge DOES NOT EXIST in this workspace because every axum workspace crate requires hyper ^0.14.x (axum/Cargo.toml line 41: hyper = { version = \"0.14.24\", features = [\"stream\"] }; axum-core/Cargo.toml line 40; axum-extra/Cargo.toml line 68) while the vendored hyper is 1.0.0-rc.4 (its Cargo.toml line 3) — ^0.14.24 does not admit 1.0.0-rc.4 under Cargo semver. A valid plan therefore orders tokio first, then hyper and axum in either order (both [tokio, hyper, axum] and [tokio, axum, hyper] are valid topological orders of the fan-out). The plan must present a numbered ordering under an order/topological heading naming the repos (plain names resolve: tokio, hyper, axum), and it must cite axum's actual hyper requirement (the 0.14 line) — that citation is what proves the graph was derived from these manifests rather than assumed, and check_topo_order.sh gates all order credit on it. Migrating axum from hyper 0.14 to hyper 1.x is separate work, not part of this cascade.",
+      "evaluation_criteria": [
+        "Must produce a numbered ordering with tokio first; hyper and axum may follow in either order (or as one parallel step), consistent with the fan-out graph",
+        "Must state that the axum -> hyper edge does not exist at these revisions, citing axum's hyper requirement 0.14.x (axum/Cargo.toml, axum-core/Cargo.toml, axum-extra/Cargo.toml) against the vendored hyper 1.0.0-rc.4",
+        "Must derive every claimed edge from a manifest citation (hyper's root Cargo.toml tokio dependency; axum/Cargo.toml tokio 1.25.0), not from ecosystem knowledge",
+        "Must NOT present the tokio -> hyper -> axum chain as the dependency structure, and must not claim axum consumes the workspace hyper"
+      ]
+    },
+    "parallelism": {
+      "expected_solution": "hyper and axum are independently updatable and can proceed in parallel once tokio's Runtime-builder change lands: each depends only on tokio (hyper root Cargo.toml line 35; axum/Cargo.toml line 63), and neither depends on the other in this workspace — axum requires hyper ^0.14.24 (axum/Cargo.toml line 41) which the vendored hyper 1.0.0-rc.4 does not satisfy, so there is no edge between them. The plan must claim the pair on a single line that names both hyper and axum together with a parallelism term (e.g. 'hyper and axum can be updated in parallel'), and must cite the 0.14 requirement as the manifest evidence of their independence — check_parallelism.sh awards nothing for the claim without the evidence. Risk/breaking-change annotations: tokio's builder change is breaking for every crate constructing a Runtime; hyper's and axum's updates are each compatible consumer-side migrations that can be released independently.",
+      "evaluation_criteria": [
+        "Must state that hyper and axum can be updated in parallel (independently), naming both together in the parallelism claim",
+        "Must support the independence claim with the manifest fact: axum requires hyper 0.14.x while the workspace vendors hyper 1.0.0-rc.4, so neither repo depends on the other here",
+        "Must NOT claim the update chain is strictly sequential (that follows from the discarded tokio -> hyper -> axum chain, which the manifests contradict)"
+      ]
+    }
+  }
+}
