@@ -744,6 +744,27 @@ class TestAggregateReport:
         assert by_mode["hybrid"]["avg_cost_per_attempt"] == 1.5
         assert by_mode["mcp_only"]["attempts"] == 1
 
+    def test_by_mode_keys_follow_canonical_arm_order(self) -> None:
+        """by_mode is emitted in MODE_ORDER (baseline, mcp_only, cli, hybrid),
+        not alphabetical, so JSON consumers see the same arm ordering as the
+        charts and prose. An arm outside MODE_ORDER still appears, appended
+        after the canonical ones."""
+        costs = [
+            _make_cost(task_id="t1", mode="hybrid"),
+            _make_cost(task_id="t2", mode="cli"),
+            _make_cost(task_id="t3", mode="zz_experimental"),
+            _make_cost(task_id="t4", mode="baseline"),
+            _make_cost(task_id="t5", mode="mcp_only"),
+        ]
+        by_mode = aggregate_report(costs)["operational_economics"]["by_mode"]
+        assert list(by_mode) == [
+            "baseline",
+            "mcp_only",
+            "cli",
+            "hybrid",
+            "zz_experimental",
+        ]
+
     def test_cli_arm_breaks_out_separately(self) -> None:
         """A cli-arm TaskCost must land in its own by_mode bucket, not vanish
         into baseline or get merged with another arm."""

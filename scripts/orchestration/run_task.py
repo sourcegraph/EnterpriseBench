@@ -1460,7 +1460,13 @@ def _apply_model_flag(agent_command: str, model: str | None) -> str:
     need real quoting for, so a malformed --model value fails loudly there
     rather than silently mis-invoking the agent.
     """
-    if not model or not agent_command or "--model" in agent_command:
+    if not model or not agent_command:
+        return agent_command
+    # Exact flag-token match only: a substring test also matched flags that
+    # merely start with "--model" (e.g. "--model-config"), silently skipping
+    # the pin. `=`-joined forms ("--model=x") cannot occur — _run_agent's
+    # _SAFE_AGENT_CMD_RE rejects "=" outright — so whitespace tokens suffice.
+    if "--model" in agent_command.split():
         return agent_command
     return agent_command + f" --model {shlex.quote(model)}"
 
