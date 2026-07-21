@@ -14,6 +14,13 @@ step scored by task_mix_validator.py. This tool covers the reproducible middle:
   Gate 3  prompt-echo resistant the exact vjrbw attack, run for real:
                                 `cp instruction.md <deliverable>` must score 0
                                 on EVERY check. Any check > 0 = FAIL.
+                                JSON deliverables additionally get the
+                                STRUCTURED vector (jn73.2.7.3.1.4): a
+                                schema-shape-valid JSON whose every string
+                                value is the prompt must also score 0 — the
+                                raw-copy vector alone is blind to them
+                                (json.load throws, every check returns None,
+                                the task passes vacuously).
   Gate 4  deterministic-consistent
                                 the shipped expected_solution.json, dropped in
                                 as the deliverable, passes every check
@@ -87,6 +94,9 @@ class GateResult:
     gate2_suspects: list[str] = field(default_factory=list)
     # gate 3 (echo attack) — per-check score on cp instruction.md
     gate3_echo_scores: dict = field(default_factory=dict)
+    # gate 3, structured vector — per-variant per-check score on the
+    # schema-shape-valid prompt-filled JSON (JSON deliverables only)
+    gate3_structured_scores: dict = field(default_factory=dict)
     gate3_pass: bool | None = None
     gate3_note: str = ""
     # gate 4 (expected_solution consistency)
@@ -147,6 +157,156 @@ def echo_scores(task_dir: Path) -> dict:
 def echo_leak(task_dir: Path) -> dict:
     """The leaking checks (score > 0) under the md-grep prompt echo. Empty = clean."""
     return {k: v for k, v in echo_scores(task_dir).items() if v is not None and v > 0}
+
+
+# --- Structured echo vector (jn73.2.7.3.1.4) ---------------------------------
+#
+# The md-grep vector above is blind to JSON deliverables: a raw instruction.md
+# copy is not valid JSON, json.load throws inside the check, and every check
+# returns None — the task is certified clean without its grading logic ever
+# running on prompt content. The structured vector closes that: a deliverable
+# that parses, exposes the keys the checks traverse, and whose every string
+# value is the prompt. A check that credits it grades prompt vocabulary.
+
+# Keys a check reads out of the parsed deliverable: answer.get('x') /
+# report.get("x") / answer['x']. GT-mirroring alone misses answer-side aliases
+# ('files' where ground truth says 'required_files'), so these are grafted in.
+ANSWER_KEY_RE = re.compile(
+    r"""(?:answer|report)(?:\.get\(|\[)\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]"""
+)
+
+
+def _echofy(node, prompt: str):
+    """Mirror a JSON shape; every leaf is replaced so ONLY prompt text remains.
+
+    Strings -> the prompt. Numbers -> 0, booleans -> False (ground-truth values
+    must not ride along: credit for them would be answer-key credit, not the
+    prompt echo this vector measures). Keys and nesting survive so the checks'
+    field traversal actually runs.
+    """
+    if isinstance(node, dict):
+        return {k: _echofy(v, prompt) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_echofy(v, prompt) for v in node]
+    if isinstance(node, str):
+        return prompt
+    if isinstance(node, bool):
+        return False
+    if isinstance(node, (int, float)):
+        return 0
+    return None
+
+
+def _check_answer_keys(task_dir: Path) -> list[str]:
+    keys: set[str] = set()
+    for sh in sorted((task_dir / "checks").glob("*.sh")):
+        keys.update(ANSWER_KEY_RE.findall(sh.read_text(errors="replace")))
+    return sorted(keys)
+
+
+def synthesize_structured_echo(task_dir: Path, prompt: str) -> str:
+    """A schema-shape-valid JSON deliverable whose only content is the prompt.
+
+    Shape source is ground_truth.json (what the checks grade against), plus a
+    [prompt] list grafted under every answer key the task's own checks read.
+    """
+    shape: dict = {}
+    gt_path = task_dir / "ground_truth.json"
+    if gt_path.exists():
+        try:
+            parsed = json.loads(gt_path.read_text(errors="replace"))
+            if isinstance(parsed, dict):
+                shape = parsed
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            shape = {}
+    echo = _echofy(shape, prompt)
+    for key in _check_answer_keys(task_dir):
+        if key not in echo:
+            echo[key] = [prompt]
+    return json.dumps(echo, indent=2)
+
+
+def synthesize_structured_list_echo(task_dir: Path, prompt: str) -> str:
+    """The top-level-ARRAY twin of synthesize_structured_echo.
+
+    Some deliverable schemas are a bare list of records (dead_code_report.json:
+    [{"file":..,"symbol":..}, ...]); an object payload crashes those checks and
+    they stay dark. Entry shape is mirrored from ground_truth.json's
+    list-of-dict values, values prompt-only as in _echofy.
+    """
+    shape: dict = {}
+    gt_path = task_dir / "ground_truth.json"
+    if gt_path.exists():
+        try:
+            parsed = json.loads(gt_path.read_text(errors="replace"))
+            if isinstance(parsed, dict):
+                shape = parsed
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            shape = {}
+    entries = [
+        _echofy(item, prompt)
+        for value in shape.values()
+        if isinstance(value, list)
+        for item in value
+        if isinstance(item, dict)
+    ]
+    return json.dumps(entries or [{"text": prompt}], indent=2)
+
+
+def structured_echo_scores(task_dir: Path) -> dict:
+    """Run every check against the structured echo, per prompt variant.
+
+    Returns {instruction_variant: {check_name: score|None}}. Each
+    instruction*.md the task ships is a separate echo vector (an mcp variant
+    can leak worse than the baseline one — ceph-rgw-auth-secure-001 did).
+    Non-JSON deliverables get the raw prompt so every check runs against a
+    coherent all-prompt workspace; JSON deliverables get the structured echo.
+
+    Both payload shapes (object mirror, record list) run, merged per check by
+    max-of-scored: a real adversary submits whichever shape the schema demands,
+    so a check is clean only if NO shape it can parse earns credit, and it is
+    evaluated as long as at least one shape reaches its grading logic.
+    """
+    deliverables = deliverable_paths(task_dir)
+    json_delivs = [d for d in deliverables if d.endswith(".json")]
+    if not json_delivs:
+        return {}
+    out: dict[str, dict] = {}
+    for instr in sorted(task_dir.glob("instruction*.md")):
+        prompt = instr.read_text(errors="replace")
+        merged: dict[str, float | None] = {}
+        for payload in (
+            synthesize_structured_echo(task_dir, prompt),
+            synthesize_structured_list_echo(task_dir, prompt),
+        ):
+            with tempfile.TemporaryDirectory() as td:
+                ws = Path(td)
+                materialize(ws, deliverables, prompt)
+                materialize(ws, json_delivs, payload)
+                scores = run_checks(task_dir, ws)
+            for check, score in scores.items():
+                prev = merged.get(check)
+                if prev is None:
+                    merged[check] = score
+                elif score is not None:
+                    merged[check] = max(prev, score)
+        out[instr.name] = merged
+    return out
+
+
+def structured_leaks(scores_by_variant: dict) -> dict:
+    """Checks crediting the structured echo, as {check: {variant: score}}."""
+    leak: dict[str, dict] = {}
+    for variant, per_check in scores_by_variant.items():
+        for check, score in per_check.items():
+            if score is not None and score > 0:
+                leak.setdefault(check, {})[variant] = score
+    return leak
+
+
+def structured_echo_leak(task_dir: Path) -> dict:
+    """Leaking checks under the structured echo vector. Empty = clean."""
+    return structured_leaks(structured_echo_scores(task_dir))
 
 
 def load_pool() -> list[dict]:
@@ -250,10 +410,12 @@ def analyze(task: dict) -> GateResult:
     instr = task_dir / "instruction.md"
     exp = task_dir / "expected_solution.json"
 
-    # Gate 3 — echo attack. This tool runs the md-grep echo vector
-    # (cp instruction.md -> deliverable). For JSON/structured deliverables the
-    # non-JSON echo cannot be parsed by the check, so all checks error to None;
-    # that is INCONCLUSIVE here (needs a task-type echo vector), not a FAIL.
+    # Gate 3 — echo attack, two vectors. The md-grep vector
+    # (cp instruction.md -> deliverable) exercises text deliverables; for JSON
+    # deliverables that copy cannot be parsed, so the structured vector
+    # (synthesize_structured_echo: schema-shape-valid, prompt-only values)
+    # runs as well and decides. Only a task neither vector can evaluate is
+    # INCONCLUSIVE.
     json_deliv = any(d.endswith(".json") for d in r.deliverables)
     if instr.exists() and r.gate3_pass is None:
         with tempfile.TemporaryDirectory() as td:
@@ -273,6 +435,26 @@ def analyze(task: dict) -> GateResult:
             r.gate3_pass = False
             leaks = {k: v for k, v in r.gate3_echo_scores.items() if v and v > 0}
             r.gate3_note = f"echo credited: {leaks}"
+
+    # Gate 3, structured vector — JSON deliverables only. A leak here fails
+    # the gate even if the md vector passed; an all-zero structured run
+    # upgrades an inconclusive md verdict to PASS.
+    if instr.exists() and json_deliv:
+        r.gate3_structured_scores = structured_echo_scores(task_dir)
+        s_leak = structured_leaks(r.gate3_structured_scores)
+        s_vals = [
+            v
+            for per_check in r.gate3_structured_scores.values()
+            for v in per_check.values()
+            if v is not None
+        ]
+        if s_leak:
+            r.gate3_pass = False
+            sep = "; " if r.gate3_note else ""
+            r.gate3_note = f"{r.gate3_note}{sep}structured echo credited: {s_leak}"
+        elif s_vals and r.gate3_pass is None:
+            r.gate3_pass = True
+            r.gate3_note = "structured echo vector: all checks 0"
 
     # Gate 4 — expected_solution consistency
     if not exp.exists():
@@ -307,6 +489,10 @@ def main() -> int:
     ap.add_argument("--rescan-quarantine", action="store_true",
                     help="rewrite tests/integrity/known_prompt_echo_leaks.json "
                          "from a fresh echo scan of all active report tasks")
+    ap.add_argument("--rescan-structured-quarantine", action="store_true",
+                    help="rewrite tests/integrity/known_structured_echo_leaks"
+                         ".json from a fresh structured-echo scan of all "
+                         "active JSON-deliverable tasks")
     args = ap.parse_args()
 
     if args.rescan_quarantine:
@@ -316,6 +502,18 @@ def main() -> int:
             if echo_leak(d)
         )
         out = REPO_ROOT / "tests" / "integrity" / "known_prompt_echo_leaks.json"
+        out.write_text(json.dumps(leakers, indent=2) + "\n")
+        print(f"wrote {out.relative_to(REPO_ROOT)}: {len(leakers)} leaking tasks")
+        return 0
+
+    if args.rescan_structured_quarantine:
+        leakers = sorted(
+            str(d.relative_to(BENCH))
+            for d in discover_report_tasks()
+            if structured_echo_leak(d)
+        )
+        out = (REPO_ROOT / "tests" / "integrity"
+               / "known_structured_echo_leaks.json")
         out.write_text(json.dumps(leakers, indent=2) + "\n")
         print(f"wrote {out.relative_to(REPO_ROOT)}: {len(leakers)} leaking tasks")
         return 0
