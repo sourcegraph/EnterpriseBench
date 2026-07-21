@@ -23,6 +23,14 @@ PYTHON ?= python3
 PYTEST_PATHS ?= tests/
 PYTEST_ARGS  ?= -q -m 'not network and not docker'
 
+# task.toml files verify-crnt runs over, and the tree verify-expected-solutions
+# walks. Both default to every active (non-archived) task; override either on
+# the command line the same way as PYTEST_PATHS, e.g. for a seeded fixture:
+#   make verify-crnt CRNT_TASK_TOMLS=/tmp/seeded/task.toml
+#   make verify-expected-solutions EXPECTED_SOLUTIONS_PATH=/tmp/seeded
+CRNT_TASK_TOMLS := $(shell git ls-files 'benchmarks/**/task.toml' | grep -v _archived)
+EXPECTED_SOLUTIONS_PATH ?= benchmarks/
+
 ANALYSIS_JSON := results/analysis/score_analysis.json
 CHARTS_DIR    := results/analysis/charts
 PAPER_FIGS    := paper/figures
@@ -49,11 +57,22 @@ verify-tasks: ## Run preflight schema validation for every task
 
 .PHONY: verify-crnt
 verify-crnt: ## Validate Cross-Repo Necessity Test for multi-repo tasks
-	$(PYTHON) scripts/validation/crnt_validator.py
+	@# crnt_validator.py is single-task by design (one positional task.toml,
+	@# one process, same convention as run_task.py) — drive it over every
+	@# active task the way run_benchmark.py drives run_task.py. It no-ops
+	@# (exit 0) on single-repo tasks, so no pre-filtering is needed here.
+	$(if $(strip $(CRNT_TASK_TOMLS)),,$(error CRNT_TASK_TOMLS is empty; found 0 task.toml files to check))
+	@fail=0; count=0; \
+	for f in $(CRNT_TASK_TOMLS); do \
+		count=$$((count + 1)); \
+		$(PYTHON) scripts/validation/crnt_validator.py "$$f" || fail=1; \
+	done; \
+	echo "[verify-crnt] checked $$count tasks"; \
+	exit $$fail
 
 .PHONY: verify-expected-solutions
 verify-expected-solutions: ## Validate expected_solution.json files
-	$(PYTHON) scripts/validation/validate_expected_solutions.py
+	$(PYTHON) scripts/validation/validate_expected_solutions.py $(EXPECTED_SOLUTIONS_PATH)
 
 .PHONY: verify-unmerged
 verify-unmerged: ## Fail if a closed bead's work branch never landed on main
