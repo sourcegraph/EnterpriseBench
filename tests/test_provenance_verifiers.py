@@ -73,15 +73,36 @@ def _create_answer(workspace: Path, answer_data: dict) -> None:
     (output_dir / "answer.json").write_text(json.dumps(answer_data, indent=2))
 
 
+def _flat_strings(node) -> list[str]:
+    """All string leaves of a (possibly nested) scoring_evidence entry."""
+    if isinstance(node, str):
+        return [node]
+    if isinstance(node, (list, tuple)):
+        return [s for v in node for s in _flat_strings(v)]
+    if isinstance(node, dict):
+        return [s for v in node.values() for s in _flat_strings(v)]
+    return []
+
+
 def _build_ground_truth_answer(gt: dict) -> dict:
-    """Build a 'perfect' answer from ground truth data."""
+    """Build a 'perfect' answer from ground truth data.
+
+    The gen-2 reanchored checks credit repo-derived scoring_evidence citations
+    (file paths / function names the instructions explicitly ask for), not the
+    gen-1 prose narrative. A correct investigation cites both, so the perfect
+    answer carries the canonical prose plus those citations; prose alone is an
+    incomplete answer to the instruction, not the ground truth.
+    """
+    se = gt.get("scoring_evidence") or {}
     return {
         "source_files": [
             {"path": f["path"], "repo": f["repo"]}
             for f in gt.get("required_files", [])
         ],
-        "error_chain": gt.get("error_chain", []),
-        "trigger_conditions": gt.get("trigger_conditions", []),
+        "error_chain": gt.get("error_chain", [])
+        + _flat_strings(se.get("error_chain")),
+        "trigger_conditions": gt.get("trigger_conditions", [])
+        + _flat_strings(se.get("trigger_conditions")),
     }
 
 
