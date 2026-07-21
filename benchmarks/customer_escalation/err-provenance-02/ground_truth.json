@@ -2,7 +2,10 @@
   "candidate_id": 2,
   "candidate_ref": "kubernetes/kubernetes#136786",
   "error_string": "Failed to list existing sets",
-  "secondary_errors": ["nftables sync failed", "Sync failed"],
+  "secondary_errors": [
+    "nftables sync failed",
+    "Sync failed"
+  ],
   "fix_pr": "https://github.com/kubernetes/kubernetes/pull/136796",
   "repo": "kubernetes/kubernetes",
   "repo_rev": "v1.33.0-alpha.2",
@@ -49,5 +52,16 @@
     "Host has nftables >= 1.1.3 which creates sets with udata",
     "Another process (firewalld, nftables rules) created sets with udata in the same namespace",
     "kube-proxy is configured to use nftables mode"
-  ]
+  ],
+  "scoring_evidence": {
+    "error_chain": [
+      "proxier.go",
+      "knftables",
+      "udata"
+    ],
+    "trigger_conditions": [
+      "udata",
+      "firewalld"
+    ]
+  }
 }
