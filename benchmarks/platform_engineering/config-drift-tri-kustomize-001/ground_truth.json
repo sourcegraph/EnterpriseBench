@@ -23,19 +23,22 @@
       "path": "api/types/kustomization.go",
       "repo": "kustomize",
       "confidence": 0.9,
-      "source": "deterministic"
+      "source": "deterministic",
+      "rationale": "Kustomization schema: Patches / PatchesStrategicMerge ordering and deprecation"
     },
     {
       "path": "util/argo/normalizers/diff_normalizer.go",
       "repo": "argo-cd",
       "confidence": 0.95,
-      "source": "deterministic"
+      "source": "deterministic",
+      "rationale": "ignoreDifferences normalizer applied before ArgoCD computes its diff"
     },
     {
-      "path": "internal/controller/kustomization_controller.go",
+      "path": "internal/build/build.go",
       "repo": "flux2",
       "confidence": 0.85,
-      "source": "deterministic"
+      "source": "deterministic",
+      "rationale": "Flux CLI kustomize build wrapper (kustomization_controller.go lives in the separate kustomize-controller repo, not in flux2)"
     }
   ],
   "sufficient_files": [
@@ -48,16 +51,63 @@
       "path": "controller/appcontroller.go",
       "repo": "argo-cd",
       "confidence": 0.8
+    },
+    {
+      "path": "util/argo/resource_tracking.go",
+      "repo": "argo-cd",
+      "confidence": 0.7,
+      "rationale": "resourceTracking.Normalize strips the tracking annotation before diffing"
     }
   ],
   "drift_points": [
     {
-      "description": "Strategic merge patch list ordering divergence across kustomize, ArgoCD normalizer, and Flux kustomize-controller",
-      "repos_involved": ["kustomize", "argo-cd", "flux2"]
+      "config_key": "strategic_merge_list_ordering",
+      "kustomize_source_file": "api/types/kustomization.go",
+      "argocd_source_file": "util/argo/normalizers/diff_normalizer.go",
+      "flux_source_file": "internal/build/build.go",
+      "description": "Kustomize applies patches in the order declared by the Kustomization schema (api/types/kustomization.go: Patches supersedes the deprecated PatchesStrategicMerge). ArgoCD normalizes resources with its ignoreDifferences normalizer (util/argo/normalizers/diff_normalizer.go, jsonpatch + gojq) before diffing, so list fields can be stripped or reordered relative to raw kustomize output. Flux's CLI build (internal/build/build.go) runs the kustomize Go API via kustomize.Build and then applies post-build variable substitution with kustomize.SubstituteVariables — a step standalone `kustomize build` never runs — so the applied output can differ from both.",
+      "repos_involved": ["kustomize", "argo-cd", "flux2"],
+      "evidence_tokens": {
+        "identifies": ["merge"],
+        "located": ["internal/build/build.go"],
+        "mechanism": ["SubstituteVariables"]
+      }
     },
     {
-      "description": "Resource tracking annotation handling differs between ArgoCD sync and Flux reconciliation",
-      "repos_involved": ["argo-cd", "flux2"]
+      "config_key": "resource_tracking_annotation_divergence",
+      "argocd_source_file": "util/argo/resource_tracking.go",
+      "flux_source_file": "internal/build/build.go",
+      "description": "ArgoCD tracks managed resources with the argocd.argoproj.io/tracking-id annotation (AnnotationKeyAppInstance, common/common.go:164) and strips it via resourceTracking.Normalize (util/argo/resource_tracking.go:203) before comparing desired vs live. Flux groups its objects under kustomize.toolkit.fluxcd.io (internal/build/build.go:55) with an external inventory instead of an in-resource annotation. The two systems disagree about which fields are tracking metadata, so the same rendered resource diffs differently in each.",
+      "repos_involved": ["argo-cd", "flux2"],
+      "evidence_tokens": {
+        "identifies": ["tracking"],
+        "mechanism": ["argocd.argoproj.io"]
+      }
     }
-  ]
+  ],
+  "scoring_evidence": {
+    "_comment": "Every graded token is ABSENT from instruction.md (checked raw and whitespace-stripped, both lowercased) and verified PRESENT at the pinned revs: PatchesStrategicMerge in api/types/kustomization.go:72 (kustomize v5.3.0); AnnotationKeyAppInstance = argocd.argoproj.io/tracking-id in common/common.go:164 and resourceTracking.Normalize in util/argo/resource_tracking.go:203 (argo-cd v2.9.0); kustomize.Build at internal/build/build.go:382, kustomize.SubstituteVariables at build.go:394 and the kustomize.toolkit.fluxcd.io controllerGroup at build.go:55 (flux2 v2.2.0). The prompt DOES supply strategic merge, patch transformer, diff normalizer (as prose), resource tracking annotation, kustomize build and kustomize-controller -- none of those may be graded alone. File-existence context: internal/controller/kustomization_controller.go does NOT exist in flux2; the controller lives in the separate fluxcd/kustomize-controller repo, which is not part of this workspace.",
+    "config_valid_kustomize_files": [
+      "api/types/kustomization.go",
+      "api/krusty/kustomizer.go",
+      "api/internal/localizer/util.go"
+    ],
+    "config_valid_argocd_files": [
+      "util/argo/normalizers/diff_normalizer.go",
+      "util/argo/resource_tracking.go",
+      "controller/appcontroller.go",
+      "common/common.go"
+    ],
+    "config_valid_flux_files": [
+      "internal/build/build.go"
+    ],
+    "cross_repo_impact_argocd": [
+      "argocd.argoproj.io",
+      "tracking-id"
+    ],
+    "cross_repo_impact_flux": [
+      "kustomize.toolkit.fluxcd.io",
+      "SubstituteVariables"
+    ]
+  }
 }

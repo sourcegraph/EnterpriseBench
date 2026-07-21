@@ -86,21 +86,21 @@ multi_repo_pattern = "investigate"
 name = "config_valid"
 weight = 0.20
 verifier = "checks/check_config_valid.sh"
-description = "Agent produces valid drift report JSON"
+description = "Agent's drift report cites real files at the pinned revs on all three sides"
 timeout_seconds = 60
 
 [[checkpoints]]
 name = "drift_points"
 weight = 0.45
 verifier = "checks/check_drift_points.sh"
-description = "Agent identifies drift points across all three tools"
+description = "Agent identifies the drift points with repo-anchored mechanisms (Flux post-build substitution, ArgoCD tracking annotation)"
 timeout_seconds = 120
 
 [[checkpoints]]
 name = "cross_repo_impact"
 weight = 0.35
 verifier = "checks/check_cross_repo_impact.sh"
-description = "Agent documents impact of drift across repos"
+description = "Agent grounds the cross-tool impact in the concrete tracking/grouping metadata that diverges"
 timeout_seconds = 120
 
 [artifacts]
@@ -126,8 +126,12 @@ repo = "argo-cd"
 confidence = 0.95
 source = "deterministic"
 
+# flux2 has no internal/controller/kustomization_controller.go — the
+# controller lives in the separate fluxcd/kustomize-controller repo. The file
+# the flux2 tree actually offers for this investigation is the CLI build
+# wrapper, verified present at v2.2.0.
 [[ground_truth.required_files]]
-path = "internal/controller/kustomization_controller.go"
+path = "internal/build/build.go"
 repo = "flux2"
 confidence = 0.85
 source = "deterministic"
