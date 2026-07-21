@@ -51,6 +51,7 @@ import argparse
 import json
 import logging
 import math
+import statistics
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -671,8 +672,11 @@ def _parse_dir_identity(dir_path: Path) -> tuple[str, str]:
     parent_name = dir_path.parent.name
     grandparent_name = dir_path.parent.parent.name if dir_path.parent.parent else ""
 
-    # Multi-mode layout: results/runs/<task_id>/<mode>/
-    if name in ("baseline", "mcp_only", "hybrid") and grandparent_name == "runs":
+    # Multi-mode layout: results/runs/<task_id>/<mode>/. VALID_MODES is the
+    # single source of truth for the arm set (was a hand-copied 3-tuple that
+    # silently dropped "cli": a results/runs/<id>/cli/ directory fell through
+    # to strip_mode_suffix, which mis-parsed "cli" itself as the task_id).
+    if name in VALID_MODES and grandparent_name == "runs":
         return parent_name, name
 
     # Legacy single-mode: results/runs/<task_id>/
@@ -865,6 +869,44 @@ def _distinct_tasks(items: list[TaskCost]) -> int:
     return len({t.task_id for t in items})
 
 
+def _percentile(values: list[float], pct: float) -> float:
+    """Linear-interpolation percentile (numpy's default "linear" method).
+
+    No numpy dependency here — cost_tracker.py runs in the numpy-less canonical
+    install (see CLAUDE.md: numpy/scikit-learn must stay optional).
+    """
+    if not values:
+        return 0.0
+    s = sorted(values)
+    if len(s) == 1:
+        return s[0]
+    k = (len(s) - 1) * pct
+    f = math.floor(k)
+    c = math.ceil(k)
+    if f == c:
+        return s[int(k)]
+    return s[int(f)] * (c - k) + s[int(c)] * (k - f)
+
+
+def _latency_stats(items: list[TaskCost]) -> dict[str, Any]:
+    """Per-arm wall-clock latency (agent_duration_seconds), median/p90 alongside cost.
+
+    A record with no recorded duration reads as 0.0 (scan_results_dirs' default
+    when task_metrics.json is absent or unreadable) — excluded here so a batch of
+    missing-metrics runs cannot masquerade as a fleet of instant ones and pull
+    the median/p90 down to zero.
+    """
+    durations = [t.agent_duration_seconds for t in items if t.agent_duration_seconds > 0]
+    if not durations:
+        return {"count": 0, "mean": None, "median": None, "p90": None}
+    return {
+        "count": len(durations),
+        "mean": round(statistics.mean(durations), 2),
+        "median": round(statistics.median(durations), 2),
+        "p90": round(_percentile(durations, 0.90), 2),
+    }
+
+
 @dataclass(frozen=True)
 class Denominator:
     """What a bucket divides by, and the key names that say so out loud.
@@ -917,6 +959,7 @@ def _bucket(items: list[TaskCost], unit: Denominator, reconcile: bool) -> dict[s
         unit.avg_key: round(total_cost / count, 6) if count else 0.0,
         "total_input_tokens": sum(t.usage.input_tokens for t in items),
         "total_output_tokens": sum(t.usage.output_tokens for t in items),
+        "latency_seconds": _latency_stats(items),
     }
     if reconcile:
         bucket["reconciliation"] = _reconcile(items)

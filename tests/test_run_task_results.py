@@ -281,3 +281,72 @@ class TestResultsJsonBackwardCompat:
         assert data["success"] is True
         assert "task_id" in data
         assert "scores" in data
+
+
+# ---------------------------------------------------------------------------
+# Model pinning + run_metadata (claude CLI version, resolved model)
+# ---------------------------------------------------------------------------
+
+
+class TestModelInRunMetadata:
+    def test_model_recorded_in_results_json_config(self, tmp_path: Path) -> None:
+        output_dir = tmp_path / "results"
+        config = _make_config(model="claude-sonnet-5")
+        result = _make_result()
+        task_data = _make_task_data()
+
+        _save_results(result, task_data, output_dir, config)
+
+        data = json.loads((output_dir / "results.json").read_text())
+        assert data["config"]["model"] == "claude-sonnet-5"
+
+    def test_model_absent_records_null_not_missing(self, tmp_path: Path) -> None:
+        """Do not change default behavior when --model is absent: the field is
+        present and explicitly null, not silently omitted."""
+        output_dir = tmp_path / "results"
+        config = _make_config()  # model unset
+        result = _make_result()
+        task_data = _make_task_data()
+
+        _save_results(result, task_data, output_dir, config)
+
+        data = json.loads((output_dir / "results.json").read_text())
+        assert data["config"]["model"] is None
+
+    def test_model_recorded_in_config_json_snapshot(self, tmp_path: Path) -> None:
+        output_dir = tmp_path / "results"
+        config = _make_config(model="claude-sonnet-5")
+        result = _make_result()
+        task_data = _make_task_data()
+
+        _save_results(result, task_data, output_dir, config)
+
+        data = json.loads((output_dir / "config.json").read_text())
+        assert data["model"] == "claude-sonnet-5"
+
+    def test_run_metadata_written_to_results_json(self, tmp_path: Path) -> None:
+        output_dir = tmp_path / "results"
+        config = _make_config(model="claude-sonnet-5")
+        result = _make_result(
+            run_metadata={"model": "claude-sonnet-5", "claude_cli_version": "2.1.0"}
+        )
+        task_data = _make_task_data()
+
+        _save_results(result, task_data, output_dir, config)
+
+        data = json.loads((output_dir / "results.json").read_text())
+        assert data["run_metadata"]["claude_cli_version"] == "2.1.0"
+        assert data["run_metadata"]["model"] == "claude-sonnet-5"
+
+    def test_run_metadata_defaults_to_empty_dict(self, tmp_path: Path) -> None:
+        """A run that never populated run_metadata still writes a valid (empty)
+        object, not a missing key or null a downstream reader would choke on."""
+        output_dir = tmp_path / "results"
+        config = _make_config()
+        result = _make_result()  # run_metadata not overridden -> default {}
+        task_data = _make_task_data()
+
+        _save_results(result, task_data, output_dir, config)
+
+        data = json.loads((output_dir / "results.json").read_text())
+        assert data["run_metadata"] == {}

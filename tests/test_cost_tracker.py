@@ -32,6 +32,7 @@ from cost_tracker import (
     scan_trace,
     select_attempt,
     _parse_dir_identity,
+    _percentile,
 )
 
 # ---------------------------------------------------------------------------
@@ -552,6 +553,20 @@ class TestParseDirIdentity:
         assert task_id == "cal-drift-flask-config-001"
         assert mode == "hybrid"
 
+    def test_cli_multi_mode_layout(self, tmp_path: Path) -> None:
+        """results/runs/<task_id>/cli/ must resolve to mode='cli', not fall
+        through to strip_mode_suffix (which would mis-parse task_id='cli')."""
+        p = tmp_path / "runs" / "dep-traversal-001" / "cli"
+        task_id, mode = _parse_dir_identity(p)
+        assert task_id == "dep-traversal-001"
+        assert mode == "cli"
+
+    def test_cli_mcp_batch_suffix(self, tmp_path: Path) -> None:
+        p = tmp_path / "mcp_batch" / "dep-traversal-001_cli"
+        task_id, mode = _parse_dir_identity(p)
+        assert task_id == "dep-traversal-001"
+        assert mode == "cli"
+
     def test_no_mode_suffix(self, tmp_path: Path) -> None:
         p = tmp_path / "mcp_batch" / "some-task-name"
         task_id, mode = _parse_dir_identity(p)
@@ -620,6 +635,28 @@ difficulty = "hard"
 
         # Cleanup cache for other tests
         _TASK_META_CACHE.clear()
+
+
+# ---------------------------------------------------------------------------
+# _percentile
+# ---------------------------------------------------------------------------
+
+
+class TestPercentile:
+    def test_empty(self) -> None:
+        assert _percentile([], 0.90) == 0.0
+
+    def test_single_value(self) -> None:
+        assert _percentile([42.0], 0.90) == 42.0
+
+    def test_p90_ten_values(self) -> None:
+        values = [float(i) for i in range(1, 11)]  # 1..10
+        # numpy's default "linear" method: p90 of 1..10 -> 9.1
+        assert _percentile(values, 0.90) == pytest.approx(9.1)
+
+    def test_median_via_p50(self) -> None:
+        values = [1.0, 2.0, 3.0, 4.0]
+        assert _percentile(values, 0.50) == pytest.approx(2.5)
 
 
 # ---------------------------------------------------------------------------
@@ -706,6 +743,43 @@ class TestAggregateReport:
         assert by_mode["hybrid"]["total_cost_usd"] == 3.0
         assert by_mode["hybrid"]["avg_cost_per_attempt"] == 1.5
         assert by_mode["mcp_only"]["attempts"] == 1
+
+    def test_cli_arm_breaks_out_separately(self) -> None:
+        """A cli-arm TaskCost must land in its own by_mode bucket, not vanish
+        into baseline or get merged with another arm."""
+        costs = [
+            _make_cost(task_id="t1", mode="baseline", cost_usd=1.0),
+            _make_cost(task_id="t2", mode="cli", cost_usd=2.0),
+        ]
+        by_mode = aggregate_report(costs)["operational_economics"]["by_mode"]
+        assert set(by_mode.keys()) == {"baseline", "cli"}
+        assert by_mode["cli"]["attempts"] == 1
+        assert by_mode["cli"]["total_cost_usd"] == 2.0
+
+    def test_latency_seconds_present_next_to_cost(self) -> None:
+        costs = [
+            _make_cost(task_id="t1", mode="hybrid"),
+            _make_cost(task_id="t2", mode="hybrid"),
+        ]
+        report = aggregate_report(costs)
+        latency = report["operational_economics"]["by_mode"]["hybrid"][
+            "latency_seconds"
+        ]
+        assert latency["count"] == 2
+        assert latency["median"] == pytest.approx(60.0)
+        assert latency["mean"] == pytest.approx(60.0)
+        assert latency["p90"] == pytest.approx(60.0)
+
+    def test_latency_seconds_empty_when_no_durations_recorded(self) -> None:
+        costs = [_make_cost(task_id="t1")]
+        # simulate a run with no task_metrics.json (default 0.0 duration)
+        costs[0] = TaskCost(**{**costs[0].__dict__, "agent_duration_seconds": 0.0})
+        report = aggregate_report(costs)
+        latency = report["operational_economics"]["by_mode"]["hybrid"][
+            "latency_seconds"
+        ]
+        assert latency["count"] == 0
+        assert latency["median"] is None
 
     def test_suite_breakdown(self) -> None:
         costs = [

@@ -16,7 +16,33 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 VALID_MODES = ("baseline", "mcp_only", "hybrid", "cli")
-MODE_SUFFIXES = ("_hybrid", "_mcp_only", "_baseline")
+# Longest/most-specific suffixes first so "_mcp_only" cannot be shadowed by a
+# shorter false match. Every entry here must have a matching VALID_MODES arm —
+# the "cli" arm was added to VALID_MODES without an "_cli" suffix here, which
+# silently mis-parsed cli result directories as (dirname, "baseline").
+MODE_SUFFIXES = ("_hybrid", "_mcp_only", "_cli", "_baseline")
+
+# Canonical arm ordering for the publish matrix: baseline first (the
+# comparison point), then mcp_only, then cli, then hybrid if a result set
+# still carries it (hybrid is cut from the publish sweep, but old data may
+# still have it). The single source of truth for analyze_scores.py,
+# generate_charts.py, and generate_report.py — each previously hard-coded its
+# own {baseline, hybrid, mcp_only} arm set and silently dropped or mislabeled
+# "cli".
+MODE_ORDER = ("baseline", "mcp_only", "cli", "hybrid")
+
+
+def ordered_modes(mode_keys) -> list[str]:
+    """Order an arbitrary collection of arm names per MODE_ORDER.
+
+    Arms present in *mode_keys* but not in MODE_ORDER are appended
+    alphabetically rather than dropped, so a reporting function using this
+    never silently loses an arm the data actually contains.
+    """
+    present = set(mode_keys)
+    ordered = [m for m in MODE_ORDER if m in present]
+    ordered += sorted(present - set(ordered))
+    return ordered
 
 
 def strip_mode_suffix(dirname: str) -> tuple[str, str]:

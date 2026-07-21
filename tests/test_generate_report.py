@@ -29,7 +29,9 @@ from generate_report import (
     _chart_ref,
     _cohens_d_interpretation,
     _count_all_modes_tasks,
+    _delta_modes_present,
     _fmt,
+    _mode_label,
     _pct,
 )
 
@@ -123,6 +125,72 @@ MINIMAL_SCORE_ANALYSIS: dict = {
             "difficulty": "hard",
             "task_type": "api_contract",
             "scores": {"baseline": 0.90},
+            "is_calibration": False,
+        },
+    ],
+}
+
+
+# Publish matrix: baseline/mcp_only/cli, no hybrid — the shape bead k1nud
+# exists to make the reporting layer handle without dropping/mislabeling cli.
+CLI_ARM_SCORE_ANALYSIS: dict = {
+    "generated_at": "2026-04-01T00:00:00+00:00",
+    "total_results": 15,
+    "by_mode": {
+        "baseline": {"count": 5, "mean": 0.60, "median": 0.60, "std": 0.10, "pass_rate": 0.40},
+        "mcp_only": {"count": 5, "mean": 0.70, "median": 0.70, "std": 0.10, "pass_rate": 0.60},
+        "cli": {"count": 5, "mean": 0.78, "median": 0.80, "std": 0.08, "pass_rate": 0.80},
+    },
+    "by_suite": {
+        "customer_escalation": {
+            "baseline": {"count": 5, "mean": 0.60, "pass_rate": 0.40},
+        },
+        "feature_delivery": {
+            "baseline": {"count": 5, "mean": 0.60, "pass_rate": 0.40},
+            "mcp_only": {"count": 5, "mean": 0.70, "pass_rate": 0.60},
+            "cli": {"count": 5, "mean": 0.78, "pass_rate": 0.80},
+        },
+    },
+    "by_difficulty": {},
+    "by_task_type": {},
+    "mcp_delta": {
+        "mcp_only_vs_baseline": {
+            "n_paired": 5,
+            "mean_delta": 0.10,
+            "median_delta": 0.10,
+            "pct_improved": 0.6,
+            "pct_degraded": 0.0,
+            "pct_unchanged": 0.4,
+            "cohens_d": 0.4,
+            "wilcoxon_p": None,
+            "significant": False,
+        },
+        "cli_vs_baseline": {
+            "n_paired": 5,
+            "mean_delta": 0.18,
+            "median_delta": 0.20,
+            "pct_improved": 0.8,
+            "pct_degraded": 0.0,
+            "pct_unchanged": 0.2,
+            "cohens_d": 0.7,
+            "wilcoxon_p": None,
+            "significant": False,
+        },
+    },
+    "calibration_bias": {
+        "calibration_task_count": 0,
+        "mean_by_mode": {},
+        "max_mode_delta": None,
+        "bias_flagged": False,
+        "bias_threshold": 0.1,
+    },
+    "per_task": [
+        {
+            "task_id": "t1",
+            "suite": "feature_delivery",
+            "difficulty": "medium",
+            "task_type": "api_contract",
+            "scores": {"baseline": 0.60, "mcp_only": 0.70, "cli": 0.80},
             "is_calibration": False,
         },
     ],
@@ -407,6 +475,22 @@ class TestCostSection:
         with pytest.raises(ValueError, match="schema_version"):
             build_cost_section(_make_inputs(cost_report=stale))
 
+    def test_latency_shown_next_to_cost(self) -> None:
+        cost = _cost_report()
+        cost["operational_economics"]["by_mode"]["baseline"]["latency_seconds"] = {
+            "count": 30, "mean": 90.0, "median": 85.0, "p90": 120.0,
+        }
+        result = build_cost_section(_make_inputs(cost_report=cost))
+        assert "Median Latency" in result
+        assert "85.0s" in result
+        assert "120.0s" in result
+
+    def test_latency_missing_shows_na(self) -> None:
+        # _cost_report's by_mode buckets carry no latency_seconds block at all —
+        # a pre-latency report must render N/A, not crash or print zeros.
+        result = build_cost_section(_make_inputs(cost_report=_cost_report()))
+        assert "N/A" in result
+
 
 class TestKeyFindings:
     def test_has_findings(self) -> None:
@@ -440,6 +524,50 @@ class TestRecommendations:
 # ---------------------------------------------------------------------------
 # Chart references
 # ---------------------------------------------------------------------------
+
+
+class TestCliArmDataDriven:
+    """bead k1nud: the report must surface cli, not drop or mislabel it."""
+
+    def _inputs(self) -> ReportInputs:
+        return _make_inputs(score_analysis=CLI_ARM_SCORE_ANALYSIS)
+
+    def test_mode_label(self) -> None:
+        assert _mode_label("cli") == "CLI"
+        assert _mode_label("mcp_only") == "MCP-only"
+        assert _mode_label("hybrid") == "Hybrid"
+
+    def test_delta_modes_present_excludes_absent_hybrid(self) -> None:
+        modes = _delta_modes_present(CLI_ARM_SCORE_ANALYSIS["mcp_delta"])
+        assert modes == ["mcp_only", "cli"]
+
+    def test_executive_summary_mentions_cli(self) -> None:
+        result = build_executive_summary(self._inputs())
+        assert "CLI vs baseline" in result
+
+    def test_score_by_mode_table_has_cli_row(self) -> None:
+        result = build_score_by_mode(self._inputs())
+        assert "cli" in result
+
+    def test_mcp_impact_has_cli_block_not_hybrid(self) -> None:
+        result = build_mcp_impact(self._inputs())
+        assert "CLI vs Baseline" in result
+        assert "Hybrid vs Baseline" not in result
+
+    def test_key_findings_mentions_cli(self) -> None:
+        result = build_key_findings(self._inputs())
+        assert "CLI mode shows" in result
+
+    def test_key_findings_no_data_gap_for_customer_escalation_suite(self) -> None:
+        """customer_escalation has only baseline -> missing-MCP finding, driven
+        by whatever non-baseline arms are actually in by_mode (mcp_only + cli),
+        not a hard-coded {hybrid, mcp_only} check."""
+        result = build_key_findings(self._inputs())
+        assert "customer_escalation" in result
+
+    def test_recommendations_reference_cli_coverage(self) -> None:
+        result = build_recommendations(self._inputs())
+        assert "customer_escalation" in result
 
 
 class TestChartReferences:

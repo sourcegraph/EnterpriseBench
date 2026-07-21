@@ -23,10 +23,40 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from cost_tracker import require_schema  # noqa: E402
+from lib.shared import ordered_modes  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# Modes considered "tool-armed" for MCP-coverage findings/recommendations —
+# any arm other than baseline. Data-driven per-run (derived from whatever
+# by_mode/mcp_delta actually contain), not a hard-coded {hybrid, mcp_only}
+# set, so a cli-only publish sweep is reported correctly instead of every
+# suite reading as "missing MCP".
+_BASELINE_MODE = "baseline"
+
+
+def _mode_label(mode: str) -> str:
+    """Human-readable label for a mode, e.g. 'mcp_only' -> 'MCP-only'."""
+    labels = {"mcp_only": "MCP-only", "cli": "CLI", "hybrid": "Hybrid", "baseline": "Baseline"}
+    return labels.get(mode, mode.replace("_", " ").title())
+
+
+def _latency_cell(bucket: dict[str, Any], stat: str) -> str:
+    """Format one latency stat from a bucket's "latency_seconds" block."""
+    val = bucket.get("latency_seconds", {}).get(stat)
+    return f"{val:.1f}s" if val is not None else "N/A"
+
+
+def _delta_modes_present(mcp_delta: dict[str, Any]) -> list[str]:
+    """Non-baseline arms with a "<mode>_vs_baseline" entry, canonically ordered."""
+    modes = {
+        key.removesuffix("_vs_baseline")
+        for key in mcp_delta
+        if key.endswith("_vs_baseline")
+    }
+    return ordered_modes(modes)
 
 
 # ---------------------------------------------------------------------------
@@ -149,9 +179,19 @@ def _cohens_d_interpretation(d: float | None) -> str:
     return "large"
 
 
-def _count_all_modes_tasks(per_task: list[dict[str, Any]]) -> int:
-    """Count tasks that have scores for all 3 modes."""
-    modes = {"baseline", "hybrid", "mcp_only"}
+def _count_all_modes_tasks(
+    per_task: list[dict[str, Any]],
+    modes: set[str] | None = None,
+) -> int:
+    """Count tasks that have scores for every mode in *modes*.
+
+    *modes* defaults to the union of modes actually seen across per_task's
+    scores — data-driven, so this is not pinned to a hard-coded 3-arm set and
+    tracks whatever arms the loaded run artifacts contain (e.g. the publish
+    matrix's baseline/mcp_only/cli, with no hybrid).
+    """
+    if modes is None:
+        modes = {m for task in per_task for m in task.get("scores", {})}
     count = 0
     for task in per_task:
         scores = task.get("scores", {})
@@ -177,19 +217,21 @@ def build_executive_summary(inputs: ReportInputs) -> str:
         f"Baseline pass rate: {_pct(baseline_pr)}."
     )
 
-    # MCP impact direction
+    # MCP impact direction — one bullet per non-baseline arm present in the data
+    # (data-driven: previously hard-coded to "hybrid" alone, which silently said
+    # nothing about a cli-only or mcp_only-only sweep).
     mcp_delta = sa.get("mcp_delta", {})
-    hybrid_delta = mcp_delta.get("hybrid_vs_baseline", {})
-    if hybrid_delta:
-        mean_d = hybrid_delta.get("mean_delta")
-        n_paired = hybrid_delta.get("n_paired", 0)
+    for mode in _delta_modes_present(mcp_delta):
+        delta = mcp_delta.get(f"{mode}_vs_baseline", {})
+        mean_d = delta.get("mean_delta")
+        n_paired = delta.get("n_paired", 0)
         if mean_d is not None:
             direction = (
                 "positive" if mean_d > 0 else "negative" if mean_d < 0 else "neutral"
             )
             bullets.append(
-                f"Hybrid vs baseline mean delta: {_fmt(mean_d)} ({direction}), "
-                f"based on {n_paired} paired task(s)."
+                f"{_mode_label(mode)} vs baseline mean delta: {_fmt(mean_d)} "
+                f"({direction}), based on {n_paired} paired task(s)."
             )
 
     # Flags
@@ -212,8 +254,9 @@ def build_coverage_section(inputs: ReportInputs) -> str:
     by_mode = sa.get("by_mode", {})
     per_task = sa.get("per_task", [])
     total = sa.get("total_results", 0)
-    modes = sorted(by_mode.keys())
-    all_three = _count_all_modes_tasks(per_task)
+    modes = ordered_modes(by_mode.keys())
+    task_modes = {m for task in per_task for m in task.get("scores", {})}
+    all_modes_count = _count_all_modes_tasks(per_task, task_modes)
 
     lines = [
         f"- Total unique results: {total} across {len(modes)} mode(s)",
@@ -223,7 +266,7 @@ def build_coverage_section(inputs: ReportInputs) -> str:
         lines.append(
             f"- {mode.replace('_', ' ').title()}: {stats['count']} tasks scored"
         )
-    lines.append(f"- Tasks with all 3 modes: {all_three}")
+    lines.append(f"- Tasks with all {len(task_modes)} modes: {all_modes_count}")
     return "\n".join(lines) + "\n"
 
 
@@ -232,7 +275,7 @@ def build_score_by_mode(inputs: ReportInputs) -> str:
     by_mode = inputs.score_analysis.get("by_mode", {})
     headers = ["Mode", "N", "Mean", "Median", "Std", "Pass Rate"]
     rows: list[list[str]] = []
-    for mode in sorted(by_mode.keys()):
+    for mode in ordered_modes(by_mode.keys()):
         s = by_mode[mode]
         rows.append(
             [
@@ -259,7 +302,7 @@ def _build_breakdown_table(
     rows: list[list[str]] = []
     for key in sorted(data.keys()):
         modes = data[key]
-        for mode in sorted(modes.keys()):
+        for mode in ordered_modes(modes.keys()):
             s = modes[mode]
             rows.append(
                 [
@@ -336,17 +379,14 @@ def _build_delta_block(label: str, delta: dict[str, Any]) -> str:
 
 
 def build_mcp_impact(inputs: ReportInputs) -> str:
-    """Generate MCP impact analysis section."""
+    """Generate MCP impact analysis section: one block per non-baseline arm."""
     mcp_delta = inputs.score_analysis.get("mcp_delta", {})
     parts: list[str] = []
 
-    hybrid = mcp_delta.get("hybrid_vs_baseline")
-    if hybrid:
-        parts.append(_build_delta_block("Hybrid vs Baseline", hybrid))
-
-    mcp_only = mcp_delta.get("mcp_only_vs_baseline")
-    if mcp_only:
-        parts.append(_build_delta_block("MCP-only vs Baseline", mcp_only))
+    for mode in _delta_modes_present(mcp_delta):
+        delta = mcp_delta.get(f"{mode}_vs_baseline")
+        if delta:
+            parts.append(_build_delta_block(f"{_mode_label(mode)} vs Baseline", delta))
 
     if not parts:
         parts.append("_No MCP delta data available._\n")
@@ -437,17 +477,27 @@ def build_cost_section(inputs: ReportInputs) -> str:
     ]
 
     if op["by_mode"]:
+        # Latency rides next to cost in the same table — sourced from
+        # cost_tracker.py's per-arm "latency_seconds" (median/p90 wall-clock,
+        # read from the "timing"."agent" field run_task.py writes), not a
+        # separate report a reader has to go cross-reference.
         lines.append(
             make_table(
-                ["Mode", "Attempts", "Total Spend", "Avg / Attempt"],
+                ["Mode", "Attempts", "Total Spend", "Avg / Attempt",
+                 "Median Latency", "P90 Latency"],
                 [
                     [
                         mode,
                         str(s["attempts"]),
                         f"${s['total_cost_usd']:.2f}",
                         f"${s['avg_cost_per_attempt']:.2f}",
+                        _latency_cell(s, "median"),
+                        _latency_cell(s, "p90"),
                     ]
-                    for mode, s in sorted(op["by_mode"].items())
+                    for mode, s in (
+                        (m, op["by_mode"][m])
+                        for m in ordered_modes(op["by_mode"].keys())
+                    )
                 ],
             )
         )
@@ -472,7 +522,10 @@ def build_cost_section(inputs: ReportInputs) -> str:
                         f"${s['total_cost_usd']:.2f}",
                         f"${s['avg_cost_per_task']:.2f}",
                     ]
-                    for mode, s in sorted(comp["by_mode"].items())
+                    for mode, s in (
+                        (m, comp["by_mode"][m])
+                        for m in ordered_modes(comp["by_mode"].keys())
+                    )
                 ],
             )
         )
@@ -528,40 +581,43 @@ def build_key_findings(inputs: ReportInputs) -> str:
             f"(mean {_fmt(worst[1])})."
         )
 
-    # MCP direction
-    hybrid = mcp_delta.get("hybrid_vs_baseline", {})
-    mean_d = hybrid.get("mean_delta")
-    n_paired = hybrid.get("n_paired", 0)
-    if mean_d is not None:
+    # MCP direction — one finding per non-baseline arm present in the data
+    for mode in _delta_modes_present(mcp_delta):
+        delta = mcp_delta.get(f"{mode}_vs_baseline", {})
+        mean_d = delta.get("mean_delta")
+        n_paired = delta.get("n_paired", 0)
+        label = _mode_label(mode)
+        if mean_d is None:
+            continue
         if mean_d > 0:
             findings.append(
-                f"Hybrid mode shows a positive mean delta of {_fmt(mean_d)} "
+                f"{label} mode shows a positive mean delta of {_fmt(mean_d)} "
                 f"over baseline ({n_paired} paired tasks)."
             )
         elif mean_d < 0:
             findings.append(
-                f"Hybrid mode shows a negative mean delta of {_fmt(mean_d)} "
+                f"{label} mode shows a negative mean delta of {_fmt(mean_d)} "
                 f"vs baseline ({n_paired} paired tasks) -- "
                 "likely due to small sample size."
             )
         else:
-            findings.append("Hybrid mode shows no difference from baseline.")
+            findings.append(f"{label} mode shows no difference from baseline.")
 
-    # Data gaps
+    # Data gaps — any tool-armed arm (every mode but baseline) trailing baseline's count
     baseline_count = by_mode.get("baseline", {}).get("count", 0)
-    hybrid_count = by_mode.get("hybrid", {}).get("count", 0)
-    mcp_count = by_mode.get("mcp_only", {}).get("count", 0)
-    if hybrid_count < baseline_count or mcp_count < baseline_count:
-        gap = baseline_count - max(hybrid_count, mcp_count)
+    mcp_modes = set(by_mode.keys()) - {_BASELINE_MODE}
+    mcp_counts = {m: by_mode.get(m, {}).get("count", 0) for m in mcp_modes}
+    if mcp_counts and any(c < baseline_count for c in mcp_counts.values()):
+        gap = baseline_count - max(mcp_counts.values())
         findings.append(
             f"Data gap: {gap}+ tasks lack MCP mode results. "
             "Complete the sweep for full coverage."
         )
 
-    # Suites missing MCP
+    # Suites missing MCP (any non-baseline arm actually present in the overall data)
     missing_mcp_suites: list[str] = []
     for suite, modes in by_suite.items():
-        if "hybrid" not in modes and "mcp_only" not in modes:
+        if not any(m in modes for m in mcp_modes):
             missing_mcp_suites.append(suite)
     if missing_mcp_suites:
         findings.append(
@@ -578,23 +634,29 @@ def build_recommendations(inputs: ReportInputs) -> str:
     """Generate recommendations section."""
     sa = inputs.score_analysis
     by_suite = sa.get("by_suite", {})
+    by_mode = sa.get("by_mode", {})
     mcp_delta = sa.get("mcp_delta", {})
     cal = sa.get("calibration_bias", {})
     recs: list[str] = []
 
-    # Check paired count
-    hybrid = mcp_delta.get("hybrid_vs_baseline", {})
-    n_paired = hybrid.get("n_paired", 0)
+    # Check paired count — the weakest-paired arm actually present, data-driven
+    # (previously hard-coded to "hybrid" alone).
+    delta_modes = _delta_modes_present(mcp_delta)
+    n_paired = min(
+        (mcp_delta[f"{m}_vs_baseline"].get("n_paired", 0) for m in delta_modes),
+        default=0,
+    )
     if n_paired < 20:
         recs.append(
             "Complete the sweep to achieve statistical power for MCP impact analysis "
             f"(currently {n_paired} paired tasks, need 20+)."
         )
 
-    # Suites with 0 MCP results
+    # Suites with 0 results from any tool-armed arm actually present in the data
+    mcp_modes = set(by_mode.keys()) - {_BASELINE_MODE}
     missing: list[str] = []
     for suite, modes in by_suite.items():
-        if "hybrid" not in modes and "mcp_only" not in modes:
+        if not any(m in modes for m in mcp_modes):
             missing.append(suite)
     if missing:
         recs.append(

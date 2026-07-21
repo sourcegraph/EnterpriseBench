@@ -18,12 +18,16 @@ from analyze_scores import (
     TaskResult,
     _compute_delta,
     _dist_stats,
+    _percentile,
     _statistical_tests,
+    by_mode,
     calibration_bias,
     infer_mode,
+    latency_by_mode,
     load_all_results,
     load_task_metadata_from_toml,
     mcp_deltas,
+    ordered_modes,
     parse_result,
     per_task_summary,
 )
@@ -341,6 +345,22 @@ class TestModeInference:
         data = {}
         assert infer_mode(path, data) == "mcp_only"
 
+    def test_dirname_suffix_cli(self, tmp_path: Path):
+        path = tmp_path / "mcp_batch" / "task-001_cli" / "results.json"
+        data = {}
+        assert infer_mode(path, data) == "cli"
+
+    def test_multi_mode_layout_cli(self, tmp_path: Path):
+        """results/runs/<task_id>/cli/results.json -> mode='cli'."""
+        path = tmp_path / "results" / "runs" / "task-001" / "cli" / "results.json"
+        data = {}
+        assert infer_mode(path, data) == "cli"
+
+    def test_smoke_cli(self, tmp_path: Path):
+        path = tmp_path / "results" / "smoke_cli" / "results.json"
+        data = {}
+        assert infer_mode(path, data) == "cli"
+
 
 # ---------------------------------------------------------------------------
 # Metadata fallback to task.toml
@@ -478,3 +498,142 @@ class TestPerTaskSummary:
         results2 = [_make_result(task_id="normal-001")]
         summary2 = per_task_summary(results2)
         assert summary2[0]["is_calibration"] is False
+
+    def test_latency_seconds_per_mode(self):
+        results = [
+            _make_result(task_id="t1", mode="baseline"),  # agent_time=100.0
+            _make_result(task_id="t1", mode="cli"),
+        ]
+        summary = per_task_summary(results)
+        assert summary[0]["latency_seconds"]["baseline"] == pytest.approx(100.0)
+        assert summary[0]["latency_seconds"]["cli"] == pytest.approx(100.0)
+
+
+# ---------------------------------------------------------------------------
+# ordered_modes — data-driven arm ordering (publish matrix)
+# ---------------------------------------------------------------------------
+
+
+class TestOrderedModes:
+    def test_canonical_order(self):
+        assert ordered_modes({"hybrid", "cli", "baseline", "mcp_only"}) == [
+            "baseline",
+            "mcp_only",
+            "cli",
+            "hybrid",
+        ]
+
+    def test_drops_nothing_present(self):
+        # publish matrix: hybrid absent, cli present
+        assert ordered_modes({"baseline", "mcp_only", "cli"}) == [
+            "baseline",
+            "mcp_only",
+            "cli",
+        ]
+
+    def test_unknown_mode_appended_alphabetically(self):
+        assert ordered_modes({"baseline", "zzz_experimental", "cli"}) == [
+            "baseline",
+            "cli",
+            "zzz_experimental",
+        ]
+
+    def test_empty(self):
+        assert ordered_modes(set()) == []
+
+
+# ---------------------------------------------------------------------------
+# mcp_deltas — data-driven, must not drop or mislabel cli
+# ---------------------------------------------------------------------------
+
+
+class TestMCPDeltasDataDriven:
+    def test_includes_cli_arm(self):
+        results = [
+            _make_result(task_id="t1", mode="baseline", task_score=1.0, checkpoints_total=2),
+            _make_result(task_id="t1", mode="cli", task_score=2.0, checkpoints_total=2),
+        ]
+        deltas = mcp_deltas(results)
+        assert "cli_vs_baseline" in deltas
+        assert deltas["cli_vs_baseline"]["n_paired"] == 1
+
+    def test_only_emits_arms_present_in_data(self):
+        """No hybrid/mcp_only data present -> no phantom hybrid_vs_baseline entry."""
+        results = [
+            _make_result(task_id="t1", mode="baseline"),
+            _make_result(task_id="t1", mode="cli"),
+        ]
+        deltas = mcp_deltas(results)
+        assert set(deltas.keys()) == {"cli_vs_baseline"}
+
+    def test_ordering_matches_publish_matrix(self):
+        results = [
+            _make_result(task_id="t1", mode="baseline"),
+            _make_result(task_id="t1", mode="hybrid"),
+            _make_result(task_id="t1", mode="cli"),
+            _make_result(task_id="t1", mode="mcp_only"),
+        ]
+        deltas = mcp_deltas(results)
+        assert list(deltas.keys()) == [
+            "mcp_only_vs_baseline",
+            "cli_vs_baseline",
+            "hybrid_vs_baseline",
+        ]
+
+
+# ---------------------------------------------------------------------------
+# by_mode — canonical ordering
+# ---------------------------------------------------------------------------
+
+
+class TestByModeOrdering:
+    def test_cli_bucket_present(self):
+        results = [
+            _make_result(task_id="t1", mode="baseline"),
+            _make_result(task_id="t2", mode="cli"),
+        ]
+        stats = by_mode(results)
+        assert "cli" in stats
+        assert stats["cli"]["count"] == 1
+
+    def test_key_order_is_canonical(self):
+        results = [
+            _make_result(task_id="t1", mode="hybrid"),
+            _make_result(task_id="t2", mode="baseline"),
+            _make_result(task_id="t3", mode="cli"),
+        ]
+        stats = by_mode(results)
+        assert list(stats.keys()) == ["baseline", "cli", "hybrid"]
+
+
+# ---------------------------------------------------------------------------
+# latency_by_mode / _percentile
+# ---------------------------------------------------------------------------
+
+
+class TestPercentile:
+    def test_empty(self):
+        assert _percentile([], 0.9) == 0.0
+
+    def test_p90_ten_values(self):
+        values = [float(i) for i in range(1, 11)]
+        assert _percentile(values, 0.90) == pytest.approx(9.1)
+
+
+class TestLatencyByMode:
+    def test_per_mode_stats(self):
+        results = [
+            _make_result(task_id="t1", mode="baseline"),  # agent_time=100.0
+            _make_result(task_id="t2", mode="baseline"),
+        ]
+        lat = latency_by_mode(results)
+        assert lat["baseline"]["count"] == 2
+        assert lat["baseline"]["median"] == pytest.approx(100.0)
+        assert lat["baseline"]["p90"] == pytest.approx(100.0)
+
+    def test_missing_agent_time_excluded(self):
+        r = _make_result(task_id="t1", mode="baseline")
+        r_no_time = TaskResult(**{**r.__dict__, "agent_time": None})
+        lat = latency_by_mode([r_no_time])
+        assert lat["baseline"]["count"] == 0
+        assert lat["baseline"]["median"] is None

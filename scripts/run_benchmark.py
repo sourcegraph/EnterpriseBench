@@ -528,6 +528,17 @@ def build_parser() -> argparse.ArgumentParser:
             "(e.g. 'baseline,mcp_only,hybrid'). Overrides --mode."
         ),
     )
+    runner_group.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help=(
+            "Model to pass to the agent CLI via --model (e.g. 'claude-sonnet-5'). "
+            "Forwarded through to run_task.py's claude invocation and recorded "
+            "in results.json run metadata. Omit to use the agent's own default "
+            "— this does not change behavior when unset."
+        ),
+    )
 
     # Parallelism
     parallel_group = parser.add_argument_group("parallelism")
@@ -592,11 +603,13 @@ def collect_passthrough_args(
     (used by the parallel dispatcher to rotate accounts per task).
     If *mode_override* is given it replaces the --mode flag.
     If *output_dir* is given a ``--output-dir`` flag is appended (used for
-    multi-mode runs that route each mode to its own subdirectory). This function
-    is the sole *emitter* of the forwarded flags — callers must not append flags
-    afterward, or the runner-contract test (which pins the emitted set against
-    runner_cli.PASSTHROUGH_FLAGS) cannot guarantee every runner accepts them
-    (EnterpriseBench-nw70h).
+    multi-mode runs that route each mode to its own subdirectory). If
+    ``args.model`` is set, ``--model`` is forwarded so the pinned model reaches
+    run_task.py's claude invocation unchanged (absent -> no flag emitted, no
+    behavior change). This function is the sole *emitter* of the forwarded
+    flags — callers must not append flags afterward, or the runner-contract
+    test (which pins the emitted set against runner_cli.PASSTHROUGH_FLAGS)
+    cannot guarantee every runner accepts them (EnterpriseBench-nw70h).
     """
     result: list[str] = []
     if args.source:
@@ -619,6 +632,8 @@ def collect_passthrough_args(
         result.append("--dry-run")
     if output_dir is not None:
         result.extend(["--output-dir", str(output_dir)])
+    if args.model:
+        result.extend(["--model", args.model])
     return result
 
 
