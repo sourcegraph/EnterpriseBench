@@ -28,7 +28,7 @@
       ]
     },
     "severity": {
-      "expected_solution": "Severity: HIGH. Two independent failure modes compound: (1) Grafana-side evaluation delays cause alerts to fire late (10-15 minutes) when complex rules exceed their evaluation interval, creating a backlog in the scheduler tick loop. (2) Alertmanager-side notification failures cause fired alerts to never reach operators, due to dispatch routing mismatches or notification integration timeouts. Together these create a silent alerting failure where critical conditions are detected late AND notifications are dropped.",
+      "expected_solution": "Severity: HIGH. Two independent failure modes compound: (1) Grafana-side evaluation delays (pkg/services/ngalert/schedule/schedule.go) cause alerts to fire late (10-15 minutes) when complex rules exceed their evaluation interval, creating a backlog in the scheduler tick loop. (2) Alertmanager-side notification failures (notify/notify.go) cause fired alerts to never reach operators, due to dispatch routing mismatches or notification integration timeouts. Together these create a silent alerting failure where critical conditions are detected late AND notifications are dropped.",
       "evaluation_criteria": [
         "Must assess as HIGH severity",
         "Must identify both Grafana-side (evaluation timing) and Alertmanager-side (notification delivery) as separate failure modes",

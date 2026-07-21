@@ -1,21 +1,33 @@
 """
 Verify Support Code Mapping task verifiers discriminate correctly.
 
-For each of the 12 support-mapping tasks:
+Covers the file-mapping cohort of support-mapping tasks — the ones with the
+standard 4-checkpoint layout (code_paths / ownership / severity /
+related_issues). The error-chain pair (dual-ansible-001, dual-httpx-httpcore-001)
+carries a different check set (error_source / error_chain / trigger_conditions)
+and is covered by tests/integrity/test_support_mapping_reanchor_coverage.py.
+
+For each covered task:
   (a) Ground truth answer → score >= 0.85
   (b) Empty answer → score <= 0.10
-  (c) Partial answer → score between 0.3-0.7
+  (c) Partial answer → score between 0.2-0.8
   No false positives: wrong answer must not score > 0.5
 
 Also verifies:
   - CSB-migrated tasks score >= 0.80 with ground truth answer
   - 4-checkpoint weighting (0.60/0.15/0.15/0.10) produces correct aggregation
+
+The ownership and severity checks are re-anchored onto
+ground_truth.json:scoring_evidence (EnterpriseBench-jn73.2.7.3.1.4): concept
+vocabulary earns nothing, so the synthetic ground-truth answer built here cites
+the repo-derived evidence tokens the way a genuinely correct answer would.
 """
 
 from __future__ import annotations
 
 import json
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -25,19 +37,29 @@ from eb_verify.runner import checkpoint_env
 REPO_ROOT = Path(__file__).parent.parent
 TASK_BASE = REPO_ROOT / "benchmarks" / "customer_escalation"
 
-# All support-mapping task directories
-SUPPORT_MAPPING_DIRS = sorted(TASK_BASE.glob("support-mapping-*"))
-
-# Verifier scripts in checkpoint order
-VERIFIERS = [
-    "checks/check_code_paths.sh",
-    "checks/check_ownership.sh",
-    "checks/check_severity.sh",
-    "checks/check_related_issues.sh",
+# The file-mapping cohort: every support-mapping task that carries the
+# standard 4-check layout this test models. The error-chain pair ships
+# different checks and is exercised elsewhere (see module docstring).
+SUPPORT_MAPPING_DIRS = [
+    d
+    for d in sorted(TASK_BASE.glob("support-mapping-*"))
+    if (d / "checks" / "check_ownership.sh").exists()
 ]
 
-# Checkpoint weights from task definitions (must sum to 1.0)
+# The 4 checkpoints every covered task must define. Weights and order vary per
+# task (they live in task.toml, the single source of truth) — the discrimination
+# bands below aggregate with each task's own weights.
+EXPECTED_CHECKPOINTS = {"code_paths", "ownership", "severity", "related_issues"}
+
+# Reference weight vector for the pure-math aggregation tests only.
 WEIGHTS = [0.60, 0.15, 0.15, 0.10]
+
+
+def _task_checkpoints(task_dir: Path) -> list[dict]:
+    """The task's own checkpoint table: [{name, weight, verifier}, ...]."""
+    with open(task_dir / "task.toml", "rb") as f:
+        task = tomllib.load(f)
+    return task.get("checkpoints", [])
 
 
 def _run_verifier(
@@ -88,8 +110,21 @@ def _load_ground_truth(task_dir: Path) -> dict:
     return json.loads(gt_path.read_text())
 
 
+def _evidence_tokens(gt: dict, checkpoint: str) -> list[str]:
+    """Repo-derived scoring_evidence tokens for a checkpoint ([] when absent)."""
+    tokens = (gt.get("scoring_evidence") or {}).get(checkpoint)
+    if not isinstance(tokens, list):
+        return []
+    return [t for t in tokens if isinstance(t, str) and t]
+
+
 def _build_ground_truth_answer(gt: dict) -> dict:
-    """Build a 'perfect' answer from ground truth data."""
+    """Build a 'perfect' answer from ground truth data.
+
+    A genuinely correct answer names the owning subsystem files and the
+    concrete mechanism, so the synthetic answer cites the re-anchored
+    scoring_evidence tokens alongside the legacy ownership keywords.
+    """
     gt_data = gt.get("ground_truth", gt)
     required = gt_data.get("required_files", [])
     sufficient = gt_data.get("sufficient_files", [])
@@ -97,18 +132,24 @@ def _build_ground_truth_answer(gt: dict) -> dict:
     expected_severity = gt.get("expected_severity", "high")
     related_refs = gt.get("related_references", [])
 
+    ownership_terms = ownership_kw + _evidence_tokens(gt, "ownership")
+    severity_rationale = f"Production impact assessed as {expected_severity}"
+    mechanism = _evidence_tokens(gt, "severity")
+    if mechanism:
+        severity_rationale += "; mechanism: " + " ".join(mechanism)
+
     return {
         "code_paths": [
             {"path": f["path"], "repo": f["repo"]}
             for f in required + sufficient
         ],
         "ownership": {
-            "subsystem": " ".join(ownership_kw),
+            "subsystem": " ".join(ownership_terms),
             "description": " ".join(kw.replace("-", " ") for kw in ownership_kw),
         },
         "severity": {
             "level": expected_severity,
-            "rationale": f"Production impact assessed as {expected_severity}",
+            "rationale": severity_rationale,
         },
         "related_issues": [
             {"reference": ref, "type": "doc"} for ref in related_refs
@@ -220,11 +261,14 @@ def task_env(request, tmp_path: Path) -> tuple[str, Path, Path, dict]:
     return task_name, task_dir, workspace, gt
 
 
-def _run_all_verifiers(
-    task_dir: Path, workspace: Path
-) -> list[dict]:
-    """Run all 4 verifiers and return results."""
-    return [_run_verifier(task_dir, v, workspace) for v in VERIFIERS]
+def _score_task(task_dir: Path, workspace: Path) -> tuple[float, list[dict]]:
+    """Run every checkpoint verifier and aggregate with the task's own weights."""
+    checkpoints = _task_checkpoints(task_dir)
+    results = [
+        _run_verifier(task_dir, cp["verifier"], workspace) for cp in checkpoints
+    ]
+    weights = [cp["weight"] for cp in checkpoints]
+    return _weighted_score(results, weights), results
 
 
 class TestGroundTruthAnswer:
@@ -238,8 +282,7 @@ class TestGroundTruthAnswer:
         answer = _build_ground_truth_answer(gt)
         _create_answer(workspace, answer)
 
-        results = _run_all_verifiers(task_dir, workspace)
-        total = _weighted_score(results, WEIGHTS)
+        total, results = _score_task(task_dir, workspace)
         assert total >= 0.85, (
             f"{task_name}: ground truth answer scored {total:.2f} < 0.85. "
             f"Per-checkpoint: {[r.get('score', 0) for r in results]}"
@@ -257,8 +300,7 @@ class TestEmptyAnswer:
         answer = _build_empty_answer()
         _create_answer(workspace, answer)
 
-        results = _run_all_verifiers(task_dir, workspace)
-        total = _weighted_score(results, WEIGHTS)
+        total, results = _score_task(task_dir, workspace)
         assert total <= 0.10, (
             f"{task_name}: empty answer scored {total:.2f} > 0.10. "
             f"Per-checkpoint: {[r.get('score', 0) for r in results]}"
@@ -276,8 +318,7 @@ class TestPartialAnswer:
         answer = _build_partial_answer(gt)
         _create_answer(workspace, answer)
 
-        results = _run_all_verifiers(task_dir, workspace)
-        total = _weighted_score(results, WEIGHTS)
+        total, results = _score_task(task_dir, workspace)
         assert 0.20 <= total <= 0.80, (
             f"{task_name}: partial answer scored {total:.2f}, "
             f"expected 0.20-0.80. "
@@ -296,8 +337,7 @@ class TestWrongAnswer:
         answer = _build_wrong_answer()
         _create_answer(workspace, answer)
 
-        results = _run_all_verifiers(task_dir, workspace)
-        total = _weighted_score(results, WEIGHTS)
+        total, results = _score_task(task_dir, workspace)
         assert total <= 0.5, (
             f"{task_name}: wrong answer scored {total:.2f} > 0.5 — "
             f"false positive! Per-checkpoint: {[r.get('score', 0) for r in results]}"
@@ -313,8 +353,7 @@ class TestNoAnswerFile:
         task_name, task_dir, workspace, _ = task_env
 
         # Don't create answer.json at all
-        results = _run_all_verifiers(task_dir, workspace)
-        total = _weighted_score(results, WEIGHTS)
+        total, _ = _score_task(task_dir, workspace)
         assert total <= 0.10, (
             f"{task_name}: missing answer scored {total:.2f} > 0.10"
         )
@@ -328,14 +367,13 @@ class TestCSBLineage:
     ) -> None:
         task_name, task_dir, workspace, gt = task_env
 
-        # All 12 have csb_lineage
+        # Every covered task has csb_lineage
         assert "csb_lineage" in gt, f"{task_name}: missing csb_lineage"
 
         answer = _build_ground_truth_answer(gt)
         _create_answer(workspace, answer)
 
-        results = _run_all_verifiers(task_dir, workspace)
-        total = _weighted_score(results, WEIGHTS)
+        total, results = _score_task(task_dir, workspace)
         assert total >= 0.80, (
             f"{task_name} (CSB-migrated): scored {total:.2f} < 0.80. "
             f"Per-checkpoint: {[r.get('score', 0) for r in results]}"
@@ -351,24 +389,18 @@ class TestCheckpointWeighting:
         )
 
     def test_task_toml_weights_match(self) -> None:
-        """Verify all 12 task.toml files use the expected checkpoint weights."""
-        try:
-            import tomllib
-        except ImportError:
-            import tomli as tomllib  # type: ignore[no-redef]
-
+        """Every covered task defines exactly the 4 expected checkpoints and
+        its weights sum to 1.0. Per-task weight VALUES vary by design (e.g.
+        support-mapping-004 emphasizes related_issues); task.toml owns them."""
         for task_dir in SUPPORT_MAPPING_DIRS:
-            toml_path = task_dir / "task.toml"
-            assert toml_path.exists(), f"No task.toml in {task_dir}"
-            with open(toml_path, "rb") as f:
-                task = tomllib.load(f)
-            checkpoints = task.get("checkpoints", [])
-            assert len(checkpoints) == 4, (
-                f"{task_dir.name}: expected 4 checkpoints, got {len(checkpoints)}"
+            checkpoints = _task_checkpoints(task_dir)
+            names = [cp["name"] for cp in checkpoints]
+            assert sorted(names) == sorted(EXPECTED_CHECKPOINTS), (
+                f"{task_dir.name}: checkpoints {names} != {EXPECTED_CHECKPOINTS}"
             )
-            actual_weights = [cp["weight"] for cp in checkpoints]
-            assert actual_weights == WEIGHTS, (
-                f"{task_dir.name}: weights {actual_weights} != expected {WEIGHTS}"
+            weight_sum = sum(cp["weight"] for cp in checkpoints)
+            assert abs(weight_sum - 1.0) < 0.01, (
+                f"{task_dir.name}: weights sum to {weight_sum}, expected 1.0"
             )
 
     def test_weighted_aggregation_math(self) -> None:
