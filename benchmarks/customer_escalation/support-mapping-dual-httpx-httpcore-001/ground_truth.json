@@ -68,6 +68,14 @@
     "Omitting the timeout argument or passing a positional number falls through to DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0) in httpx/_config.py which produces a 5 second cap on every dimension including read",
     "The exception surfaced to user code is always an httpx subclass because httpx/_transports/default.py wraps every call into httpcore inside map_httpcore_exceptions which uses HTTPCORE_EXC_MAP to translate httpcore.ReadTimeout into httpx.ReadTimeout"
   ],
+  "scoring_evidence": {
+    "_note": "Repo-derived anchors for the re-anchored trigger_conditions check at httpx 0.27.0 / httpcore 1.0.5: the instruction hands over DEFAULT_TIMEOUT_CONFIG, HTTPCORE_EXC_MAP and the class names, so credit requires the values it does not supply — the literal 5.0 default constructor, its defining file, and the exception-remapping function in httpx/_transports/default.py.",
+    "trigger_conditions": [
+      "Timeout(timeout=5.0)",
+      "httpx/_config.py",
+      "map_httpcore_exceptions"
+    ]
+  },
   "expected_answer": {
     "error_origin": "httpcore AsyncHTTP11Connection per-operation read enforcement in httpcore/_async/http11.py raising httpcore.ReadTimeout when the read dimension of the timeout extension is exceeded during response body iteration",
     "bypass_reason": "Customer code most likely passes a single positional argument or omits timeout entirely so httpx falls back to DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0) defined in httpx/_config.py rather than the Timeout(timeout=None) they intend; the 5 second value is then forwarded into httpcore via the request extensions and enforced on read",

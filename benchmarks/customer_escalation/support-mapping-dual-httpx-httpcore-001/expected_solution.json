@@ -23,7 +23,7 @@
       ]
     },
     "trigger_conditions": {
-      "expected_solution": "Trigger conditions: (1) An explicit Timeout(timeout=None) marshals as None for each of connect/read/write/pool and disables per-operation timeouts at the httpcore HTTP11 connection level; (2) Omitting timeout or passing a positional number falls through to DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0) which yields a 5 second read cap; (3) Every exception path returning to user code goes through map_httpcore_exceptions -> HTTPCORE_EXC_MAP, so even when the underlying error is httpcore.ReadTimeout the user sees httpx.ReadTimeout, which obscures the cross-repo origin.",
+      "expected_solution": "Trigger conditions: (1) An explicit Timeout(timeout=None) marshals as None for each of connect/read/write/pool and disables per-operation timeouts at the httpcore HTTP11 connection level; (2) Omitting timeout or passing a positional number falls through to DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0) defined in httpx/_config.py which yields a 5 second read cap; (3) Every exception path returning to user code goes through map_httpcore_exceptions -> HTTPCORE_EXC_MAP, so even when the underlying error is httpcore.ReadTimeout the user sees httpx.ReadTimeout, which obscures the cross-repo origin.",
       "evaluation_criteria": [
         "Must identify the condition: explicit Timeout(None) disables per-op timeouts only when each dimension is None",
         "Must identify the condition: DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0) is the silent default the customer is most likely hitting",
