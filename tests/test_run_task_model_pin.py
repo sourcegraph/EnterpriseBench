@@ -46,6 +46,15 @@ class TestApplyModelFlag:
         cmd = "claude --model claude-opus-4-8 -p"
         assert _apply_model_flag(cmd, "claude-sonnet-5") == cmd
 
+    def test_pins_despite_model_prefixed_flag(self) -> None:
+        """A flag that merely starts with "--model" (e.g. --model-config) is
+        not an explicit model choice; the old substring test skipped the pin.
+        """
+        cmd = "claude --model-config /home/agent/mc.json -p"
+        assert _apply_model_flag(cmd, "claude-sonnet-5") == (
+            cmd + " --model claude-sonnet-5"
+        )
+
 
 class TestModelFlag:
     def test_build_parser_accepts_model(self) -> None:
