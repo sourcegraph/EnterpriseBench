@@ -61,7 +61,12 @@ from pathlib import Path
 from typing import Any
 
 from analyze_scores import parse_result
-from lib.shared import VALID_MODES, load_task_index, strip_mode_suffix
+from lib.shared import (
+    VALID_MODES,
+    load_task_index,
+    ordered_modes,
+    strip_mode_suffix,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -978,18 +983,28 @@ def _buckets(
     across all of them. The operational view passes the same denominator twice
     because an attempt is an attempt in either direction.
 
+    ``by_mode`` keys come out in canonical arm order (``ordered_modes``), not
+    alphabetical, so every JSON consumer sees the same baseline-first ordering
+    the charts and prose use. The other dimensions have no canonical order and
+    stay alphabetical.
+
     The dimensions are a table rather than a branch on the dimension name, so a
-    fourth breakdown has to declare its denominator instead of inheriting one.
+    fourth breakdown has to declare its denominator and key order instead of
+    inheriting one.
     """
 
-    dims = (("mode", in_arm), ("suite", across_arms), ("difficulty", across_arms))
-    return {
-        f"by_{dim}": {
-            k: _bucket(v, unit, reconcile)
-            for k, v in sorted(_group_by(items, attrgetter(dim)).items())
+    dims = (
+        ("mode", in_arm, ordered_modes),
+        ("suite", across_arms, sorted),
+        ("difficulty", across_arms, sorted),
+    )
+    buckets: dict[str, Any] = {}
+    for dim, unit, order in dims:
+        grouped = _group_by(items, attrgetter(dim))
+        buckets[f"by_{dim}"] = {
+            k: _bucket(grouped[k], unit, reconcile) for k in order(grouped)
         }
-        for dim, unit in dims
-    }
+    return buckets
 
 
 def _group_by(items: Sequence[TaskCost], key: Any) -> dict[Any, list[TaskCost]]:
