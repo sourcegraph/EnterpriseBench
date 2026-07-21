@@ -15,6 +15,10 @@ Usage:
     # Generate manifest, print commands, and execute them
     python3 scripts/run_sweep.py --execute --account 1-5
 
+    # Publish-scoped matrix: skip corpus-preserved tasks marked
+    # paper_scope = "excluded" in task.toml (e.g. non-single session_type)
+    python3 scripts/run_sweep.py --matrix publish --execute --account 1-5
+
     # Custom results dirs
     python3 scripts/run_sweep.py --results-dir results/runs --results-dir results/mcp_batch
 """
@@ -91,10 +95,21 @@ def discover_all_tasks(benchmarks_dir: Path | None = None) -> list[TaskInfo]:
 def build_sweep_matrix(
     tasks: list[TaskInfo],
     modes: list[str] | None = None,
+    matrix: str = "all",
 ) -> list[SweepItem]:
-    """Create all task x mode combinations as pending SweepItems."""
+    """Create all task x mode combinations as pending SweepItems.
+
+    matrix="publish" drops tasks with task.toml `paper_scope = "excluded"`
+    (corpus-preserved but not agent-runnable under the 3-arm publish
+    comparison, e.g. session_type != "single"). matrix="all" (default) keeps
+    every task discover_all_tasks() returned.
+    """
     if modes is None:
         modes = list(DEFAULT_SWEEP_MODES)
+    if matrix == "publish":
+        tasks = [t for t in tasks if t.paper_scope != "excluded"]
+    elif matrix != "all":
+        raise ValueError(f"Unknown matrix scope: {matrix!r} (expected 'all' or 'publish')")
     items: list[SweepItem] = []
     for task in tasks:
         for mode in modes:
@@ -314,6 +329,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Account range (e.g. '1-5' or '1,3,5')",
     )
     parser.add_argument(
+        "--matrix",
+        choices=("all", "publish"),
+        default="all",
+        help=(
+            "'all' (default) sweeps every discovered task. 'publish' drops "
+            "tasks marked task.toml paper_scope = \"excluded\" (corpus-"
+            "preserved, non-single session_type tasks that aren't "
+            "agent-runnable under the 3-arm comparison)."
+        ),
+    )
+    parser.add_argument(
         "--manifest-only",
         action="store_true",
         help="Generate manifest without printing or executing run commands",
@@ -373,11 +399,13 @@ def main(argv: list[str] | None = None) -> int:
     logger.info("Found %d tasks", len(tasks))
 
     # 2. Build sweep matrix
-    sweep_items = build_sweep_matrix(tasks, modes)
+    sweep_items = build_sweep_matrix(tasks, modes, matrix=args.matrix)
+    swept_task_count = len({item.task_id for item in sweep_items})
     logger.info(
-        "Sweep matrix: %d combinations (%d tasks x %d modes)",
+        "Sweep matrix (%s): %d combinations (%d tasks x %d modes)",
+        args.matrix,
         len(sweep_items),
-        len(tasks),
+        swept_task_count,
         len(modes),
     )
 
