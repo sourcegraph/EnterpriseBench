@@ -155,3 +155,23 @@ confidence = 0.70
 path = "charts/redis-ha/Chart.yaml"
 repo = "dandydeveloper-charts"
 confidence = 0.70
+
+[qa]
+
+[[qa.waivers]]
+code = "F2"
+token = "manifests/ha/base/redis-ha/chart/values.yaml"
+decision = "waive"
+rationale = "ArgoCD override file named as the comparison scope for the Helm-precedence drift trace. The discriminative answer is which null securityContext overrides break under Helm 3.17.1, not which file to inspect."
+approved_by = "stephanie.jarmak (dec-uon CLOSED)"
+bead = "EnterpriseBench-1is"
+date = "2026-06-04"
+
+[[qa.waivers]]
+code = "F2"
+token = "charts/redis-ha/values.yaml"
+decision = "waive"
+rationale = "Upstream redis-ha default-values file named as the comparison baseline for the override diff. Given as scope; the discriminative null-override drift is not named."
+approved_by = "stephanie.jarmak (dec-uon CLOSED)"
+bead = "EnterpriseBench-1is"
+date = "2026-06-04"
