@@ -2,25 +2,27 @@
   "task_id": "api-contract-tri-protobuf-001",
   "checkpoints": {
     "contract_source": {
-      "expected_solution": "Agent identifies well-known type definitions in protobuf The answer must reference the canonical artifact(s) for this checkpoint at the pinned revision (basenames: timestamp.proto, duration.proto, and struct.proto). The judge looks for the following concept tokens in the agent output: timestamp, duration, fieldmask, struct, any.proto.",
+      "expected_solution": "protobuf v25.1 defines the well-known types under src/google/protobuf/: timestamp.proto, duration.proto, struct.proto, and any.proto (plus field_mask.proto). The comments in those files pin the JSON wire contract: Timestamp serializes to an RFC 3339 string, Duration to a decimal seconds string with an s suffix, Struct maps onto plain JSON objects with its NullValue singleton standing in for null, and Any embeds a type.googleapis.com type URL beside the payload fields.",
       "evaluation_criteria": [
-        "Cites at least one canonical file by basename (timestamp.proto, duration.proto, and struct.proto) in the agent output",
-        "Mentions at least three of the canonical concept tokens: timestamp, duration, fieldmask, struct, and any.proto"
+        "Cites timestamp.proto, duration.proto and struct.proto under src/google/protobuf/",
+        "Cites any.proto and its type URL contract",
+        "Describes the JSON serialization semantics the .proto comments pin down"
       ]
     },
     "direct_consumers": {
-      "expected_solution": "Agent finds gRPC and googleapis consumers of well-known types The answer must reference the canonical artifact(s) for this checkpoint at the pinned revision (basenames: message_size_filter.cc, httpbody.proto, and status.proto). The judge looks for the following concept tokens in the agent output: path.",
+      "expected_solution": "The gRPC v1.60.0 C++ core treats messages as opaque serialized bytes; the concrete integration point on the wire path is src/core/ext/filters/message_size/message_size_filter.cc, where ClientMessageSizeFilter and ServerMessageSizeFilter enforce serialized-size limits on every message the channel moves. googleapis (common-protos-1_3_1) consumes the well-known types directly: google/rpc/status.proto imports google/protobuf/any.proto for its repeated details field, and google/longrunning/operations.proto builds on Any for operation payloads.",
       "evaluation_criteria": [
-        "Cites at least one canonical file by basename (message_size_filter.cc, httpbody.proto, and status.proto) in the agent output",
-        "Mentions at least three of the canonical concept tokens: path",
-        "Connects the source artifacts to their downstream impact in the consumer code path"
+        "Cites message_size_filter.cc (ClientMessageSizeFilter / ServerMessageSizeFilter) as the gRPC-side wire touchpoint",
+        "Cites google/rpc/status.proto as a googleapis consumer of well-known types",
+        "Connects the googleapis protos to their google/protobuf imports"
       ]
     },
     "compliance_check": {
-      "expected_solution": "Agent identifies contract compliance issues The answer must reference the canonical artifact(s) for this checkpoint at the pinned revision (basenames: timestamp.proto, message_size_filter.cc, httpbody.proto, duration.proto, struct.proto, and status.proto). The judge looks for the following concept tokens in the agent output: serializ, json, contract, drift, mismatch, breaking, compat.",
+      "expected_solution": "The contract chain: protobuf's WKT definitions fix the JSON forms (RFC 3339 for Timestamp, NullValue for Struct nulls, a type.googleapis.com prefix for Any type URLs); the gRPC runtime forwards serialized bytes subject to message-size filtering, so it neither repairs nor detects a semantic mismatch; googleapis protos assume those exact forms — the repeated google.protobuf.Any details field in google/rpc/status.proto only round-trips when producer and consumer agree on the type URL prefix and the JSON encodings. Drift between a v25.x serializer and an older consumer surfaces precisely at these seams as serialization errors.",
       "evaluation_criteria": [
-        "Cites at least one canonical file by basename (timestamp.proto, message_size_filter.cc, httpbody.proto, duration.proto, struct.proto, and status.proto) in the agent output",
-        "Mentions at least three of the canonical concept tokens: serializ, json, contract, drift, and mismatch"
+        "Anchors the Timestamp JSON contract in RFC 3339",
+        "Anchors the Any contract in the type.googleapis.com type URL prefix and google.protobuf.Any usage",
+        "Anchors the Struct null contract in NullValue"
       ]
     }
   }
