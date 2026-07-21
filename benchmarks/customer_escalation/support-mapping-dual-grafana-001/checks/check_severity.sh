@@ -29,16 +29,22 @@ if not expected_severity:
     print(json.dumps({'score': 0.0, 'passed': False, 'detail': 'No expected severity in ground truth'}))
     sys.exit(0)
 
-# Specific Envoy config parameter names that must accompany the severity rating.
-# A hallucinating agent that just says 'high severity' without citing the actual
-# mechanism should not pass.
+# Implementation identifiers from the prometheus v2.48.0 / grafana v10.2.0
+# sample-limit path that must accompany the severity rating. A hallucinating
+# agent that just says 'high severity' without citing the actual mechanism
+# should not pass. All are repo-derived and appear ZERO times in instruction.md
+# (verified with grep -cioF); the prompt's 'max samples' / 'query timeout' are
+# spaced, so they cannot substring-match these identifiers under this
+# normalization. (This list previously carried Envoy connection-pool parameters
+# copy-pasted from another task, which no honest grafana/prometheus answer
+# could ever cite.)
 MECHANISM_KEYWORDS = [
-    'max_connections',
-    'max_pending_requests',
-    'conn_pool_base',
-    'ConnPoolBase',
-    'circuit_breaking',
-    'circuit breaker',
+    'ErrTooManySamples',
+    'MaxSamples',
+    'maxSamplesPerQuery',
+    'query.max-samples',
+    'returnAPIError',
+    'queryTimeout',
 ]
 
 # Extract agent severity (flexible key names)

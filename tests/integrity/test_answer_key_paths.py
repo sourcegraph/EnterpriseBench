@@ -41,6 +41,7 @@ VERIFIED_TASKS = [
     # Lane ground-truth authoring: each key was written from a shallow clone of
     # the pinned revs and every extracted path stat()'d locally before landing.
     "customer_escalation/support-mapping-dual-flask-001",
+    "customer_escalation/support-mapping-dual-grafana-001",
 ]
 
 

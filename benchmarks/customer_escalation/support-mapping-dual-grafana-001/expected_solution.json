@@ -1,0 +1,40 @@
+{
+  "task_id": "support-mapping-dual-grafana-001",
+  "checkpoints": {
+    "code_paths": {
+      "expected_solution": "Prometheus side (v2.48.0): the limit is enforced by the PromQL engine in promql/engine.go. ErrTooManySamples (declared lines 92-93) renders exactly the customer's message — 'query processing would load too many samples into memory in %s' (line 108). The evaluator raises it via ev.error(ErrTooManySamples(env)) at the eval sites (lines 1214, 1234, 1541, 1704, 1818) whenever a query would exceed maxSamplesPerQuery (engine.go line 407), which comes from EngineOpts.MaxSamples (line 281) and is wired from the --query.max-samples flag in cmd/prometheus/main.go (lines 415-416, default 50000000; --query.timeout sits beside it). The error leaves Prometheus through web/api/v1/api.go: query/query_range handlers pass res.Err to returnAPIError (lines 622-645), which classifies it as apiError{errorExec} ('execution', line 76) and the HTTP layer serializes {\"status\":\"error\",\"errorType\":\"execution\",\"error\":...} with a 422. Grafana side (v10.2.0): the dashboard panel issues the query through the frontend Prometheus datasource public/app/plugins/datasource/prometheus/datasource.ts to Grafana's backend query endpoint POST /api/ds/query (pkg/api/metrics.go QueryMetricsV2, line 51), which resolves the datasource via pkg/services/datasources/datasources.go and hands the query to the Prometheus plugin (pkg/tsdb/prometheus/prometheus.go Service.QueryData, line 80). pkg/tsdb/prometheus/querydata/request.go executes the HTTP call and copies the upstream error into the backend DataResponse.Error (error propagation at lines 120-201, including the fallback Error: fmt.Errorf(res.Status)), which is what the panel renders as the error banner. Configuration knobs: Prometheus --query.max-samples and --query.timeout; Grafana per-datasource queryTimeout (public/app/plugins/datasource/prometheus/configuration/PromSettings.tsx, jsonData.queryTimeout) plus the server-wide dataproxy timeout settings.",
+      "evaluation_criteria": [
+        "Must cite promql/engine.go as the file that generates the error: ErrTooManySamples with the literal 'query processing would load too many samples into memory' message, enforced against MaxSamples/maxSamplesPerQuery",
+        "Must cite pkg/tsdb/prometheus/querydata/request.go as the Grafana-side file where the upstream Prometheus error is turned into the DataResponse error the panel displays",
+        "Must cite web/api/v1/api.go for the HTTP surface: returnAPIError classifying the engine error as errorType 'execution' on the query/query_range endpoints",
+        "Must describe the full path in order: panel -> frontend prometheus datasource (datasource.ts) -> /api/ds/query -> datasource resolution (pkg/services/datasources) -> prometheus plugin QueryData -> pkg/tsdb/prometheus/querydata/request.go -> promql engine limit -> error propagated back to the panel",
+        "Must name the controlling configuration on both sides: --query.max-samples (default 50000000) and --query.timeout on Prometheus; the per-datasource queryTimeout (and dataproxy timeout) on Grafana",
+        "Should distinguish the two symptoms the customer conflates: 'query timeout' (Grafana/dataproxy or --query.timeout) versus the sample-limit error text, which is a MaxSamples rejection, not a timeout"
+      ]
+    },
+    "ownership": {
+      "expected_solution": "The sample-limit mechanism is owned by the Prometheus PromQL engine (promql/ package — promql/engine.go and promql/parser/parse.go); its HTTP surface is owned by the Prometheus web API (web/api/v1/api.go). On the Grafana side, the Prometheus datasource plugin (pkg/tsdb/prometheus/, plus the frontend public/app/plugins/datasource/prometheus/) owns query execution and error propagation into the dashboard panel, and pkg/services/datasources owns datasource resolution and proxy settings. A change to the limit itself belongs to the Prometheus promql/query engine maintainers; how the error is displayed in a dashboard panel belongs to Grafana's datasource/plugin owners.",
+      "evaluation_criteria": [
+        "Must attribute the sample limit to Prometheus's PromQL engine (promql package) and the error display path to Grafana's Prometheus datasource plugin",
+        "Must name both projects' surfaces: prometheus web/api/v1 for the HTTP error contract, grafana pkg/tsdb/prometheus (and the frontend datasource) for query execution in dashboards",
+        "Should route the escalation correctly: raising the limit -> Prometheus operators/maintainers (query.max-samples); surfacing/timeout behavior in panels -> Grafana datasource owners"
+      ]
+    },
+    "related_issues": {
+      "expected_solution": "Related code and context an investigator should attach to the ticket: pkg/services/datasources/datasources.go (Grafana datasource service — where datasource config such as timeouts is stored and resolved), web/api/v1/api.go (the Prometheus API layer whose errorType 'execution' distinguishes a limit rejection from a timeout, errorType 'timeout'), and promql/parser/parse.go (the PromQL parser — complex queries with many selectors/subqueries are what drive sample counts up, and parsing is where a query's shape is fixed before evaluation). The customer-facing knobs to reference: Prometheus --query.max-samples and --query.timeout, Grafana per-datasource queryTimeout, and reducing query range/resolution (step interval, maxDataPoints) to cut samples loaded.",
+      "evaluation_criteria": [
+        "Must reference pkg/services/datasources/datasources.go as related Grafana-side context for datasource configuration/resolution",
+        "Must reference web/api/v1/api.go and the errorType distinction (execution vs timeout) as the signal separating a sample-limit rejection from a real timeout",
+        "Must reference promql/parser/parse.go as related context for how query shape (selectors, subqueries, range/step) determines sample volume"
+      ]
+    },
+    "severity": {
+      "expected_solution": "Severity: high. Dashboards backing operational monitoring fail for every panel whose PromQL exceeds the sample budget — after the v2.48.0 upgrade this is a persistent, deterministic loss of observability for the affected views (not a transient blip), and it hides exactly the high-cardinality panels teams rely on during incidents. It is not critical: Prometheus itself is healthy and ingesting, simple queries work, and there are direct operator remediations — raise --query.max-samples (MaxSamples/maxSamplesPerQuery is the enforcing mechanism, returnAPIError/errorExec is just the messenger), raise the per-datasource queryTimeout if timeouts are also in play, or reduce query range/step so fewer samples load. The rating rests on the mechanism: ErrTooManySamples is a hard rejection at query evaluation, so no retry will succeed until config or query shape changes.",
+      "evaluation_criteria": [
+        "Must rate severity as high (loss of monitoring visibility on affected dashboards, deterministic and persistent post-upgrade), while noting it is not critical because ingestion is healthy and operator-level remediations exist",
+        "Must ground the rating in the concrete mechanism: a hard ErrTooManySamples/MaxSamples rejection at query evaluation time — retries cannot succeed until --query.max-samples or the query shape changes",
+        "Should name at least one concrete remediation knob with its side: --query.max-samples (Prometheus) or queryTimeout / range-and-step reduction (Grafana)"
+      ]
+    }
+  }
+}
