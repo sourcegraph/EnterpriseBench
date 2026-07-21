@@ -50,8 +50,13 @@ verifier = "checks/check_test_fails.sh"
 description = "Regression test fails on current buggy code for the correct reason"
 timeout_seconds = 120
 
+# code_patch is the primary deliverable (the regression test). answer is
+# graded too: checks/check_root_cause.sh (weight 0.30) scores
+# agent_output/answer.json, which the run_task.py output appendix instructs
+# every agent to write.
 [artifacts]
 required = ["code_patch"]
+optional = ["answer"]
 
 [tool_access]
 sourcegraph_mirror_config = "configs/sg_mirrors/ansible-galaxy-tar-regression-prove-001.json"

@@ -190,6 +190,62 @@ class TestJsonOutputDelegation:
         assert sum(summary.values()) == 0
 
 
+class TestArtifactMatchOptionalCoverage:
+    """'answer' in [artifacts].optional satisfies artifact_match.
+
+    check_artifact_match unions required and optional. Pinned because the
+    ansible-galaxy-tar-regression-prove-001 repair relies on it: code_patch
+    stays the sole required artifact (the regression test) while the graded
+    answer.json is declared optional.
+    """
+
+    def _task_reading_answer(
+        self, benchmarks: Path, artifacts_toml: str
+    ) -> None:
+        task_dir = _write_clean_task(benchmarks)
+        toml_text = _CLEAN_TASK_TOML.replace(
+            '[artifacts]\nrequired = ["answer"]', artifacts_toml
+        )
+        assert artifacts_toml in toml_text  # replacement actually happened
+        (task_dir / "task.toml").write_text(toml_text)
+        # _CLEAN_CHECK_SH does not mention answer.json; make the check read it.
+        script = task_dir / "checks" / "check_answer.sh"
+        script.write_text(
+            _CLEAN_CHECK_SH.replace(
+                "os.environ['ANSWER_PATH']",
+                "os.environ['WORKSPACE'] + '/agent_output/answer.json'",
+            )
+        )
+        script.chmod(script.stat().st_mode | stat.S_IXUSR)
+
+    def test_answer_in_optional_is_not_a_violation(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        benchmarks = tmp_path / "benchmarks"
+        self._task_reading_answer(
+            benchmarks,
+            '[artifacts]\nrequired = ["code_patch"]\noptional = ["answer"]',
+        )
+        monkeypatch.setattr(ac, "BENCH_DIR", benchmarks)
+
+        _violations, summary = ac.main([])
+
+        assert summary["artifact_match"] == 0
+
+    def test_undeclared_answer_is_a_violation(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        benchmarks = tmp_path / "benchmarks"
+        self._task_reading_answer(
+            benchmarks, '[artifacts]\nrequired = ["code_patch"]'
+        )
+        monkeypatch.setattr(ac, "BENCH_DIR", benchmarks)
+
+        _violations, summary = ac.main([])
+
+        assert summary["artifact_match"] == 1
+
+
 class TestViolationDetectionStillExitsNonzero:
     """Seeded-violation regression guard for the exit-code contract the
     --out refactor must not disturb: exit 1 iff any violation summed.
