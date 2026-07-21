@@ -11,6 +11,7 @@ Checks ALL active tasks for:
 6. Artifact types in task.toml match what check scripts read
 """
 
+import argparse
 import os
 import re
 import stat
@@ -28,8 +29,12 @@ except ImportError:
     except ImportError:
         tomllib = None
 
-BENCH_DIR = Path("/home/ds/EnterpriseBench/benchmarks")
-RESULTS_FILE = Path("/home/ds/EnterpriseBench/results/analysis/consistency_audit.md")
+# Repo root derived from this script's own location, not a hardcoded absolute
+# path — a hardcoded path silently no-ops (FileNotFoundError, or worse, a
+# stale sibling checkout) on any machine/CI runner/worktree other than the
+# one it was written on.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+BENCH_DIR = REPO_ROOT / "benchmarks"
 ARCHIVED = {"_archived"}
 
 # Collect all active task directories (skip _archived, examples, mined)
@@ -196,7 +201,79 @@ def check_artifact_match(task_dir, toml_data):
     return violations
 
 
-def main():
+def write_report(
+    out_path: Path,
+    tasks_checked: int,
+    total_scripts: int,
+    all_violations: dict,
+    summary: dict,
+) -> None:
+    """Write the markdown consistency-audit report to an explicit path."""
+    import datetime
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    total_violations = sum(summary.values())
+    tasks_with_issues = len(all_violations)
+
+    with open(out_path, "w") as f:
+        f.write("# Cross-Task Consistency Audit\n\n")
+        f.write(
+            f"Generated: {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
+        )
+
+        f.write("## Summary\n\n")
+        f.write(f"| Metric | Count |\n")
+        f.write(f"|--------|-------|\n")
+        f.write(f"| Tasks scanned | {tasks_checked} |\n")
+        f.write(f"| Check scripts scanned | {total_scripts} |\n")
+        f.write(f"| Tasks with violations | {tasks_with_issues} |\n")
+        f.write(f"| Total violations | {total_violations} |\n\n")
+
+        f.write("## Violations by Category\n\n")
+        f.write("| Category | Count | Description |\n")
+        f.write("|----------|-------|-------------|\n")
+        f.write(f"| env_usage | {summary['env_usage']} | Shell var expansion in python3 -c blocks |\n")
+        f.write(f"| set_flags | {summary['set_flags']} | Missing set -euo pipefail |\n")
+        f.write(f"| json_output | {summary['json_output']} | Missing score/passed keys in output |\n")
+        f.write(f"| weights | {summary['weights']} | Checkpoint weights not summing to 1.0 |\n")
+        f.write(f"| executable | {summary['executable']} | Check scripts not chmod +x |\n")
+        f.write(f"| artifact_match | {summary['artifact_match']} | Artifact type mismatch |\n\n")
+
+        if all_violations:
+            f.write("## Detailed Violations\n\n")
+            for task_name, violations in sorted(all_violations.items()):
+                f.write(f"### {task_name}\n\n")
+                for category, detail in violations:
+                    f.write(f"- **[{category}]** {detail}\n")
+                f.write("\n")
+        else:
+            f.write("## Detailed Violations\n\n")
+            f.write("No violations found.\n\n")
+
+        f.write("## Checks Performed\n\n")
+        f.write("1. **env_usage**: All python3 -c blocks use `os.environ` (not `'$VAR'` shell expansion)\n")
+        f.write("2. **set_flags**: All scripts have `set -euo pipefail` or `set -uo pipefail`\n")
+        f.write("3. **json_output**: All scripts produce JSON with `score` and `passed` keys\n")
+        f.write("4. **weights**: Checkpoint weights sum to 1.0 (±0.01)\n")
+        f.write("5. **executable**: All check scripts are chmod +x\n")
+        f.write("6. **artifact_match**: Artifact types in task.toml match what check scripts read\n")
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Write the markdown report to this path (opt-in; default: no file, "
+        "stdout summary only)",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None):
+    args = parse_args(argv)
     tasks = find_active_tasks()
     print(f"Found {len(tasks)} active tasks")
 
@@ -276,56 +353,16 @@ def main():
         if task_violations:
             all_violations[task_name] = task_violations
 
-    # Generate report
-    RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-
     total_violations = sum(summary.values())
     tasks_with_issues = len(all_violations)
 
-    with open(RESULTS_FILE, "w") as f:
-        f.write("# Cross-Task Consistency Audit\n\n")
-        f.write(f"Generated: {__import__('datetime').datetime.now(__import__('datetime').timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n")
-
-        f.write("## Summary\n\n")
-        f.write(f"| Metric | Count |\n")
-        f.write(f"|--------|-------|\n")
-        f.write(f"| Tasks scanned | {tasks_checked} |\n")
-        f.write(f"| Check scripts scanned | {total_scripts} |\n")
-        f.write(f"| Tasks with violations | {tasks_with_issues} |\n")
-        f.write(f"| Total violations | {total_violations} |\n\n")
-
-        f.write("## Violations by Category\n\n")
-        f.write("| Category | Count | Description |\n")
-        f.write("|----------|-------|-------------|\n")
-        f.write(f"| env_usage | {summary['env_usage']} | Shell var expansion in python3 -c blocks |\n")
-        f.write(f"| set_flags | {summary['set_flags']} | Missing set -euo pipefail |\n")
-        f.write(f"| json_output | {summary['json_output']} | Missing score/passed keys in output |\n")
-        f.write(f"| weights | {summary['weights']} | Checkpoint weights not summing to 1.0 |\n")
-        f.write(f"| executable | {summary['executable']} | Check scripts not chmod +x |\n")
-        f.write(f"| artifact_match | {summary['artifact_match']} | Artifact type mismatch |\n\n")
-
-        if all_violations:
-            f.write("## Detailed Violations\n\n")
-            for task_name, violations in sorted(all_violations.items()):
-                f.write(f"### {task_name}\n\n")
-                for category, detail in violations:
-                    f.write(f"- **[{category}]** {detail}\n")
-                f.write("\n")
-        else:
-            f.write("## Detailed Violations\n\n")
-            f.write("No violations found.\n\n")
-
-        f.write("## Checks Performed\n\n")
-        f.write("1. **env_usage**: All python3 -c blocks use `os.environ` (not `'$VAR'` shell expansion)\n")
-        f.write("2. **set_flags**: All scripts have `set -euo pipefail` or `set -uo pipefail`\n")
-        f.write("3. **json_output**: All scripts produce JSON with `score` and `passed` keys\n")
-        f.write("4. **weights**: Checkpoint weights sum to 1.0 (±0.01)\n")
-        f.write("5. **executable**: All check scripts are chmod +x\n")
-        f.write("6. **artifact_match**: Artifact types in task.toml match what check scripts read\n")
+    if args.out is not None:
+        write_report(args.out, tasks_checked, total_scripts, all_violations, summary)
 
     print(f"\nAudit complete: {tasks_checked} tasks, {total_scripts} scripts")
     print(f"Violations: {total_violations} across {tasks_with_issues} tasks")
-    print(f"Report: {RESULTS_FILE}")
+    if args.out is not None:
+        print(f"Report: {args.out}")
 
     return all_violations, summary
 
