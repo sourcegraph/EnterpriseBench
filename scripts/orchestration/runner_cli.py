@@ -39,6 +39,7 @@ PASSTHROUGH_FLAGS: tuple[str, ...] = (
     "--mode",
     "--dry-run",
     "--output-dir",
+    "--model",
 )
 
 # argparse kwargs for each forwarding flag, used when a runner only needs to
@@ -52,6 +53,7 @@ _FLAG_KWARGS: dict[str, dict[str, object]] = {
     "--mode": {"type": str, "default": None},
     "--dry-run": {"action": "store_true"},
     "--output-dir": {"type": str, "default": None},
+    "--model": {"type": str, "default": None},
 }
 
 

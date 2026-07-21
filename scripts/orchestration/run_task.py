@@ -163,6 +163,10 @@ class TaskRunConfig:
     rep: int | None = None
     ablation_variant: str | None = None
     min_disk_gb: float = 10.0
+    # Model to pass to the agent CLI via --model (e.g. "claude-sonnet-5").
+    # None/empty means "let the agent CLI use its own default" — passthrough
+    # only, this must never change behavior when unset.
+    model: str | None = None
 
 
 # Status marker for runs that must not be scored (e.g. MCP pre-flight failure,
@@ -305,6 +309,11 @@ class TaskRunResult:
     # "" for normal runs; RUN_STATUS_INVALID for runs that must be re-run,
     # never scored (see the MCP pre-flight gate).
     status: str = ""
+    # Dispatch-time provenance for a mixed-model/mixed-CLI-version sweep to be
+    # detectable post-hoc: the resolved --model string (None if unpinned) and
+    # the `claude --version` output captured from the container right before
+    # the agent runs. Populated best-effort; absence must never block a save.
+    run_metadata: dict = field(default_factory=dict)
 
 
 def _load_oauth_token(account: int) -> str:
@@ -1431,6 +1440,23 @@ def _run_health_check(container_id: str, repos: list[dict]) -> bool:
     return all_healthy
 
 
+def _apply_model_flag(agent_command: str, model: str | None) -> str:
+    """Pin *model* onto *agent_command* via a trailing `--model <model>` flag.
+
+    No-op (returns *agent_command* unchanged) when: *model* is unset/empty
+    (default behavior must not change when --model is absent), *agent_command*
+    is empty (nothing to pin onto), or the command already names a model
+    explicitly (never override an explicit choice). The model string is
+    shell-quoted the same way the rest of agent_command is validated —
+    :func:`_run_agent`'s _SAFE_AGENT_CMD_RE rejects anything shlex.quote would
+    need real quoting for, so a malformed --model value fails loudly there
+    rather than silently mis-invoking the agent.
+    """
+    if not model or not agent_command or "--model" in agent_command:
+        return agent_command
+    return agent_command + f" --model {shlex.quote(model)}"
+
+
 def _run_agent(
     container_id: str,
     agent_command: str,
@@ -2040,6 +2066,7 @@ def _save_results(
             "timeout": config.timeout,
             "dry_run": config.dry_run,
             "mode": config.mode,
+            "model": config.model or None,
         },
         "task_metadata": {
             "suite": task_data.get("task", {}).get("suite", ""),
@@ -2047,6 +2074,10 @@ def _save_results(
             "difficulty": task_data.get("task", {}).get("difficulty", ""),
             "languages": task_data.get("metadata", {}).get("languages", []),
         },
+        # Dispatch-time provenance so a mixed-model/mixed-CLI-version sweep is
+        # detectable post-hoc without re-parsing agent logs. See
+        # TaskRunResult.run_metadata for what populates this.
+        "run_metadata": result.run_metadata,
     }
     results_path.write_text(json.dumps(payload, indent=2) + "\n")
 
@@ -2062,6 +2093,7 @@ def _save_results(
         "no_build": config.no_build,
         "keep_container": config.keep_container,
         "mode": config.mode,
+        "model": config.model or None,
     }
     (output_dir / "config.json").write_text(json.dumps(config_payload, indent=2) + "\n")
 
@@ -3175,6 +3207,9 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         # Resolve OAuth token if --account was specified
         env_extra: dict[str, str] = {}
         agent_command = config.agent_command
+        # Recorded up front (even when unset) so a mixed-model sweep is
+        # detectable post-hoc from results.json alone.
+        result.run_metadata["model"] = config.model or None
 
         # Set Sourcegraph access token and TLS bypass for MCP modes
         if config.mode in ("mcp_only", "hybrid"):
@@ -3233,6 +3268,18 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
                 result.timing = timings
                 _save_results(result, task_data, output_dir, config)
                 return result
+
+            # Record the dispatched CLI version for post-hoc detection of a
+            # mixed-version sweep. Best-effort: a failed capture must not block
+            # the run — it just leaves run_metadata.claude_cli_version unset.
+            ver = _docker_exec(container_id, ["claude", "--version"])
+            if ver.returncode == 0:
+                result.run_metadata["claude_cli_version"] = ver.stdout.strip()
+
+        # Pin the model on the actual invocation, whether it came from
+        # DEFAULT_OAUTH_AGENT_COMMAND above or a caller-supplied --agent
+        # command.
+        agent_command = _apply_model_flag(agent_command, config.model)
 
         if agent_command:
             # --- Pre-agent readability gate (fail loud, never fake-0) ---
@@ -3488,6 +3535,18 @@ Examples:
         ),
     )
     parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help=(
+            "Model to pass to the agent CLI via --model (e.g. 'claude-sonnet-5'). "
+            "Appended to the resolved agent command and recorded in "
+            "results.json/config.json run metadata. Omit to leave the agent "
+            "CLI's own default in effect — this does not change behavior when "
+            "unset."
+        ),
+    )
+    parser.add_argument(
         "--mode",
         choices=list(VALID_MODES),
         default="baseline",
@@ -3576,6 +3635,7 @@ def main() -> None:
         rep=args.rep,
         ablation_variant=args.ablation_variant,
         min_disk_gb=args.min_disk_gb,
+        model=args.model,
     )
 
     result = run_task(config)
@@ -3585,6 +3645,8 @@ def main() -> None:
     print("=" * 60)
     print(f"Task:      {result.task_id}")
     print(f"Mode:      {config.mode}")
+    if config.model:
+        print(f"Model:     {config.model}")
     print(f"Phase:     {result.phase}")
     print(f"Success:   {result.success}")
     if result.error:

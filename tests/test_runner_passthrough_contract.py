@@ -43,6 +43,7 @@ def _maximal_namespace() -> argparse.Namespace:
         account="3",
         mode="hybrid",
         dry_run=True,
+        model="claude-sonnet-5",
     )
 
 
