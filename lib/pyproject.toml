@@ -29,7 +29,12 @@ scoring = [
 # eb_metrics) dies at collection with ModuleNotFoundError — the CI failure
 # this extra exists to close.
 metrics = [
-    "codeprobe>=0.5.5",
+    # Upper bound: codeprobe owns these schemas and does not follow semver
+    # guarantees we control, so each new minor gets admitted deliberately —
+    # bump the bound after tests/integrity/test_codeprobe_dependency_declared.py
+    # ::test_trace_quality_adapter_symbols_present (the canary that every
+    # imported symbol still exists) passes against it.
+    "codeprobe>=0.5.5,<0.12",
 ]
 dev = [
     "eb-verify[scoring,metrics]",
