@@ -27,8 +27,9 @@ The JSON parser uses the `json-iterator/go` library (jsoniter), which has an unu
 ## Environment
 
 - Grafana v10.1.0 at `/workspace/grafana/`
-- Prometheus v2.46.0 at `/workspace/prometheus/` (for understanding the API response format)
-- Focus on the Go backend, specifically the Prometheus response converter
+- Focus on the Go backend, specifically the Prometheus response converter. Prometheus itself
+  returns a complete, valid JSON response (see the investigation notes above) -- the bug is
+  entirely in how Grafana parses that response, so you will not need a Prometheus checkout.
 
 ## What I Need
 

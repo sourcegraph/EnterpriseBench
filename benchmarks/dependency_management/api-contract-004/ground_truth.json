@@ -1,16 +1,12 @@
 {
   "candidate_id": "AC-4",
   "producer_repo": "grpc/grpc-go",
-  "consumer_repos": [
-    "etcd-io/etcd"
-  ],
+  "consumer_repos": [],
   "breaking_change_pr": "grpc/grpc-go#8026",
-  "consumer_fix_prs": [
-    "etcd-io/etcd#19780"
-  ],
+  "consumer_fix_prs": [],
   "api_contract_type": "go_interface",
   "breakage_type": "compile_error",
-  "description": "gRPC-Go enforced embedding requirement on balancer.ClientConn interface, breaking etcd's custom implementations",
+  "description": "gRPC-Go enforced an embedding requirement on balancer.ClientConn via an internal.EnforceClientConnEmbedding marker; the breakage is entirely internal to grpc-go's own balancer and xds implementations (etcd-io/etcd does not implement balancer.ClientConn at any pinned revision and is not a genuine consumer of this change -- corrected 2026-07-21, see EnterpriseBench-Lane-E CRNT repair)",
   "producer_changed_files": [
     "balancer/balancer.go",
     "balancer/subconn.go",
@@ -20,13 +16,16 @@
     "internal/testutils/balancer.go",
     "xds/internal/balancer/outlierdetection/balancer.go"
   ],
-  "consumer_affected_files": {
-    "etcd": [
-      "server/etcdserver/api/rafthttp/http.go"
+  "internal_implementors": {
+    "grpc-go": [
+      "internal/balancer/gracefulswitch/gracefulswitch.go",
+      "xds/internal/balancer/outlierdetection/balancer.go",
+      "internal/testutils/balancer.go"
     ]
   },
   "breaking_symbols": [
-    "balancer.ClientConn"
+    "balancer.ClientConn",
+    "internal.EnforceClientConnEmbedding"
   ],
   "difficulty": "hard",
   "confidence": 0.92,
@@ -41,16 +40,21 @@
       "xds/internal/balancer/outlierdetection/balancer.go",
       "balancer.go",
       "subconn.go",
-      "gracefulswitch.go"
+      "gracefulswitch.go",
+      "EnforceClientConnEmbedding"
     ],
     "find_direct_consumers": [
-      "server/etcdserver/api/rafthttp/http.go",
-      "http.go",
-      "ground_truth"
+      "internal/balancer/gracefulswitch/gracefulswitch.go",
+      "xds/internal/balancer/outlierdetection/balancer.go",
+      "gracefulswitch.go",
+      "outlierdetection",
+      "wrappedBalancer",
+      "outlierDetectionBalancer"
     ],
     "trace_transitive_impact": [
-      "etcd-io/etcd#19780",
-      "balancer/balancer.go"
+      "internal/testutils/balancer.go",
+      "BalancerClientConn",
+      "EnforceClientConnEmbedding"
     ],
     "classify_breakage": [
       "compile_error",
