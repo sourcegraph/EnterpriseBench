@@ -124,6 +124,46 @@ EB_VERIFY_LIB = REPO_ROOT / "lib" / "eb_verify"
 
 VALID_MODES = ("baseline", "mcp_only", "hybrid", "cli")
 
+# Mirrors scripts/lib/shared.py (orchestration scripts stay import-independent
+# of scripts/lib, same as VALID_MODES above). The analysis-side dir parsers
+# split on the first "--", so a label may not contain one — enforced here.
+VARIANT_LABEL_SEPARATOR = "--"
+_VARIANT_LABEL_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+
+
+def _validate_variant_label(label: str) -> str:
+    """Return *label* if it is a legal variant label, else raise ValueError.
+
+    Lowercase alphanumerics and single hyphens only: the label becomes a path
+    segment and a dir-parser token, so consecutive hyphens would collide with
+    the '<mode>--<label>' separator and anything else invites quoting bugs.
+    """
+    if not _VARIANT_LABEL_RE.fullmatch(label):
+        raise ValueError(
+            f"invalid --variant-label {label!r}: must match [a-z0-9]+(-[a-z0-9]+)* "
+            "(lowercase alphanumerics, single hyphens, no leading/trailing/double hyphen)"
+        )
+    return label
+
+
+def _resolve_output_dir(config: "TaskRunConfig", task_id: str) -> Path:
+    """Default output directory for a run; an explicit --output-dir wins.
+
+    Layout: results/runs/<task_id>/<mode>[--<label>][/rep<N>]. The label is part
+    of run identity — without its own directory a tuning run would overwrite the
+    production run of the same (task_id, mode) cell.
+    """
+    if config.output_dir is not None:
+        return config.output_dir
+    mode_dir = config.mode
+    if config.variant_label:
+        mode_dir = f"{config.mode}{VARIANT_LABEL_SEPARATOR}{config.variant_label}"
+    base = REPO_ROOT / "results" / "runs" / task_id / mode_dir
+    if config.rep is not None:
+        return base / f"rep{config.rep}"
+    return base
+
+
 _DEFAULT_MCP_URL = "https://demo.sourcegraph.com/.api/mcp/all"
 _raw_mcp_url = os.environ.get("SOURCEGRAPH_MCP_URL", _DEFAULT_MCP_URL)
 # Ensure /all suffix for full tool set (13 tools vs 8 on base endpoint)
@@ -162,6 +202,7 @@ class TaskRunConfig:
     mode: str = "baseline"
     rep: int | None = None
     ablation_variant: str | None = None
+    variant_label: str | None = None
     min_disk_gb: float = 10.0
 
 
@@ -519,10 +560,20 @@ def _docker_exec(
     if user is not None:
         full_cmd += ["-u", user]
     full_cmd += [container_id] + cmd
+    # errors="replace": container stdout/stderr is arbitrary bytes (compiler
+    # output, file contents, agent text echoed into a verifier's detail). Under
+    # text=True's strict default, a single non-UTF-8 byte raises
+    # UnicodeDecodeError here — before the verifier path can hand result.stdout
+    # to guard_verifier_output — so the fail-closed InfraError route is bypassed
+    # and every checkpoint in the run is lost to an unhandled exception. Decode
+    # leniently so malformed bytes reach the guard as data, not a crash. Matches
+    # the errors="replace" contract already used at the read_text/decode sites
+    # below (EnterpriseBench-d0jih).
     return subprocess.run(
         full_cmd,
         capture_output=True,
         text=True,
+        errors="replace",
         timeout=timeout,
     )
 
@@ -2048,6 +2099,10 @@ def _save_results(
             "languages": task_data.get("metadata", {}).get("languages", []),
         },
     }
+    # Only when set: an unlabeled run's artifacts stay byte-identical to the
+    # pre-label format.
+    if config.variant_label:
+        payload["config"]["variant_label"] = config.variant_label
     results_path.write_text(json.dumps(payload, indent=2) + "\n")
 
     # --- config.json — run configuration snapshot ---
@@ -2063,6 +2118,8 @@ def _save_results(
         "keep_container": config.keep_container,
         "mode": config.mode,
     }
+    if config.variant_label:
+        config_payload["variant_label"] = config.variant_label
     (output_dir / "config.json").write_text(json.dumps(config_payload, indent=2) + "\n")
 
     # --- task_metrics.json — timing, tool_usage, status ---
@@ -2978,16 +3035,10 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         timings["parse"] = time.monotonic() - t0
 
         # Resolve output directory
-        # Layout: results/runs/<task_id>/<mode>/rep<N>/  (mode + rep partitioned)
-        # This prevents concurrent and repeated runs from overwriting each other.
-        if config.output_dir is not None:
-            output_dir = config.output_dir
-        else:
-            base = REPO_ROOT / "results" / "runs" / task_id / config.mode
-            if config.rep is not None:
-                output_dir = base / f"rep{config.rep}"
-            else:
-                output_dir = base
+        # Layout: results/runs/<task_id>/<mode>[--<label>]/rep<N>/  (mode, variant
+        # label, and rep partitioned) so concurrent, repeated, and tuning runs
+        # never overwrite each other.
+        output_dir = _resolve_output_dir(config, task_id)
         output_dir.mkdir(parents=True, exist_ok=True)
         result.output_dir = str(output_dir)
 
@@ -3526,6 +3577,18 @@ Examples:
         ),
     )
     parser.add_argument(
+        "--variant-label",
+        default=None,
+        help=(
+            "Display label for a prompt/preamble tuning iteration "
+            "(e.g. 'preamble-p3'). Lowercase [a-z0-9-], no double hyphen. "
+            "The label joins run identity: output dir becomes "
+            "results/runs/<task_id>/<mode>--<label>/ and results.json records "
+            "it, so tuning runs never overwrite or contaminate production "
+            "(unlabeled) runs. Raw --mode stays machine-meaningful."
+        ),
+    )
+    parser.add_argument(
         "--min-disk-gb",
         type=float,
         default=10.0,
@@ -3575,6 +3638,11 @@ def main() -> None:
         mode=args.mode,
         rep=args.rep,
         ablation_variant=args.ablation_variant,
+        variant_label=(
+            _validate_variant_label(args.variant_label)
+            if args.variant_label
+            else None
+        ),
         min_disk_gb=args.min_disk_gb,
     )
 

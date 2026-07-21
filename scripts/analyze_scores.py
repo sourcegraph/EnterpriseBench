@@ -58,6 +58,9 @@ class TaskResult:
     languages: tuple[str, ...]
     agent_time: float | None  # seconds
     source_path: str
+    # Set for tuning-iteration runs. Excluded from headline analysis by default
+    # (load_all_results) so a tuned prompt never contaminates production arms.
+    variant_label: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -207,14 +210,25 @@ def parse_result(result_path: Path, benchmarks_root: Path) -> TaskResult | None:
         languages=tuple(tm.get("languages", [])),
         agent_time=agent_time,
         source_path=str(result_path),
+        variant_label=data.get("config", {}).get("variant_label"),
     )
 
 
 def load_all_results(
     results_dirs: list[Path],
     benchmarks_root: Path,
+    include_variant_labeled: bool = False,
 ) -> list[TaskResult]:
-    """Scan all results dirs, parse, and deduplicate."""
+    """Scan all results dirs, parse, and deduplicate.
+
+    Variant-labeled runs (prompt/preamble tuning iterations) are dropped by
+    default: every downstream aggregate — by_mode, deltas, calibration bias —
+    treats ``mode`` as a production arm, and a tuned run inside an arm would
+    contaminate exactly the comparison the label exists to keep clean. Pass
+    ``include_variant_labeled=True`` for a variant analysis; the dedup key then
+    separates (task_id, mode, label) so a labeled run can never displace the
+    unlabeled run of its cell.
+    """
     all_results: list[TaskResult] = []
 
     for rdir in results_dirs:
@@ -226,10 +240,20 @@ def load_all_results(
             if tr is not None:
                 all_results.append(tr)
 
-    # Deduplicate: same task_id + mode -> keep highest score
-    best: dict[tuple[str, str], TaskResult] = {}
+    if not include_variant_labeled:
+        labeled = sum(1 for tr in all_results if tr.variant_label is not None)
+        if labeled:
+            logger.info(
+                "Excluding %d variant-labeled (tuning) result(s) from analysis; "
+                "pass include_variant_labeled=True to include them",
+                labeled,
+            )
+        all_results = [tr for tr in all_results if tr.variant_label is None]
+
+    # Deduplicate: same task_id + mode + variant_label -> keep highest score
+    best: dict[tuple[str, str, str | None], TaskResult] = {}
     for tr in all_results:
-        key = (tr.task_id, tr.mode)
+        key = (tr.task_id, tr.mode, tr.variant_label)
         if key not in best or tr.normalized_score > best[key].normalized_score:
             best[key] = tr
 
