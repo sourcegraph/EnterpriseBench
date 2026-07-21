@@ -17,15 +17,15 @@ description = "Trace impact of gRPC-Go balancer.ClientConn embedding requirement
 prompt = """
 The gRPC-Go v1.71.0 release added an internal method to the
 `balancer.ClientConn` interface (PR #8026), requiring all implementors
-to embed a delegate implementation (`internal.EnforceClientConnEmbedding`).
+to embed an unexported delegate field to keep satisfying the interface.
 This ensures gRPC-Go can add new methods without breaking builds. However,
 any type that directly implements `balancer.ClientConn` without embedding
 will fail to compile.
 
 Your task:
 1. Identify the exact change in `grpc-go/balancer/balancer.go` that
-   enforces embedding, and the `internal.EnforceClientConnEmbedding`
-   marker interface it relies on.
+   enforces embedding, and name the internal marker interface it
+   relies on.
 2. Find all types within the grpc-go repository itself (internal
    balancer implementations and xds implementations) that implement
    `balancer.ClientConn` and had to add the embed to keep compiling.
