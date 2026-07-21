@@ -36,7 +36,12 @@ sys.path.insert(0, str(REPO_ROOT / "scripts" / "validation"))
 from validate_expected_solutions import _extract_paths, _parse_toml  # noqa: E402
 
 # Suite-relative task dirs whose answer keys are verified against their pinned rev.
-VERIFIED_TASKS = ["feature_delivery/camel-routing-arch-001"]
+VERIFIED_TASKS = [
+    "feature_delivery/camel-routing-arch-001",
+    # Lane ground-truth authoring: each key was written from a shallow clone of
+    # the pinned revs and every extracted path stat()'d locally before landing.
+    "customer_escalation/support-mapping-dual-flask-001",
+]
 
 
 def _network_available() -> bool:

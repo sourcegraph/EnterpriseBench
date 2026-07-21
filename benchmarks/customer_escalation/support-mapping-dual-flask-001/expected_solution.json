@@ -1,0 +1,40 @@
+{
+  "task_id": "support-mapping-dual-flask-001",
+  "checkpoints": {
+    "code_paths": {
+      "expected_solution": "Registration path (Flask 3.0.0): the @app.route() decorator is Scaffold.route in src/flask/sansio/scaffold.py (line 338), which delegates to App.add_url_rule in src/flask/sansio/app.py (line 607). add_url_rule defaults methods to ('GET',) when the view declares none (lines 623-624), uppercases them (line 630), decides automatic OPTIONS handling via provide_automatic_options / required_methods (lines 637-649), builds self.url_rule_class(rule, methods=methods) and registers it with self.url_map.add(rule) (lines 652-655). Werkzeug side (3.0.1): src/werkzeug/routing/rules.py Rule.__init__ normalizes methods — uppercases (line 477) and auto-adds HEAD only when GET is present (lines 479-480); src/werkzeug/routing/map.py holds Map.add / Map.bind_to_environ and MapAdapter.match, which converts a NoMatch carrying a non-empty have_match_for set into MethodNotAllowed(valid_methods=list(e.have_match_for)) (map.py lines 618-619) — this is the 405. The actual matching engine is the StateMachineMatcher in src/werkzeug/routing/matcher.py (rewritten in Werkzeug 2.2): _match accumulates have_match_for whenever the path matches a rule whose methods exclude the request method (lines 76-110), and the trailing-slash fallback issues SlashRequired (-> RequestRedirect 308) only when the slashed rule accepts the request method (lines 100-108). Dispatch path back in Flask: src/flask/app.py create_url_adapter (line 388) binds the Map to the request environ, RequestContext.match_request in src/flask/ctx.py stores the routing exception on the request (lines 318/356), and Flask.dispatch_request (src/flask/app.py line 829) re-raises it via raise_routing_exception (line 428), producing the 405 response. What changed that can turn previously-working PUT into 405: (1) Werkzeug 2.2 replaced the regex matcher with the state-machine matcher in the new module src/werkzeug/routing/matcher.py, changing strict_slashes interplay with methods — a trailing-slash mismatch now redirects only if the slashed rule accepts the method, otherwise the request falls through to 404/405; (2) the strict_slashes=False leaf/branch matching regression was fixed in 2.2.2 (werkzeug PR 2489); (3) Werkzeug 3.0.0 removed all previously-deprecated code (PR 2768) and Flask 3.0.0 requires Werkzeug >= 3.0, so an app upgrade jumps the whole 2.x routing rewrite at once; (4) on the Flask side, methods still default to ('GET',) in add_url_rule, so any registration path that stops passing methods=['PUT'] (e.g. a decorator wrapper dropping options) silently loses PUT while GET keeps working.",
+      "evaluation_criteria": [
+        "Must cite src/werkzeug/routing/map.py MapAdapter.match as the point where the 405 is raised: NoMatch with a non-empty have_match_for becomes MethodNotAllowed(valid_methods) (map.py lines 618-619 at 3.0.1)",
+        "Must cite src/flask/sansio/app.py App.add_url_rule (line 607) as the registration entry that defaults methods to ('GET',), uppercases them, applies provide_automatic_options/OPTIONS, and calls url_map.add",
+        "Must cite src/flask/app.py for the dispatch side: create_url_adapter (line 388) binding the Map, and dispatch_request/raise_routing_exception re-raising the stored routing exception as the 405 response",
+        "Must cite src/werkzeug/routing/rules.py Rule for method normalization: methods are uppercased and HEAD is auto-added only when GET is present (lines 477-480); PUT is never implied",
+        "Should cite src/werkzeug/routing/matcher.py (StateMachineMatcher, new in Werkzeug 2.2) as the engine that accumulates have_match_for and gates the trailing-slash redirect on the method being accepted by the slashed rule",
+        "Must identify at least one real routing behavior change from the Werkzeug 2.x->3.0 line (state-machine matcher rewrite, strict_slashes/SlashRequired method gating, the 2.2.2 strict_slashes=False fix PR 2489, or 3.0.0's removal of deprecated code PR 2768) rather than inventing a Werkzeug API change"
+      ]
+    },
+    "ownership": {
+      "expected_solution": "Both repos are maintained by the Pallets organization. The URL matching and method validation subsystem is Werkzeug's routing package (src/werkzeug/routing/: Map and MapAdapter in map.py, Rule in rules.py, the matcher in matcher.py) — changes to 405 semantics land there. The route registration and dispatch layer is Flask's application core (src/flask/sansio/app.py, src/flask/sansio/scaffold.py, src/flask/app.py) — Flask owns which methods get attached to a Rule and how the routing exception surfaces as an HTTP response. A fix or behavior question about method matching belongs upstream with Werkzeug's routing maintainers; a question about default methods or automatic OPTIONS belongs with Flask.",
+      "evaluation_criteria": [
+        "Must attribute URL matching and method validation (Map/Rule/MapAdapter) to Werkzeug's routing package, and route registration/dispatch to Flask's application layer",
+        "Must name Pallets as the organization maintaining both flask and werkzeug",
+        "Should route the escalation correctly: method-matching semantics -> werkzeug routing owners; default-methods/auto-OPTIONS behavior -> flask owners"
+      ]
+    },
+    "related_issues": {
+      "expected_solution": "Related code and context an investigator should attach to the ticket: src/flask/sansio/app.py (the add_url_rule defaulting and automatic-OPTIONS logic that decides which methods a rule carries), src/werkzeug/routing/rules.py (Rule.methods normalization: uppercasing, HEAD-from-GET), and src/werkzeug/routing/converters.py (the <id> path segment is a converter; converter matching determines whether the PUT request even reaches method validation — a stricter converter match turns a would-be 405 into a 404). The werkzeug CHANGES.rst entries for 2.1 (strict_slashes redirects switched to 308), 2.2 (matcher rewrite), 2.2.2 (PR 2489 strict_slashes=False fix), and 3.0.0 (deprecated code removal, PR 2768) are the changelog trail for 'what changed'.",
+      "evaluation_criteria": [
+        "Must reference src/flask/sansio/app.py as related context for how methods get attached to a rule",
+        "Must reference src/werkzeug/routing/rules.py for Rule.methods normalization behavior",
+        "Must reference src/werkzeug/routing/converters.py and explain that converter matching for the <id> segment gates whether method validation is reached at all"
+      ]
+    },
+    "severity": {
+      "expected_solution": "Severity: medium. One HTTP method (PUT) on affected routes fails deterministically with 405 while GET/POST keep working — a functional regression that breaks write flows for API clients, but not a security issue, not data loss, and not a full outage; reads and most writes still succeed and a config/registration-level fix (restoring methods=['PUT'] on the rule, or aligning trailing-slash usage) restores service without a code rollback of the framework. The mechanism grounding the rating: the route's Rule no longer carries PUT in Rule.methods, so MapAdapter.match raises MethodNotAllowed built from have_match_for — the 405's Allow header (valid_methods) tells the customer exactly which methods the rule still accepts, which makes diagnosis and workaround fast.",
+      "evaluation_criteria": [
+        "Must rate severity as medium (not low: a client-facing method is hard-broken; not high/critical: scoped to one method on affected routes, with GET/POST unaffected and a registration-level workaround)",
+        "Must ground the rating in the concrete mechanism: MethodNotAllowed raised from have_match_for / valid_methods in MapAdapter.match, not just the surface '405' symptom",
+        "Should note that the Allow header carried by MethodNotAllowed (valid_methods) shortens time-to-diagnosis, supporting medium rather than high"
+      ]
+    }
+  }
+}

@@ -29,16 +29,21 @@ if not expected_severity:
     print(json.dumps({'score': 0.0, 'passed': False, 'detail': 'No expected severity in ground truth'}))
     sys.exit(0)
 
-# Specific Envoy config parameter names that must accompany the severity rating.
-# A hallucinating agent that just says 'high severity' without citing the actual
-# mechanism should not pass.
+# Implementation identifiers from the werkzeug 3.0.1 / flask 3.0.0 routing
+# internals that must accompany the severity rating. A hallucinating agent that
+# just says 'medium severity' without citing the actual 405 mechanism should
+# not pass. All are repo-derived and appear ZERO times in instruction.md
+# (verified with grep -cioF); the prompt's 'Method Not Allowed' is spaced, so
+# it cannot substring-match 'methodnotallowed' under this normalization.
+# (This list previously carried Envoy connection-pool parameters copy-pasted
+# from another task, which no honest flask/werkzeug answer could ever cite.)
 MECHANISM_KEYWORDS = [
-    'max_connections',
-    'max_pending_requests',
-    'conn_pool_base',
-    'ConnPoolBase',
-    'circuit_breaking',
-    'circuit breaker',
+    'MethodNotAllowed',
+    'have_match_for',
+    'valid_methods',
+    'allowed_methods',
+    'SlashRequired',
+    'provide_automatic_options',
 ]
 
 # Extract agent severity (flexible key names)

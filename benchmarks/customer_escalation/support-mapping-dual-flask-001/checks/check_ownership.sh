@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # check_ownership.sh — verify agent identified correct code owners or subsystem
 # Reads agent output from $WORKSPACE/agent_output/answer.json
-# Checks for implementation-specific ownership terms from the Envoy codebase
+# Checks for implementation-specific ownership terms from ground_truth.json
 set -euo pipefail
 
 export ANSWER_FILE="${WORKSPACE:-/workspace}/agent_output/answer.json"
@@ -23,7 +23,7 @@ import json, sys, os, re
 gt = json.load(open(os.environ['GT_FILE']))
 answer = json.load(open(os.environ['ANSWER_FILE']))
 
-# Implementation-specific ownership terms from the Envoy codebase.
+# Implementation-specific ownership terms from ground_truth.json.
 # Generic words like 'overflow' or 'upstream' are NOT sufficient —
 # the agent must reference actual file names or class names.
 ownership_kw = gt.get('ownership_keywords', [])
