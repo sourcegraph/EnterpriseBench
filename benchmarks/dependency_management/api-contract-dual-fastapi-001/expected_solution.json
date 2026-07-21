@@ -2,27 +2,27 @@
   "task_id": "api-contract-dual-fastapi-001",
   "checkpoints": {
     "contract_source": {
-      "expected_solution": "Agent identifies FastAPI request validation logic The answer must reference the canonical artifact(s) for this checkpoint at the pinned revision (basenames: routing.py and utils.py). The judge looks for the following concept tokens in the agent output: routing, pydantic, validation, body, dependency, deserializ.",
+      "expected_solution": "FastAPI 0.109.0 processes incoming request bodies in fastapi/routing.py and fastapi/dependencies/utils.py. get_request_handler (routing.py) drives each request: it reads and parses the body, then solve_dependencies (dependencies/utils.py) resolves the endpoint signature and request_body_to_args validates the parsed JSON against the endpoint's Pydantic model fields. Validation failures raise RequestValidationError, which is what surfaces as the 422 response. Response-side serialization runs through serialize_response in routing.py with its exclude_unset handling.",
       "evaluation_criteria": [
-        "Cites at least one canonical file by basename (routing.py and utils.py) in the agent output",
-        "Mentions at least three of the canonical concept tokens: routing, pydantic, validation, body, and dependency",
-        "Captures at least one of the canonical drift findings: FastAPI Pydantic v2 validation expects explicit None vs missing key distinction that httpx JSON serialization does not preserve"
+        "Cites fastapi/routing.py and fastapi/dependencies/utils.py as the request validation chain",
+        "Names request_body_to_args and solve_dependencies as the body-validation entry points",
+        "Identifies RequestValidationError as the source of the 422 responses"
       ]
     },
     "consumer_usage": {
-      "expected_solution": "Agent finds httpx request encoding logic The answer must reference the canonical artifact(s) for this checkpoint at the pinned revision (basenames: _content.py and _models.py). The judge looks for the following concept tokens in the agent output: httpx, _content, _models, encoding, json, serializ, request.",
+      "expected_solution": "httpx 0.26.0 constructs outgoing request bodies in httpx/_content.py and httpx/_models.py. encode_request (_content.py) dispatches on the content=/data=/files=/json= arguments; encode_json serializes the payload with the stdlib json.dumps (imported as json_dumps) and sets the application/json Content-Type header. Request.__init__ in _models.py calls encode_request to build the headers and body stream.",
       "evaluation_criteria": [
-        "Cites at least one canonical file by basename (_content.py and _models.py) in the agent output",
-        "Mentions at least three of the canonical concept tokens: httpx, _content, _models, encoding, and json",
-        "Captures at least one of the canonical drift findings: FastAPI Pydantic v2 validation expects explicit None vs missing key distinction that httpx JSON serialization does not preserve"
+        "Cites httpx/_content.py and httpx/_models.py as the request encoding chain",
+        "Names encode_request as the dispatch point for body construction",
+        "Names encode_json as the JSON serialization path"
       ]
     },
     "drift_analysis": {
-      "expected_solution": "Agent identifies contract drift between FastAPI and httpx The answer must reference the canonical artifact(s) for this checkpoint at the pinned revision (basenames: routing.py, _content.py, utils.py, and _models.py). The judge looks for the following concept tokens in the agent output: none, missing, optional, default, nested, union, serializ, pydantic.",
+      "expected_solution": "The contract drift sits between httpx's encode_json — a bare json_dumps of whatever dict or model dump the caller passes, which preserves explicit null values and emits every key — and FastAPI's request_body_to_args, where Pydantic v2 field validation distinguishes an explicitly-null key from an absent one. A client that serializes unset optional fields as null (instead of omitting them, as exclude_unset-style dumping would) trips validation on non-nullable fields with defaults and yields the 422 RequestValidationError; nested models and unions hit the same seam because json_dumps flattens them without Pydantic's field-level coercion.",
       "evaluation_criteria": [
-        "Cites at least one canonical file by basename (routing.py, _content.py, utils.py, and _models.py) in the agent output",
-        "Mentions at least three of the canonical concept tokens: none, missing, optional, default, and nested",
-        "Captures at least one of the canonical drift findings: FastAPI Pydantic v2 validation expects explicit None vs missing key distinction that httpx JSON serialization does not preserve"
+        "Anchors the httpx side of the drift in encode_json / json_dumps serialization",
+        "Anchors the FastAPI side of the drift in request_body_to_args Pydantic v2 validation",
+        "Explains the None-vs-missing-key mismatch, referencing exclude_unset semantics for unset fields"
       ]
     }
   }

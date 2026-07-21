@@ -48,5 +48,26 @@
       "description": "Nested model serialization in httpx uses default json.dumps which may not match FastAPI's expected Pydantic model structure",
       "repos_involved": ["fastapi", "httpx"]
     }
-  ]
+  ],
+  "scoring_evidence": {
+    "contract_source": [
+      "routing.py",
+      "dependencies/utils.py",
+      "request_body_to_args",
+      "solve_dependencies",
+      "RequestValidationError"
+    ],
+    "consumer_usage": [
+      "_content.py",
+      "_models.py",
+      "encode_json",
+      "encode_request"
+    ],
+    "drift_analysis": [
+      "request_body_to_args",
+      "encode_json",
+      "json_dumps",
+      "exclude_unset"
+    ]
+  }
 }
