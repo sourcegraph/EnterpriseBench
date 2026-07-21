@@ -6,22 +6,39 @@
     {
       "key": "SECRET_KEY",
       "file": "src/flask/config.py",
-      "expected": "from_envvar overrides from_object",
-      "actual": "If from_envvar file does not set SECRET_KEY, from_object value persists",
+      "expected": "The APP_SETTINGS file value overrides the from_object default",
+      "actual": "from_envvar is a shortcut for from_pyfile: it execs the file named by APP_SETTINGS and hands the resulting module to from_object. If that file does not assign SECRET_KEY (or assigns it as a non-uppercase name), the value loaded earlier from default_settings persists untouched",
       "override_chain": [
-        "default_config -> from_object -> from_envvar -> direct"
-      ]
+        "default_config (src/flask/app.py) -> make_config -> from_object -> from_envvar -> from_pyfile -> from_object -> direct assignment"
+      ],
+      "evidence_tokens": {
+        "identifies": ["secret_key"],
+        "located": ["src/flask/config.py"],
+        "mechanism": ["from_pyfile"]
+      }
     },
     {
       "key": "SESSION_COOKIE_SECURE",
       "file": "src/flask/config.py",
-      "expected": "from_envvar overrides default",
-      "actual": "Boolean config in env file may be loaded as string, not overriding correctly",
+      "expected": "The env-specific config file overrides the False default that ships in Flask.default_config",
+      "actual": "SESSION_COOKIE_SECURE defaults to False in the default_config ImmutableDict (src/flask/app.py), copied into the Config instance by make_config (src/flask/sansio/app.py) before any from_object/from_envvar call. Because Config is a plain dict, a later layer only overrides the key if the loaded module actually assigns it as an UPPERCASE attribute; from_object silently skips everything else",
       "override_chain": [
-        "default_config -> from_object -> from_envvar"
-      ]
+        "default_config (src/flask/app.py) -> make_config -> from_object -> from_envvar -> from_pyfile -> from_object"
+      ],
+      "evidence_tokens": {
+        "identifies": ["session_cookie_secure"],
+        "located": ["src/flask/config.py"],
+        "mechanism": ["make_config"]
+      }
     }
   ],
+  "scoring_evidence": {
+    "_comment": "Every graded token is ABSENT from instruction.md (checked raw and whitespace-stripped, both lowercased) and verified PRESENT in pallets/flask at tag 3.1.0: from_envvar delegates to from_pyfile at src/flask/config.py:124; from_object filters on key.isupper() at src/flask/config.py:252-254; default_config ImmutableDict at src/flask/app.py:178; make_config at src/flask/sansio/app.py:482 seeds the Config with dict(self.default_config). The prompt DOES supply SECRET_KEY, SESSION_COOKIE_SECURE, from_object, from_envvar, default_config, default_settings, APP_SETTINGS, Config — none of those may be graded alone.",
+    "validate_corrected_config": [
+      "from_pyfile",
+      "uppercase"
+    ]
+  },
   "required_files": [
     {
       "path": "src/flask/config.py",
@@ -35,15 +52,15 @@
       "repo": "flask",
       "confidence": 0.85,
       "source": "deterministic",
-      "rationale": "Flask.__init__ where default config is set up"
+      "rationale": "Flask.default_config ImmutableDict where SECRET_KEY/SESSION_COOKIE_SECURE defaults live"
     }
   ],
   "sufficient_files": [
     {
-      "path": "src/flask/sansio/scaffold.py",
+      "path": "src/flask/sansio/app.py",
       "repo": "flask",
       "confidence": 0.6,
-      "rationale": "Base class that may influence config initialization"
+      "rationale": "make_config seeds the Config instance from default_config"
     }
   ]
 }

@@ -7,28 +7,45 @@
       "key": "envvar_resolution",
       "file": "src/click/core.py",
       "expected": "CLI > envvar > default > prompt",
-      "actual": "When envvar is defined but unset, resolve_envvar returns None which triggers prompt instead of falling back to default",
+      "actual": "When the envvar is unset, Option.resolve_envvar_value returns None, so Parameter.consume_value falls through to ctx.lookup_default (ParameterSource.DEFAULT_MAP) and then self.get_default (ParameterSource.DEFAULT) — the envvar layer itself never blocks the default",
       "override_chain": [
-        "cli_arg -> envvar -> default -> prompt"
-      ]
+        "opts (COMMANDLINE) -> value_from_envvar/resolve_envvar_value (ENVIRONMENT) -> ctx.lookup_default (DEFAULT_MAP) -> get_default (DEFAULT) -> prompt_for_value (PROMPT)"
+      ],
+      "evidence_tokens": {
+        "identifies": ["envvar"],
+        "located": ["src/click/core.py"],
+        "mechanism": ["resolve_envvar_value"]
+      }
     },
     {
-      "key": "type_cast_value",
+      "key": "prompt_overrides_default",
       "file": "src/click/core.py",
-      "expected": "Default value should be returned when envvar is unset",
-      "actual": "type_cast_value receives None from envvar lookup, bypasses default",
+      "expected": "The default should be used as the fallback when the env var is unset; the prompt should fire only when no source provides a value",
+      "actual": "Option.consume_value prompts whenever the resolved source is None or ParameterSource.DEFAULT, self.prompt is set, and (self.required or self.prompt_required) holds — so once a prompt is configured, a value that came from the option default is treated as unset and the user is prompted anyway. prompt_required=False is the knob that restores default-as-fallback",
       "override_chain": [
-        "resolve_envvar -> type_cast_value -> consume_value"
-      ]
+        "Option.consume_value -> super().consume_value -> prompt gate on source in {None, ParameterSource.DEFAULT} -> prompt_for_value"
+      ],
+      "evidence_tokens": {
+        "identifies": ["prompt"],
+        "located": ["src/click/core.py"],
+        "mechanism": ["prompt_required"]
+      }
     }
   ],
+  "scoring_evidence": {
+    "_comment": "Every graded token is ABSENT from instruction.md (checked raw and whitespace-stripped, both lowercased) and verified PRESENT in pallets/click at tag 8.2.1: Parameter.consume_value fall-through at src/click/core.py:2268-2286; Option.resolve_envvar_value at src/click/core.py:2961; Option.consume_value prompt gate (source in {None, ParameterSource.DEFAULT} and (required or prompt_required)) at src/click/core.py:3023-3031; prompt_for_value at src/click/core.py:2928. The prompt DOES supply envvar, default, prompt, consume_value, resolve_envvar (without the _value suffix), core.py and the CLI > envvar > default > prompt ordering — none of those may be graded alone. ParameterSource is also unusable: the prompt phrase parameter sources contains it once whitespace is stripped.",
+    "validate_corrected_config": [
+      "prompt_for_value",
+      "lookup_default"
+    ]
+  },
   "required_files": [
     {
       "path": "src/click/core.py",
       "repo": "click",
       "confidence": 0.95,
       "source": "deterministic",
-      "rationale": "Option.resolve_envvar, consume_value, and type_cast_value methods"
+      "rationale": "Parameter.consume_value fall-through, Option.resolve_envvar_value, and the Option.consume_value prompt gate"
     },
     {
       "path": "src/click/types.py",

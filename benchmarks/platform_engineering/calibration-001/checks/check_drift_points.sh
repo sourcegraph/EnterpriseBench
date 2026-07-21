@@ -1,39 +1,91 @@
 #!/usr/bin/env bash
-# check_drift_points.sh — verify agent identified drift points
+# check_drift_points.sh — checkpoint "identify_drift_points"
+#
+# Grades answer.json against ground_truth.json:drift_points (sealed root-only),
+# verified against pallets/flask at the pinned tag 3.1.0.
+#
+# What changed and why: this check used to credit any drift point whose text
+# merely mentioned "secret_key" or "session_cookie_secure" — both handed over
+# by instruction.md — so a schema-shaped answer fabricated from the prompt
+# alone scored 1.0 (EnterpriseBench-jn73.2.7.3.1.4). Identification now
+# requires locating each drifted key in the real config machinery: the point
+# must name src/flask/config.py, the file that holds Config.from_object /
+# from_envvar / from_pyfile. The prompt names only /workspace/flask/ — the
+# src/ layout is readable only in the repo.
 set -euo pipefail
 
-export REPORT="${WORKSPACE}/agent_output/answer.json"
-export GT_FILE="${TASK_DIR}/ground_truth.json"
+WORKSPACE="${WORKSPACE:-/workspace}"
+REPORT="$WORKSPACE/agent_output/answer.json"
+GT="${TASK_DIR:-}/ground_truth.json"
+MAX_REPORT_BYTES=1048576
 
+verdict() { printf '{"score": %s, "passed": %s, "detail": "%s"}\n' "$1" "$2" "$3"; exit 0; }
+
+if [[ ! -f "$GT" ]]; then
+  verdict 0.0 false "VERIFIER_INFRA_ERROR: ground_truth.json not found at $GT"
+fi
+if [[ -L "$REPORT" ]]; then
+  verdict 0.0 false "answer.json is a symlink, not a regular file"
+fi
 if [[ ! -f "$REPORT" ]]; then
-    echo '{"score": 0.0, "passed": false, "detail": "No answer.json found"}'
-    exit 0
+  verdict 0.0 false "answer.json not found"
+fi
+if [[ "$(wc -c <"$REPORT")" -gt "$MAX_REPORT_BYTES" ]]; then
+  verdict 0.0 false "answer.json exceeds ${MAX_REPORT_BYTES} bytes"
 fi
 
-if [[ ! -f "$GT_FILE" ]]; then
-    echo '{"score": 0.0, "passed": false, "detail": "No ground_truth.json found"}'
-    exit 0
-fi
+export REPORT GT
+python3 -c '
+import json, os, re
 
-python3 -c "
-import json, os
+def verdict(score, detail):
+    print(json.dumps({"score": round(score, 2), "passed": score >= 0.5, "detail": detail}))
+    raise SystemExit(0)
 
-with open(os.environ['REPORT']) as f:
-    answer = json.load(f)
-with open(os.environ['GT_FILE']) as f:
-    gt = json.load(f)
+with open(os.environ["GT"]) as fh:
+    expected = json.load(fh).get("drift_points") or []
+if not expected:
+    verdict(0.0, "VERIFIER_INFRA_ERROR: no drift_points in ground_truth.json")
 
-gt_points = gt.get('drift_points', [])
-agent_points = answer.get('drift_points', [])
-agent_text = json.dumps(agent_points).lower()
+try:
+    with open(os.environ["REPORT"], encoding="utf-8", errors="replace") as fh:
+        report = json.load(fh)
+except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+    verdict(0.0, f"answer.json is not valid JSON: {exc}")
+if not isinstance(report, dict):
+    verdict(0.0, "answer.json is not a JSON object")
 
-found = 0
-for gp in gt_points:
-    key = gp.get('key', '').lower()
-    if key and key in agent_text:
-        found += 1
+claimed = report.get("drift_points")
+if not isinstance(claimed, list) or not claimed:
+    verdict(0.0, "answer.json has no drift_points array")
 
-total = max(len(gt_points), 1)
-score = round(found / total, 2)
-print(json.dumps({'score': score, 'passed': score >= 0.5, 'detail': f'Found {found}/{total} drift points'}))
-"
+def norm(value):
+    """Flatten a field to comparable text. An agent may hand back a string, a
+    nested dict, or a list; compare content, not the shape it chose."""
+    return re.sub(r"\s+", "", json.dumps(value) if not isinstance(value, str) else value).lower()
+
+found, detail = 0, []
+for want in expected:
+    tokens = want.get("evidence_tokens") or {}
+    ident = [t.lower() for t in tokens.get("identifies", [])]
+    located = [t.lower() for t in tokens.get("located", [])]
+    hit = False
+    for point in claimed:
+        if not isinstance(point, dict):
+            continue
+        whole = norm(point)
+        if not all(t in whole for t in ident):
+            continue
+        # Naming the key is not evidence: instruction.md supplies both keys.
+        # Credit only a point that also locates the drift in the real file,
+        # whose src/ path is readable only in the repo.
+        if all(t in norm(point.get("file", "")) for t in located):
+            hit = True
+            break
+    found += hit
+    detail.append(str(want.get("key")) + ("=hit" if hit else "=miss"))
+
+verdict(found / len(expected),
+        "Identified %d/%d drift points located in the real config source file: %s"
+        % (found, len(expected), ", ".join(detail)))
+'
