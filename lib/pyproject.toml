@@ -21,8 +21,18 @@ scoring = [
     "numpy>=1.24",
     "scikit-learn>=1.3",
 ]
+# lib/eb_metrics/trace_quality_adapter.py and aggregate_quality.py project EB
+# results onto schemas owned by the sibling `codeprobe` rig, imported
+# unconditionally at package-init time (lib/eb_metrics/__init__.py). Left
+# undeclared here, `pip install -e "lib/[dev]"` in CI never installs it and
+# every test under tests/eb_metrics/ (and any module that merely imports
+# eb_metrics) dies at collection with ModuleNotFoundError — the CI failure
+# this extra exists to close.
+metrics = [
+    "codeprobe>=0.5.5",
+]
 dev = [
-    "eb-verify[scoring]",
+    "eb-verify[scoring,metrics]",
     "pytest>=7.0",
     "pytest-cov>=4.0",
     # scripts/generate_charts.py, covered by tests/test_generate_charts.py.
