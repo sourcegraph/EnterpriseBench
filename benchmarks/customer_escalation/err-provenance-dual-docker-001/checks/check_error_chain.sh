@@ -1,48 +1,85 @@
 #!/usr/bin/env bash
-# check_error_chain.sh — verify agent traced the error propagation chain
-# Reads agent output from $WORKSPACE/agent_output/answer.json
-# Validates ordered call-path against ground truth error_chain
+# check_error_chain.sh — checkpoint "error_chain"
+#
+# Re-anchored to ground_truth.json:scoring_evidence["error_chain"] (gen-2
+# discipline, precedent a51e7e8; EnterpriseBench-jn73.2.7.3.1.4). Grades ONLY
+# repo-specific investigation evidence — file paths and symbol names absent
+# from instruction.md — via case-insensitive fixed-string matching (no regex).
+# A schema-shape-valid deliverable whose every string value is prompt text
+# scores 0.0, and key presence alone earns nothing. An evidence entry is a
+# string or a list of accepted alternates; each entry is one unit of credit.
 set -euo pipefail
 
-export ANSWER_FILE="$WORKSPACE/agent_output/answer.json"
-export GT_FILE="$TASK_DIR/ground_truth.json"
+CHECKPOINT="error_chain"
+ANSWER_KEYS="error_chain,chain,propagation,propagation_chain"
+NO_FIELD_DETAIL="Agent provided no error chain"
+WORKSPACE="${WORKSPACE:-/workspace}"
+ANSWER_FILE="$WORKSPACE/agent_output/answer.json"
+GT_FILE="${TASK_DIR:-}/ground_truth.json"
+MAX_ANSWER_BYTES=1048576
 
-if [[ ! -f "$ANSWER_FILE" ]]; then
-    echo '{"score": 0.0, "passed": false, "detail": "No answer.json found"}'
-    exit 1
-fi
+verdict() { printf '{"score": %s, "passed": %s, "detail": "%s"}\n' "$1" "$2" "$3"; exit 0; }
 
+# The answer key is ours, not the agent's: a missing/unreadable ground truth
+# routes to re-run, never to an agent 0.0.
 if [[ ! -f "$GT_FILE" ]]; then
-    echo '{"score": 0.0, "passed": false, "detail": "No ground_truth.json found"}'
-    exit 1
+    verdict 0.0 false "VERIFIER_INFRA_ERROR: ground_truth.json not found at $GT_FILE"
+fi
+# agent_output/ is agent-owned: refuse a symlinked answer, cap its size.
+if [[ -L "$ANSWER_FILE" ]]; then
+    verdict 0.0 false "answer.json is a symlink, not a regular file"
+fi
+if [[ ! -f "$ANSWER_FILE" ]]; then
+    verdict 0.0 false "No answer.json found"
+fi
+if [[ "$(wc -c <"$ANSWER_FILE")" -gt "$MAX_ANSWER_BYTES" ]]; then
+    verdict 0.0 false "answer.json exceeds $MAX_ANSWER_BYTES bytes"
 fi
 
-python3 -c "
-import json
-import os
+export ANSWER_FILE GT_FILE CHECKPOINT ANSWER_KEYS NO_FIELD_DETAIL
+python3 <<'PYEOF'
+import json, os
 
-gt = json.load(open(os.environ['GT_FILE']))
-answer = json.load(open(os.environ['ANSWER_FILE']))
+def verdict(score, passed, detail):
+    print(json.dumps({"score": round(score, 2), "passed": passed, "detail": detail}))
+    raise SystemExit(0)
 
-gt_chain = gt.get('error_chain', [])
-agent_chain = answer.get('error_chain', answer.get('propagation_chain', answer.get('chain', [])))
+try:
+    with open(os.environ["GT_FILE"]) as fh:
+        gt = json.load(fh)
+except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+    verdict(0.0, False, f"VERIFIER_INFRA_ERROR: ground_truth.json unreadable: {exc}")
 
-if not gt_chain:
-    print(json.dumps({'score': 0.0, 'passed': False, 'detail': 'No GT error chain defined'}))
-elif not agent_chain:
-    print(json.dumps({'score': 0.0, 'passed': False, 'detail': 'Agent did not provide error chain'}))
-else:
-    # Score based on key concepts mentioned in agent chain
-    # Extract key terms from GT chain steps
-    gt_terms = set()
-    for step in gt_chain:
-        for word in step.lower().split():
-            if len(word) > 4 and word.isalpha():
-                gt_terms.add(word)
+checkpoint = os.environ["CHECKPOINT"]
+raw = (gt.get("scoring_evidence") or {}).get(checkpoint) or []
+groups = [
+    [str(t).lower() for t in (g if isinstance(g, list) else [g])] for g in raw
+]
+if not groups:
+    verdict(0.0, False, f"VERIFIER_INFRA_ERROR: no scoring_evidence for {checkpoint}")
 
-    agent_text = ' '.join(str(s) for s in agent_chain).lower()
-    matched = sum(1 for term in gt_terms if term in agent_text)
-    score = min(1.0, matched / max(len(gt_terms) * 0.5, 1))  # 50% coverage = full score
-    detail = f'Matched {matched}/{len(gt_terms)} key concepts in error chain'
-    print(json.dumps({'score': round(score, 2), 'passed': score >= 0.3, 'detail': detail}))
-"
+# "not a JSON object" is the detail contract for an agent-killed read
+# (test_verifier_infra_detection.py): true for unparseable text, a list, or
+# a bare string alike, and it marks this 0.0 as attribution, not judgement.
+try:
+    with open(os.environ["ANSWER_FILE"]) as fh:
+        answer = json.load(fh)
+except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+    verdict(0.0, False, f"answer.json is not a JSON object: {exc}")
+if not isinstance(answer, dict):
+    verdict(0.0, False, "answer.json is not a JSON object")
+
+field = next(
+    (answer[k] for k in os.environ["ANSWER_KEYS"].split(",") if answer.get(k)),
+    None,
+)
+if not field:
+    verdict(0.0, False, os.environ["NO_FIELD_DETAIL"])
+
+# Fixed-string containment on the serialized field text — no regex, ever.
+text = json.dumps(field, ensure_ascii=False).lower()
+found = sum(1 for alts in groups if any(a in text for a in alts))
+score = found / len(groups)
+verdict(score, score >= 0.5,
+        f"Cited {found}/{len(groups)} repo evidence groups for {checkpoint}")
+PYEOF

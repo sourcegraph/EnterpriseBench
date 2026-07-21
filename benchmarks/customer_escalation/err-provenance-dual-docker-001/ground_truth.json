@@ -50,5 +50,25 @@
     "Docker CLI sends a container creation request with conflicting network options",
     "Moby daemon validates the configuration in daemon/create.go",
     "The error message from Moby is wrapped by CLI without preserving the root cause context"
-  ]
+  ],
+  "scoring_evidence": {
+    "error_chain": [
+      [
+        "cli/command/container/run.go",
+        "cli/command/container/create.go"
+      ],
+      [
+        "daemon/start.go",
+        "daemon/create.go",
+        "container.go"
+      ]
+    ],
+    "trigger_conditions": [
+      "daemon/create.go",
+      [
+        "cli/error.go",
+        "cli/command/container/run.go"
+      ]
+    ]
+  }
 }
