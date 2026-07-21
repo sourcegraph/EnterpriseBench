@@ -1,49 +1,55 @@
 #!/usr/bin/env bash
-# check_feature_flags.sh — Verify feature flag identification.
-# Env: WORKSPACE, TASK_DIR, TASK_ID
+# check_feature_flags.sh — checkpoint "check_feature_flags"
+#
+# Re-anchored to ground_truth.json:scoring_evidence[check_feature_flags]
+# (EnterpriseBench-jn73.2.7.3.1.4). The gen-1 body graded whether the report
+# mentions the flag NAME — but instruction.md hands enableRenderableContext
+# over in its title, so the structured prompt echo scored 1.0. Naming the flag
+# earns nothing now; credit requires tracing what the flag kills: the
+# REACT_PROVIDER_TYPE symbol and the files carrying its dead branches at the
+# pinned rev, none of which instruction.md names.
+# Env: WORKSPACE, TASK_DIR
 set -euo pipefail
 
-REPORT="${WORKSPACE}/react/dead_code_report.json"
-GT_DIR="${TASK_DIR}/ground_truth.json"
+CHECKPOINT="check_feature_flags"
+WORKSPACE="${WORKSPACE:-/workspace}"
+REPORT="$WORKSPACE/react/dead_code_report.json"
+GT="${TASK_DIR:-}/ground_truth.json"
+MAX_REPORT_BYTES=1048576
 
+verdict() { printf '{"score": %s, "passed": %s, "detail": "%s"}\n' "$1" "$2" "$3"; exit 0; }
+
+if [[ ! -f "$GT" ]]; then
+  verdict 0.0 false "VERIFIER_INFRA_ERROR: ground_truth.json not found at $GT"
+fi
+if [[ -L "$REPORT" ]]; then
+  verdict 0.0 false "dead_code_report.json is a symlink, not a regular file"
+fi
 if [[ ! -f "$REPORT" ]]; then
-    echo '{"score": 0.0, "detail": "No dead_code_report.json found"}'
-    exit 0
+  verdict 0.0 false "No dead_code_report.json found"
+fi
+if [[ "$(wc -c <"$REPORT")" -gt "$MAX_REPORT_BYTES" ]]; then
+  verdict 0.0 false "dead_code_report.json exceeds ${MAX_REPORT_BYTES} bytes"
 fi
 
-python3 - "$REPORT" "$GT_DIR" <<'PYEOF'
-import json
-import sys
+export REPORT GT CHECKPOINT
+python3 -c '
+import json, os
 
-report_path = sys.argv[1]
-gt_path = sys.argv[2]
+def verdict(score, detail):
+    print(json.dumps({"score": round(score, 4), "passed": score >= 0.5, "detail": detail}))
+    raise SystemExit(0)
 
-with open(report_path) as f:
-    claimed = json.load(f)
+with open(os.environ["GT"]) as fh:
+    gt = json.load(fh)
+evidence = (gt.get("scoring_evidence") or {}).get(os.environ["CHECKPOINT"]) or []
+if not evidence:
+    verdict(0.0, "VERIFIER_INFRA_ERROR: no scoring_evidence for " + os.environ["CHECKPOINT"])
 
-with open(gt_path) as f:
-    gt = json.load(f)
+with open(os.environ["REPORT"], encoding="utf-8", errors="replace") as fh:
+    text = fh.read().lower()
 
-gt_flags = gt.get("feature_flags", [])
-gt_flag_names = {f["flag"].lower() for f in gt_flags}
-
-if not gt_flag_names:
-    print(json.dumps({"score": 1.0, "detail": "No feature flags in ground truth"}))
-    sys.exit(0)
-
-found_flags = set()
-for item in claimed:
-    evidence = item.get("evidence", "").lower()
-    symbol = item.get("symbol", "").lower()
-    file_path = item.get("file", "").lower()
-    combined = f"{evidence} {symbol} {file_path}"
-    for flag in gt_flag_names:
-        if flag in combined:
-            found_flags.add(flag)
-
-recall = len(found_flags) / len(gt_flag_names) if gt_flag_names else 0.0
-score = recall
-
-detail = f"flags_found={len(found_flags)}/{len(gt_flag_names)} ({', '.join(sorted(found_flags)) or 'none'})"
-print(json.dumps({"score": round(score, 4), "detail": detail}))
-PYEOF
+found = sum(1 for token in evidence if token.lower() in text)
+verdict(found / len(evidence),
+        "Traced %d/%d dead-branch anchors for the flag" % (found, len(evidence)))
+'
