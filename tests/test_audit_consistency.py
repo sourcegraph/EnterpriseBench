@@ -112,6 +112,140 @@ class TestOptInReport:
         assert "Cross-Task Consistency Audit" in out_path.read_text()
 
 
+# A check that delegates its whole verdict to a shared eb_verify scorer: the
+# wrapper spells no JSON keys because the library module prints the
+# {"score", "passed", "detail"} verdict itself.
+_DELEGATING_CHECK_SH = textwrap.dedent(
+    """\
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    export ANSWER_FILE="$WORKSPACE/agent_output/answer.json"
+    export GT_FILE="$TASK_DIR/ground_truth.json"
+
+    exec python3 -m eb_verify.scorers.file_extraction \\
+        --keys source_files,files,code_paths
+    """
+)
+
+
+class TestJsonOutputDelegation:
+    """eb_verify delegation is JSON-emitting, not a json_output violation.
+
+    Phase 3 of the publish campaign found the json_output heuristic flagging
+    checks that `exec python3 -m eb_verify.scorers.<module>` — the module owns
+    the verdict, so the wrapper text never contains 'score'/'passed'.
+    """
+
+    def test_delegating_script_is_not_flagged(self, tmp_path: Path) -> None:
+        script = tmp_path / "check_delegate.sh"
+        script.write_text(_DELEGATING_CHECK_SH)
+
+        assert ac.check_json_output(script) == []
+
+    def test_python_without_3_suffix_also_counts(self, tmp_path: Path) -> None:
+        script = tmp_path / "check_delegate.sh"
+        script.write_text(
+            _DELEGATING_CHECK_SH.replace("python3 -m", "python -m")
+        )
+
+        assert ac.check_json_output(script) == []
+
+    def test_non_delegating_script_without_keys_is_still_flagged(
+        self, tmp_path: Path
+    ) -> None:
+        script = tmp_path / "check_bad.sh"
+        script.write_text(
+            "#!/usr/bin/env bash\nset -euo pipefail\necho done\n"
+        )
+
+        violations = ac.check_json_output(script)
+
+        assert len(violations) == 2  # missing score AND missing passed/detail
+
+    def test_python_m_other_module_is_not_delegation(self, tmp_path: Path) -> None:
+        # `python3 -m pytest` (or any non-eb_verify module) makes no promise
+        # about the verdict; the wrapper still owes the JSON keys.
+        script = tmp_path / "check_pytest.sh"
+        script.write_text(
+            "#!/usr/bin/env bash\nset -euo pipefail\n"
+            "python3 -m pytest tests/\n"
+        )
+
+        assert len(ac.check_json_output(script)) == 2
+
+    def test_delegating_task_fixture_audits_clean(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        benchmarks = tmp_path / "benchmarks"
+        task_dir = _write_clean_task(benchmarks)
+        script = task_dir / "checks" / "check_answer.sh"
+        script.write_text(_DELEGATING_CHECK_SH)
+        script.chmod(script.stat().st_mode | stat.S_IXUSR)
+        monkeypatch.setattr(ac, "BENCH_DIR", benchmarks)
+
+        _violations, summary = ac.main([])
+
+        assert summary["json_output"] == 0
+        assert sum(summary.values()) == 0
+
+
+class TestArtifactMatchOptionalCoverage:
+    """'answer' in [artifacts].optional satisfies artifact_match.
+
+    check_artifact_match unions required and optional. Pinned because the
+    ansible-galaxy-tar-regression-prove-001 repair relies on it: code_patch
+    stays the sole required artifact (the regression test) while the graded
+    answer.json is declared optional.
+    """
+
+    def _task_reading_answer(
+        self, benchmarks: Path, artifacts_toml: str
+    ) -> None:
+        task_dir = _write_clean_task(benchmarks)
+        toml_text = _CLEAN_TASK_TOML.replace(
+            '[artifacts]\nrequired = ["answer"]', artifacts_toml
+        )
+        assert artifacts_toml in toml_text  # replacement actually happened
+        (task_dir / "task.toml").write_text(toml_text)
+        # _CLEAN_CHECK_SH does not mention answer.json; make the check read it.
+        script = task_dir / "checks" / "check_answer.sh"
+        script.write_text(
+            _CLEAN_CHECK_SH.replace(
+                "os.environ['ANSWER_PATH']",
+                "os.environ['WORKSPACE'] + '/agent_output/answer.json'",
+            )
+        )
+        script.chmod(script.stat().st_mode | stat.S_IXUSR)
+
+    def test_answer_in_optional_is_not_a_violation(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        benchmarks = tmp_path / "benchmarks"
+        self._task_reading_answer(
+            benchmarks,
+            '[artifacts]\nrequired = ["code_patch"]\noptional = ["answer"]',
+        )
+        monkeypatch.setattr(ac, "BENCH_DIR", benchmarks)
+
+        _violations, summary = ac.main([])
+
+        assert summary["artifact_match"] == 0
+
+    def test_undeclared_answer_is_a_violation(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        benchmarks = tmp_path / "benchmarks"
+        self._task_reading_answer(
+            benchmarks, '[artifacts]\nrequired = ["code_patch"]'
+        )
+        monkeypatch.setattr(ac, "BENCH_DIR", benchmarks)
+
+        _violations, summary = ac.main([])
+
+        assert summary["artifact_match"] == 1
+
+
 class TestViolationDetectionStillExitsNonzero:
     """Seeded-violation regression guard for the exit-code contract the
     --out refactor must not disturb: exit 1 iff any violation summed.

@@ -5,7 +5,7 @@ WORKSPACE="${1:-.}"
 ACTIONS="$WORKSPACE/actions.jsonl"
 
 if [ ! -f "$ACTIONS" ]; then
-    echo '{"score": 0.0, "message": "actions.jsonl not found"}'
+    echo '{"score": 0.0, "passed": false, "message": "actions.jsonl not found"}'
     exit 1
 fi
 
@@ -14,9 +14,9 @@ HAS_INVESTIGATE=0
 grep -qi '"investigate"' "$ACTIONS" && grep -qi 'markupsafe\|utils\|soft_str' "$ACTIONS" && HAS_INVESTIGATE=1 || true
 
 if [ "$HAS_INVESTIGATE" -eq 1 ]; then
-    echo '{"score": 1.0, "message": "Root cause investigation found"}'
+    echo '{"score": 1.0, "passed": true, "message": "Root cause investigation found"}'
     exit 0
 else
-    echo '{"score": 0.0, "message": "No investigation of markupsafe/utils root cause"}'
+    echo '{"score": 0.0, "passed": false, "message": "No investigation of markupsafe/utils root cause"}'
     exit 1
 fi
