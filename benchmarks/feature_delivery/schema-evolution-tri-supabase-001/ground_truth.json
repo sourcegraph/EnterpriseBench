@@ -20,7 +20,7 @@
   ],
   "required_files": [
     {
-      "path": "docker/volumes/db/init/00-initial-schema.sql",
+      "path": "docker/volumes/db/init/data.sql",
       "repo": "supabase",
       "confidence": 0.9,
       "source": "deterministic"
@@ -55,5 +55,25 @@
     "PostgREST schema cache does not refresh automatically, serves stale RLS policy evaluation",
     "PostgREST returns 403 because cached RLS policy references non-existent column state",
     "GoTrue token refresh queries auth.sessions with hardcoded column assumptions that no longer match"
-  ]
+  ],
+  "scoring_evidence": {
+    "schema_change": [
+      "docker/volumes/db",
+      "data.sql",
+      "roles.sql",
+      "add_sessions_table"
+    ],
+    "indirect_refs": [
+      "AppState.hs",
+      "dbChannel",
+      "sessions.go",
+      "refresh_token.go"
+    ],
+    "test_impact": [
+      "user_test.go",
+      "sessions_test.go",
+      "refresh_token_test.go",
+      "test_io.py"
+    ]
+  }
 }
