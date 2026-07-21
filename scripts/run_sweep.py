@@ -17,6 +17,12 @@ Usage:
 
     # Custom results dirs
     python3 scripts/run_sweep.py --results-dir results/runs --results-dir results/mcp_batch
+
+    # Publish sweep: baseline/mcp_only/cli (hybrid cut), pinned model. The
+    # default matrix is still the old 3-mode one — a publish run MUST pass
+    # --matrix publish explicitly, it is never inferred.
+    python3 scripts/run_sweep.py --matrix publish --model claude-sonnet-5 \\
+        --execute --account 1-5
 """
 
 from __future__ import annotations
@@ -50,6 +56,17 @@ ALL_MODES = ("baseline", "mcp_only", "hybrid", "cli")
 # default so an existing sweep does not silently gain a 4th arm — inflating cost
 # ~33% — the day the cli port lands. Request it explicitly: --modes ... cli.
 DEFAULT_SWEEP_MODES = ("baseline", "mcp_only", "hybrid")
+
+# Named mode-matrix presets, selected via --matrix instead of --modes. Added
+# rather than changing DEFAULT_SWEEP_MODES itself so an existing sweep script
+# or cron job that omits --modes/--matrix keeps running the old 3-mode matrix —
+# a publish sweep must opt in explicitly with `--matrix publish`.
+MATRIX_PRESETS: dict[str, tuple[str, ...]] = {
+    # arXiv-grade publish matrix: hybrid is cut (mcp_only + cli cover the tool-
+    # access ablation; hybrid's incremental signal isn't worth its cost at
+    # publish scale).
+    "publish": ("baseline", "mcp_only", "cli"),
+}
 
 # ---------------------------------------------------------------------------
 # Data
@@ -268,10 +285,15 @@ def generate_manifest(sweep_items: list[SweepItem]) -> dict:
 def generate_run_commands(
     pending_items: list[SweepItem],
     accounts: str = "1-5",
+    model: str | None = None,
 ) -> list[str]:
     """Generate shell commands to run pending task+mode combos.
 
-    Groups by mode and emits one run_benchmark.py invocation per mode.
+    Groups by mode and emits one run_benchmark.py invocation per mode. When
+    *model* is given, `--model <model>` is appended to every command so a
+    publish sweep pins the agent model end-to-end (run_sweep -> run_benchmark
+    -> run_task -> the claude invocation) instead of leaving it to whatever the
+    agent CLI defaults to that day.
     """
     modes_with_pending: set[str] = set()
     for item in pending_items:
@@ -284,6 +306,8 @@ def generate_run_commands(
             f"python3 scripts/run_benchmark.py benchmarks/ --all"
             f" --account {accounts} -j0 --mode {mode}"
         )
+        if model:
+            cmd += f" --model {model}"
         commands.append(cmd)
     return commands
 
@@ -305,13 +329,37 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--modes",
-        default="baseline,mcp_only,hybrid",
-        help="Comma-separated list of modes (default: baseline,mcp_only,hybrid)",
+        default=None,
+        help=(
+            "Comma-separated list of modes (default: baseline,mcp_only,hybrid "
+            "unless --matrix is given). Mutually exclusive with --matrix."
+        ),
+    )
+    parser.add_argument(
+        "--matrix",
+        choices=sorted(MATRIX_PRESETS),
+        default=None,
+        help=(
+            "Named mode-matrix preset instead of --modes. 'publish' = "
+            "baseline,mcp_only,cli (the arXiv-grade sweep matrix, hybrid cut) "
+            "— publish sweeps MUST pass --matrix publish; it is not the "
+            "default. Mutually exclusive with --modes."
+        ),
     )
     parser.add_argument(
         "--account",
         default="1-5",
         help="Account range (e.g. '1-5' or '1,3,5')",
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Model to pin via --model on the generated run_benchmark.py "
+            "commands (e.g. claude-sonnet-5). Recommended for publish sweeps "
+            "so the run metadata records one model, not whatever the agent "
+            "CLI defaults to that day."
+        ),
     )
     parser.add_argument(
         "--manifest-only",
@@ -353,7 +401,16 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    modes = [m.strip() for m in args.modes.split(",")]
+    if args.modes and args.matrix:
+        logger.error("--modes and --matrix are mutually exclusive")
+        return 1
+    if args.matrix:
+        modes = list(MATRIX_PRESETS[args.matrix])
+    elif args.modes:
+        modes = [m.strip() for m in args.modes.split(",")]
+    else:
+        modes = list(DEFAULT_SWEEP_MODES)
+
     for m in modes:
         if m not in ALL_MODES:
             logger.error("Invalid mode: %s (valid: %s)", m, ", ".join(ALL_MODES))
@@ -420,7 +477,7 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("No pending tasks — all combinations are scored or failed.")
         return 0
 
-    commands = generate_run_commands(pending, accounts)
+    commands = generate_run_commands(pending, accounts, model=args.model)
     logger.info("Run commands (%d):", len(commands))
     for cmd in commands:
         logger.info("  %s", cmd)

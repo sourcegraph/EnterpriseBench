@@ -14,11 +14,16 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from run_sweep import (
+    ALL_MODES,
+    DEFAULT_SWEEP_MODES,
+    MATRIX_PRESETS,
     SweepItem,
+    build_parser,
     build_sweep_matrix,
     check_completion,
     generate_manifest,
     generate_run_commands,
+    main,
 )
 from run_benchmark import TaskInfo
 
@@ -296,3 +301,80 @@ class TestGenerateRunCommands:
     def test_no_pending(self) -> None:
         commands = generate_run_commands([])
         assert commands == []
+
+    def test_model_flag_appended_when_given(self) -> None:
+        items = [SweepItem("t1", "baseline", "s", "e", "single", "/p", "pending", None)]
+        commands = generate_run_commands(items, model="claude-sonnet-5")
+        assert len(commands) == 1
+        assert "--model claude-sonnet-5" in commands[0]
+
+    def test_model_flag_absent_by_default(self) -> None:
+        """Do not change default behavior when --model is absent."""
+        items = [SweepItem("t1", "baseline", "s", "e", "single", "/p", "pending", None)]
+        commands = generate_run_commands(items)
+        assert "--model" not in commands[0]
+
+
+# ---------------------------------------------------------------------------
+# --matrix publish
+# ---------------------------------------------------------------------------
+
+
+class TestMatrixPreset:
+    def test_publish_matrix_is_baseline_mcp_only_cli(self) -> None:
+        assert MATRIX_PRESETS["publish"] == ("baseline", "mcp_only", "cli")
+
+    def test_default_matrix_unchanged_without_flags(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["--manifest-only"])
+        assert args.modes is None
+        assert args.matrix is None
+        # main() must fall back to DEFAULT_SWEEP_MODES, not silently change it
+        assert DEFAULT_SWEEP_MODES == ("baseline", "mcp_only", "hybrid")
+
+    def test_matrix_and_modes_mutually_exclusive(self, tmp_path: Path, monkeypatch) -> None:
+        import run_sweep
+
+        monkeypatch.setattr(run_sweep, "discover_all_tasks", lambda: [])
+        output = tmp_path / "manifest.json"
+        rc = main(
+            [
+                "--matrix",
+                "publish",
+                "--modes",
+                "baseline,cli",
+                "--manifest-only",
+                "--output",
+                str(output),
+            ]
+        )
+        assert rc == 1
+
+    def test_matrix_publish_drives_the_sweep(self, tmp_path: Path, monkeypatch) -> None:
+        """--matrix publish must actually select {baseline, mcp_only, cli} for
+        the sweep matrix — not just parse — verified via the written
+        manifest's by_mode keys, no hybrid."""
+        import run_sweep
+
+        fake_task = _make_task("task-001")
+        monkeypatch.setattr(run_sweep, "discover_all_tasks", lambda: [fake_task])
+        monkeypatch.setattr(run_sweep, "_find_results_dirs", lambda extra_dirs=None: [])
+        output = tmp_path / "manifest.json"
+        rc = main(
+            [
+                "--matrix",
+                "publish",
+                "--manifest-only",
+                "--output",
+                str(output),
+            ]
+        )
+        assert rc == 0
+        manifest = json.loads(output.read_text())
+        assert manifest["total_combinations"] == 3
+        assert set(manifest["by_mode"].keys()) == {"baseline", "mcp_only", "cli"}
+
+    def test_invalid_matrix_choice_rejected_by_argparse(self) -> None:
+        parser = build_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--matrix", "not-a-real-matrix"])
