@@ -20,8 +20,9 @@
       ]
     },
     "config_identified": {
-      "expected_solution": "The behavior is controlled by the cluster-level circuit breaker thresholds in the Envoy cluster config — specifically max_connections, max_pending_requests, and max_requests (and max_retries) under cluster.circuit_breakers.thresholds. These are loaded by the cluster manager (source/common/upstream/cluster_manager_impl.cc) and consulted by conn_pool_base.cc when admitting new streams.",
+      "expected_solution": "The behavior is controlled by the cluster-level circuit breaker thresholds in the Envoy cluster config — specifically max_connections, max_pending_requests, and max_requests (and max_retries) under cluster.circuit_breakers.thresholds, defined in the data-plane-api protobuf envoy/config/cluster/v3/circuit_breaker.proto. These are loaded by the cluster manager (source/common/upstream/cluster_manager_impl.cc) and consulted by conn_pool_base.cc when admitting new streams.",
       "evaluation_criteria": [
+        "Names envoy/config/cluster/v3/circuit_breaker.proto in data-plane-api as the protobuf defining the thresholds",
         "Names the cluster circuit_breakers configuration block (cluster.circuit_breakers.thresholds)",
         "Lists max_connections and max_pending_requests as the relevant knobs",
         "Connects the circuit breaker config to the conn_pool overflow path"
