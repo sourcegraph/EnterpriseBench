@@ -405,3 +405,43 @@ class TestMatrixPreset:
         parser = build_parser()
         with pytest.raises(SystemExit):
             parser.parse_args(["--matrix", "not-a-real-matrix"])
+
+
+class TestExclusiveResults:
+    """--exclusive-results must scan ONLY the given dirs — the default
+    results/mcp_batch* glob banks cells scored by pre-fix code, which the
+    publish sweep's data-hygiene rule forbids."""
+
+    def test_exclusive_returns_only_given_dirs(self, tmp_path, monkeypatch):
+        import run_sweep as rs
+
+        fresh = tmp_path / "fresh"
+        fresh.mkdir()
+        stale_root = tmp_path / "results"
+        (stale_root / "mcp_batch").mkdir(parents=True)
+        (stale_root / "runs").mkdir()
+        monkeypatch.setattr(rs, "PROJECT_ROOT", tmp_path)
+
+        exclusive = rs.resolve_results_dirs(True, [fresh])
+        assert exclusive == [fresh.resolve()]
+
+        default = rs.resolve_results_dirs(False, [fresh])
+        assert (stale_root / "runs").resolve() in [d.resolve() for d in default]
+        assert (stale_root / "mcp_batch").resolve() in [
+            d.resolve() for d in default
+        ]
+
+    def test_exclusive_without_dir_raises(self):
+        import pytest
+        import run_sweep as rs
+
+        with pytest.raises(ValueError):
+            rs.resolve_results_dirs(True, None)
+
+    def test_flag_is_wired(self):
+        import run_sweep as rs
+
+        args = rs.build_parser().parse_args(
+            ["--exclusive-results", "--results-dir", "x"]
+        )
+        assert args.exclusive_results and args.results_dirs == ["x"]

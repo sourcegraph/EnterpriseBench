@@ -150,6 +150,20 @@ def build_sweep_matrix(
 # ---------------------------------------------------------------------------
 
 
+def resolve_results_dirs(
+    exclusive: bool, extra_dirs: list[Path] | None
+) -> list[Path]:
+    """Results dirs to check for completion. With ``exclusive``, ONLY the
+    explicitly passed dirs are scanned — the default results/runs +
+    results/mcp_batch* glob banks cells scored by pre-fix code, which a fresh
+    sweep's data-hygiene rule forbids."""
+    if exclusive:
+        if not extra_dirs:
+            raise ValueError("--exclusive-results requires at least one --results-dir")
+        return [d.resolve() for d in extra_dirs if d.resolve().is_dir()]
+    return _find_results_dirs(extra_dirs)
+
+
 def _find_results_dirs(extra_dirs: list[Path] | None = None) -> list[Path]:
     """Collect all results directories to check for completion."""
     dirs: list[Path] = []
@@ -401,6 +415,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Additional results directory to check (repeatable)",
     )
     parser.add_argument(
+        "--exclusive-results",
+        action="store_true",
+        help=(
+            "Check completion ONLY against the --results-dir paths given, "
+            "skipping the default results/runs + results/mcp_batch* scan. "
+            "Use for a fresh sweep whose data-hygiene rule bans banking "
+            "cells scored by pre-fix code."
+        ),
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -440,7 +464,10 @@ def main(argv: list[str] | None = None) -> int:
     extra_dirs: list[Path] | None = None
     if args.results_dirs:
         extra_dirs = [Path(d) for d in args.results_dirs]
-    results_dirs = _find_results_dirs(extra_dirs)
+    try:
+        results_dirs = resolve_results_dirs(args.exclusive_results, extra_dirs)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     # 1. Discover tasks
     logger.info("Discovering tasks under benchmarks/...")
