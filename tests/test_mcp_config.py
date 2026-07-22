@@ -115,6 +115,7 @@ class TestMcpAuthHeaders:
             cmd: list[str],
             timeout: int = 120,
             workdir: str = "/workspace",
+            user: str | None = None,
         ):
             return MagicMock(returncode=0, stdout="", stderr="")
 
@@ -566,7 +567,7 @@ class TestVerifyMcpEndpoint:
         iterator of CompletedProcess-likes); chmod / rm return benign success."""
         it = iter(curl_results)
 
-        def _exec(container_id, cmd, timeout=120, workdir="/workspace"):
+        def _exec(container_id, cmd, timeout=120, workdir="/workspace", user=None):
             if cmd and cmd[0] == "curl":
                 return next(it)
             return MagicMock(returncode=0, stdout="", stderr="")
@@ -618,7 +619,7 @@ class TestVerifyMcpEndpoint:
         captured_cmds: list[list[str]] = []
         header_writes: list[tuple[str, str]] = []
 
-        def capture_exec(container_id, cmd, timeout=120, workdir="/workspace"):
+        def capture_exec(container_id, cmd, timeout=120, workdir="/workspace", user=None):
             captured_cmds.append(cmd)
             if cmd and cmd[0] == "curl":
                 return MagicMock(returncode=0, stdout="200", stderr="")
@@ -657,7 +658,7 @@ class TestVerifyMcpEndpoint:
         """The staged header must be locked down (0600) and scrubbed afterward."""
         cmds: list[list[str]] = []
 
-        def capture_exec(container_id, cmd, timeout=120, workdir="/workspace"):
+        def capture_exec(container_id, cmd, timeout=120, workdir="/workspace", user=None):
             cmds.append(cmd)
             if cmd and cmd[0] == "curl":
                 return MagicMock(returncode=0, stdout="200", stderr="")
@@ -692,7 +693,9 @@ class TestMcpDualConfig:
         def mock_docker_cp(src: str, dest: str):
             cp_dests.append(dest)
 
-        def mock_docker_exec(container_id, cmd, timeout=120, workdir="/workspace"):
+        def mock_docker_exec(
+            container_id, cmd, timeout=120, workdir="/workspace", user=None
+        ):
             return MagicMock(returncode=0, stdout="", stderr="")
 
         def mock_mcp_exec(container_id, cmd, timeout=30):

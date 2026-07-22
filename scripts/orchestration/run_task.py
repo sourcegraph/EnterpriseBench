@@ -2255,7 +2255,7 @@ def _verify_mcp_endpoint(container_id: str, sg_token: str) -> bool:
                 exc,
             )
             return False
-        _docker_exec(container_id, ["chmod", "600", header_path])
+        _docker_exec(container_id, ["chmod", "600", header_path], user="root")
 
         max_retries = 5
         for attempt in range(1, max_retries + 1):
@@ -2281,6 +2281,7 @@ def _verify_mcp_endpoint(container_id: str, sg_token: str) -> bool:
                     SOURCEGRAPH_MCP_ENDPOINT,
                 ],
                 timeout=15,
+                user="root",
             )
             http_code = result.stdout.strip()
             # 200 = OK, 405 = Method Not Allowed (GET on POST-only MCP endpoint —
@@ -2395,7 +2396,9 @@ def _trust_project_mcp_servers(container_id: str, server_name: str) -> bool:
             )
             return False
         _docker_cp(tmp, f"{container_id}:{settings_path}")
-        _docker_exec(container_id, ["chown", "agent:agent", settings_path])
+        _docker_exec(
+            container_id, ["chown", "agent:agent", settings_path], user="root"
+        )
         logger.info(
             "Trusted MCP server %r via enabledMcpjsonServers in %s",
             server_name,
@@ -2482,6 +2485,7 @@ def _configure_mcp(container_id: str, mode: str) -> bool:
         _docker_exec(
             container_id,
             ["chown", "agent:agent", "/workspace/.mcp.json"],
+            user="root",
         )
 
         # User-level config: /home/agent/.claude/.mcp.json
@@ -2492,11 +2496,13 @@ def _configure_mcp(container_id: str, mode: str) -> bool:
                 "-c",
                 "mkdir -p /home/agent/.claude && chown agent:agent /home/agent/.claude",
             ],
+            user="root",
         )
         _docker_cp(tmp_user, f"{container_id}:/home/agent/.claude/.mcp.json")
         _docker_exec(
             container_id,
             ["chown", "agent:agent", "/home/agent/.claude/.mcp.json"],
+            user="root",
         )
 
         # Also write to /home/agent/.mcp.json for --mcp-config flag
@@ -2504,6 +2510,7 @@ def _configure_mcp(container_id: str, mode: str) -> bool:
         _docker_exec(
             container_id,
             ["chown", "agent:agent", "/home/agent/.mcp.json"],
+            user="root",
         )
         logger.info(
             "MCP config written to /workspace/.mcp.json, "
@@ -2626,6 +2633,7 @@ def _install_sgx(container_id: str, mode: str) -> bool:
             "(yum install -y python3) 2>/dev/null || true; }",
         ],
         timeout=300,
+        user="root",
     )
 
     # Step 3: build the /bin/sh wrapper baking SG_URL + token defaults
@@ -2650,6 +2658,7 @@ def _install_sgx(container_id: str, mode: str) -> bool:
             f"echo '{wrapper_b64}' | base64 -d > /usr/local/bin/sgx && "
             "chmod 755 /usr/local/bin/sgx /usr/local/lib/sg_cli.py",
         ],
+        user="root",
     )
 
     # Step 4: verify PATH resolves to OUR wrapper. The grep on the literal usage
