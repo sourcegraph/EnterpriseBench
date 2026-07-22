@@ -86,6 +86,38 @@ class TestRouteAgentExit:
         assert r.status == RUN_STATUS_INVALID
         assert r.phase == "agent_infra_error"
 
+    def test_max_turns_exit_is_a_scored_outcome_not_infra(
+        self, tmp_path: Path
+    ) -> None:
+        """Exhausting the turn budget is the agent's real, measured failure.
+        Routing it INVALID re-runs the weakest cells until they happen to
+        finish, censoring scores upward — and hits baseline hardest on hard
+        tasks. The session terminated cleanly at budget: score what's there."""
+        out = _out_with_stdout(
+            tmp_path,
+            '{"type":"result","subtype":"error_max_turns","is_error":true,'
+            '"num_turns":51,"terminal_reason":"max_turns",'
+            '"errors":["Reached maximum number of turns (50)"]}',
+        )
+        r = TaskRunResult(task_id="t")
+        _route_agent_exit(r, 1, out)
+        assert r.failure_class == "agent_max_turns"
+        assert r.status == ""  # NOT invalid — proceeds to scoring
+        assert r.phase == ""  # not routed to the infra re-run channel
+
+    def test_rate_limit_beats_max_turns_marker_noise(
+        self, tmp_path: Path
+    ) -> None:
+        # A terminal rate-limit is infra even if earlier content mentioned
+        # max turns; only the provider-emitted terminal subtype counts.
+        out = _out_with_stdout(
+            tmp_path, RATE_LIMIT_STDOUT + "\nReached maximum number of turns"
+        )
+        r = TaskRunResult(task_id="t")
+        _route_agent_exit(r, 1, out)
+        assert r.failure_class == "infra_rate_limit"
+        assert r.status == RUN_STATUS_INVALID
+
 
 class TestBaselineRegression:
     """The core rryas.7 defect: baseline has no zero-tool gate to catch a bad

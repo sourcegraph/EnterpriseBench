@@ -1199,6 +1199,22 @@ def _scan_agent_rate_limited(output_dir: Path) -> bool:
     )
 
 
+def _scan_agent_max_turns(output_dir: Path) -> bool:
+    """Detect a clean termination at the turn budget.
+
+    The Claude Code stream-json terminal result event carries
+    ``"subtype":"error_max_turns"`` and exits non-zero, but the session itself
+    completed normally at its budget — a scored outcome, not an infra failure
+    (:func:`_route_agent_exit`). Only the provider-emitted terminal subtype is
+    matched; agent-authored prose about turns is deliberately NOT matched.
+    """
+    stdout_log = output_dir / "agent_stdout.log"
+    if not stdout_log.exists():
+        return False
+    content = stdout_log.read_text(errors="replace")
+    return '"subtype":"error_max_turns"' in content
+
+
 def _write_content_to_container(
     container_id: str, content: str, dest_path: str, suffix: str = ""
 ) -> None:
@@ -1751,6 +1767,23 @@ def _route_agent_exit(
     already-classified run" guard then preserves whichever cause this set.
     """
     if agent_exit == 0:
+        return
+    if (
+        agent_exit not in (124, 137)
+        and not _scan_agent_rate_limited(output_dir)
+        and _scan_agent_max_turns(output_dir)
+    ):
+        # Exhausting the turn budget is a clean termination at budget — the
+        # agent's real, measured failure, not a harness fault. Routing it
+        # INVALID would re-run the weakest cells until they happen to finish,
+        # censoring scores upward (and hitting baseline hardest on hard
+        # tasks). Label it and let scoring proceed on whatever was produced.
+        result.failure_class = "agent_max_turns"
+        logger.warning(
+            "Agent exhausted its turn budget (exit %d) — scored outcome, "
+            "not routed to the infra re-run channel",
+            agent_exit,
+        )
         return
     result.phase = "agent_infra_error"
     result.status = RUN_STATUS_INVALID
