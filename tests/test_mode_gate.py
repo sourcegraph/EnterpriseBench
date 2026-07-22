@@ -64,7 +64,10 @@ EXPECTED_GATING = {
     "baseline": False,  # local-only; the control arm.
     "mcp_only": True,  # the ablation: local source denied at the filesystem.
     "hybrid": False,  # MCP *plus* local by design.
-    "cli": False,  # baseline + sgx; the manipulation is the tool interface,
+    "cli": True,  # sgx is the sole retrieval channel; local source denied so
+    # cli-vs-mcp_only is a clean single-factor contrast (tool interface only),
+    # not baseline+sgx. Without the gate, agents grep locally and never call
+    # sgx (18/139 zero-sgx invalids observed), and the arm measures nothing.
     # not readability, so local source stays present.
 }
 
@@ -216,6 +219,13 @@ def test_code_patch_task_is_ineligible_for_mcp_only():
 def test_optional_code_patch_is_still_eligible():
     """required=[answer], optional=[code_patch] is deliverable without the tree."""
     check_eligibility(_task(required=("answer",), optional=("code_patch",)), "mcp_only")
+
+
+def test_code_patch_task_is_ineligible_for_cli():
+    """cli is gated too, so a code_patch task cannot run there either."""
+    with pytest.raises(IneligibleTask) as exc:
+        check_eligibility(_task(required=("code_patch",)), "cli")
+    assert "code_patch" in str(exc)
 
 
 def test_code_patch_is_eligible_in_ungated_arms():

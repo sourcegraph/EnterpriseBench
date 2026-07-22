@@ -43,9 +43,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
 from validation import validate_repo_entry
 
-#: Arms whose agent is denied local source. ``hybrid`` is MCP *plus* local by
-#: definition, and ``baseline`` is local-only, so neither is gated.
-GATED_MODES = frozenset({"mcp_only"})
+#: Arms whose agent is denied local source, so a remote retrieval channel is the
+#: only path to code. ``mcp_only`` forces the MCP tools; ``cli`` forces the sgx
+#: (codemode) tools — gating it is what makes cli-vs-mcp_only a single-factor
+#: contrast over the tool interface, not baseline+sgx. ``hybrid`` is MCP *plus*
+#: local by definition and ``baseline`` is local-only, so neither is gated.
+GATED_MODES = frozenset({"mcp_only", "cli"})
 
 #: Artifacts the agent can only produce by reading and writing inside a repo
 #: tree. Under the gate that tree is unreadable, so such a task is not merely
