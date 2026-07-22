@@ -401,3 +401,28 @@ task_type = "error_provenance"
         info = _parse_task_meta(self._write_toml(tmp_path, extra='paper_scope = "excluded"\n'))
         assert info is not None
         assert info.paper_scope == "excluded"
+
+
+class TestTaskIdsAllowlist:
+    """--task-ids is a closed allowlist: only listed tasks run, and a listed
+    id that discovery cannot find aborts loudly — a silent miss would let a
+    sweep claim coverage it does not have."""
+
+    def test_keeps_only_listed(self):
+        from run_benchmark import filter_tasks
+
+        tasks = [_make_task_info("a-001"), _make_task_info("b-002")]
+        out = filter_tasks(tasks, task_ids={"a-001"})
+        assert [t.task_id for t in out] == ["a-001"]
+
+    def test_unknown_id_raises(self):
+        from run_benchmark import filter_tasks
+
+        with pytest.raises(ValueError, match="not discovered"):
+            filter_tasks([_make_task_info("a-001")], task_ids={"a-001", "ghost-9"})
+
+    def test_none_means_no_filter(self):
+        from run_benchmark import filter_tasks
+
+        tasks = [_make_task_info("a-001"), _make_task_info("b-002")]
+        assert len(filter_tasks(tasks, task_ids=None)) == 2

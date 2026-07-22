@@ -445,3 +445,41 @@ class TestExclusiveResults:
             ["--exclusive-results", "--results-dir", "x"]
         )
         assert args.exclusive_results and args.results_dirs == ["x"]
+
+
+class TestRunCommandsCarryTheAllowlist:
+    """The executed sweep must run exactly the manifest's pending cells — a
+    bare `benchmarks/ --all` rediscovers archived/mined/chain tasks the matrix
+    excluded (observed live: 172 matched vs 139 in the manifest)."""
+
+    def test_commands_reference_per_mode_task_ids_files(self, tmp_path):
+        import run_sweep as rs
+
+        def item(tid, mode, status):
+            return rs.SweepItem(
+                task_id=tid,
+                mode=mode,
+                suite="s",
+                difficulty="hard",
+                session_type="single",
+                toml_path="x",
+                results_path=None,
+                status=status,
+            )
+
+        items = [
+            item("t-b", "baseline", "pending"),
+            item("t-a", "baseline", "pending"),
+            item("t-a", "cli", "scored"),
+            item("t-c", "cli", "pending"),
+        ]
+        cmds = rs.generate_run_commands(
+            items, accounts="1-5", model="claude-sonnet-5", task_ids_dir=tmp_path
+        )
+        assert len(cmds) == 2
+        for cmd in cmds:
+            assert "--task-ids" in cmd and "--model claude-sonnet-5" in cmd
+        baseline_file = tmp_path / "sweep_pending_baseline.txt"
+        cli_file = tmp_path / "sweep_pending_cli.txt"
+        assert baseline_file.read_text().split() == ["t-a", "t-b"]
+        assert cli_file.read_text().split() == ["t-c"]

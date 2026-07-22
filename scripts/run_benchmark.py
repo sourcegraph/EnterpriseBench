@@ -186,9 +186,25 @@ def filter_tasks(
     session_type: str | None = None,
     task_type: str | None = None,
     limit: int | None = None,
+    task_ids: set[str] | None = None,
 ) -> list[TaskInfo]:
-    """Return a new list filtered by the given criteria."""
+    """Return a new list filtered by the given criteria.
+
+    ``task_ids`` is a closed allowlist: only listed ids survive, and every
+    listed id must exist in *tasks* — a silent miss would let a sweep claim
+    coverage it does not have, so unknown ids raise ValueError.
+    """
     result = list(tasks)
+    if task_ids is not None:
+        found = {t.task_id for t in result}
+        missing = sorted(task_ids - found)
+        if missing:
+            raise ValueError(
+                f"--task-ids lists {len(missing)} id(s) not discovered under "
+                f"the given path: {', '.join(missing[:5])}"
+                + ("..." if len(missing) > 5 else "")
+            )
+        result = [t for t in result if t.task_id in task_ids]
     if difficulty:
         result = [t for t in result if t.difficulty == difficulty]
     if session_type:
@@ -491,6 +507,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     filter_group.add_argument("--task-type")
     filter_group.add_argument(
+        "--task-ids",
+        type=str,
+        help=(
+            "Path to a file with one task_id per line: run ONLY these tasks. "
+            "Every listed id must be discoverable or the run aborts."
+        ),
+    )
+    filter_group.add_argument(
         "--limit", type=int, default=None, help="Max number of tasks to run"
     )
     filter_group.add_argument(
@@ -669,13 +693,33 @@ def main(argv: Sequence[str] | None = None) -> int:
         logger.error("No tasks found at %s", path)
         return 1
 
-    tasks = filter_tasks(
-        tasks,
-        difficulty=args.difficulty,
-        session_type=args.session_type,
-        task_type=args.task_type,
-        limit=args.limit,
-    )
+    task_ids: set[str] | None = None
+    if args.task_ids:
+        ids_path = Path(args.task_ids)
+        if not ids_path.is_file():
+            logger.error("--task-ids file does not exist: %s", ids_path)
+            return 1
+        task_ids = {
+            line.strip()
+            for line in ids_path.read_text().splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        }
+        if not task_ids:
+            logger.error("--task-ids file is empty: %s", ids_path)
+            return 1
+
+    try:
+        tasks = filter_tasks(
+            tasks,
+            difficulty=args.difficulty,
+            session_type=args.session_type,
+            task_type=args.task_type,
+            limit=args.limit,
+            task_ids=task_ids,
+        )
+    except ValueError as exc:
+        logger.error("%s", exc)
+        return 1
 
     logger.info("Matched %d task(s)", len(tasks))
 

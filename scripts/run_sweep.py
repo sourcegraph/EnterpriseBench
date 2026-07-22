@@ -315,24 +315,34 @@ def generate_run_commands(
     pending_items: list[SweepItem],
     accounts: str = "1-5",
     model: str | None = None,
+    task_ids_dir: Path | None = None,
 ) -> list[str]:
     """Generate shell commands to run pending task+mode combos.
 
-    Groups by mode and emits one run_benchmark.py invocation per mode. When
-    *model* is given, `--model <model>` is appended to every command so a
-    publish sweep pins the agent model end-to-end (run_sweep -> run_benchmark
-    -> run_task -> the claude invocation) instead of leaving it to whatever the
-    agent CLI defaults to that day.
+    Groups by mode and emits one run_benchmark.py invocation per mode, each
+    carrying an explicit ``--task-ids`` allowlist written to *task_ids_dir* —
+    a bare ``benchmarks/ --all`` rediscovers archived/mined/chain tasks the
+    manifest already excluded, so the executed sweep would diverge from the
+    manifest it claims to run. When *model* is given, ``--model <model>`` is
+    appended so a publish sweep pins the agent model end-to-end.
     """
-    modes_with_pending: set[str] = set()
+    pending_by_mode: dict[str, list[str]] = {}
     for item in pending_items:
         if item.status == "pending":
-            modes_with_pending.add(item.mode)
+            pending_by_mode.setdefault(item.mode, []).append(item.task_id)
+
+    if task_ids_dir is None:
+        task_ids_dir = PROJECT_ROOT / "configs"
+    task_ids_dir.mkdir(parents=True, exist_ok=True)
 
     commands: list[str] = []
-    for mode in sorted(modes_with_pending):
+    for mode in sorted(pending_by_mode):
+        ids = sorted(set(pending_by_mode[mode]))
+        ids_file = task_ids_dir / f"sweep_pending_{mode}.txt"
+        ids_file.write_text("\n".join(ids) + "\n")
         cmd = (
             f"python3 scripts/run_benchmark.py benchmarks/ --all"
+            f" --task-ids {ids_file}"
             f" --account {accounts} -j0 --mode {mode}"
         )
         if model:
