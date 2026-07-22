@@ -714,6 +714,38 @@ def _chown_to_agent(container_id: str, paths: list[str]) -> None:
         )
 
 
+class SealUnverifiable(Exception):
+    """The seal check could not RUN — its `docker exec` never reached the
+    container (killed/crashed/OOM'd, daemon blip). Distinct from a seal that ran
+    and found a breach: an unreachable container is no evidence of tampering, so
+    this routes to the ``verifier_infra_error`` re-run channel, never to
+    ``integrity_violation``. The agent cannot remove its own container from
+    inside, so this opens no g5k5s mulligan."""
+
+
+_CONTAINER_GONE_SIGNATURES = (
+    "no such container",
+    "is not running",
+    "dead or marked for removal",
+    "cannot connect to the docker daemon",
+    "is restarting",
+    "no such exec",
+)
+
+
+def _is_container_gone(proc: subprocess.CompletedProcess) -> bool:
+    """True when *proc* is a Docker-CLI-level failure to reach the container,
+    not the seal command's own verdict. The `docker exec` wrapper exits 125
+    with a daemon error when the container is absent; the inner seal command,
+    when it runs, exits 0/1 with its own stdout. Match the daemon signature so
+    only an unreachable container — never a genuine breach (returncode 1, no
+    signature) — is classified as infra."""
+    if proc.returncode == 0:
+        return False
+    stderr = (proc.stderr or "").lower()
+    return any(sig in stderr for sig in _CONTAINER_GONE_SIGNATURES)
+
+
 def _seal_grading_assets(container_id: str) -> None:
     """Seal the grading assets: owned by root, read by the scorer, agent locked out.
 
@@ -806,6 +838,11 @@ def _assert_grading_assets_sealed(container_id: str) -> tuple[bool, str]:
         user="root",
     )
     if parent.returncode != 0:
+        if _is_container_gone(parent):
+            raise SealUnverifiable(
+                f"container unreachable during {WORKSPACE_DIR} seal check: "
+                f"{parent.stderr.strip() or 'unknown error'}"
+            )
         return False, (
             f"could not verify the {WORKSPACE_DIR} seal: "
             f"{parent.stderr.strip() or 'unknown error'}"
@@ -830,6 +867,11 @@ def _assert_grading_assets_sealed(container_id: str) -> tuple[bool, str]:
     )
     result = _docker_exec(container_id, ["bash", "-c", script], user="root")
     if result.returncode != 0:
+        if _is_container_gone(result):
+            raise SealUnverifiable(
+                f"container unreachable during grading-asset seal check: "
+                f"{result.stderr.strip() or 'unknown error'}"
+            )
         return False, (
             f"could not verify the grading-asset seal: "
             f"{result.stderr.strip() or 'unknown error'}"
@@ -1829,7 +1871,23 @@ def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
     Refuses to run at all if the grading-asset seal is broken: a verifier the
     agent could have rewritten produces a number, not a measurement.
     """
-    sealed, seal_err = _assert_grading_assets_sealed(container_id)
+    try:
+        sealed, seal_err = _assert_grading_assets_sealed(container_id)
+    except SealUnverifiable as exc:
+        # The seal check never reached the container (killed/crashed/OOM'd,
+        # daemon blip). An unreachable container is not evidence of tampering,
+        # so route to the re-run channel — NOT the permanent integrity_violation
+        # channel, which would brand transient infra noise as sabotage and deny
+        # the re-run the run is owed.
+        return {
+            "task_score": 0.0,
+            "all_passed": False,
+            "verifier_infra_error": InfraError(
+                reason="seal_check_unreachable",
+                stage="seal_verification",
+                detail=str(exc),
+            ).as_verifier_error(),
+        }
     if not sealed:
         return {
             "task_score": 0.0,

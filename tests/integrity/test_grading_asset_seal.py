@@ -1398,3 +1398,66 @@ class TestForgeAttackEndToEnd:
             assert "test.sh" in err
         finally:
             subprocess.run(["docker", "kill", cid], capture_output=True)
+
+
+def _daemon_gone(stderr: str = None) -> subprocess.CompletedProcess:
+    """The proc `docker exec` returns when its target container is gone: the
+    Docker CLI exits 125 with a daemon 'No such container' error — the seal
+    command never ran against the container's filesystem at all."""
+    if stderr is None:
+        stderr = (
+            "Error response from daemon: No such container: "
+            "930e7f1ad895fa2f2f27f7cc488b00250664da833451becc0ce2906dbadad4e"
+        )
+    return subprocess.CompletedProcess(args=[], returncode=125, stdout="", stderr=stderr)
+
+
+class TestContainerGoneIsInfraNotTamper:
+    """A crash/kill/OOM that removes the container mid-scoring must route to the
+    re-run channel, NOT the permanent integrity_violation channel. The seal
+    check never touched the assets, so a gone container is no evidence of
+    tampering — and the agent cannot remove its own container from inside, so
+    this opens no g5k5s mulligan. Opposite failure modes must not fold together
+    (scorer_guard trust boundary)."""
+
+    def test_is_container_gone_matches_daemon_signatures(self) -> None:
+        assert rt._is_container_gone(_daemon_gone()) is True
+        assert rt._is_container_gone(
+            _daemon_gone("Error response from daemon: is not running")
+        ) is True
+        assert rt._is_container_gone(
+            _daemon_gone("Cannot connect to the Docker daemon at unix://...")
+        ) is True
+
+    def test_is_container_gone_rejects_a_real_breach(self) -> None:
+        # A plain nonzero exit with no daemon signature is a genuine seal
+        # failure (e.g. find reported an agent-owned asset) — must NOT be
+        # treated as infra, or a saboteur gets a re-run.
+        assert rt._is_container_gone(_fail("boom", returncode=1)) is False
+        assert rt._is_container_gone(_ok(stdout="MISSING:/workspace/test.sh")) is False
+
+    def test_seal_raises_seal_unverifiable_when_container_gone(self) -> None:
+        with patch.object(rt, "_docker_exec", return_value=_daemon_gone()):
+            with pytest.raises(rt.SealUnverifiable):
+                _assert_grading_assets_sealed("cid")
+
+    def test_run_scoring_routes_container_gone_to_infra(self) -> None:
+        with patch.object(
+            rt, "_assert_grading_assets_sealed",
+            side_effect=rt.SealUnverifiable("No such container: abc"),
+        ):
+            scores = _run_scoring("cid")
+        assert "verifier_infra_error" in scores
+        assert "integrity_violation" not in scores
+        assert scores["verifier_infra_error"]["reason"] == "seal_check_unreachable"
+
+    def test_run_scoring_still_flags_a_live_breach_as_tamper(self) -> None:
+        # Container responds (no SealUnverifiable), seal reports a breach:
+        # still integrity_violation, never a re-run (g5k5s preserved).
+        with patch.object(
+            rt, "_assert_grading_assets_sealed",
+            return_value=(False, "grading assets are missing: MISSING:/workspace/test.sh"),
+        ):
+            scores = _run_scoring("cid")
+        assert scores["integrity_violation"]["reason"] == "grading_assets_tampered"
+        assert "verifier_infra_error" not in scores
