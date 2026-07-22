@@ -1941,9 +1941,24 @@ def _apply_llm_judge(
             break
 
     if not agent_output:
-        # llm_curator + expected_solution present but no agent artifact found:
-        # the Tier-2 cap cannot be applied. Do NOT pass through un-capped grep
-        # scores as a real measurement — route to the re-run channel instead.
+        cps = scores.get("checkpoints", [])
+        if cps and all(float(cp.get("score") or 0.0) == 0.0 for cp in cps):
+            # Every deterministic checkpoint scored 0.0, so the Tier-2 ceiling
+            # is arithmetically irrelevant: min(0.0, judge) == 0.0 for any
+            # verdict. A missing artifact over an all-zero grep score is the
+            # agent's real, measured failure (e.g. out of turns before writing
+            # the deliverable) — record the zero, don't send it for re-run.
+            logger.info(
+                "LLM judge: no agent artifact but all deterministic "
+                "checkpoints scored 0.0 — Tier-2 cap irrelevant, recording "
+                "real zero"
+            )
+            scores["tier2_skipped"] = "no_agent_output_zero_score"
+            return scores
+        # llm_curator + expected_solution present but no agent artifact found,
+        # and at least one grep checkpoint scored > 0: the Tier-2 cap cannot be
+        # applied. Do NOT pass through un-capped grep scores as a real
+        # measurement — route to the re-run channel instead.
         logger.warning(
             "LLM judge: no agent output found for llm_curator task with "
             "expected_solution (candidates: %s) — routing to verifier_infra_error",

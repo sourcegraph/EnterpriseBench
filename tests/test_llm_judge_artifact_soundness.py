@@ -118,6 +118,58 @@ class TestDeriveArtifactCandidates:
 # --------------------------------------------------------------------------
 
 
+class TestNoAgentOutputWithZeroGrepIsARealZero:
+    """A missing artifact is only an infra error when the un-capped grep score
+    could inflate the measurement. With every deterministic checkpoint at 0.0
+    the Tier-2 cap is arithmetically irrelevant (min(0, judge) == 0), so the
+    zero is the agent's real, measured failure — e.g. it ran out of turns
+    before writing the deliverable — and must be recorded, not re-run."""
+
+    def test_all_zero_grep_records_real_zero(self, tmp_path: Path) -> None:
+        task_dir = _write_task(
+            tmp_path,
+            "Write findings to `/workspace/agent_output/answer.json`.",
+            {"cp1": {"expected_solution": "x", "evaluation_criteria": []}},
+        )
+        scores = {
+            "task_score": 0.0,
+            "checkpoints": [
+                {"name": "cp1", "score": 0.0, "weight": 1.0, "passed": False}
+            ],
+        }
+        with patch.object(
+            run_task, "_docker_exec", side_effect=_docker_exec_for({})
+        ):
+            out = _apply_llm_judge(scores, task_dir, "cid", {"task": {}})
+
+        assert "verifier_infra_error" not in out
+        assert out["tier2_skipped"] == "no_agent_output_zero_score"
+        assert out["task_score"] == 0.0
+
+    def test_any_nonzero_grep_still_routes_to_infra_error(
+        self, tmp_path: Path
+    ) -> None:
+        task_dir = _write_task(
+            tmp_path,
+            "Write findings to `/workspace/agent_output/answer.json`.",
+            {"cp1": {"expected_solution": "x", "evaluation_criteria": []}},
+        )
+        scores = {
+            "task_score": 0.3,
+            "checkpoints": [
+                {"name": "cp1", "score": 0.0, "weight": 0.5, "passed": False},
+                {"name": "cp2", "score": 0.6, "weight": 0.5, "passed": False},
+            ],
+        }
+        with patch.object(
+            run_task, "_docker_exec", side_effect=_docker_exec_for({})
+        ):
+            out = _apply_llm_judge(scores, task_dir, "cid", {"task": {}})
+
+        assert out["verifier_infra_error"]["reason"] == "no_agent_output"
+        assert "tier2_skipped" not in out
+
+
 class TestNoAgentOutputRoutesToInfraError:
     def _scores(self) -> dict:
         return {
