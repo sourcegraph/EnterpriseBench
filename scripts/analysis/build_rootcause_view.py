@@ -21,6 +21,27 @@ from pathlib import Path
 MODES = ("baseline", "mcp_only", "cli", "hybrid")
 RESULT_SNIPPET = 500
 INSTR_CAP = 12000
+OUTPUT_CAP = 9000
+ORACLE_CAP = 9000
+_DELIVERABLE_HINTS = ("answer", "report", "drift", ".md", ".json", "output", "analysis", "plan")
+
+
+def build_taskdir_map(bench: Path) -> dict:
+    """result-dir-name (== [task].id) -> task.toml directory. The results tree
+    is keyed by task_id, which frequently differs from the benchmark dir name."""
+    import tomllib
+
+    out = {}
+    for tp in bench.glob("*/*/task.toml"):
+        if "_archived" in tp.parts or "mined" in tp.parts:
+            continue
+        try:
+            tid = tomllib.load(tp.open("rb")).get("task", {}).get("id")
+        except (OSError, tomllib.TOMLDecodeError):
+            continue
+        if tid:
+            out[tid] = tp.parent
+    return out
 
 
 def _load_json(p: Path) -> dict:
@@ -86,8 +107,10 @@ def extract_trace(trace_path: Path, stdout_path: Path) -> dict:
     mcp_servers: list[dict] = init.get("mcp_servers", []) or []
     instruction = ""
     calls: list[dict] = []
+    writes: dict[str, dict] = {}  # deliverable path -> {content, status} (last write wins)
     terminal = {}
     pending: dict[str, dict] = {}
+    write_pending: dict[str, str] = {}  # tool_use_id -> path
 
     for ev in _iter_trace(trace_path):
         t = ev.get("type")
@@ -117,14 +140,29 @@ def extract_trace(trace_path: Path, stdout_path: Path) -> dict:
                     }
                     calls.append(rec)
                     pending[c.get("id", "")] = rec
+                    # Capture deliverable Write attempts (content survives even
+                    # when the write later EACCES-fails in a gated arm).
+                    if c.get("name") in ("Write", "Edit"):
+                        fp = (inp.get("file_path") or "").lower()
+                        if any(h in fp for h in _DELIVERABLE_HINTS):
+                            content = inp.get("content") or inp.get("new_string") or ""
+                            writes[inp.get("file_path")] = {
+                                "content": content[:OUTPUT_CAP],
+                                "status": "pending",
+                            }
+                            write_pending[c.get("id", "")] = inp.get("file_path")
         if t == "user":
             for c in (ev.get("message") or {}).get("content", []):
                 if isinstance(c, dict) and c.get("type") == "tool_result":
-                    rec = pending.pop(c.get("tool_use_id", ""), None)
+                    tuid = c.get("tool_use_id", "")
+                    rec = pending.pop(tuid, None)
                     if rec is not None:
                         txt = _text_of(c.get("content", ""))
                         rec["status"] = _result_status(txt)
                         rec["result"] = txt[:RESULT_SNIPPET]
+                        wp = write_pending.pop(tuid, None)
+                        if wp and wp in writes:
+                            writes[wp]["status"] = rec["status"]
         if t == "result":
             terminal = {
                 "subtype": ev.get("subtype"),
@@ -137,6 +175,7 @@ def extract_trace(trace_path: Path, stdout_path: Path) -> dict:
         "mcp_servers": mcp_servers,
         "instruction": instruction[:INSTR_CAP],
         "calls": calls,
+        "writes": [{"path": p, **v} for p, v in writes.items()],
         "terminal": terminal,
     }
 
@@ -168,7 +207,7 @@ def flags_for(cell: dict) -> list[str]:
     return f
 
 
-def build_cells(results_dir: Path) -> list[dict]:
+def build_cells(results_dir: Path, taskdirs: dict) -> list[dict]:
     cells = []
     for rj in sorted(results_dir.glob("*/*/results.json")):
         mode = rj.parent.name
@@ -185,6 +224,16 @@ def build_cells(results_dir: Path) -> list[dict]:
         tr = extract_trace(
             rj.parent / "agent_trace.jsonl", rj.parent / "agent_stdout.log"
         )
+        tdir = taskdirs.get(task)
+        ground_truth = ""
+        expected_solution = ""
+        if tdir:
+            gt = tdir / "ground_truth.json"
+            es = tdir / "expected_solution.json"
+            if gt.exists():
+                ground_truth = gt.read_text(errors="replace")[:ORACLE_CAP]
+            if es.exists():
+                expected_solution = es.read_text(errors="replace")[:ORACLE_CAP]
         infra = (
             (r.get("verifier_infra_error") or {}).get("detail")
             or (r.get("integrity_violation") or {}).get("detail")
@@ -235,7 +284,10 @@ def build_cells(results_dir: Path) -> list[dict]:
             "mcp_servers": tr["mcp_servers"],
             "instruction": tr["instruction"],
             "calls": tr["calls"],
+            "writes": tr["writes"],
             "terminal": tr["terminal"],
+            "ground_truth": ground_truth,
+            "expected_solution": expected_solution,
         }
         cell["flags"] = flags_for(cell)
         cells.append(cell)
@@ -287,6 +339,8 @@ pre{background:var(--panel2);border:1px solid var(--bd);border-radius:5px;paddin
 .tool-badges span{font-size:10px;padding:1px 5px;margin:1px;border-radius:3px;display:inline-block;background:var(--panel2);border:1px solid var(--bd)}
 .tool-badges .mcp{color:var(--mcp);border-color:#3d2d5a}.tool-badges .sgx{color:var(--sgx)}
 .cp{padding:3px 0;border-bottom:1px solid #21262d}.cp .d{color:var(--dim);font-size:11px}
+.wr{margin:6px 0}.wr .wrh{font-size:11px;margin-bottom:2px}.wr code,.orc code{color:var(--acc)}
+.orc{margin:6px 0}.orc b{font-size:11px;color:var(--dim)}
 .empty{color:var(--dim);padding:40px;text-align:center}
 .count{color:var(--dim);font-size:11px}
 </style></head><body>
@@ -407,6 +461,12 @@ function detail(c){
   <pre>${esc(c.instruction||'(not captured)')}</pre>
   <h3>Trace — ${c.calls.length} tool calls</h3>
   <div>${calls||'<div class="empty">no tool calls</div>'}</div>
+  <h3>Agent output produced — ${(c.writes||[]).length} deliverable write(s)</h3>
+  ${(c.writes&&c.writes.length)?c.writes.map(w=>`<div class="wr"><div class="wrh"><span class="st ${w.status}">${w.status==='denied'?'✗ WRITE DENIED':w.status==='ok'?'✓ written':w.status}</span> <code>${esc(w.path)}</code></div><pre>${esc(w.content||'(empty)')}</pre></div>`).join(''):'<div class="empty">agent wrote no deliverable file</div>'}
+  <h3>Oracle — what the checker graded against</h3>
+  ${c.ground_truth?`<div class="orc"><b>ground_truth.json</b><pre>${esc(c.ground_truth)}</pre></div>`:''}
+  ${c.expected_solution?`<div class="orc"><b>expected_solution.json (curated)</b><pre>${esc(c.expected_solution)}</pre></div>`:''}
+  ${(!c.ground_truth&&!c.expected_solution)?'<div class="empty">no ground_truth/expected_solution on disk for this task</div>':''}
   <h3>Scoring — ${c.checkpoints.length} checkpoints</h3>
   <div>${cps||'<div class="empty">no checkpoints</div>'}</div>`;
   document.getElementById('detail').scrollTop=0;
@@ -424,7 +484,8 @@ def main() -> None:
     ap.add_argument("--results", default="results/runs")
     ap.add_argument("--out", default="/tmp/rootcause.html")
     args = ap.parse_args()
-    cells = build_cells(Path(args.results))
+    taskdirs = build_taskdir_map(Path("benchmarks"))
+    cells = build_cells(Path(args.results), taskdirs)
     data = json.dumps(cells, ensure_ascii=False, separators=(",", ":"))
     out = Path(args.out)
     out.write_text(HTML_TEMPLATE.replace("__DATA__", data), encoding="utf-8")
