@@ -394,8 +394,15 @@ def _run_verifier(
 
 
 def _write_report(workspace: Path, repo_dir: str, content: str) -> Path:
-    """Write an IMPACT_REPORT.md into the workspace."""
-    report_dir = workspace / repo_dir
+    """Write IMPACT_REPORT.md to the agent's deliverable drop.
+
+    *repo_dir* is accepted for call-site compatibility (historically the
+    report lived under the repo tree) but is unused: deliverables were
+    migrated to /workspace/agent_output/ (mode_gate locks repo dirs in gated
+    arms; agent_output is the one location every arm leaves writable) --
+    scripts/authoring/migrate_deliverable_to_agent_output.py.
+    """
+    report_dir = workspace / "agent_output"
     report_dir.mkdir(parents=True, exist_ok=True)
     report_path = report_dir / "IMPACT_REPORT.md"
     report_path.write_text(content)

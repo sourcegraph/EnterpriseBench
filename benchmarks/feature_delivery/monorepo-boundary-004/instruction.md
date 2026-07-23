@@ -20,4 +20,4 @@ Both are straightforward fixes, but before we ship the patch I want to make sure
 
 ## Output
 
-Write findings to `/workspace/babel/IMPACT_REPORT.md`.
+Write findings to `/workspace/agent_output/IMPACT_REPORT.md`.

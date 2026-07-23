@@ -47,4 +47,4 @@ theory about snapshotters or platforms.
 
 ## Output
 
-Write your incident report to `/workspace/nerdctl/INCIDENT_REPORT.md`.
+Write your incident report to `/workspace/agent_output/INCIDENT_REPORT.md`.

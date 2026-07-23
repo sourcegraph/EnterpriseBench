@@ -53,4 +53,4 @@ LSM-tree or MVCC theory.
 
 ## Output
 
-Write your incident report to `/workspace/cockroach/INCIDENT_REPORT.md`.
+Write your incident report to `/workspace/agent_output/INCIDENT_REPORT.md`.

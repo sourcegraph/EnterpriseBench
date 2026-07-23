@@ -17,7 +17,7 @@
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-/workspace}"
-REPORT="$WORKSPACE/charts/DRIFT_REPORT.json"
+REPORT="$WORKSPACE/agent_output/DRIFT_REPORT.json"
 GT="${TASK_DIR:-}/ground_truth.json"
 MAX_REPORT_BYTES=1048576
 

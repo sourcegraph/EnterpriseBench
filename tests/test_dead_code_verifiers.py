@@ -96,8 +96,15 @@ def _run_verifier(
 
 
 def _write_report(workspace: Path, repo_dir: str, entries: list[dict]) -> Path:
-    """Write a dead_code_report.json into the workspace repo directory."""
-    report_dir = workspace / repo_dir
+    """Write a dead_code_report.json to the agent's deliverable drop.
+
+    *repo_dir* is accepted for call-site compatibility (historically the
+    report lived under the repo tree) but is unused: deliverables were
+    migrated to /workspace/agent_output/ (mode_gate locks repo dirs in gated
+    arms; agent_output is the one location every arm leaves writable) --
+    scripts/authoring/migrate_deliverable_to_agent_output.py.
+    """
+    report_dir = workspace / "agent_output"
     report_dir.mkdir(parents=True, exist_ok=True)
     report_path = report_dir / "dead_code_report.json"
     report_path.write_text(json.dumps(entries, indent=2))

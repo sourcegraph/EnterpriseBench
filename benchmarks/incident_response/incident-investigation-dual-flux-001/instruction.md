@@ -43,4 +43,4 @@ Two repos are checked out in the workspace:
 
 ## Output
 
-Write your findings to `/workspace/flux2/INCIDENT_REPORT.md`.
+Write your findings to `/workspace/agent_output/INCIDENT_REPORT.md`.

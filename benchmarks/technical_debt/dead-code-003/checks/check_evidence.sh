@@ -15,7 +15,7 @@ set -euo pipefail
 
 CHECKPOINT="check_evidence"
 WORKSPACE="${WORKSPACE:-/workspace}"
-REPORT="$WORKSPACE/react/dead_code_report.json"
+REPORT="$WORKSPACE/agent_output/dead_code_report.json"
 GT="${TASK_DIR:-}/ground_truth.json"
 MAX_REPORT_BYTES=1048576
 

@@ -40,4 +40,4 @@ The following sequence consistently triggers the bug:
 
 ## Output
 
-Write your findings to `/workspace/kubernetes/INCIDENT_REPORT.md` with clearly labeled sections for each of the four items above.
+Write your findings to `/workspace/agent_output/INCIDENT_REPORT.md` with clearly labeled sections for each of the four items above.

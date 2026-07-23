@@ -9,10 +9,12 @@ Covers two verifier-soundness holes in run_task._apply_llm_judge
   with ``verifier_infra_error`` so the run routes to the re-run channel.
 
   Finding #2 (hardcoded artifact paths): artifact discovery was a baked-in set
-  of task-specific repo paths (``/workspace/moby/INCIDENT_REPORT.md`` …). Any
-  task whose artifact lives elsewhere (e.g. ``/workspace/BLAST_RADIUS.md``)
-  yielded empty output and silently routed into finding #1. Candidate paths
-  must be derived from task metadata (instruction.md) instead.
+  of task-specific repo paths (e.g. the pre-migration ``/workspace/moby/
+  INCIDENT_REPORT.md`` — deliverables now route to ``/workspace/agent_output/``
+  instead, see EnterpriseBench's gated-repo-deliverable migration). Any task
+  whose artifact lives elsewhere (e.g. ``/workspace/BLAST_RADIUS.md``) yielded
+  empty output and silently routed into finding #1. Candidate paths must be
+  derived from task metadata (instruction.md) instead.
 """
 
 from __future__ import annotations

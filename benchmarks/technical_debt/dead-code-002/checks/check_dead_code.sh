@@ -3,7 +3,7 @@
 # Env: WORKSPACE, TASK_DIR, TASK_ID
 set -euo pipefail
 
-REPORT="${WORKSPACE}/react/dead_code_report.json"
+REPORT="${WORKSPACE}/agent_output/dead_code_report.json"
 GT_DIR="${TASK_DIR}/ground_truth.json"
 
 if [[ ! -f "$REPORT" ]]; then

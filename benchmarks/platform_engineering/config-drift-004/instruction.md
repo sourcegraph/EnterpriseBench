@@ -20,4 +20,4 @@ Nothing in our values file changed. The same overrides that rendered cleanly bef
 
 ## Output
 
-Write your findings to `/workspace/argo-cd/DRIFT_REPORT.json` as a JSON object with a `drift_points` array. Each entry needs: `file`, `key`, `expected`, `actual`, and `override_chain`.
+Write your findings to `/workspace/agent_output/DRIFT_REPORT.json` as a JSON object with a `drift_points` array. Each entry needs: `file`, `key`, `expected`, `actual`, and `override_chain`.

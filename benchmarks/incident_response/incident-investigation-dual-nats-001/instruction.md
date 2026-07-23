@@ -53,4 +53,4 @@ JetStream theory.
 
 ## Output
 
-Write your incident report to `/workspace/nats-server/INCIDENT_REPORT.md`.
+Write your incident report to `/workspace/agent_output/INCIDENT_REPORT.md`.

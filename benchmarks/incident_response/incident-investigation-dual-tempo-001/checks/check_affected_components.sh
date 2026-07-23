@@ -9,7 +9,7 @@ set -euo pipefail
 
 CHECKPOINT="affected_components"
 WORKSPACE="${WORKSPACE:-/workspace}"
-REPORT="$WORKSPACE/tempo/INCIDENT_REPORT.md"
+REPORT="$WORKSPACE/agent_output/INCIDENT_REPORT.md"
 GT="${TASK_DIR:-}/ground_truth.json"
 MAX_REPORT_BYTES=1048576
 

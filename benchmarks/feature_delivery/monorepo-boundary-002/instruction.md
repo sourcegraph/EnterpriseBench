@@ -20,4 +20,4 @@ This is going into v7.24.0 as a minor bump. Before we cut the release, I need to
 
 ## Output
 
-Write your findings to `/workspace/babel/IMPACT_REPORT.md` with sections for each affected package.
+Write your findings to `/workspace/agent_output/IMPACT_REPORT.md` with sections for each affected package.

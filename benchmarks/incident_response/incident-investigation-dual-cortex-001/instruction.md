@@ -56,4 +56,4 @@ description of the symptoms above.
 
 ## Output
 
-Write your incident report to `/workspace/cortex/INCIDENT_REPORT.md`.
+Write your incident report to `/workspace/agent_output/INCIDENT_REPORT.md`.

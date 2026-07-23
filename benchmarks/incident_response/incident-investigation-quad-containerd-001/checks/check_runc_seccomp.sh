@@ -9,7 +9,7 @@ set -euo pipefail
 
 CHECKPOINT="runc_seccomp_filter"
 WORKSPACE="${WORKSPACE:-/workspace}"
-REPORT="$WORKSPACE/moby/INCIDENT_REPORT.md"
+REPORT="$WORKSPACE/agent_output/INCIDENT_REPORT.md"
 GT="${TASK_DIR:-}/ground_truth.json"
 MAX_REPORT_BYTES=1048576
 

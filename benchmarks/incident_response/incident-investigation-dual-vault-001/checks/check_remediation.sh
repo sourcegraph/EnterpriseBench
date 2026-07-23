@@ -9,7 +9,7 @@ set -euo pipefail
 
 CHECKPOINT="remediation_proposal"
 WORKSPACE="${WORKSPACE:-/workspace}"
-REPORT="$WORKSPACE/vault/INCIDENT_REPORT.md"
+REPORT="$WORKSPACE/agent_output/INCIDENT_REPORT.md"
 GT="${TASK_DIR:-}/ground_truth.json"
 MAX_REPORT_BYTES=1048576
 

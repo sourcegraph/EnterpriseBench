@@ -19,7 +19,7 @@
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-/workspace}"
-REPORT="$WORKSPACE/babel/IMPACT_REPORT.md"
+REPORT="$WORKSPACE/agent_output/IMPACT_REPORT.md"
 MAX_REPORT_BYTES=1048576
 
 verdict() { printf '{"score": %s, "passed": %s, "detail": "%s"}\n' "$1" "$2" "$3"; exit 0; }

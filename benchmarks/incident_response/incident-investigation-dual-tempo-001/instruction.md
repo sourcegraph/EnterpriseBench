@@ -54,4 +54,4 @@ general ring/gossip theory.
 
 ## Output
 
-Write your incident report to `/workspace/tempo/INCIDENT_REPORT.md`.
+Write your incident report to `/workspace/agent_output/INCIDENT_REPORT.md`.

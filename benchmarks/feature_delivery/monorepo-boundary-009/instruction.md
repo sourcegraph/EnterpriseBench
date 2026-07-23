@@ -23,4 +23,4 @@ The current `rustc_attr` crate at `compiler/rustc_attr/` exports both data types
 
 ## Output
 
-Write findings to `/workspace/rust/IMPACT_REPORT.md`.
+Write findings to `/workspace/agent_output/IMPACT_REPORT.md`.

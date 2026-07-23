@@ -24,4 +24,4 @@ We're deploying Spring Cloud Dataflow via the bitnami Helm chart and want to use
 
 ## Output
 
-Write your findings to `/workspace/charts/DRIFT_REPORT.json` as a JSON object with a `drift_points` array. Each entry needs: `file`, `key`, `expected`, `actual`, and `override_chain`.
+Write your findings to `/workspace/agent_output/DRIFT_REPORT.json` as a JSON object with a `drift_points` array. Each entry needs: `file`, `key`, `expected`, `actual`, and `override_chain`.

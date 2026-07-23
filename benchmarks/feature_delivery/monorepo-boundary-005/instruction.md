@@ -20,4 +20,4 @@ These are among the most foundational data structures in pnpm — the lockfile f
 
 ## Output
 
-Write findings to `/workspace/pnpm/IMPACT_REPORT.md`.
+Write findings to `/workspace/agent_output/IMPACT_REPORT.md`.

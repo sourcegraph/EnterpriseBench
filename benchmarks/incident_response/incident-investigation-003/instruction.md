@@ -43,4 +43,4 @@ The JSON parser uses the `json-iterator/go` library (jsoniter), which has an unu
 
 ## Output
 
-Write your findings to `/workspace/grafana/INCIDENT_REPORT.md`.
+Write your findings to `/workspace/agent_output/INCIDENT_REPORT.md`.

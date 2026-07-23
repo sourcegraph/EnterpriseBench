@@ -23,7 +23,7 @@
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-/workspace}"
-REPORT="$WORKSPACE/babel/IMPACT_REPORT.md"
+REPORT="$WORKSPACE/agent_output/IMPACT_REPORT.md"
 GT="${TASK_DIR:-$(dirname "$(dirname "$0")")}/ground_truth.json"
 MAX_REPORT_BYTES=1048576
 

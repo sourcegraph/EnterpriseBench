@@ -15,7 +15,7 @@ When a feature flag becomes permanently enabled (set to `true` in the main flags
 
 ## Output
 
-Write your findings to `/workspace/react/dead_code_report.json` as a JSON array where each entry has:
+Write your findings to `/workspace/agent_output/dead_code_report.json` as a JSON array where each entry has:
 - `file`: relative path from repo root
 - `symbol`: function/type/branch description
 - `kind`: one of `function`, `class`, `method`, `export`, `branch`

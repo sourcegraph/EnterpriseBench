@@ -41,4 +41,4 @@ The team traced the suppression to the Alertmanager inhibition pipeline:
 
 ## Output
 
-Write your findings to `/workspace/alertmanager/INCIDENT_REPORT.md`.
+Write your findings to `/workspace/agent_output/INCIDENT_REPORT.md`.

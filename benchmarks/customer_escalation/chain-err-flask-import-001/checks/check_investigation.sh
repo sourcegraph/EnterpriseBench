@@ -46,11 +46,11 @@ CHECKPOINT="investigation_evidence"
 # See check_cycle.sh for why the workspace and TASK_DIR are resolved this way (three
 # runners, three conventions) and why the literal "$WORKSPACE/..." spelling matters.
 WORKSPACE="${1:-${WORKSPACE:-/workspace}}"
-REPORT="$WORKSPACE/flask/INVESTIGATION.md"
+REPORT="$WORKSPACE/agent_output/INVESTIGATION.md"
 # The gate's input. Session 1 writes both files, and session 2 inherits them on the
 # branch, so CYCLE_VERDICT.json is present wherever this check runs — as a session-1
 # milestone and as a final weighted checkpoint.
-CYCLE="$WORKSPACE/flask/CYCLE_VERDICT.json"
+CYCLE="$WORKSPACE/agent_output/CYCLE_VERDICT.json"
 TASK_DIR="${TASK_DIR:-$(dirname "$(dirname "$(realpath "$0")")")}"
 GT="$TASK_DIR/ground_truth.json"
 MAX_BYTES=1048576

@@ -43,4 +43,4 @@ The team has identified the general area of the failure:
 
 ## Output
 
-Write your findings to `/workspace/moby/INCIDENT_REPORT.md`.
+Write your findings to `/workspace/agent_output/INCIDENT_REPORT.md`.

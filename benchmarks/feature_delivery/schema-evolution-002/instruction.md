@@ -22,4 +22,4 @@ Before we merge this, I need a complete picture of what code touches the export 
 
 4. **Test coverage**: Which test files need updating? We have dedicated export tests, import/export round-trip tests, event tests, and management command tests.
 
-Write your findings to `/workspace/zulip/SCHEMA_IMPACT.md`.
+Write your findings to `/workspace/agent_output/SCHEMA_IMPACT.md`.

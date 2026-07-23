@@ -14,7 +14,7 @@ The React Compiler (`babel-plugin-react-compiler`) is a compilation pipeline tha
 
 ## Output
 
-Write your findings to `/workspace/react/dead_code_report.json` as a JSON array where each entry has:
+Write your findings to `/workspace/agent_output/dead_code_report.json` as a JSON array where each entry has:
 - `file`: relative path from repo root
 - `symbol`: function/type/export name
 - `kind`: one of `function`, `class`, `method`, `file`, `export`, `type`

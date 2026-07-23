@@ -20,4 +20,4 @@ This is an internal representation change (no user-facing API change), but it af
 
 ## Output
 
-Write findings to `/workspace/rust/IMPACT_REPORT.md`.
+Write findings to `/workspace/agent_output/IMPACT_REPORT.md`.

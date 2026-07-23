@@ -39,4 +39,4 @@ The team has identified that the issue is related to regex header matching:
 
 ## Output
 
-Write your findings to `/workspace/istio/INCIDENT_REPORT.md`.
+Write your findings to `/workspace/agent_output/INCIDENT_REPORT.md`.

@@ -37,7 +37,7 @@ CHECKPOINT="cycle_discrimination"
 # curated_gate_analyzer.DELIV_RE scrapes to find this task's deliverables — spell it
 # any other way and the task silently drops out of the suite-wide echo sweep.
 WORKSPACE="${1:-${WORKSPACE:-/workspace}}"
-VERDICT="$WORKSPACE/flask/CYCLE_VERDICT.json"
+VERDICT="$WORKSPACE/agent_output/CYCLE_VERDICT.json"
 # milestone.py sets no env at all, so TASK_DIR must fall back to this script's own
 # location (<task_dir>/checks/<this>.sh). In-sandbox the scripts are relocated to
 # /workspace/.verifiers/, where that derivation would be wrong — but there

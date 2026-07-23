@@ -21,4 +21,4 @@ Here's what concerns me: the Next.js monorepo has a Rust-based SWC compiler (`@n
 
 ## Output
 
-Write findings to `/workspace/next.js/IMPACT_REPORT.md`.
+Write findings to `/workspace/agent_output/IMPACT_REPORT.md`.

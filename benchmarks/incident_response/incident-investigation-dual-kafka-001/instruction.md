@@ -43,4 +43,4 @@ The team has narrowed the issue to the interaction between batch processing and 
 
 ## Output
 
-Write your findings to `/workspace/kafka/INCIDENT_REPORT.md`.
+Write your findings to `/workspace/agent_output/INCIDENT_REPORT.md`.

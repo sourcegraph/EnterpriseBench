@@ -120,13 +120,20 @@ def _session_prompts() -> str:
 def _make_ws(tmp_path: Path, name: str) -> Path:
     ws = tmp_path / name
     (ws / "flask").mkdir(parents=True)
+    (ws / "agent_output").mkdir(parents=True)
     return ws
 
 
 def _write(
     ws: Path, *, investigation: str, cycle_verdict: str, resolution: str
 ) -> Path:
-    """Write this task's three deliverables into `ws/flask/`.
+    """Write this task's three deliverables into `ws/agent_output/`.
+
+    Deliverables were migrated out of `ws/flask/` (mode_gate locks repo dirs in
+    gated arms; agent_output is the one location every arm leaves writable) --
+    scripts/authoring/migrate_deliverable_to_agent_output.py. `ws/flask/` stays
+    (created by _make_ws) as the repo tree the checks may still scan for source
+    evidence.
 
     Named for the deliverables rather than taking arbitrary filenames: the task
     grades exactly these three, and every caller writes all three, so a missing
@@ -138,7 +145,7 @@ def _write(
         ("CYCLE_VERDICT.json", cycle_verdict),
         ("RESOLUTION.json", resolution),
     ):
-        (ws / "flask" / name).write_text(content)
+        (ws / "agent_output" / name).write_text(content)
     return ws
 
 
@@ -819,9 +826,9 @@ def test_task_is_inside_the_echo_gate_universe() -> None:
     becoming invisible rather than by being clean."""
     assert TASK_DIR in gate.discover_report_tasks()
     assert set(gate.deliverable_paths(TASK_DIR)) == {
-        "flask/CYCLE_VERDICT.json",
-        "flask/INVESTIGATION.md",
-        "flask/RESOLUTION.json",
+        "agent_output/CYCLE_VERDICT.json",
+        "agent_output/INVESTIGATION.md",
+        "agent_output/RESOLUTION.json",
     }
 
 
@@ -897,10 +904,10 @@ def test_a_corrupt_answer_key_is_an_infra_error_even_with_no_verdict_to_gate_on(
         (task_gt / "checks" / c).write_text((TASK_DIR / "checks" / c).read_text())
 
     ws = _make_ws(tmp_path, f"corrupt_key_{check}")
-    (ws / "flask" / "INVESTIGATION.md").write_text(CORRECT_INVESTIGATION)
-    (ws / "flask" / "RESOLUTION.json").write_text(CORRECT_RESOLUTION)
+    (ws / "agent_output" / "INVESTIGATION.md").write_text(CORRECT_INVESTIGATION)
+    (ws / "agent_output" / "RESOLUTION.json").write_text(CORRECT_RESOLUTION)
     # deliberately NO CYCLE_VERDICT.json — the gate has nothing to read
-    assert not (ws / "flask" / "CYCLE_VERDICT.json").exists()
+    assert not (ws / "agent_output" / "CYCLE_VERDICT.json").exists()
 
     out = _raw(check, ws, base=task_gt)
     assert out.returncode == 0, f"{check} crashed instead of a verdict: {out.stderr}"
@@ -936,7 +943,7 @@ def test_an_unreadable_deliverable_still_returns_a_verdict(
         cycle_verdict=CORRECT_VERDICT,
         resolution=CORRECT_RESOLUTION,
     )
-    target = ws / "flask" / deliverable
+    target = ws / "agent_output" / deliverable
     target.chmod(0o000)
     try:
         out = _raw(check, ws)
@@ -989,7 +996,7 @@ def test_a_nested_json_deliverable_cannot_opt_a_run_out_of_scoring(
         resolution=CORRECT_RESOLUTION,
     )
     depth = 200_000
-    (ws / "flask" / deliverable).write_text("[" * depth + "]" * depth)
+    (ws / "agent_output" / deliverable).write_text("[" * depth + "]" * depth)
 
     out = _raw(check, ws)
     assert out.returncode == 0, (
@@ -1067,11 +1074,11 @@ def test_symlinked_answer_key_cannot_forge_the_whole_task(tmp_path: Path) -> Non
     that cannot fail is decoration (EnterpriseBench-e4w15).
     """
     ws = _make_ws(tmp_path, "symlinked_key")
-    (ws / "flask" / "INVESTIGATION.md").write_text(GLOBALS_HEAD)
-    (ws / "flask" / "RESOLUTION.json").write_text(
+    (ws / "agent_output" / "INVESTIGATION.md").write_text(GLOBALS_HEAD)
+    (ws / "agent_output" / "RESOLUTION.json").write_text(
         json.dumps({"code_change_required": False, "reason": GLOBALS_HEAD})
     )
-    (ws / "flask" / "CYCLE_VERDICT.json").symlink_to(TASK_DIR / "ground_truth.json")
+    (ws / "agent_output" / "CYCLE_VERDICT.json").symlink_to(TASK_DIR / "ground_truth.json")
 
     assert score(ws, "runner", tmp_path) == 0.0, (
         "an agent symlinked the sealed answer key as its own verdict and the grader "

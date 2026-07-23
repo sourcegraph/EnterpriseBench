@@ -20,4 +20,4 @@ Before we ship, I need a thorough impact analysis across the monorepo. TypeScrip
 
 ## Output
 
-Write your findings to `/workspace/babel/IMPACT_REPORT.md` with sections for each affected package including file paths, impact classification, and specific code references.
+Write your findings to `/workspace/agent_output/IMPACT_REPORT.md` with sections for each affected package including file paths, impact classification, and specific code references.

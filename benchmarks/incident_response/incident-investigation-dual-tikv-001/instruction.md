@@ -53,4 +53,4 @@ Raft/PD theory.
 
 ## Output
 
-Write your incident report to `/workspace/tikv/INCIDENT_REPORT.md`.
+Write your incident report to `/workspace/agent_output/INCIDENT_REPORT.md`.

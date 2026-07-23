@@ -72,4 +72,4 @@ The snapshot for the shared layer exists (the extracted filesystem is there), bu
 
 ## Output
 
-Write your findings to `/workspace/moby/INCIDENT_REPORT.md`.
+Write your findings to `/workspace/agent_output/INCIDENT_REPORT.md`.

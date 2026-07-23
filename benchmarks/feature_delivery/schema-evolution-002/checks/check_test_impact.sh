@@ -9,7 +9,7 @@ set -euo pipefail
 
 CHECKPOINT="identify_test_impact"
 WORKSPACE="${WORKSPACE:-/workspace}"
-REPORT="$WORKSPACE/zulip/SCHEMA_IMPACT.md"
+REPORT="$WORKSPACE/agent_output/SCHEMA_IMPACT.md"
 GT="${TASK_DIR:-}/ground_truth.json"
 MAX_REPORT_BYTES=1048576
 

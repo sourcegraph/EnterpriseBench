@@ -39,6 +39,6 @@ Investigate the full seccomp profile handling chain across all four repositories
 
 ## Deliverable
 
-Write your incident report to `/workspace/moby/INCIDENT_REPORT.md`.
+Write your incident report to `/workspace/agent_output/INCIDENT_REPORT.md`.
 
 The report should include root cause identification with specific files and functions in each repository, the full processing chain, and remediation recommendations.

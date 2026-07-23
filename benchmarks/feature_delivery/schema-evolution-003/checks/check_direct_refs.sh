@@ -9,7 +9,7 @@ set -euo pipefail
 
 CHECKPOINT="find_direct_refs"
 WORKSPACE="${WORKSPACE:-/workspace}"
-REPORT="$WORKSPACE/zulip/SCHEMA_IMPACT.md"
+REPORT="$WORKSPACE/agent_output/SCHEMA_IMPACT.md"
 GT="${TASK_DIR:-}/ground_truth.json"
 MAX_REPORT_BYTES=1048576
 

@@ -16,4 +16,4 @@ The core change is in `@pnpm/config` — specifically `config/config/src/getOpti
 
 ## Output
 
-Write findings to `/workspace/pnpm/IMPACT_REPORT.md`.
+Write findings to `/workspace/agent_output/IMPACT_REPORT.md`.

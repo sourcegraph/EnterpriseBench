@@ -42,4 +42,4 @@ The etcd3 watcher and the legacy etcd watcher both have logic to set the correct
 
 ## Output
 
-Write your findings to `/workspace/kubernetes/INCIDENT_REPORT.md`.
+Write your findings to `/workspace/agent_output/INCIDENT_REPORT.md`.

@@ -51,4 +51,4 @@ raft theory.
 
 ## Output
 
-Write your incident report to `/workspace/vault/INCIDENT_REPORT.md`.
+Write your incident report to `/workspace/agent_output/INCIDENT_REPORT.md`.

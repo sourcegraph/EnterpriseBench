@@ -28,4 +28,4 @@ This change crosses the full stack — backend model through API through fronten
 
 4. **Test coverage**: We need test updates on both sides — Python tests for events, realm settings, subscriptions; JS tests for settings UI, dispatch, and the admin E2E test.
 
-Write your complete analysis to `/workspace/zulip/SCHEMA_IMPACT.md`.
+Write your complete analysis to `/workspace/agent_output/SCHEMA_IMPACT.md`.

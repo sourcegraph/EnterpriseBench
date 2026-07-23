@@ -20,4 +20,4 @@ Both changes affect core data formats — hash output format and path encoding. 
 
 ## Output
 
-Write findings to `/workspace/pnpm/IMPACT_REPORT.md`.
+Write findings to `/workspace/agent_output/IMPACT_REPORT.md`.

@@ -526,6 +526,7 @@ class TestScoringDoesNotBreakTheChecks:
 
         workspace = tmp_path / "workspace"
         (workspace / "flask").mkdir(parents=True)
+        (workspace / "agent_output").mkdir(parents=True)
         # A CORRECT answer: the payload must score, and the fixture used to assert
         # a FABRICATED root cause ("a circular import between flask/cli.py and
         # flask/app.py") scored non-zero. That cycle never existed either, so after
@@ -533,7 +534,11 @@ class TestScoringDoesNotBreakTheChecks:
         # next reader to weaken check_resolution.sh until the fabrication passed
         # again, reintroducing the defect. The property under test is only that the
         # workspace arg is honoured off the scoring cwd.
-        (workspace / "flask" / "RESOLUTION.json").write_text(
+        #
+        # Written to agent_output/, not flask/: deliverables were migrated out
+        # of the repo tree (mode_gate locks it in gated arms) --
+        # scripts/authoring/migrate_deliverable_to_agent_output.py.
+        (workspace / "agent_output" / "RESOLUTION.json").write_text(
             json.dumps(
                 {
                     "code_change_required": False,
@@ -551,7 +556,7 @@ class TestScoringDoesNotBreakTheChecks:
         # is what the gate closes (EnterpriseBench-e4w15). Without this the check
         # scores 0.0 for a missing verdict and the assertion below would blame the
         # workspace arg — the one thing this test exists to isolate.
-        (workspace / "flask" / "CYCLE_VERDICT.json").write_text(
+        (workspace / "agent_output" / "CYCLE_VERDICT.json").write_text(
             json.dumps(
                 {
                     "claimed_edges": [

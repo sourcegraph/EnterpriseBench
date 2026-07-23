@@ -15,7 +15,7 @@ Your task is to perform a dead code analysis and identify all unreachable code r
 
 ## Output
 
-Write your findings to `/workspace/react/dead_code_report.json` as a JSON array where each entry has:
+Write your findings to `/workspace/agent_output/dead_code_report.json` as a JSON array where each entry has:
 - `file`: relative path from repo root
 - `symbol`: function/class/export name (use `"default"` for entire file being dead)
 - `kind`: one of `function`, `class`, `method`, `file`, `export`

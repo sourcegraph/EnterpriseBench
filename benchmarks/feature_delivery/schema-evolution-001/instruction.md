@@ -24,4 +24,4 @@ The plan is to add a `deactivated` boolean field to the `NamedUserGroup` model. 
 
 4. **Test coverage**: Which test files exercise user group functionality and would need new test cases for deactivation scenarios?
 
-Write your complete analysis to `/workspace/zulip/SCHEMA_IMPACT.md` with sections for each category above, including file paths and brief descriptions of required changes.
+Write your complete analysis to `/workspace/agent_output/SCHEMA_IMPACT.md` with sections for each category above, including file paths and brief descriptions of required changes.

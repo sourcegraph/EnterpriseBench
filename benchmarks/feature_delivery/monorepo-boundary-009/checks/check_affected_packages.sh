@@ -9,7 +9,7 @@ set -euo pipefail
 
 CHECKPOINT="identify_affected_packages"
 WORKSPACE="${WORKSPACE:-/workspace}"
-REPORT="$WORKSPACE/rust/IMPACT_REPORT.md"
+REPORT="$WORKSPACE/agent_output/IMPACT_REPORT.md"
 GT="${TASK_DIR:-}/ground_truth.json"
 MAX_REPORT_BYTES=1048576
 

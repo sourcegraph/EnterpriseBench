@@ -33,4 +33,4 @@ establishes it. If a package the notes call affected turns out not to be, say so
 
 ## Output
 
-Write findings to `/workspace/babel/IMPACT_REPORT.md`.
+Write findings to `/workspace/agent_output/IMPACT_REPORT.md`.

@@ -45,7 +45,7 @@ class CheckSpec:
 class TaskSpec:
     """Full spec for testing one task's verifiers."""
     task_dir: Path
-    report_path: str       # relative to workspace, e.g. "kubernetes/INCIDENT_REPORT.md"
+    report_path: str       # relative to workspace, e.g. "agent_output/INCIDENT_REPORT.md"
     checks: list[CheckSpec]
     gt_answer: str
     partial_answer: str
@@ -110,7 +110,7 @@ INCIDENT_TASKS: list[TaskSpec] = [
     # 001: K8s watch cache missing events
     TaskSpec(
         task_dir=_II_DIR / "incident-investigation-001",
-        report_path="kubernetes/INCIDENT_REPORT.md",
+        report_path="agent_output/INCIDENT_REPORT.md",
         checks=[
             CheckSpec("check_root_cause.sh", 0.35),
             CheckSpec("check_error_chain.sh", 0.30),
@@ -173,7 +173,7 @@ The API server watch cache interacts with etcd to serve watch events.
     # 002: K8s watch cache delete event wrong resourceVersion
     TaskSpec(
         task_dir=_II_DIR / "incident-investigation-002",
-        report_path="kubernetes/INCIDENT_REPORT.md",
+        report_path="agent_output/INCIDENT_REPORT.md",
         checks=[
             CheckSpec("check_root_cause.sh", 0.35),
             CheckSpec("check_error_chain.sh", 0.30),
@@ -236,7 +236,7 @@ The client-go informer gets stale data from the watch cache (cacher).
     # 003: Grafana Prometheus JSON parsing silent failure
     TaskSpec(
         task_dir=_II_DIR / "incident-investigation-003",
-        report_path="grafana/INCIDENT_REPORT.md",
+        report_path="agent_output/INCIDENT_REPORT.md",
         checks=[
             CheckSpec("check_root_cause.sh", 0.35),
             CheckSpec("check_error_chain.sh", 0.30),
@@ -295,7 +295,7 @@ Prometheus API -> Grafana dataproxy -> converter
     # 004: Docker daemon spurious restart warnings
     TaskSpec(
         task_dir=_II_DIR / "incident-investigation-004",
-        report_path="moby/INCIDENT_REPORT.md",
+        report_path="agent_output/INCIDENT_REPORT.md",
         checks=[
             CheckSpec("check_root_cause.sh", 0.35),
             CheckSpec("check_error_chain.sh", 0.30),
@@ -370,7 +370,7 @@ CONFIG_DRIFT_TASKS: list[TaskSpec] = [
     # 001: Consul serfLAN/serfWAN port mismatch
     TaskSpec(
         task_dir=_CD_DIR / "config-drift-001",
-        report_path="charts/DRIFT_REPORT.json",
+        report_path="agent_output/DRIFT_REPORT.json",
         # validate_corrected_config / check_config_valid.sh was removed in
         # 6cbbc54: instruction.md never asks for a corrected config, so it graded
         # an artifact a compliant agent has no reason to produce and paid 1.0 for
@@ -412,7 +412,7 @@ CONFIG_DRIFT_TASKS: list[TaskSpec] = [
     # 002: Spring Cloud Dataflow RabbitMQ config
     TaskSpec(
         task_dir=_CD_DIR / "config-drift-002",
-        report_path="charts/DRIFT_REPORT.json",
+        report_path="agent_output/DRIFT_REPORT.json",
         # Rebuilt in 2c1ac55. check_config_valid.sh removed (never-requested
         # artifact, paid 1.0 for its absence); determine_expected_values became
         # config_hierarchy, the instruction's actual first ask.
@@ -490,7 +490,7 @@ CONFIG_DRIFT_TASKS: list[TaskSpec] = [
     # 003: Redis password generation drift
     TaskSpec(
         task_dir=_CD_DIR / "config-drift-003",
-        report_path="charts/DRIFT_REPORT.json",
+        report_path="agent_output/DRIFT_REPORT.json",
         # Rebuilt in 80ca4f8. check_config_valid.sh removed (never-requested
         # artifact); determine_expected_values became root_cause_mechanism —
         # what its description always said it graded.
@@ -567,7 +567,7 @@ CONFIG_DRIFT_TASKS: list[TaskSpec] = [
     # the prompt's own words. It now scores 0.0 — as it should.
     TaskSpec(
         task_dir=_CD_DIR / "config-drift-004",
-        report_path="argo-cd/DRIFT_REPORT.json",
+        report_path="agent_output/DRIFT_REPORT.json",
         checks=[
             CheckSpec("check_drift_points.sh", 0.55),
             CheckSpec("check_expected_values.sh", 0.45),

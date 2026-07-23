@@ -36,13 +36,13 @@ CHECKPOINT="resolution_correct"
 # See check_cycle.sh for why the workspace and TASK_DIR are resolved this way (three
 # runners, three conventions) and why the literal "$WORKSPACE/..." spelling matters.
 WORKSPACE="${1:-${WORKSPACE:-/workspace}}"
-RESOLUTION="$WORKSPACE/flask/RESOLUTION.json"
+RESOLUTION="$WORKSPACE/agent_output/RESOLUTION.json"
 # The gate's input. Session 1 writes it and the chain commits the repo between
 # sessions, so it is on the branch by the time this check runs. (task.toml declares
 # this script as a session-2 milestone too, but chain_runner.py:392 skips the FINAL
 # session's milestones — `session_num < session_count` — so that milestone never fires.
 # Not this bead's to fix; see EnterpriseBench-2eqr6.)
-CYCLE="$WORKSPACE/flask/CYCLE_VERDICT.json"
+CYCLE="$WORKSPACE/agent_output/CYCLE_VERDICT.json"
 TASK_DIR="${TASK_DIR:-$(dirname "$(dirname "$(realpath "$0")")")}"
 GT="$TASK_DIR/ground_truth.json"
 MAX_BYTES=1048576

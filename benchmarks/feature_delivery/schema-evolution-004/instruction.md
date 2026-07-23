@@ -18,4 +18,4 @@ This field is referenced in more places than you'd expect. I need the full pictu
 
 4. **Test coverage**: We need updates in upload tests, importer tests, and event tests.
 
-Write your findings to `/workspace/zulip/SCHEMA_IMPACT.md`.
+Write your findings to `/workspace/agent_output/SCHEMA_IMPACT.md`.
