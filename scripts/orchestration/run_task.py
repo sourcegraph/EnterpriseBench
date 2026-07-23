@@ -1529,6 +1529,83 @@ def _apply_model_flag(agent_command: str, model: str | None) -> str:
     return agent_command + f" --model {shlex.quote(model)}"
 
 
+# The container's `claude` inherits the full host/fleet tool registry, not a
+# pinned benchmark set. Found while root-causing the mcp_only sweep
+# (2026-07-22): 69% of scored cells (205/299) called at least one of these --
+# WebSearch/WebFetch (external answer lookup: contamination, an agent can
+# solve the task without ever touching the provided repos), Task/Agent
+# (sub-agent spawning that runs OUTSIDE both the measured trace and mode_gate
+# -- a gated arm's sub-agent could read local source or hit the web with none
+# of it counted, the single worst contaminant), and the fleet orchestration
+# surface (ScheduleWakeup, SendMessage, Cron*, Monitor, RemoteTrigger,
+# PushNotification, DesignSync, Workflow, Skill, EnterWorktree/ExitWorktree,
+# Task{Create,Get,List,Output,Stop}, ReportFindings, NotebookEdit) which has
+# no place in a scored sandbox at all.
+#
+# `Bash`, `Read`, `Write`, `Edit` stay allowed (core retrieval/deliverable
+# machinery in every arm), and so does `ToolSearch`: the `mcp__sourcegraph__*`
+# tools are genuinely deferred in this harness -- 100% of mcp_only cells in
+# the sweep called ToolSearch before their first MCP call -- so blocking it
+# would zero the mcp_only/cli arms' only retrieval path. Verified live
+# (2026-07-22, local smoke test): with a name in --disallowedTools, ToolSearch
+# itself reports "No matching deferred tools found" for it -- the tool is
+# undiscoverable, not just denied at invocation.
+BENCHMARK_DISALLOWED_TOOLS = (
+    "WebSearch",
+    "WebFetch",
+    "Task",
+    "Agent",
+    "ScheduleWakeup",
+    "SendMessage",
+    "Monitor",
+    "CronCreate",
+    "CronDelete",
+    "CronList",
+    "RemoteTrigger",
+    "PushNotification",
+    "DesignSync",
+    "Workflow",
+    "Skill",
+    "EnterWorktree",
+    "ExitWorktree",
+    "TaskCreate",
+    "TaskGet",
+    "TaskList",
+    "TaskOutput",
+    "TaskStop",
+    "ReportFindings",
+    "NotebookEdit",
+)
+
+
+def _apply_disallowed_tools(
+    agent_command: str, disallow: tuple[str, ...] = BENCHMARK_DISALLOWED_TOOLS
+) -> str:
+    """Pin the benchmark tool lockdown onto *agent_command* via a trailing
+    `--disallowedTools <comma list>` flag.
+
+    No-op when *agent_command* is empty (nothing to pin onto) or it already
+    names --disallowedTools explicitly (never override an explicit choice --
+    mirrors :func:`_apply_model_flag`'s contract). Exact flag-token match, not
+    a substring test, for the same reason _apply_model_flag uses one: a
+    substring test would also match a flag that merely starts with
+    "--disallowedTools" and silently skip the pin.
+    """
+    if not agent_command:
+        return agent_command
+    tokens = agent_command.split()
+    if "--disallowedTools" in tokens or "--disallowed-tools" in tokens:
+        return agent_command
+    return agent_command + " --disallowedTools " + ",".join(disallow)
+
+
+# Widened from `[\w./@: -]` to also allow `,`, which --disallowedTools's
+# comma-separated list needs (BENCHMARK_DISALLOWED_TOOLS is a fixed, code-
+# reviewed tuple of tool names -- shell metacharacters (`;|&$`(){}<>\n'"`)
+# stay rejected, so this cannot open a shell-injection path.
+_SAFE_AGENT_CMD_RE = re.compile(r"^[\w./@:, -]+$")
+
+
 def _run_agent(
     container_id: str,
     agent_command: str,
@@ -1540,7 +1617,6 @@ def _run_agent(
 
     Returns (exit_code, duration_seconds).
     """
-    _SAFE_AGENT_CMD_RE = re.compile(r"^[\w./@: -]+$")
     if not _SAFE_AGENT_CMD_RE.match(agent_command):
         raise ValueError(f"agent_command contains unsafe characters: {agent_command!r}")
 
@@ -3417,6 +3493,11 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         # DEFAULT_OAUTH_AGENT_COMMAND above or a caller-supplied --agent
         # command.
         agent_command = _apply_model_flag(agent_command, config.model)
+        # Lock the sandbox to the benchmark's retrieval tools, whether the
+        # command came from DEFAULT_OAUTH_AGENT_COMMAND or --agent: without
+        # this every arm booted with the full host/fleet tool registry
+        # (WebSearch, sub-agent spawning, fleet orchestration).
+        agent_command = _apply_disallowed_tools(agent_command)
 
         if agent_command:
             # --- Pre-agent readability gate (fail loud, never fake-0) ---
