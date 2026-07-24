@@ -50,6 +50,9 @@ logger = logging.getLogger("run_benchmark")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "infra"))
+from account_health import load_retired_accounts  # noqa: E402
+
 # Session-type to runner script mapping
 RUNNERS: dict[str, Path] = {
     "single": PROJECT_ROOT / "scripts" / "orchestration" / "run_task.py",
@@ -603,14 +606,23 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def parse_accounts(account_str: str | None) -> list[int]:
+def parse_accounts(
+    account_str: str | None, retired: frozenset[int] | set[int] | None = None
+) -> list[int]:
     """Parse account spec into a list of account numbers.
 
     Supports: "1", "1-5", "1,3,5", "1-3,5".
     Returns an empty list if account_str is None.
+
+    Retired accounts (configs/retired_accounts.json) are dropped, so the
+    habitual "--account 1-5" keeps working after an account is lost. A spec
+    that names ONLY retired accounts raises instead of returning [] — an empty
+    list is how "no --account given" is spelled, and would silently route every
+    task to the default account.
     """
     if not account_str:
         return []
+    skip = load_retired_accounts() if retired is None else retired
     accounts: list[int] = []
     for part in account_str.split(","):
         part = part.strip()
@@ -619,7 +631,13 @@ def parse_accounts(account_str: str | None) -> list[int]:
             accounts.extend(range(int(lo), int(hi) + 1))
         else:
             accounts.append(int(part))
-    return accounts
+    live = [a for a in accounts if a not in skip]
+    if accounts and not live:
+        raise ValueError(
+            f"account spec {account_str!r} names only retired accounts "
+            f"({sorted(skip)}); nothing to dispatch to"
+        )
+    return live
 
 
 def collect_passthrough_args(

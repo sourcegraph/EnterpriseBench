@@ -64,7 +64,32 @@ def default_real_home() -> Path:
     return Path(os.environ.get("HOME", str(Path.home())))
 
 
-def discover_managed_account_homes(real_home: Path) -> list[Path]:
+def retired_accounts_config() -> Path:
+    return repo_root() / "configs" / "retired_accounts.json"
+
+
+def load_retired_accounts(path: Path | None = None) -> frozenset[int]:
+    """Account numbers that are permanently gone.
+
+    An absent config retires nothing. A malformed one raises rather than
+    defaulting to empty: quietly re-enabling a dead account puts a blocking
+    login failure back in every infra check and dispatches real work to an
+    account that cannot run it.
+    """
+    config = path or retired_accounts_config()
+    if not config.is_file():
+        return frozenset()
+    try:
+        data = json.loads(config.read_text())
+        return frozenset(int(n) for n in data["retired"])
+    except (json.JSONDecodeError, OSError, KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"malformed retired_accounts config at {config}: {exc}") from exc
+
+
+def discover_managed_account_homes(
+    real_home: Path, retired: frozenset[int] | set[int] | None = None
+) -> list[Path]:
+    skip = load_retired_accounts() if retired is None else retired
     homes_dir = real_home / ".claude-homes"
     if not homes_dir.is_dir():
         return []
@@ -73,7 +98,8 @@ def discover_managed_account_homes(real_home: Path) -> list[Path]:
     for path in homes_dir.iterdir():
         if not path.is_dir():
             continue
-        if ACCOUNT_NAME_RE.fullmatch(path.name):
+        match = ACCOUNT_NAME_RE.fullmatch(path.name)
+        if match and int(match.group(1)) not in skip:
             homes.append(path)
 
     return sorted(homes, key=lambda path: int(ACCOUNT_NAME_RE.fullmatch(path.name).group(1)))
