@@ -147,6 +147,16 @@ SGX_ENDPOINT = f"{SOURCEGRAPH_MCP_ENDPOINT.split('/.api/mcp/')[0]}/.api/mcp/v1"
 SGX_CLI_SRC = REPO_ROOT / "agents" / "harnesses" / "claude" / "mcp" / "sg_cli.py"
 
 
+# Agent wall clock. With no turn cap this is the only bound on agent work, and
+# exhausting it routes to infra_timeout/INVALID (a re-run), not to a score — so
+# a clock that binds normal work would re-run the slowest cells until they
+# happen to finish and censor the corpus upward. Sized to clear real work by a
+# wide margin rather than to shape it: the longest of 303 capped pilot cells ran
+# 1335s, and uncapped runs are longer. Exit 124 should mean "wedged", not "hard
+# task". Image build keeps its own separate bound.
+DEFAULT_AGENT_TIMEOUT_S = 3600
+
+
 @dataclass(frozen=True)
 class TaskRunConfig:
     """Immutable configuration for a single task run."""
@@ -154,7 +164,7 @@ class TaskRunConfig:
     task_toml: Path
     source: str = "mirror"
     agent_command: str = ""
-    timeout: int = 1800
+    timeout: int = DEFAULT_AGENT_TIMEOUT_S
     build_timeout: int = 1800
     verifier_timeout: int = 600
     memory_mb: int = 8192
@@ -374,7 +384,14 @@ def _load_oauth_token(account: int) -> str:
     return access_token
 
 
-DEFAULT_OAUTH_AGENT_COMMAND = "claude --dangerously-skip-permissions --max-turns 50 --verbose --output-format stream-json -p"
+# No --max-turns: a fixed turn budget is not a neutral bound across arms. The
+# cli arm reaches Sourcegraph through the `sgx` shell command, so every
+# retrieval costs a Bash turn, while mcp_only calls mcp__sourcegraph__* tools
+# directly — equal budgets bought unequal retrieval, landing on the exact
+# cli-vs-mcp_only contrast this benchmark measures. The wall clock
+# (RunConfig.timeout) remains the bound; see _classify_agent_exit for why a
+# truncated run is still scored rather than re-run.
+DEFAULT_OAUTH_AGENT_COMMAND = "claude --dangerously-skip-permissions --verbose --output-format stream-json -p"
 
 # The sandbox registers exactly one MCP server, `sourcegraph` (see _configure_mcp),
 # so every genuine tool is named `mcp__sourcegraph__<tool>`. Prefix, not allow-list:
@@ -3764,8 +3781,8 @@ Examples:
     parser.add_argument(
         "--timeout",
         type=int,
-        default=1800,
-        help="Max seconds for agent execution (default: 1800)",
+        default=DEFAULT_AGENT_TIMEOUT_S,
+        help=f"Max seconds for agent execution (default: {DEFAULT_AGENT_TIMEOUT_S})",
     )
     parser.add_argument(
         "--build-timeout",
