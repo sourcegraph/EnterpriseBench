@@ -569,6 +569,44 @@ def _docker_stop_rm(container_id: str) -> None:
     )
 
 
+# Canonical answer-artifact location, appended to a task's instruction when the
+# task does not name a deliverable of its own. Also always a candidate for the
+# LLM judge (_derive_artifact_candidates).
+ANSWER_ARTIFACT_PATH = "/workspace/agent_output/answer.json"
+
+# A deliverable path as an instruction names it. Anchored at /workspace/agent_output/
+# because that is the one directory every arm leaves writable (aab54ec) and the
+# only place a check script looks; a /workspace/<repo>/... path in an instruction
+# is an input to read, not an output to write.
+_AGENT_OUTPUT_DELIVERABLE_RE = re.compile(
+    r"/workspace/agent_output/[A-Za-z0-9_.-]+\.(?:json|md|txt|ya?ml)"
+)
+
+_ANSWER_FILENAMES = ("answer.json", "answer.txt")
+
+
+def _derive_graded_deliverable(task_dir: Path) -> str:
+    """The in-container path the task's own checks grade.
+
+    Read from instruction.md, which is what the agent sees and what the check
+    scripts were written against. Returns :data:`ANSWER_ARTIFACT_PATH` unless
+    the instruction names exactly one non-answer deliverable: zero means the
+    task uses the canonical artifact, and more than one has no single path the
+    appendix could name without telling the agent to skip the others.
+    """
+    instruction = task_dir / "instruction.md"
+    if not instruction.exists():
+        return ANSWER_ARTIFACT_PATH
+
+    named: list[str] = []
+    for match in _AGENT_OUTPUT_DELIVERABLE_RE.findall(instruction.read_text()):
+        if match.endswith(_ANSWER_FILENAMES) or match in named:
+            continue
+        named.append(match)
+
+    return named[0] if len(named) == 1 else ANSWER_ARTIFACT_PATH
+
+
 def _build_instruction_text(
     task_dir: Path,
     mode: str,
@@ -581,10 +619,19 @@ def _build_instruction_text(
     agents.harnesses.claude.mcp.sourcegraph) and any task-specific
     instruction_mcp.md. For baseline mode, uses instruction.md as-is.
 
-    When require_grounded_citations is True, the answer.json appendix's
-    example JSON includes a top-level `citations` field (schema:
-    {repo, file, evidence_span}), matching what
-    lib/eb_verify/plugins/answer.py's groundedness gate requires.
+    The appendix names the task's OWN graded deliverable
+    (:func:`_derive_graded_deliverable`) and promises JSON only when that file
+    is JSON. Appending a fixed "write JSON to answer.json" to every task made
+    40 tasks whose checks grade a bespoke filename unwinnable-by-instruction:
+    an agent that followed the appendix wrote a file nothing reads and scored
+    0.0 with the retrieval already done, while one that followed instruction.md
+    scored normally (EnterpriseBench-uj43y).
+
+    When require_grounded_citations is True, the deliverable is pinned back to
+    answer.json — lib/eb_verify/plugins/answer.py's groundedness gate resolves
+    the graded artifact by that name, so citations written anywhere else are
+    never read — and the example JSON grows a top-level `citations` field
+    (schema: {repo, file, evidence_span}) to match what the gate requires.
 
     Returns the combined text, or None if instruction.md does not exist.
     """
@@ -613,45 +660,64 @@ def _build_instruction_text(
         if instruction_mcp.exists():
             preamble_parts.append(instruction_mcp.read_text())
 
-    if require_grounded_citations:
-        sys.path.insert(0, str(REPO_ROOT / "lib"))
-        from eb_verify.groundedness import MIN_SPAN_CHARS
+    # Citations are graded out of answer.json only, so requiring them pins the
+    # deliverable there regardless of what the instruction names.
+    deliverable = (
+        ANSWER_ARTIFACT_PATH
+        if require_grounded_citations
+        else _derive_graded_deliverable(task_dir)
+    )
 
-        citations_block = (
-            ',\n  "citations": [\n'
-            '    {"repo": "repo-name", "file": "relative/path", '
-            f'"evidence_span": "verbatim excerpt, >={MIN_SPAN_CHARS} characters, copied exactly from the file"}}\n'
-            "  ]\n"
-        )
-        closing_sentence = (
-            "Include only the fields relevant to this task, but `citations` is "
-            "required. Every entry in `citations` must quote an exact, verbatim "
-            "span from the cited file — not a paraphrase or summary. "
+    if deliverable.endswith(".json"):
+        if require_grounded_citations:
+            sys.path.insert(0, str(REPO_ROOT / "lib"))
+            from eb_verify.groundedness import MIN_SPAN_CHARS
+
+            citations_block = (
+                ',\n  "citations": [\n'
+                '    {"repo": "repo-name", "file": "relative/path", '
+                f'"evidence_span": "verbatim excerpt, >={MIN_SPAN_CHARS} characters, copied exactly from the file"}}\n'
+                "  ]\n"
+            )
+            closing_sentence = (
+                "Include only the fields relevant to this task, but `citations` is "
+                "required. Every entry in `citations` must quote an exact, verbatim "
+                "span from the cited file — not a paraphrase or summary. "
+            )
+        else:
+            citations_block = "\n"
+            closing_sentence = "Include only the fields relevant to this task. "
+
+        write_line = f"Write your findings as a JSON file to `{deliverable}`.\n"
+        shape_block = (
+            "Include all relevant fields for this task type. Example structure:\n"
+            "```json\n"
+            "{\n"
+            '  "source_files": [{"path": "/workspace/<repo>/path/to/file"}],\n'
+            '  "error_chain": ["Step 1", "Step 2"],\n'
+            '  "trigger_conditions": ["Condition 1"],\n'
+            '  "code_paths": [{"path": "/workspace/<repo>/path/to/file"}],\n'
+            '  "ownership": "subsystem description",\n'
+            '  "severity": {"level": "high", "rationale": "..."},\n'
+            '  "related_issues": ["/workspace/<repo>/path/to/related/file.go", "description of related component"]'
+            + citations_block
+            + "}\n```\n"
+            + closing_sentence
         )
     else:
-        citations_block = "\n"
-        closing_sentence = "Include only the fields relevant to this task. "
+        # A prose/markdown deliverable: the task description owns its structure,
+        # so do not hand the agent a JSON skeleton it must not follow.
+        write_line = f"Write your findings to `{deliverable}`.\n"
+        shape_block = "Follow the structure the task description specifies. "
 
     output_appendix = (
         "\n\n---\n\n## Output Requirements\n\n"
-        "Write your findings as a JSON file to `/workspace/agent_output/answer.json`.\n"
-        "Create the directory first: `mkdir -p /workspace/agent_output`\n\n"
+        + write_line
+        + "Create the directory first: `mkdir -p /workspace/agent_output`\n\n"
         "All file paths MUST be absolute and anchored at `/workspace/<repo>/...` "
         "(the repo roots are the directories under `/workspace`). "
         "Repo-relative paths will not match the oracle and score 0.\n\n"
-        "Include all relevant fields for this task type. Example structure:\n"
-        "```json\n"
-        "{\n"
-        '  "source_files": [{"path": "/workspace/<repo>/path/to/file"}],\n'
-        '  "error_chain": ["Step 1", "Step 2"],\n'
-        '  "trigger_conditions": ["Condition 1"],\n'
-        '  "code_paths": [{"path": "/workspace/<repo>/path/to/file"}],\n'
-        '  "ownership": "subsystem description",\n'
-        '  "severity": {"level": "high", "rationale": "..."},\n'
-        '  "related_issues": ["/workspace/<repo>/path/to/related/file.go", "description of related component"]'
-        + citations_block
-        + "}\n```\n"
-        + closing_sentence
+        + shape_block
         + "Your answer is evaluated against a closed-world oracle — completeness matters.\n"
     )
 
@@ -2029,12 +2095,11 @@ def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
     return guarded
 
 
-# Canonical answer-artifact location appended to every task instruction by
-# _build_instruction_text(); always a candidate for the LLM judge.
-ANSWER_ARTIFACT_PATH = "/workspace/agent_output/answer.json"
-
 # Matches a /workspace/... artifact path a task's instruction.md tells the agent
 # to write to (e.g. /workspace/BLAST_RADIUS.md, /workspace/analysis/IMPACT_REPORT.md).
+# Wider than _AGENT_OUTPUT_DELIVERABLE_RE on purpose: the judge only reads
+# candidates, so an over-broad guess costs a failed `cat`, while the appendix
+# would send the agent's write to the wrong path.
 _WORKSPACE_ARTIFACT_RE = re.compile(r"/workspace/[A-Za-z0-9_./-]+\.(?:json|md|txt|ya?ml)")
 
 
