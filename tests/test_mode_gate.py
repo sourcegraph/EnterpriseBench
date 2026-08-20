@@ -21,6 +21,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+from dataclasses import replace
+
 import pytest
 
 sys.path.insert(
@@ -63,6 +65,11 @@ def _task(repos=(("ansible", "ansible"),), required=("answer",), optional=()):
 EXPECTED_GATING = {
     "baseline": False,  # local-only; the control arm.
     "mcp_only": True,  # the ablation: local source denied at the filesystem.
+    "mcp_default": True,  # the server as shipped; still MCP-only for code.
+    "mcp_treatment": True,  # mcp_default with the unshipped server change applied.
+    "mcp_code_finder": True,  # Code Finder is the sole remote retrieval path.
+    "mcp_assisted": True,  # Finder bootstrap plus targeted remote follow-up.
+    "mcp_toast": True,  # Toast-1, offered as a tool, is the sole path to code.
     "hybrid": False,  # MCP *plus* local by design.
     "cli": False,  # baseline + sgx; the manipulation is the tool interface,
     # not readability, so local source stays present.
@@ -224,6 +231,39 @@ def test_code_patch_is_eligible_in_ungated_arms():
     check_eligibility(task, "hybrid")  # must not raise
 
 
+
+def test_deliverable_inside_a_repo_tree_is_ineligible_for_gated_arms():
+    """The lockdown denies write as surely as read: the agent cannot create a
+    file in a directory it cannot enter. Scoring such a run 0.0 would record a
+    harness failure as a measured agent failure."""
+    task = _task()
+    try:
+        check_eligibility(
+            task, "mcp_only", graded_artifact_path="/workspace/ansible/REPORT.md"
+        )
+    except IneligibleTask as exc:
+        assert "/workspace/ansible" in str(exc)
+    else:
+        raise AssertionError("an in-repo deliverable is unwritable under the gate")
+
+
+def test_deliverable_outside_the_repo_trees_is_eligible():
+    check_eligibility(
+        _task(), "mcp_only", graded_artifact_path="/workspace/REPORT.md"
+    )
+    # A repo path is a prefix of the deliverable's directory name but not its
+    # parent -- string containment is not the test, path containment is.
+    check_eligibility(
+        _task(), "mcp_only", graded_artifact_path="/workspace/ansible-out/REPORT.md"
+    )
+
+
+def test_in_repo_deliverable_is_fine_in_ungated_arms():
+    check_eligibility(
+        _task(), "baseline", graded_artifact_path="/workspace/ansible/REPORT.md"
+    )
+
+
 def test_ineligible_task_records_an_invalid_run(tmp_path):
     """The ineligible exit must produce a saved INVALID record, not a crash."""
     toml = tmp_path / "task.toml"
@@ -276,7 +316,7 @@ def test_gate_aborts_the_run_when_the_agent_can_still_read(monkeypatch):
     """
     monkeypatch.setattr(run_task, "_docker_exec", _FakeExec(agent_can_read=True))
 
-    ok, err = run_task._apply_mode_gate("cid", _task(), "mcp_only")
+    ok, err, _proof = run_task._apply_mode_gate("cid", _task(), "mcp_only")
 
     assert ok is False
     assert "agent can still read" in err
@@ -296,7 +336,7 @@ def test_gate_aborts_when_it_blinds_the_scorer(monkeypatch):
         _FakeExec(agent_can_read=False, scorer_can_read=False),
     )
 
-    ok, err = run_task._apply_mode_gate("cid", _task(), "mcp_only")
+    ok, err, _proof = run_task._apply_mode_gate("cid", _task(), "mcp_only")
 
     assert ok is False
     assert "blinded the scorer" in err
@@ -306,7 +346,7 @@ def test_gate_passes_when_agent_is_denied_and_scorer_is_not(monkeypatch):
     fake = _FakeExec(agent_can_read=False, scorer_can_read=True)
     monkeypatch.setattr(run_task, "_docker_exec", fake)
 
-    ok, err = run_task._apply_mode_gate("cid", _task(), "mcp_only")
+    ok, err, _proof = run_task._apply_mode_gate("cid", _task(), "mcp_only")
 
     assert ok is True and err == ""
     chowned = [c for c, _ in fake.calls if c[0] == "chown"]
@@ -338,7 +378,7 @@ def test_gate_that_cannot_be_proven_is_treated_as_failed(monkeypatch):
 
     monkeypatch.setattr(run_task, "_docker_exec", no_files)
 
-    ok, err = run_task._apply_mode_gate("cid", _task(), "mcp_only")
+    ok, err, _proof = run_task._apply_mode_gate("cid", _task(), "mcp_only")
 
     assert ok is False
     assert "no file" in err
@@ -354,7 +394,7 @@ def test_gate_apply_failure_invalidates_the_run(monkeypatch):
 
     monkeypatch.setattr(run_task, "_docker_exec", failing_chown)
 
-    ok, err = run_task._apply_mode_gate("cid", _task(), "mcp_only")
+    ok, err, _proof = run_task._apply_mode_gate("cid", _task(), "mcp_only")
 
     assert ok is False
     assert "mode gate failed" in err
@@ -372,7 +412,7 @@ def test_gate_timeout_invalidates_the_run(monkeypatch):
 
     monkeypatch.setattr(run_task, "_docker_exec", slow)
 
-    ok, err = run_task._apply_mode_gate("cid", _task(), "mcp_only")
+    ok, err, _proof = run_task._apply_mode_gate("cid", _task(), "mcp_only")
 
     assert ok is False
     assert "timed out" in err
@@ -384,7 +424,9 @@ def test_unsafe_repo_path_invalidates_the_run(monkeypatch):
     monkeypatch.setattr(run_task, "_docker_exec", fake)
     escaping = {"url": "https://x/etc", "rev": "main", "path": "../../etc"}
 
-    ok, err = run_task._apply_mode_gate("cid", {"repos": [escaping]}, "mcp_only")
+    ok, err, _proof = run_task._apply_mode_gate(
+        "cid", {"repos": [escaping]}, "mcp_only"
+    )
 
     assert ok is False
     assert "Invalid repo path" in err
@@ -401,7 +443,7 @@ def test_gate_is_a_noop_for_ungated_arms(monkeypatch):
     monkeypatch.setattr(run_task, "_docker_exec", fake)
 
     for mode in ("baseline", "hybrid"):
-        ok, err = run_task._apply_mode_gate("cid", _task(), mode)
+        ok, err, _proof = run_task._apply_mode_gate("cid", _task(), mode)
         assert ok is True and err == ""
 
     assert fake.calls == [], "an ungated arm must not be touched by the gate"
@@ -436,11 +478,15 @@ def test_gated_mode_without_agent_command_is_invalid_not_complete(
 ):
     """A gated arm reaching the no-agent path never applied the gate.
 
-    ``mcp_only`` + empty ``agent_command`` must refuse (INVALID), not fall through
-    to scoring and save ``phase="complete"``, ``success=True`` on a container
-    whose repos were never chowned — the exact confound this bead removes,
-    reintroduced through a nesting hole (the gate lived inside ``if
-    agent_command:``).
+    Such an arm must refuse (INVALID), not fall through to scoring and save
+    ``phase="complete"``, ``success=True`` on a container whose repos were never
+    chowned -- the exact confound this bead removes, reintroduced through a
+    nesting hole (the gate lived inside ``if agent_command:``).
+
+    An empty ``--agent`` no longer reaches this path: the claude default command
+    now comes from the harness registry, so the model flag is applied in one
+    place. The property still needs a test, so the empty command is forced at
+    the plan instead of through the flag.
     """
     toml = tmp_path / "task.toml"
     toml.write_text(
@@ -460,6 +506,12 @@ def test_gated_mode_without_agent_command_is_invalid_not_complete(
         monkeypatch.setattr(
             run_task, name, (lambda r: (lambda *a, **k: r))(ret)
         )
+    real_plan = run_task.build_harness_plan
+    monkeypatch.setattr(
+        run_task,
+        "build_harness_plan",
+        lambda *a, **k: replace(real_plan(*a, **k), command=()),
+    )
 
     result = run_task.run_task(
         run_task.TaskRunConfig(
@@ -475,3 +527,38 @@ def test_gated_mode_without_agent_command_is_invalid_not_complete(
     assert result.phase != "complete"
     assert result.status == run_task.RUN_STATUS_INVALID
     assert result.success is False
+
+
+def test_gate_proof_records_both_directions_for_a_gated_run(monkeypatch):
+    """A passing gate writes the probes it proved, so results.json can be audited."""
+    monkeypatch.setattr(run_task, "_docker_exec", _FakeExec(agent_can_read=False))
+
+    ok, err, proof = run_task._apply_mode_gate("cid", _task(), "mcp_only")
+
+    assert (ok, err) == (True, "")
+    assert proof["gated"] is True
+    assert proof["proven"] is True
+    assert proof["agent_denied_probes"] == proof["scorer_readable_probes"]
+    assert proof["agent_denied_probes"], "a proven gate must name the probes it used"
+
+
+def test_gate_proof_marks_an_ungated_arm_as_not_gated():
+    ok, err, proof = run_task._apply_mode_gate("cid", _task(), "baseline")
+
+    assert (ok, err) == (True, "")
+    assert proof["gated"] is False
+    assert proof["proven"] is True
+    assert proof["agent_denied_probes"] == []
+
+
+def test_gate_proof_survives_a_failed_gate(monkeypatch):
+    """A gate that did not hold still records what it checked, and why it failed."""
+    monkeypatch.setattr(run_task, "_docker_exec", _FakeExec(agent_can_read=True))
+
+    ok, err, proof = run_task._apply_mode_gate("cid", _task(), "mcp_only")
+
+    assert ok is False
+    assert proof["proven"] is False
+    assert proof["repo_dirs"], "a failed gate still records the trees it targeted"
+    assert proof["reason"] == err
+    assert "INVALID" in proof["reason"]

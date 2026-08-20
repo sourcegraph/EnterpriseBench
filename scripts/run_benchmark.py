@@ -32,7 +32,7 @@ import subprocess
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
@@ -49,6 +49,18 @@ except ImportError:
 logger = logging.getLogger("run_benchmark")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from agents.harnesses.registry import (  # noqa: E402
+    CODEX_REASONING_EFFORTS,
+    HARNESS_NAMES,
+    HarnessConfigurationError,
+    build_harness_plan,
+    harness_variant_label,
+)
+
+sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "infra"))
+from capacity import retired_accounts  # noqa: E402
 
 # Session-type to runner script mapping
 RUNNERS: dict[str, Path] = {
@@ -75,7 +87,17 @@ class TaskInfo:
     toml_path: Path
 
 
-VALID_MODES = ("baseline", "mcp_only", "hybrid", "cli")
+VALID_MODES = (
+    "baseline",
+    "mcp_only",
+    "mcp_default",
+    "mcp_treatment",
+    "mcp_code_finder",
+    "mcp_assisted",
+    "mcp_toast",
+    "hybrid",
+    "cli",
+)
 
 
 @dataclass
@@ -171,16 +193,31 @@ def _parse_task_meta(toml_path: Path) -> TaskInfo | None:
     )
 
 
+def manifest_task_ids(manifest_path: Path) -> set[str]:
+    """Task ids named by a slice manifest.
+
+    Manifests list tasks suite-qualified ("suite/task-id") because bare ids
+    are not unique -- calibration-002 exists in three suites. Dispatch keys
+    off the bare id, so the suite prefix is stripped here; the manifest's own
+    gate (scripts/audit_disclosure.py) is what validates the qualified form.
+    """
+    manifest = json.loads(manifest_path.read_text())
+    return {entry.rsplit("/", 1)[-1] for entry in manifest["tasks"]}
+
+
 def filter_tasks(
     tasks: list[TaskInfo],
     *,
     difficulty: str | None = None,
     session_type: str | None = None,
     task_type: str | None = None,
+    task_ids: set[str] | None = None,
     limit: int | None = None,
 ) -> list[TaskInfo]:
     """Return a new list filtered by the given criteria."""
     result = list(tasks)
+    if task_ids is not None:
+        result = [t for t in result if t.task_id in task_ids]
     if difficulty:
         result = [t for t in result if t.difficulty == difficulty]
     if session_type:
@@ -197,6 +234,7 @@ def is_task_completed(
     *,
     results_dir: Path | None = None,
     mode: str = "baseline",
+    variant_label: str | None = None,
 ) -> bool:
     """Check whether a task already has a successful results.json.
 
@@ -210,11 +248,10 @@ def is_task_completed(
     if results_dir is None:
         results_dir = PROJECT_ROOT / "results" / "runs"
 
-    candidates = [
-        results_dir / task_id / mode / "results.json",
-    ]
+    segment = f"{mode}--{variant_label}" if variant_label else mode
+    candidates = [results_dir / task_id / segment / "results.json"]
     # Legacy single-mode layout only matches baseline
-    if mode == "baseline":
+    if mode == "baseline" and variant_label is None:
         candidates.append(results_dir / task_id / "results.json")
     for path in candidates:
         if not path.exists():
@@ -233,6 +270,7 @@ def filter_completed_tasks(
     *,
     results_dir: Path | None = None,
     mode: str = "baseline",
+    variant_label: str | None = None,
 ) -> tuple[list[TaskInfo], list[TaskInfo]]:
     """Partition *tasks* into (remaining, skipped) based on existing results.
 
@@ -242,7 +280,12 @@ def filter_completed_tasks(
     remaining: list[TaskInfo] = []
     skipped: list[TaskInfo] = []
     for t in tasks:
-        if is_task_completed(t.task_id, results_dir=results_dir, mode=mode):
+        if is_task_completed(
+            t.task_id,
+            results_dir=results_dir,
+            mode=mode,
+            variant_label=variant_label,
+        ):
             skipped.append(t)
         else:
             remaining.append(t)
@@ -259,6 +302,7 @@ def extract_task_cost(
     *,
     results_dir: Path | None = None,
     mode: str = "baseline",
+    variant_label: str | None = None,
 ) -> float:
     """Read cost_usd from a task's results.json tool_usage section.
 
@@ -268,10 +312,9 @@ def extract_task_cost(
     if results_dir is None:
         results_dir = PROJECT_ROOT / "results" / "runs"
 
-    candidates = [
-        results_dir / task_id / mode / "results.json",
-    ]
-    if mode == "baseline":
+    segment = f"{mode}--{variant_label}" if variant_label else mode
+    candidates = [results_dir / task_id / segment / "results.json"]
+    if mode == "baseline" and variant_label is None:
         candidates.append(results_dir / task_id / "results.json")
     for path in candidates:
         if not path.exists():
@@ -290,6 +333,15 @@ def extract_task_cost(
 # ---------------------------------------------------------------------------
 # Execution
 # ---------------------------------------------------------------------------
+
+
+def _passthrough_value(args: Sequence[str], flag: str) -> str | None:
+    """Return the value following *flag* in a generated passthrough argv."""
+    try:
+        index = args.index(flag)
+    except ValueError:
+        return None
+    return args[index + 1] if index + 1 < len(args) else None
 
 
 def run_task(
@@ -341,12 +393,36 @@ def run_task(
             result.status = "error"
             return result
 
-        # Try to read results.json from the run output directory
-        for results_file in [
-            PROJECT_ROOT / "results" / "runs" / task.task_id / mode / "results.json",
-            PROJECT_ROOT / "results" / "runs" / task.task_id / "results.json",
-            task.toml_path.parent / "results.json",
-        ]:
+        output_override = _passthrough_value(passthrough_args, "--output-dir")
+        variant_label = _passthrough_value(passthrough_args, "--variant-label")
+        segment = f"{mode}--{variant_label}" if variant_label else mode
+        generated_path = (
+            Path(output_override) / "results.json"
+            if output_override
+            else PROJECT_ROOT
+            / "results"
+            / "runs"
+            / task.task_id
+            / segment
+            / "results.json"
+        )
+
+        # Labeled harness runs have exactly one result identity. Legacy
+        # fallbacks are valid only for unlabeled runs; otherwise an old Claude
+        # baseline can be mistaken for a newly completed Codex/OpenCode run.
+        result_candidates = [generated_path]
+        if variant_label is None:
+            result_candidates.extend(
+                [
+                    PROJECT_ROOT
+                    / "results"
+                    / "runs"
+                    / task.task_id
+                    / "results.json",
+                    task.toml_path.parent / "results.json",
+                ]
+            )
+        for results_file in result_candidates:
             if results_file.exists():
                 try:
                     rdata = json.loads(results_file.read_text())
@@ -376,19 +452,40 @@ def run_task(
 # ---------------------------------------------------------------------------
 
 
-def _mode_output_dir(task_id: str, mode: str, *, multi_mode: bool) -> Path | None:
+def _mode_output_dir(
+    task_id: str,
+    mode: str,
+    *,
+    multi_mode: bool,
+    variant_label: str | None = None,
+) -> Path | None:
     """Per-mode results directory, or None for single-mode runs.
 
     Multi-mode sweeps route each mode to its own subdirectory so results from
-    different modes do not overwrite each other; a single-mode run uses the
-    runner's default output path. Only run_task (single-session tasks) honors the
-    forwarded --output-dir; chain_runner and event_replay accept it but write to
-    their own fixed paths, so their multi-mode outputs still collide — tracked
-    separately, out of scope for the argparse contract this file establishes.
+    different modes do not overwrite each other; a variant label extends the
+    segment (<mode>--<label>) so tuning runs do not overwrite production runs
+    either. A single-mode run uses the runner's default output path (which
+    applies the same label segment itself). Only run_task (single-session tasks)
+    honors the forwarded --output-dir; chain_runner and event_replay accept it
+    but write to their own fixed paths, so their multi-mode outputs still
+    collide — tracked separately, out of scope for the argparse contract this
+    file establishes.
     """
     if not multi_mode:
         return None
-    return PROJECT_ROOT / "results" / "runs" / task_id / mode
+    segment = f"{mode}--{variant_label}" if variant_label else mode
+    return PROJECT_ROOT / "results" / "runs" / task_id / segment
+
+
+def _effective_variant_label(args: argparse.Namespace) -> str | None:
+    """Resolve an explicit run label or isolate a generated harness/model arm."""
+    explicit = getattr(args, "variant_label", None)
+    if explicit:
+        return explicit
+    return harness_variant_label(
+        getattr(args, "harness", "claude"),
+        getattr(args, "model", None),
+    )
 
 
 def _run_task_with_account(
@@ -403,7 +500,12 @@ def _run_task_with_account(
         cli_args,
         account_override=account_id,
         mode_override=mode,
-        output_dir=_mode_output_dir(task.task_id, mode, multi_mode=multi_mode),
+        output_dir=_mode_output_dir(
+            task.task_id,
+            mode,
+            multi_mode=multi_mode,
+            variant_label=_effective_variant_label(cli_args),
+        ),
     )
     return run_task(task, passthrough_args=pt, mode=mode)
 
@@ -483,6 +585,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     filter_group.add_argument("--task-type")
     filter_group.add_argument(
+        "--manifest",
+        type=Path,
+        default=None,
+        help=(
+            "Slice manifest ({'tasks': ['suite/task-id', ...]}) restricting the "
+            "run to the tasks it names, e.g. configs/retrieval_stress_set.json"
+        ),
+    )
+    filter_group.add_argument(
         "--limit", type=int, default=None, help="Max number of tasks to run"
     )
     filter_group.add_argument(
@@ -499,6 +610,27 @@ def build_parser() -> argparse.ArgumentParser:
     runner_group = parser.add_argument_group("runner options (passed through)")
     runner_group.add_argument("--source", choices=["mirror", "upstream"])
     runner_group.add_argument("--agent", type=str)
+    runner_group.add_argument(
+        "--harness",
+        choices=list(HARNESS_NAMES),
+        default="claude",
+        help="Agent harness to run (default: claude)",
+    )
+    runner_group.add_argument(
+        "--reasoning-effort",
+        choices=list(CODEX_REASONING_EFFORTS),
+        default=None,
+        help="Codex reasoning effort (codex harness only).",
+    )
+    runner_group.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Explicit model ID. Required for codex and opencode; OpenCode "
+            "expects provider/model, for example "
+            "openrouter/deepseek/deepseek-v4-pro."
+        ),
+    )
     runner_group.add_argument("--timeout", type=int)
     runner_group.add_argument(
         "--account",
@@ -508,6 +640,20 @@ def build_parser() -> argparse.ArgumentParser:
             "OAuth account(s): single number (1), range (1-5), or "
             "comma-separated (1,3,5). Tasks are distributed round-robin "
             "across accounts when multiple are given."
+        ),
+    )
+    runner_group.add_argument(
+        "--judge-model",
+        default="cc:haiku",
+        help="Tier-2 judge model/backend identifier (default: cc:haiku).",
+    )
+    runner_group.add_argument(
+        "--judge-account",
+        type=int,
+        default=None,
+        help=(
+            "Claude account wrapper used only by a cc:* judge "
+            "(for example 1 selects claude-1)."
         ),
     )
     runner_group.add_argument(
@@ -525,7 +671,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Comma-separated list of modes to run each task in "
-            "(e.g. 'baseline,mcp_only,hybrid'). Overrides --mode."
+            "(e.g. 'baseline,mcp_code_finder,mcp_assisted'). Overrides --mode."
+        ),
+    )
+    runner_group.add_argument(
+        "--variant-label",
+        type=str,
+        default=None,
+        help=(
+            "Display label for a prompt/preamble tuning iteration. Forwarded "
+            "to the runner; labeled runs are routed to "
+            "results/runs/<task_id>/<mode>--<label>/ and never overwrite or "
+            "satisfy completion checks for unlabeled (production) runs."
         ),
     )
 
@@ -561,10 +718,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def parse_accounts(account_str: str | None) -> list[int]:
-    """Parse account spec into a list of account numbers.
+    """Parse account spec into a list of account numbers, minus retired ones.
 
     Supports: "1", "1-5", "1,3,5", "1-3,5".
     Returns an empty list if account_str is None.
+
+    Retired accounts are dropped here rather than rejected, because "1-5" is
+    the range in every runbook and habit, and failing the whole sweep on it
+    helps nobody. Dropping is safe precisely because a retired account cannot
+    produce a score: its runs die in under ten seconds on an HTTP 403 and
+    route to ``verifier_infra_error``. Silently keeping it in the round-robin
+    is the harmful option -- it costs every Nth task in the sweep and the
+    losses look like task failures.
     """
     if not account_str:
         return []
@@ -576,7 +741,26 @@ def parse_accounts(account_str: str | None) -> list[int]:
             accounts.extend(range(int(lo), int(hi) + 1))
         else:
             accounts.append(int(part))
-    return accounts
+
+    retired = {
+        int(name.removeprefix("account"))
+        for name in retired_accounts()
+        if name.removeprefix("account").isdigit()
+    }
+    live = [account for account in accounts if account not in retired]
+    dropped = sorted(set(accounts) - set(live))
+    if dropped:
+        logger.warning(
+            "Skipping retired account(s) %s; dispatching to %s",
+            ", ".join(str(account) for account in dropped),
+            ", ".join(str(account) for account in live) or "no accounts",
+        )
+    if accounts and not live:
+        raise SystemExit(
+            f"every account in --account {account_str} is retired; "
+            "nothing can be dispatched"
+        )
+    return live
 
 
 def collect_passthrough_args(
@@ -603,6 +787,14 @@ def collect_passthrough_args(
         result.extend(["--source", args.source])
     if args.agent:
         result.extend(["--agent", args.agent])
+    harness = getattr(args, "harness", "claude")
+    model = getattr(args, "model", None)
+    result.extend(["--harness", harness])
+    if model:
+        result.extend(["--model", model])
+    effort = getattr(args, "reasoning_effort", None)
+    if effort:
+        result.extend(["--reasoning-effort", effort])
     if args.timeout:
         result.extend(["--timeout", str(args.timeout)])
     if account_override is not None:
@@ -612,6 +804,12 @@ def collect_passthrough_args(
         accounts = parse_accounts(args.account)
         if len(accounts) == 1:
             result.extend(["--account", str(accounts[0])])
+    judge_model = getattr(args, "judge_model", None)
+    if judge_model:
+        result.extend(["--judge-model", judge_model])
+    judge_account = getattr(args, "judge_account", None)
+    if judge_account is not None:
+        result.extend(["--judge-account", str(judge_account)])
     # Mode passthrough
     mode = mode_override if mode_override is not None else args.mode
     result.extend(["--mode", mode])
@@ -619,12 +817,29 @@ def collect_passthrough_args(
         result.append("--dry-run")
     if output_dir is not None:
         result.extend(["--output-dir", str(output_dir)])
+    variant_label = _effective_variant_label(args)
+    if variant_label:
+        result.extend(["--variant-label", variant_label])
     return result
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.harness != "claude" and args.account is not None:
+        parser.error("--account selects Claude OAuth and cannot be used with --harness")
+    if args.harness != "claude" and args.agent:
+        parser.error("--agent cannot be combined with generated codex/opencode harnesses")
+    try:
+        build_harness_plan(
+            args.harness,
+            model=args.model,
+            mode=args.mode,
+            agent_command=args.agent or "",
+        )
+    except HarnessConfigurationError as exc:
+        parser.error(str(exc))
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -641,6 +856,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             parser.error("Pass --all to run all tasks in a directory")
 
+    manifest_ids = manifest_task_ids(args.manifest) if args.manifest else None
+
     tasks = discover_tasks(path)
     if not tasks:
         logger.error("No tasks found at %s", path)
@@ -651,8 +868,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         difficulty=args.difficulty,
         session_type=args.session_type,
         task_type=args.task_type,
+        task_ids=manifest_ids,
         limit=args.limit,
     )
+
+    if args.harness != "claude":
+        unsupported = sorted(
+            task.task_id for task in tasks if task.session_type != "single"
+        )
+        if unsupported:
+            parser.error(
+                f"harness={args.harness} currently supports session_type=single; "
+                f"unsupported task(s): {', '.join(unsupported[:5])}"
+            )
 
     logger.info("Matched %d task(s)", len(tasks))
 
@@ -666,6 +894,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             tasks,
             results_dir=results_dir,
             mode=check_mode,
+            variant_label=_effective_variant_label(args),
         )
         previously_completed = len(skipped_tasks)
         if previously_completed > 0:
@@ -685,6 +914,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 difficulty=args.difficulty,
                 session_type=args.session_type,
                 task_type=args.task_type,
+                task_ids=manifest_ids,
             )
             if filtered:
                 print(
@@ -707,6 +937,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
     else:
         modes = [args.mode]
+
+    for selected_mode in modes:
+        try:
+            build_harness_plan(
+                args.harness,
+                model=args.model,
+                mode=selected_mode,
+                agent_command=args.agent or "",
+            )
+        except HarnessConfigurationError as exc:
+            parser.error(str(exc))
 
     logger.info("Tool-access mode(s): %s", ", ".join(modes))
 
@@ -765,7 +1006,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                     account_override=account_id,
                     mode_override=current_mode,
                     output_dir=_mode_output_dir(
-                        task.task_id, current_mode, multi_mode=len(modes) > 1
+                        task.task_id,
+                        current_mode,
+                        multi_mode=len(modes) > 1,
+                        variant_label=_effective_variant_label(args),
                     ),
                 )
                 result = run_task(
@@ -782,6 +1026,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         task.task_id,
                         results_dir=results_dir,
                         mode=current_mode,
+                        variant_label=_effective_variant_label(args),
                     )
                     cumulative_cost_usd += task_cost
 
@@ -844,6 +1089,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         task.task_id,
                         results_dir=results_dir,
                         mode=current_mode,
+                        variant_label=_effective_variant_label(args),
                     )
                     cumulative_cost_usd += task_cost
 

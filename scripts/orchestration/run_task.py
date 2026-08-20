@@ -14,6 +14,7 @@ import argparse
 import base64
 import json
 import logging
+import math
 import os
 import re
 import shlex
@@ -22,9 +23,9 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator, NamedTuple, Optional, Sequence
 from collections.abc import MutableMapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
@@ -73,6 +74,7 @@ _load_env_local(_env_local, os.environ)
 # Reuse the TOML parser from create_sg_mirrors
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "infra"))
 from create_sg_mirrors import parse_toml
+from mirror_naming import derive_mirror_name
 
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
 from validation import validate_repo_entry
@@ -101,6 +103,18 @@ from agents.harnesses.claude.mcp.sourcegraph import (
 from agents.harnesses.claude.cli.sgx import (
     build_system_prompt as _build_cli_preamble,
 )
+from agents.harnesses.registry import (
+    CODEX_REASONING_EFFORTS,
+    HARNESS_NAMES,
+    HarnessConfigurationError,
+    HarnessPlan,
+    build_harness_plan,
+    deferred_tool_markers,
+    full_tool_schema_env,
+    harness_variant_label,
+)
+from agents.harnesses import sourcegraph_server_treatment  # noqa: E402
+from agents.harnesses.mcp_telemetry_proxy import build_retrieval_telemetry  # noqa: E402
 
 # Scorer trust boundary — single definition of "infra failure vs real score",
 # shared by every scoring entry point in this file and by code_patch.validate.
@@ -127,11 +141,50 @@ HEALTH_CHECK_SH = REPO_ROOT / "scripts" / "sandbox" / "health_check.sh"
 EB_VERIFY_LIB = REPO_ROOT / "lib" / "eb_verify"
 
 
-VALID_MODES = ("baseline", "mcp_only", "hybrid", "cli")
+FINDER_MODES = frozenset({"mcp_code_finder", "mcp_assisted"})
+
+# Code Finder runs server-side, so its execution never appears in the Claude
+# Code `modelUsage` that feeds `cost_usd`. A run that calls it therefore looks
+# cheaper than it is. These two rates price the same call from the two sides
+# that matter to a comparison: what Sourcegraph spends in model tokens to
+# answer it, and what a customer is billed in credits for it.
+CODE_FINDER_TOKEN_COST_USD = 0.02
+CODE_FINDER_CREDIT_COST_USD = 0.11
+# Toast-1 served as an MCP tool. Unlike every other arm this one does not point
+# at Sourcegraph's MCP server; it points at a host-side server (see
+# experiments/toast_retrieval/toast_mcp_server.py) that runs Toast-1's own
+# search loop and answers over the docker bridge. Toast-1 stays out of the task
+# image, so all arms keep building the byte-identical image mode_gate.py's
+# design depends on.
+TOAST_MODES = frozenset({"mcp_toast"})
+MCP_MODES = frozenset(
+    {
+        "mcp_only",
+        "mcp_default",
+        "mcp_treatment",
+        "hybrid",
+        *FINDER_MODES,
+        *TOAST_MODES,
+    }
+)
+VALID_MODES = (
+    "baseline",
+    "mcp_only",
+    "mcp_default",
+    "mcp_treatment",
+    "mcp_code_finder",
+    "mcp_assisted",
+    "mcp_toast",
+    "hybrid",
+    "cli",
+)
 
 _DEFAULT_MCP_URL = "https://demo.sourcegraph.com/.api/mcp/all"
 _raw_mcp_url = os.environ.get("SOURCEGRAPH_MCP_URL", _DEFAULT_MCP_URL)
-# Ensure /all suffix for full tool set (13 tools vs 8 on base endpoint)
+# Ensure the /all suffix. Probed 2026-08-18: /.api/mcp/v1 and /.api/mcp/all
+# serve the identical 15 tools, code_finder included, and differ only in the
+# `sg_` name prefix v1 applies. /all is kept because the un-prefixed names are
+# what every MCP preamble, telemetry breakdown, and arm contract references.
 SOURCEGRAPH_MCP_ENDPOINT = (
     _raw_mcp_url if _raw_mcp_url.endswith("/all") else f"{_raw_mcp_url.rstrip('/')}/all"
 )
@@ -145,6 +198,29 @@ SOURCEGRAPH_MCP_ENDPOINT = (
 SGX_ENDPOINT = f"{SOURCEGRAPH_MCP_ENDPOINT.split('/.api/mcp/')[0]}/.api/mcp/v1"
 # The stdlib-only CLI uploaded into the container for the cli arm.
 SGX_CLI_SRC = REPO_ROOT / "agents" / "harnesses" / "claude" / "mcp" / "sg_cli.py"
+MCP_PROXY_SRC = REPO_ROOT / "agents" / "harnesses" / "mcp_telemetry_proxy.py"
+MCP_PROXY_SCRIPT_PATH = "/usr/local/lib/enterprisebench/mcp_telemetry_proxy.py"
+# The treatment overlay is imported by the proxy, so it is staged beside it --
+# the proxy's own directory is sys.path[0] when it runs as a script.
+MCP_TREATMENT_SRC = REPO_ROOT / "agents" / "harnesses" / "sourcegraph_server_treatment.py"
+MCP_TREATMENT_SCRIPT_PATH = (
+    "/usr/local/lib/enterprisebench/sourcegraph_server_treatment.py"
+)
+# Arms whose MCP client talks to the local proxy rather than Sourcegraph
+# directly: the Finder arms for their call telemetry, mcp_treatment because the
+# proxy is where the unshipped server change is applied.
+PROXY_MODES = frozenset({*FINDER_MODES, "mcp_treatment"})
+# The arm that varies the server's descriptions and initialize instructions.
+TREATMENT_MODES = frozenset({"mcp_treatment"})
+MCP_PROXY_TRACE_PATH = "/var/tmp/enterprisebench-mcp-trace.jsonl"
+MCP_PROXY_ENDPOINT = "http://127.0.0.1:8765/mcp"
+MCP_PROXY_HEALTH_ENDPOINT = "http://127.0.0.1:8765/healthz"
+# The host-side Toast-1 MCP server, reached over the docker bridge gateway.
+# It carries no Authorization header: it listens on the bridge address only and
+# holds the Mixedbread and Sourcegraph credentials host-side, so nothing the
+# agent can read ever contains them.
+TOAST_MCP_ENDPOINT = os.environ.get("TOAST_MCP_URL", "http://172.17.0.1:8770/mcp")
+TOAST_MCP_SERVER_NAME = "toast"
 
 
 @dataclass(frozen=True)
@@ -154,6 +230,9 @@ class TaskRunConfig:
     task_toml: Path
     source: str = "mirror"
     agent_command: str = ""
+    harness: str = "claude"
+    model: str | None = None
+    reasoning_effort: str | None = None
     timeout: int = 1800
     build_timeout: int = 1800
     verifier_timeout: int = 600
@@ -164,10 +243,13 @@ class TaskRunConfig:
     keep_container: bool = False
     verbose: bool = False
     account: int | None = None
+    judge_model: str = "cc:haiku"
+    judge_account: int | None = None
     mode: str = "baseline"
     rep: int | None = None
     ablation_variant: str | None = None
     min_disk_gb: float = 10.0
+    variant_label: str | None = None
 
 
 # Status marker for runs that must not be scored (e.g. MCP pre-flight failure,
@@ -307,9 +389,43 @@ class TaskRunResult:
     output_dir: str = ""
     tool_usage: dict = field(default_factory=dict)
     failure_class: Optional[str] = None
+    agent_command: str = ""
+    mode_gate: dict = field(default_factory=dict)
     # "" for normal runs; RUN_STATUS_INVALID for runs that must be re-run,
     # never scored (see the MCP pre-flight gate).
     status: str = ""
+
+
+_VARIANT_LABEL_RE = re.compile(r"^[a-z0-9](?:[a-z0-9]|-(?!-))*[a-z0-9]$|^[a-z0-9]$")
+
+
+def _validate_variant_label(label: str) -> str:
+    """Validate a human run-variant label used in result directory names."""
+    if len(label) > 96 or not _VARIANT_LABEL_RE.fullmatch(label):
+        raise ValueError(
+            "variant label must be 1-96 lowercase letters/digits/hyphens, "
+            "start and end with a letter or digit, and contain no '--'"
+        )
+    return label
+
+
+def _effective_variant_label(config: TaskRunConfig) -> str | None:
+    """Resolve an explicit label or isolate a generated non-Claude harness."""
+    if config.variant_label is not None:
+        return _validate_variant_label(config.variant_label)
+    return harness_variant_label(config.harness, config.model)
+
+
+def _resolve_output_dir(config: TaskRunConfig, task_id: str) -> Path:
+    """Resolve a collision-safe result directory for one task run."""
+    if config.output_dir is not None:
+        return config.output_dir
+    variant_label = _effective_variant_label(config)
+    segment = (
+        f"{config.mode}--{variant_label}" if variant_label else config.mode
+    )
+    base = REPO_ROOT / "results" / "runs" / task_id / segment
+    return base / f"rep{config.rep}" if config.rep is not None else base
 
 
 def _load_oauth_token(account: int) -> str:
@@ -365,12 +481,22 @@ def _load_oauth_token(account: int) -> str:
     return access_token
 
 
-DEFAULT_OAUTH_AGENT_COMMAND = "claude --dangerously-skip-permissions --max-turns 50 --verbose --output-format stream-json -p"
 
-# The sandbox registers exactly one MCP server, `sourcegraph` (see _configure_mcp),
-# so every genuine tool is named `mcp__sourcegraph__<tool>`. Prefix, not allow-list:
-# a gate that invalidates on zero must not fire over a tool added after this shipped.
-_MCP_TOOL_PREFIX = "mcp__sourcegraph__"
+# The sandbox registers exactly one MCP server per arm (see _configure_mcp), so
+# every genuine tool is named `mcp__<server>__<tool>`. Prefix, not allow-list: a
+# gate that invalidates on zero must not fire over a tool added after this
+# shipped. The mcp_toast arm registers `toast` instead of `sourcegraph`, and its
+# calls must count here or the zero-call gate would invalidate every run of it.
+_MCP_TOOL_PREFIXES = ("mcp__sourcegraph__", "mcp__toast__")
+_MCP_TOOL_PREFIX = _MCP_TOOL_PREFIXES[0]
+
+
+def _strip_mcp_prefix(name: str) -> str | None:
+    """Bare tool name if *name* is an MCP tool of a registered server, else None."""
+    for prefix in _MCP_TOOL_PREFIXES:
+        if name.startswith(prefix):
+            return name.removeprefix(prefix)
+    return None
 
 # The cli arm's retrieval is the `sgx` shell command, run via the Bash tool, so it
 # is not visible to the MCP-prefix match above. Match `sgx` only in COMMAND
@@ -528,6 +654,12 @@ def _docker_exec(
         full_cmd,
         capture_output=True,
         text=True,
+        # The agent owns this filesystem and the commands run here read from
+        # it, so a single invalid byte in a filename or a grepped file is
+        # ordinary input. Under strict decoding it raises UnicodeDecodeError
+        # out of subprocess itself -- a harness crash in the middle of scoring,
+        # where a replacement character is the correct answer.
+        errors="replace",
         timeout=timeout,
     )
 
@@ -544,19 +676,205 @@ def _docker_cp(src: str, dest: str) -> None:
         raise RuntimeError(f"docker cp failed: {result.stderr.strip()}")
 
 
-def _docker_stop_rm(container_id: str) -> None:
-    """Stop and remove a container."""
-    subprocess.run(
-        ["docker", "stop", "-t", "5", container_id],
+def _docker_exec_detached(
+    container_id: str,
+    cmd: list[str],
+    *,
+    env: dict[str, str],
+) -> subprocess.CompletedProcess:
+    """Start a root-owned background process with non-secret explicit env."""
+    env_args = [
+        argument for key, value in env.items() for argument in ("-e", f"{key}={value}")
+    ]
+    return subprocess.run(
+        [
+            "docker",
+            "exec",
+            "-d",
+            "-u",
+            "root",
+            *env_args,
+            "-w",
+            "/",
+            container_id,
+            *cmd,
+        ],
         capture_output=True,
         text=True,
         timeout=30,
     )
-    subprocess.run(
-        ["docker", "rm", "-f", container_id],
-        capture_output=True,
-        text=True,
-        timeout=30,
+
+
+def _docker_stop_rm(container_id: str) -> None:
+    """Stop and remove a container."""
+    try:
+        subprocess.run(
+            ["docker", "stop", "-t", "5", container_id],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        logger.warning(
+            "docker stop timed out for %s; forcing removal",
+            container_id[:12],
+        )
+    try:
+        subprocess.run(
+            ["docker", "rm", "-f", container_id],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        logger.error(
+            "docker rm -f timed out for %s; manual cleanup may be required",
+            container_id[:12],
+        )
+
+
+# Default artifact for checks that do not declare a bespoke report path.
+ANSWER_ARTIFACT_PATH = "/workspace/agent_output/answer.json"
+
+_ARTIFACT_SUFFIX_RE = re.compile(
+    r"(?:\$\{WORKSPACE(?::-/workspace)?\}|\$WORKSPACE|/workspace)"
+    r"(/[A-Za-z0-9_./-]+\.(?:jsonl?|md|txt|ya?ml))"
+)
+_ARTIFACT_VARIABLE_RE = re.compile(
+    r"^\s*(?:export\s+)?"
+    r"(?:ANSWER_FILE|ANSWER|REPORT|OUTPUT_FILE|OUTPUT|ARTIFACT_FILE|ACTIONS)\s*="
+)
+
+
+def _validate_graded_artifact_path(path: str, task_dir: Path) -> str:
+    """Reject checker paths that escape the workspace after normalization."""
+    artifact = PurePosixPath(path)
+    if artifact.parts[:2] != ("/", "workspace") or ".." in artifact.parts:
+        raise ValueError(
+            f"{task_dir}: graded artifact path resolves outside /workspace: {path}"
+        )
+    return path
+
+
+def _derive_graded_artifact_path(task_dir: Path) -> str:
+    """Return the one artifact path read by this task's checkpoint scripts."""
+    paths: set[str] = set()
+    checks_dir = task_dir / "checks"
+    check_scripts = (
+        tuple(sorted(checks_dir.glob("*.sh"))) if checks_dir.is_dir() else ()
+    )
+    if check_scripts:
+        for check_script in check_scripts:
+            for line in check_script.read_text(errors="replace").splitlines():
+                if not _ARTIFACT_VARIABLE_RE.match(line):
+                    continue
+                match = _ARTIFACT_SUFFIX_RE.search(line)
+                if match:
+                    paths.add(
+                        _validate_graded_artifact_path(
+                            f"/workspace{match.group(1)}", task_dir
+                        )
+                    )
+                    # The first assignment is the primary graded artifact.
+                    # Later assignments in the same script are compatibility
+                    # fallbacks guarded by a missing-file check.
+                    break
+    if len(paths) > 1:
+        rendered = ", ".join(sorted(paths))
+        raise ValueError(
+            f"{task_dir}: multiple graded artifact paths in checkpoint scripts: "
+            f"{rendered}"
+        )
+    if paths:
+        return next(iter(paths))
+    if not check_scripts:
+        return ANSWER_ARTIFACT_PATH
+    checker_source = "\n".join(
+        script.read_text(errors="replace") for script in check_scripts
+    )
+    if "agent_output/answer.json" in checker_source:
+        return ANSWER_ARTIFACT_PATH
+    raise ValueError(
+        f"{task_dir}: cannot determine graded artifact path from checkpoint scripts"
+    )
+
+
+def _canonical_json_schema(require_grounded_citations: bool) -> str:
+    citations = ""
+    closing = "Include only the fields relevant to this task. "
+    if require_grounded_citations:
+        sys.path.insert(0, str(REPO_ROOT / "lib"))
+        from eb_verify.groundedness import MIN_SPAN_CHARS
+
+        citations = (
+            ',\n  "citations": [\n'
+            '    {"repo": "repo-name", "file": "relative/path", '
+            f'"evidence_span": "verbatim excerpt, >={MIN_SPAN_CHARS} characters, copied exactly from the file"}}\n'
+            "  ]\n"
+        )
+        closing = (
+            "Include only the fields relevant to this task, but `citations` is "
+            "required. Every citation must quote an exact, verbatim span from "
+            "the cited file, not a paraphrase. "
+        )
+    return (
+        "Include all relevant fields for this task type. Example structure:\n"
+        "```json\n"
+        "{\n"
+        '  "source_files": [{"path": "/workspace/<repo>/path/to/file"}],\n'
+        '  "error_chain": ["Step 1", "Step 2"],\n'
+        '  "trigger_conditions": ["Condition 1"],\n'
+        '  "code_paths": [{"path": "/workspace/<repo>/path/to/file"}],\n'
+        '  "ownership": "subsystem description",\n'
+        '  "severity": {"level": "high", "rationale": "..."},\n'
+        '  "related_issues": ["/workspace/<repo>/path/to/related/file.go", '
+        '"description of related component"]'
+        + citations
+        + "}\n```\n"
+        + closing
+    )
+
+
+def _build_output_appendix(
+    artifact_path: str, require_grounded_citations: bool
+) -> str:
+    artifact = Path(artifact_path)
+    parent = str(artifact.parent)
+    if artifact_path == ANSWER_ARTIFACT_PATH:
+        format_requirements = (
+            "Write your findings as JSON and ensure the file parses before "
+            "finishing.\n\n"
+            + _canonical_json_schema(require_grounded_citations)
+        )
+    elif artifact.suffix.lower() == ".json":
+        format_requirements = (
+            "Follow the task's requested JSON schema exactly and ensure the "
+            "file parses before finishing.\n"
+        )
+    else:
+        format_name = {
+            ".jsonl": "JSON Lines",
+            ".md": "Markdown",
+        }.get(artifact.suffix.lower(), "text")
+        format_requirements = (
+            f"Write the complete report as {format_name}, following the task's "
+            "requested structure.\n"
+        )
+    return (
+        "\n\n---\n\n## Output Requirements\n\n"
+        f"The grader reads only `{artifact_path}`. This exact path supersedes "
+        "any other output path mentioned earlier.\n\n"
+        f"Create its parent directory first: `mkdir -p {parent}`\n"
+        f"{format_requirements}\n"
+        "Do not create secondary or legacy deliverables. After validating the "
+        "graded artifact, stop immediately instead of starting another "
+        "reasoning step.\n\n"
+        "All cited source-file paths MUST be absolute and anchored at "
+        "`/workspace/<repo>/...` (the repo roots are the directories under "
+        "`/workspace`). Repo-relative source paths will not match the oracle "
+        "and score 0.\n\n"
+        "Your answer is evaluated against a closed-world oracle — completeness "
+        "matters.\n"
     )
 
 
@@ -590,7 +908,7 @@ def _build_instruction_text(
     # remote reach, exposed as a shell command, no MCP tools). baseline gets
     # none.
     preamble_parts: list[str] = []
-    if mode in ("mcp_only", "hybrid", "cli"):
+    if mode in (*MCP_MODES, "cli"):
         if mode == "cli":
             retrieval_preamble = _build_cli_preamble(mode=mode, repos=repos)
         else:
@@ -604,46 +922,9 @@ def _build_instruction_text(
         if instruction_mcp.exists():
             preamble_parts.append(instruction_mcp.read_text())
 
-    if require_grounded_citations:
-        sys.path.insert(0, str(REPO_ROOT / "lib"))
-        from eb_verify.groundedness import MIN_SPAN_CHARS
-
-        citations_block = (
-            ',\n  "citations": [\n'
-            '    {"repo": "repo-name", "file": "relative/path", '
-            f'"evidence_span": "verbatim excerpt, >={MIN_SPAN_CHARS} characters, copied exactly from the file"}}\n'
-            "  ]\n"
-        )
-        closing_sentence = (
-            "Include only the fields relevant to this task, but `citations` is "
-            "required. Every entry in `citations` must quote an exact, verbatim "
-            "span from the cited file — not a paraphrase or summary. "
-        )
-    else:
-        citations_block = "\n"
-        closing_sentence = "Include only the fields relevant to this task. "
-
-    output_appendix = (
-        "\n\n---\n\n## Output Requirements\n\n"
-        "Write your findings as a JSON file to `/workspace/agent_output/answer.json`.\n"
-        "Create the directory first: `mkdir -p /workspace/agent_output`\n\n"
-        "All file paths MUST be absolute and anchored at `/workspace/<repo>/...` "
-        "(the repo roots are the directories under `/workspace`). "
-        "Repo-relative paths will not match the oracle and score 0.\n\n"
-        "Include all relevant fields for this task type. Example structure:\n"
-        "```json\n"
-        "{\n"
-        '  "source_files": [{"path": "/workspace/<repo>/path/to/file"}],\n'
-        '  "error_chain": ["Step 1", "Step 2"],\n'
-        '  "trigger_conditions": ["Condition 1"],\n'
-        '  "code_paths": [{"path": "/workspace/<repo>/path/to/file"}],\n'
-        '  "ownership": "subsystem description",\n'
-        '  "severity": {"level": "high", "rationale": "..."},\n'
-        '  "related_issues": ["/workspace/<repo>/path/to/related/file.go", "description of related component"]'
-        + citations_block
-        + "}\n```\n"
-        + closing_sentence
-        + "Your answer is evaluated against a closed-world oracle — completeness matters.\n"
+    output_appendix = _build_output_appendix(
+        _derive_graded_artifact_path(task_dir),
+        require_grounded_citations,
     )
 
     if preamble_parts:
@@ -1076,20 +1357,56 @@ def _gate_probe_file(container_id: str, repo_dir: str) -> str | None:
     return found[0] if res.returncode == 0 and found else None
 
 
-def _gate_failed(reason: str) -> tuple[bool, str]:
-    """An (ok, error) pair for a gate that could not be applied or proven.
+class ModeGateResult(NamedTuple):
+    """Whether the gate holds, why not, and the evidence either way.
+
+    `proof` is written verbatim into results.json so a reader can confirm the
+    ablation was kernel-enforced for a given run without re-reading its trace
+    for `Permission denied` strings.
+    """
+
+    ok: bool
+    error: str
+    proof: dict[str, Any]
+
+
+def _gate_proof(
+    *,
+    mode: str,
+    gated: bool,
+    proven: bool,
+    repo_dirs_checked: Sequence[str] = (),
+    agent_denied: Sequence[str] = (),
+    scorer_readable: Sequence[str] = (),
+    reason: str = "",
+) -> dict[str, Any]:
+    """The per-run record of what the mode gate did and what it proved."""
+    return {
+        "mode": mode,
+        "gated": gated,
+        "proven": proven,
+        "repo_dirs": list(repo_dirs_checked),
+        "agent_denied_probes": list(agent_denied),
+        "scorer_readable_probes": list(scorer_readable),
+        "reason": reason,
+    }
+
+
+def _gate_failed(reason: str, proof: dict[str, Any]) -> ModeGateResult:
+    """A failed-gate result carrying the same sentence at every exit.
 
     Every mode-gate failure ends with the same sentence, and that ending is the
     load-bearing half: an unenforced gate means the run must be re-run, never
     averaged in as a low score. Saying it in one place is what keeps the promise
     identical across every exit, including ones added later.
     """
-    return False, f"{reason} — run is INVALID, not a real score"
+    message = f"{reason} — run is INVALID, not a real score"
+    return ModeGateResult(False, message, {**proof, "reason": message})
 
 
 def _apply_mode_gate(
     container_id: str, task_data: dict, mode: str
-) -> tuple[bool, str]:
+) -> ModeGateResult:
     """Deny the agent local source in gated arms, and PROVE it in both directions.
 
     Returns (ok, error_message). A gate that silently failed to apply would
@@ -1101,14 +1418,31 @@ def _apply_mode_gate(
     EnterpriseBench-7rc1).
     """
     if not should_gate(mode):
-        return True, ""
+        return ModeGateResult(
+            True,
+            "",
+            _gate_proof(
+                mode=mode, gated=False, proven=True, reason="mode is not gated"
+            ),
+        )
 
     try:
         dirs = repo_dirs(task_data, WORKSPACE_DIR)
     except ValueError as exc:
-        return _gate_failed(f"mode gate cannot run: {exc}")
+        return _gate_failed(
+            f"mode gate cannot run: {exc}",
+            _gate_proof(mode=mode, gated=True, proven=False),
+        )
     if not dirs:
-        return True, ""
+        return ModeGateResult(
+            True,
+            "",
+            _gate_proof(
+                mode=mode, gated=True, proven=True, reason="task clones no repos"
+            ),
+        )
+
+    pending = _gate_proof(mode=mode, gated=True, proven=False, repo_dirs_checked=dirs)
 
     for cmd in lockdown_commands(dirs, SCORING_GROUP):
         printable = shlex.join(cmd)
@@ -1119,25 +1453,36 @@ def _apply_mode_gate(
         except subprocess.TimeoutExpired:
             # A recursive chown over a Kubernetes-sized tree can outlast a
             # default timeout. Half-applied is not a gate.
-            return _gate_failed(f"mode gate timed out running `{printable}`")
+            return _gate_failed(
+                f"mode gate timed out running `{printable}`", pending
+            )
         if res.returncode != 0:
             return _gate_failed(
-                f"mode gate failed running `{printable}`: {res.stderr.strip()}"
+                f"mode gate failed running `{printable}`: {res.stderr.strip()}",
+                pending,
             )
 
+    denied: list[str] = []
+    readable: list[str] = []
     for repo_dir in dirs:
         probe = _gate_probe_file(container_id, repo_dir)
         if probe is None:
             return _gate_failed(
-                f"mode gate found no file under {repo_dir} to prove itself against"
+                f"mode gate found no file under {repo_dir} to prove itself against",
+                pending,
             )
         if _can_read(container_id, probe, user=AGENT_USER):
-            return _gate_failed(f"mode gate did not hold: agent can still read {probe}")
+            return _gate_failed(
+                f"mode gate did not hold: agent can still read {probe}", pending
+            )
+        denied.append(probe)
         if not _can_read(container_id, probe, user=SCORING_USER):
             return _gate_failed(
                 f"mode gate blinded the scorer: {SCORING_USER} cannot read "
-                f"{probe}, so its checkpoints would score a tree they cannot see"
+                f"{probe}, so its checkpoints would score a tree they cannot see",
+                pending,
             )
+        readable.append(probe)
 
     logger.info(
         "Mode gate applied for mode=%s: agent denied local source on %s; "
@@ -1146,7 +1491,18 @@ def _apply_mode_gate(
         ", ".join(dirs),
         SCORING_USER,
     )
-    return True, ""
+    return ModeGateResult(
+        True,
+        "",
+        _gate_proof(
+            mode=mode,
+            gated=True,
+            proven=True,
+            repo_dirs_checked=dirs,
+            agent_denied=denied,
+            scorer_readable=readable,
+        ),
+    )
 
 
 def _scan_mcp_config_error(output_dir: Path) -> bool:
@@ -1419,6 +1775,135 @@ def _install_claude_cli(container_id: str) -> bool:
     return False
 
 
+def _install_harness_cli(container_id: str, plan: HarnessPlan) -> bool:
+    """Ensure a generated harness CLI is installed at its pinned version."""
+    if plan.npm_package is None:
+        return True
+
+    expected_version = plan.npm_package.rsplit("@", 1)[-1]
+
+    def is_pinned(result: subprocess.CompletedProcess[str]) -> bool:
+        return (
+            result.returncode == 0
+            and expected_version in result.stdout.strip().split()
+        )
+
+    version = _docker_exec(container_id, [plan.binary, "--version"])
+    if is_pinned(version):
+        logger.info("%s CLI ready: %s", plan.name, version.stdout.strip())
+        return True
+
+    logger.info(
+        "%s CLI missing or not at %s; installing %s",
+        plan.name,
+        expected_version,
+        plan.npm_package,
+    )
+    installed = _docker_exec(
+        container_id,
+        ["npm", "install", "-g", plan.npm_package],
+        timeout=300,
+    )
+    if installed.returncode != 0:
+        logger.error(
+            "Failed to install %s CLI: %s", plan.name, installed.stderr.strip()
+        )
+        return False
+
+    version = _docker_exec(container_id, [plan.binary, "--version"])
+    if not is_pinned(version):
+        logger.error(
+            "%s CLI did not report pinned version %s after package installation",
+            plan.name,
+            expected_version,
+        )
+        return False
+    logger.info("%s CLI ready: %s", plan.name, version.stdout.strip())
+    return True
+
+
+def _prepare_harness_credentials(
+    container_id: str,
+    plan: HarnessPlan,
+    *,
+    environ: MutableMapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Stage only the credentials required by the selected harness."""
+    source_env = os.environ if environ is None else environ
+
+    if plan.name == "codex":
+        source_home = Path(
+            source_env.get(
+                "CODEX_HOME",
+                str(Path(source_env.get("HOME", str(Path.home()))) / ".codex"),
+            )
+        )
+        auth_path = source_home / "auth.json"
+        if not auth_path.is_file():
+            raise FileNotFoundError(
+                "Codex authentication not found. Run `codex login` before "
+                "starting the benchmark."
+            )
+
+        container_home = "/home/agent/.codex"
+        mkdir = _docker_exec(container_id, ["mkdir", "-p", container_home])
+        if mkdir.returncode != 0:
+            raise RuntimeError(
+                f"failed to create Codex home in container: {mkdir.stderr.strip()}"
+            )
+        _docker_cp(
+            str(auth_path),
+            f"{container_id}:{container_home}/auth.json",
+        )
+        for argv in (
+            ["chmod", "600", f"{container_home}/auth.json"],
+            ["chown", "agent:agent", f"{container_home}/auth.json"],
+        ):
+            result = _docker_exec(container_id, argv)
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"failed to secure Codex auth in container: "
+                    f"{result.stderr.strip()}"
+                )
+        return {"CODEX_HOME": container_home}
+
+    credentials = {
+        name: source_env[name]
+        for name in plan.required_env
+        if source_env.get(name)
+    }
+    missing = [name for name in plan.required_env if name not in credentials]
+    if missing:
+        raise FileNotFoundError(
+            f"harness={plan.name} requires environment variable(s): "
+            f"{', '.join(missing)}"
+        )
+    return credentials
+
+
+def _cleanup_harness_credentials(
+    container_id: str,
+    plan: HarnessPlan,
+    credentials: dict[str, str],
+) -> None:
+    """Remove credential files staged for a harness run.
+
+    Environment-only credentials disappear with ``docker exec``. A copied
+    Codex login file does not, so remove it before scoring and before honoring
+    ``--keep-container``.
+    """
+    if plan.name != "codex" or "CODEX_HOME" not in credentials:
+        return
+
+    auth_path = f"{credentials['CODEX_HOME']}/auth.json"
+    removed = _docker_exec(container_id, ["rm", "-f", auth_path])
+    if removed.returncode != 0:
+        raise RuntimeError(
+            f"failed to remove staged Codex auth from container: "
+            f"{removed.stderr.strip()}"
+        )
+
+
 def _run_health_check(container_id: str, repos: list[dict]) -> bool:
     """Run health_check.sh inside the container. Returns True if healthy."""
     repo_paths = [r["path"] for r in repos if r.get("path")]
@@ -1441,7 +1926,7 @@ def _run_health_check(container_id: str, repos: list[dict]) -> bool:
 
 def _run_agent(
     container_id: str,
-    agent_command: str,
+    agent_command: str | Sequence[str],
     timeout: int,
     output_dir: Path,
     env_extra: dict[str, str] | None = None,
@@ -1450,15 +1935,41 @@ def _run_agent(
 
     Returns (exit_code, duration_seconds).
     """
-    _SAFE_AGENT_CMD_RE = re.compile(r"^[\w./@: -]+$")
-    if not _SAFE_AGENT_CMD_RE.match(agent_command):
-        raise ValueError(f"agent_command contains unsafe characters: {agent_command!r}")
+    if isinstance(agent_command, str):
+        safe_agent_cmd = re.compile(r"^[\w./@: -]+$")
+        if not safe_agent_cmd.fullmatch(agent_command):
+            raise ValueError(
+                f"agent_command contains unsafe characters: {agent_command!r}"
+            )
+        command_display = agent_command
+        shell_script = (
+            "mkdir -p /workspace/agent_output && "
+            f"{agent_command} < /workspace/instruction.md"
+        )
+        command_args: list[str] = []
+    else:
+        command_args = list(agent_command)
+        if not command_args or any(not arg or "\0" in arg for arg in command_args):
+            raise ValueError("generated agent command contains an empty or NUL argument")
+        command_display = shlex.join(command_args)
+        shell_script = (
+            'mkdir -p /workspace/agent_output && '
+            'exec "$@" < /workspace/instruction.md'
+        )
 
-    logger.info("Running agent: %s (timeout=%ds)", agent_command, timeout)
+    logger.info("Running agent: %s (timeout=%ds)", command_display, timeout)
 
     # Write env vars to a temp file so they are not visible in `ps aux`
     env_items = dict(env_extra or {})
     env_items["HOME"] = "/home/agent"
+    env_key = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+    for key, value in env_items.items():
+        if not env_key.fullmatch(key):
+            raise ValueError(f"invalid environment variable name: {key!r}")
+        if "\n" in value or "\r" in value or "\0" in value:
+            raise ValueError(
+                f"environment variable {key} contains an unsafe newline or NUL"
+            )
 
     tmp_env_file = None
     start = time.monotonic()
@@ -1481,8 +1992,9 @@ def _run_agent(
         ] + [
             "bash",
             "-c",
-            "mkdir -p /workspace/agent_output && "
-            f"{agent_command} < /workspace/instruction.md",
+            shell_script,
+            "enterprisebench-agent",
+            *command_args,
         ]
         result = subprocess.run(
             full_cmd,
@@ -1530,10 +2042,7 @@ def _run_agent(
 
     finally:
         if tmp_env_file is not None:
-            try:
-                os.unlink(tmp_env_file)
-            except OSError:
-                pass
+            Path(tmp_env_file).unlink(missing_ok=True)
 
     return exit_code, duration
 
@@ -1551,6 +2060,11 @@ def _route_verifier_infra_error(result: "TaskRunResult", scores: dict) -> None:
         return
     result.failure_class = "verifier_infra_error"
     result.phase = "verifier_infra_error"
+    result.status = RUN_STATUS_INVALID
+    result.success = False
+    # Preserve checkpoint diagnostics for triage, but never publish an
+    # aggregate reward for a run whose scorer or judge did not complete.
+    scores["task_score"] = None
     logger.warning(
         "Verifier infra error (%s): %s",
         infra_err.get("reason", "?"),
@@ -1599,17 +2113,34 @@ def _route_zero_mcp_run(result: "TaskRunResult", mode: str) -> None:
     scored. Gating it would drop exactly the runs where the agent preferred
     local tools and bias the hybrid arm upward.
 
-    The gate is zero-vs-nonzero only, and under the filesystem gate that is all
-    it needs to be: a single MCP call proves the arm's retrieval path was live.
+    The gate counts calls the server actually *served*, not calls the agent
+    attempted. A call that comes back flagged ``is_error`` retrieved nothing:
+    when the retrieval backend is down (an expired token, a depleted credit
+    balance, a 5xx), the agent still emits tool_use blocks and the attempted
+    count is healthily non-zero while the arm's only path to code was dead the
+    whole run. Scoring that banks a backend outage as a measured agent failure
+    -- the exact inversion scorer_guard exists to prevent, and it is worse than
+    a uniform offset because an outage hits one arm and not the others. So a
+    run whose every MCP call errored is INVALID on the same grounds as a run
+    that made none. One served call is still enough to prove the path was live.
     """
-    if mode not in ("mcp_only", "hybrid"):
+    if mode not in MCP_MODES:
         return
 
-    mcp_calls = result.tool_usage.get("mcp_tool_calls", 0)
+    attempted = result.tool_usage.get("mcp_tool_calls", 0)
+    errored = result.tool_usage.get("mcp_tool_errors", 0)
+    mcp_calls = max(0, attempted - errored)
     result.tool_usage["mcp_used"] = mcp_calls > 0
 
     if mcp_calls > 0:
-        logger.info("Agent made %d MCP tool calls", mcp_calls)
+        if errored:
+            logger.warning(
+                "Agent made %d MCP tool calls, %d of which the server refused",
+                attempted,
+                errored,
+            )
+        else:
+            logger.info("Agent made %d MCP tool calls", mcp_calls)
         return
 
     if mode == "hybrid":
@@ -1629,20 +2160,130 @@ def _route_zero_mcp_run(result: "TaskRunResult", mode: str) -> None:
         # infra_mcp_unused would bury the actual cause and send triage chasing
         # a phantom MCP problem, so keep the more specific classification.
         logger.info(
-            "mode=mcp_only with 0 MCP tool calls, but the run already failed "
+            "mode=%s with 0 MCP tool calls, but the run already failed "
             "as %s — keeping that classification",
+            mode,
             result.failure_class,
         )
         return
 
+    if errored and attempted == errored:
+        result.failure_class = "infra_mcp_backend_error"
+        result.error = (
+            f"mode={mode}: all {attempted} MCP tool calls came back as errors, so "
+            "the arm's only path to code was never live. The run measures a "
+            "retrieval-backend outage, not the agent; routed for re-run."
+        )
+        logger.error(result.error)
+        return
+
     reason = (
-        "mode=mcp_only but the agent made 0 MCP tool calls: the run had "
-        "baseline tool access under an MCP label, so it is not a valid MCP "
-        "measurement. Recorded as infra error for re-run."
+        f"mode={mode} but the agent made 0 MCP tool calls: the run had "
+        "no evidence that its required remote retrieval path was used, so it "
+        "is not a valid MCP measurement. Recorded as infra error for re-run."
     )
     logger.error(reason)
     result.failure_class = "infra_mcp_unused"
     result.error = reason
+
+
+def _route_deferred_tool_run(
+    result: "TaskRunResult",
+    mode: str,
+    harness: str,
+    output_dir: Path,
+) -> None:
+    """Invalidate an MCP run whose tool descriptions were withheld from the model.
+
+    The env in `full_tool_schema_env` is what prevents deferral; this proves it
+    held. A harness that defers anyway (a release that renames the variable, a
+    setting that overrides it) produces an arm that cannot answer what it claims
+    to: the agent chose among tool *names* and never saw the server's
+    descriptions. That is a broken measurement, not a low score, so it routes to
+    the re-run channel rather than being recorded.
+    """
+    if mode not in MCP_MODES:
+        return
+    markers = deferred_tool_markers(harness)
+    if not markers:
+        return
+    trace_path = output_dir / "agent_trace.jsonl"
+    if not trace_path.is_file():
+        return
+    observed = sorted(
+        {
+            marker
+            for marker in markers
+            if any(
+                block.get("type") == "tool_use" and block.get("name") == marker
+                for line in trace_path.read_text().splitlines()
+                if line.strip()
+                for block in _trace_content_blocks(line)
+            )
+        }
+    )
+    if not observed:
+        return
+    result.status = RUN_STATUS_INVALID
+    result.phase = "agent_infra_error"
+    result.success = False
+    if result.failure_class is None:
+        result.failure_class = "invalid_deferred_tool_schemas"
+        result.error = (
+            f"invalid mode={mode} run: harness={harness} deferred MCP tool "
+            f"schemas ({', '.join(observed)} was used), so the agent chose "
+            "among tool names without the server's descriptions"
+        )
+
+
+def _trace_content_blocks(line: str) -> list[dict[str, Any]]:
+    """Return the assistant content blocks of one trace line, or nothing."""
+    try:
+        record = json.loads(line)
+    except json.JSONDecodeError:
+        return []
+    message = record.get("message")
+    content = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(content, list):
+        return []
+    return [block for block in content if isinstance(block, dict)]
+
+
+def _route_code_finder_run(result: "TaskRunResult", mode: str) -> None:
+    """Invalidate Finder arms whose captured call/telemetry contract failed."""
+    breakdown = result.tool_usage.get("mcp_tool_breakdown", {})
+    if (
+        mode == "mcp_only"
+        and isinstance(breakdown, dict)
+        and breakdown.get("code_finder", 0) > 0
+    ):
+        result.status = RUN_STATUS_INVALID
+        result.phase = "agent_infra_error"
+        result.success = False
+        if result.failure_class is None:
+            result.failure_class = "invalid_arm_contamination"
+            result.error = (
+                "invalid mode=mcp_only run: code_finder was used in the direct "
+                "MCP comparison arm"
+            )
+        return
+    if mode not in FINDER_MODES:
+        return
+    retrieval = result.tool_usage.get("retrieval")
+    if isinstance(retrieval, dict) and retrieval.get("valid") is True:
+        return
+
+    reason = (
+        retrieval.get("invalid_reason", "Code Finder telemetry was not captured")
+        if isinstance(retrieval, dict)
+        else "Code Finder telemetry was not captured"
+    )
+    result.status = RUN_STATUS_INVALID
+    result.phase = "agent_infra_error"
+    result.success = False
+    if result.failure_class is None:
+        result.failure_class = "infra_code_finder_contract"
+        result.error = f"invalid mode={mode} run: {reason}"
 
 
 def _route_zero_sgx_run(result: "TaskRunResult", mode: str) -> None:
@@ -1830,10 +2471,6 @@ def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
     return guarded
 
 
-# Canonical answer-artifact location appended to every task instruction by
-# _build_instruction_text(); always a candidate for the LLM judge.
-ANSWER_ARTIFACT_PATH = "/workspace/agent_output/answer.json"
-
 # Matches a /workspace/... artifact path a task's instruction.md tells the agent
 # to write to (e.g. /workspace/BLAST_RADIUS.md, /workspace/analysis/IMPACT_REPORT.md).
 _WORKSPACE_ARTIFACT_RE = re.compile(r"/workspace/[A-Za-z0-9_./-]+\.(?:json|md|txt|ya?ml)")
@@ -1842,18 +2479,44 @@ _WORKSPACE_ARTIFACT_RE = re.compile(r"/workspace/[A-Za-z0-9_./-]+\.(?:json|md|tx
 def _derive_artifact_candidates(task_dir: Path) -> list[str]:
     """Candidate in-container paths where the agent's answer artifact may live.
 
-    Derived from task metadata, not baked-in repo names. Always includes the
-    canonical answer.json location (appended to every instruction by
-    _build_instruction_text), then any /workspace/... artifact path the task's
-    instruction.md instructs the agent to write to. Order preserved, deduped.
+    The checkpoint scripts' actual graded path is first, followed by paths from
+    instruction.md for backward-compatible judge recovery, then the default
+    answer.json path. Order is preserved and duplicates are removed.
     """
-    candidates: list[str] = [ANSWER_ARTIFACT_PATH]
+    candidates: list[str] = [_derive_graded_artifact_path(task_dir)]
     instruction = task_dir / "instruction.md"
     if instruction.exists():
         for match in _WORKSPACE_ARTIFACT_RE.findall(instruction.read_text()):
             if match not in candidates:
                 candidates.append(match)
+    if ANSWER_ARTIFACT_PATH not in candidates:
+        candidates.append(ANSWER_ARTIFACT_PATH)
     return candidates
+
+
+def _gt_checkpoint_lookup(task_data: dict, checkpoints_gt: dict) -> dict:
+    """Map each scored checkpoint name to its expected_solution entry.
+
+    Two different identities are in play and they are routinely not the same
+    string. A *scored* checkpoint is named after its verifier script
+    (``checks/check_root_cause.sh`` -> ``root_cause``, see
+    _checkpoint_verifier_name), because that is the name the sealed
+    .verifiers/<name> copy carries. ``expected_solution.json`` is authored
+    against ``[[checkpoints]].name`` in task.toml (``root_cause_identification``).
+    Looking the ground truth up by the scored name alone therefore reports
+    ``incomplete_expected_solution`` -- and voids the whole run as a verifier
+    infra error -- for every task whose author did not happen to name the
+    script after the checkpoint. Resolve through task.toml so both spellings
+    reach the same entry.
+    """
+    lookup = {name: gt for name, gt in checkpoints_gt.items()}
+    for cp in task_data.get("checkpoints", []) or []:
+        toml_name = cp.get("name")
+        verifier = cp.get("verifier")
+        if not toml_name or not verifier or toml_name not in checkpoints_gt:
+            continue
+        lookup.setdefault(_checkpoint_verifier_name(verifier), checkpoints_gt[toml_name])
+    return lookup
 
 
 def _apply_llm_judge(
@@ -1861,6 +2524,9 @@ def _apply_llm_judge(
     task_dir: Path,
     container_id: str,
     task_data: dict,
+    *,
+    judge_model: str = "cc:haiku",
+    judge_account: int | None = None,
 ) -> dict:
     """Apply Tier 2 LLM judge to cap grep-based scores.
 
@@ -1893,8 +2559,62 @@ def _apply_llm_judge(
         ).as_verifier_error()
         return scores
 
-    checkpoints_gt = expected.get("checkpoints", {})
-    if not checkpoints_gt:
+    checkpoints_gt = expected.get("checkpoints") if isinstance(expected, dict) else None
+    scored_checkpoints = scores.get("checkpoints", [])
+    scored_names = {
+        cp.get("name")
+        for cp in scored_checkpoints
+        if isinstance(cp, dict) and isinstance(cp.get("name"), str)
+    }
+    gt_lookup = (
+        _gt_checkpoint_lookup(task_data, checkpoints_gt)
+        if isinstance(checkpoints_gt, dict)
+        else {}
+    )
+    missing_checkpoints = sorted(name for name in scored_names if name not in gt_lookup)
+    invalid_checkpoints: list[str] = []
+    if isinstance(checkpoints_gt, dict):
+        for name, checkpoint in checkpoints_gt.items():
+            expected_solution = (
+                checkpoint.get("expected_solution")
+                if isinstance(checkpoint, dict)
+                else None
+            )
+            criteria = (
+                checkpoint.get("evaluation_criteria", [])
+                if isinstance(checkpoint, dict)
+                else None
+            )
+            if (
+                not isinstance(name, str)
+                or not name
+                or not isinstance(expected_solution, str)
+                or not expected_solution.strip()
+                or not isinstance(criteria, list)
+                or any(not isinstance(item, str) for item in criteria)
+            ):
+                invalid_checkpoints.append(str(name))
+
+    if (
+        not isinstance(checkpoints_gt, dict)
+        or not checkpoints_gt
+        or missing_checkpoints
+        or invalid_checkpoints
+    ):
+        detail = (
+            "expected_solution.json does not contain complete, structurally "
+            "valid ground truth for every scored checkpoint"
+        )
+        logger.warning("%s", detail)
+        scores["verifier_infra_error"] = InfraError(
+            reason="incomplete_expected_solution",
+            stage="llm_judge",
+            detail=detail,
+            context={
+                "missing_checkpoints": missing_checkpoints,
+                "invalid_checkpoints": sorted(invalid_checkpoints),
+            },
+        ).as_verifier_error()
         return scores
 
     # Extract agent output from container — candidate paths derived from task
@@ -1934,7 +2654,8 @@ def _apply_llm_judge(
         sys.path.insert(0, str(REPO_ROOT / "lib"))
         from eb_verify.judge import CheckpointJudgeInput, LLMJudge
 
-        judge = LLMJudge(model="cc:haiku")
+        judge = LLMJudge(model=judge_model, account=judge_account)
+        scores["judge_provenance"] = judge.provenance
     except Exception as exc:
         # Judge could not be constructed (import/config/credential failure):
         # the Tier-2 cap cannot be applied. Flag infra error rather than
@@ -1949,12 +2670,10 @@ def _apply_llm_judge(
 
     task_desc = task_data.get("task", {}).get("description", "")
 
-    checkpoints = scores.get("checkpoints", [])
+    checkpoints = scored_checkpoints
     for cp in checkpoints:
         cp_name = cp.get("name", "")
-        cp_gt = checkpoints_gt.get(cp_name)
-        if cp_gt is None:
-            continue
+        cp_gt = gt_lookup[cp_name]
 
         grep_score = cp.get("score", 0.0)
 
@@ -2036,6 +2755,8 @@ def _save_results(
 
     # Derived once so the two artifacts below cannot disagree.
     status = _effective_status(result)
+    effective_agent_command = result.agent_command or config.agent_command
+    variant_label = _effective_variant_label(config)
 
     # --- results.json (backward compatible) ---
     results_path = output_dir / "results.json"
@@ -2050,9 +2771,14 @@ def _save_results(
         "scores": result.scores,
         "timing": result.timing,
         "tool_usage": result.tool_usage,
+        "mode_gate": result.mode_gate,
         "config": {
             "source": config.source,
-            "agent_command": config.agent_command,
+            "agent_command": effective_agent_command,
+            "harness": config.harness,
+            "model": config.model,
+            "judge_model": config.judge_model,
+            "judge_account": config.judge_account,
             "timeout": config.timeout,
             "dry_run": config.dry_run,
             "mode": config.mode,
@@ -2064,12 +2790,14 @@ def _save_results(
             "languages": task_data.get("metadata", {}).get("languages", []),
         },
     }
-    results_path.write_text(json.dumps(payload, indent=2) + "\n")
-
     # --- config.json — run configuration snapshot ---
     config_payload = {
         "source": config.source,
-        "agent_command": config.agent_command,
+        "agent_command": effective_agent_command,
+        "harness": config.harness,
+        "model": config.model,
+        "judge_model": config.judge_model,
+        "judge_account": config.judge_account,
         "timeout": config.timeout,
         "build_timeout": config.build_timeout,
         "verifier_timeout": config.verifier_timeout,
@@ -2079,6 +2807,10 @@ def _save_results(
         "keep_container": config.keep_container,
         "mode": config.mode,
     }
+    if variant_label is not None:
+        payload["config"]["variant_label"] = variant_label
+        config_payload["variant_label"] = variant_label
+    results_path.write_text(json.dumps(payload, indent=2) + "\n")
     (output_dir / "config.json").write_text(json.dumps(config_payload, indent=2) + "\n")
 
     # --- task_metrics.json — timing, tool_usage, status ---
@@ -2091,6 +2823,7 @@ def _save_results(
         "failure_class": result.failure_class,
         "timing": result.timing,
         "tool_usage": result.tool_usage,
+        "mode_gate": result.mode_gate,
     }
     (output_dir / "task_metrics.json").write_text(
         json.dumps(metrics_payload, indent=2) + "\n"
@@ -2112,9 +2845,18 @@ def _save_results(
 
 
 def _mcp_exec(
-    container_id: str, cmd: list[str], timeout: int = 30
+    container_id: str,
+    cmd: list[str],
+    timeout: int = 30,
+    env_names: Sequence[str] = (),
 ) -> subprocess.CompletedProcess:
-    """Run a command as agent with MCP-required env vars."""
+    """Run an MCP command while forwarding secrets by name, never argv value."""
+    env_args: list[str] = []
+    env_key = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+    for name in env_names:
+        if not env_key.fullmatch(name):
+            raise ValueError(f"invalid environment variable name: {name!r}")
+        env_args.extend(("-e", name))
     return subprocess.run(
         [
             "docker",
@@ -2125,6 +2867,7 @@ def _mcp_exec(
             "HOME=/home/agent",
             "-e",
             "NODE_TLS_REJECT_UNAUTHORIZED=0",
+            *env_args,
             "-w",
             "/workspace",
             container_id,
@@ -2134,6 +2877,35 @@ def _mcp_exec(
         text=True,
         timeout=timeout,
     )
+
+
+def _verify_toast_endpoint(container_id: str) -> bool:
+    """Confirm the container can reach the host-side Toast-1 MCP server.
+
+    Same hard-gate posture as _verify_mcp_endpoint: an unreachable Toast
+    server must fail the pre-flight rather than let a degraded no-tool run
+    masquerade as a Toast measurement. No auth header to stage, so this is
+    just a health probe over the docker bridge.
+    """
+    health_url = TOAST_MCP_ENDPOINT.rsplit("/", 1)[0] + "/healthz"
+    for attempt in range(1, 6):
+        result = _docker_exec(
+            container_id,
+            ["curl", "-sf", "-m", "5", "-o", "/dev/null", "-w", "%{http_code}", health_url],
+        )
+        if result.stdout.strip() == "200":
+            logger.info("Toast MCP endpoint reachable (attempt %d): %s", attempt, health_url)
+            return True
+        logger.warning(
+            "Toast MCP health check attempt %d/5 returned %r", attempt, result.stdout.strip()
+        )
+        time.sleep(2)
+    logger.error(
+        "Toast MCP server unreachable at %s. Start it on the host with "
+        "experiments/toast_retrieval/toast_mcp_server.py before running this arm.",
+        health_url,
+    )
+    return False
 
 
 def _verify_mcp_endpoint(container_id: str, sg_token: str) -> bool:
@@ -2169,7 +2941,22 @@ def _verify_mcp_endpoint(container_id: str, sg_token: str) -> bool:
                 exc,
             )
             return False
-        _docker_exec(container_id, ["chmod", "600", header_path])
+        # docker cp preserves the host tempfile's 0600 mode and maps it to the
+        # host uid (1000). Whether the exec user can then read it is an accident
+        # of the base image: `agent` is uid 1000 on the python images and 1001 on
+        # the node ones, where the copy lands owned by `node` and curl silently
+        # sends no Authorization header -- a 401 that reads as an expired token
+        # rather than an unreadable file. Hand it to the exec user explicitly,
+        # as root, and keep it 0600.
+        owner = _docker_exec(container_id, ["id", "-u"]).stdout.strip()
+        group = _docker_exec(container_id, ["id", "-g"]).stdout.strip()
+        if owner and group:
+            _docker_exec(
+                container_id,
+                ["chown", f"{owner}:{group}", header_path],
+                user="root",
+            )
+        _docker_exec(container_id, ["chmod", "600", header_path], user="root")
 
         max_retries = 5
         for attempt in range(1, max_retries + 1):
@@ -2309,7 +3096,33 @@ def _trust_project_mcp_servers(container_id: str, server_name: str) -> bool:
             )
             return False
         _docker_cp(tmp, f"{container_id}:{settings_path}")
-        _docker_exec(container_id, ["chown", "agent:agent", settings_path])
+        # As root, and checked. `docker cp` stamps the file with the host temp
+        # file's uid, and the image's default exec user is `agent`, so an
+        # unqualified chown here is a no-op the agent has no permission to
+        # perform. A trust file the agent cannot read leaves the server
+        # "Pending approval" -- the very handshake timeout this function's
+        # docstring promises to prevent.
+        owned = _docker_exec(
+            container_id, ["chown", "agent:agent", settings_path], user="root"
+        )
+        if owned.returncode != 0:
+            logger.error(
+                "Failed to chown %s to agent (rc=%d: %s); cannot trust MCP server",
+                settings_path,
+                owned.returncode,
+                (owned.stderr or "").strip()[:120],
+            )
+            return False
+        readable = _docker_exec(
+            container_id, ["test", "-r", settings_path], user="agent"
+        )
+        if readable.returncode != 0:
+            logger.error(
+                "%s is not readable by the agent; the MCP server would stay "
+                "'Pending approval'",
+                settings_path,
+            )
+            return False
         logger.info(
             "Trusted MCP server %r via enabledMcpjsonServers in %s",
             server_name,
@@ -2323,7 +3136,234 @@ def _trust_project_mcp_servers(container_id: str, server_name: str) -> bool:
         os.unlink(tmp)
 
 
-def _configure_mcp(container_id: str, mode: str) -> bool:
+def _mcp_server_for_mode(mode: str, sg_token: str) -> tuple[str, str, dict]:
+    """The one MCP server this arm registers: (name, url, headers).
+
+    Each MCP arm sees exactly one server, so the arm is defined by which
+    retrieval backend is in the tool list rather than by a prompt asking the
+    agent to prefer one. ``mcp_toast`` swaps Sourcegraph's server for the
+    host-side Toast-1 one; every other MCP arm keeps Sourcegraph and differs
+    only in endpoint (capture proxy or not) and preamble.
+    """
+    if mode in TOAST_MODES:
+        return TOAST_MCP_SERVER_NAME, TOAST_MCP_ENDPOINT, {}
+    headers = {"Authorization": f"token {sg_token}"} if sg_token else {}
+    return "sourcegraph", _mcp_endpoint_for_mode(mode), headers
+
+
+def _mcp_endpoint_for_mode(mode: str) -> str:
+    """Return the client endpoint, adding the local proxy for the arms that need it."""
+    return MCP_PROXY_ENDPOINT if mode in PROXY_MODES else SOURCEGRAPH_MCP_ENDPOINT
+
+
+def _start_mcp_telemetry_proxy(container_id: str, mode: str = "") -> bool:
+    """Stage and health-check the root-owned, local-only telemetry proxy."""
+    install_dir = str(PurePosixPath(MCP_PROXY_SCRIPT_PATH).parent)
+    # root, not the container's default user. The proxy is root-owned and
+    # agent-inaccessible by design, and /usr/local/lib is root-owned on some
+    # base images (node) but agent-owned on others (python) -- so an unprivileged
+    # mkdir made the Finder arms runnable or not according to which language a
+    # task's repos happened to need.
+    prepared = _docker_exec(container_id, ["mkdir", "-p", install_dir], user="root")
+    if prepared.returncode != 0:
+        logger.error(
+            "Could not create MCP proxy install directory %s: %s",
+            install_dir,
+            (prepared.stderr or "").strip()[:200],
+        )
+        return False
+    treatment = mode in TREATMENT_MODES
+    staged = [(MCP_PROXY_SRC, MCP_PROXY_SCRIPT_PATH)]
+    if treatment:
+        staged.append((MCP_TREATMENT_SRC, MCP_TREATMENT_SCRIPT_PATH))
+    for source, destination in staged:
+        try:
+            _docker_cp(source.as_posix(), f"{container_id}:{destination}")
+        except RuntimeError as exc:
+            logger.error("Could not stage %s: %s", destination, exc)
+            return False
+    for argv in (
+        ["chmod", "755", *[destination for _source, destination in staged]],
+        ["install", "-m", "600", "/dev/null", MCP_PROXY_TRACE_PATH],
+    ):
+        if _docker_exec(container_id, argv, user="root").returncode != 0:
+            logger.error("Could not prepare MCP telemetry proxy: %s", shlex.join(argv))
+            return False
+
+    started = _docker_exec_detached(
+        container_id,
+        ["python3", MCP_PROXY_SCRIPT_PATH],
+        env={
+            "MCP_PROXY_UPSTREAM_URL": SOURCEGRAPH_MCP_ENDPOINT,
+            "MCP_PROXY_TRACE_PATH": MCP_PROXY_TRACE_PATH,
+            "MCP_PROXY_TREATMENT": "1" if treatment else "0",
+        },
+    )
+    if started.returncode != 0:
+        logger.error("Could not start MCP telemetry proxy: %s", started.stderr.strip())
+        return False
+
+    for _attempt in range(10):
+        health = _docker_exec(
+            container_id,
+            ["curl", "-sf", "--max-time", "1", MCP_PROXY_HEALTH_ENDPOINT],
+            timeout=3,
+        )
+        if health.returncode == 0:
+            return True
+        time.sleep(0.2)
+    logger.error("MCP telemetry proxy did not become healthy")
+    return False
+
+
+def _configure_mcp(container_id: str, mode: str, *, harness: str = "claude") -> bool:
+    """Configure the selected harness's Sourcegraph MCP client."""
+    if mode not in MCP_MODES:
+        return True
+    if mode in PROXY_MODES and not _start_mcp_telemetry_proxy(container_id, mode):
+        return False
+    if harness == "codex":
+        return _configure_codex_mcp(container_id, mode)
+    if harness == "opencode":
+        return _configure_opencode_mcp(container_id, mode)
+    if harness == "claude":
+        return _configure_claude_mcp(container_id, mode)
+    raise ValueError(f"unsupported MCP harness: {harness!r}")
+
+
+def _codex_mcp_config(endpoint: str = SOURCEGRAPH_MCP_ENDPOINT) -> str:
+    """Build a secret-free Codex MCP configuration for Sourcegraph."""
+    encoded_endpoint = json.dumps(endpoint)
+    return (
+        "[mcp_servers.sourcegraph]\n"
+        f"url = {encoded_endpoint}\n"
+        'bearer_token_env_var = "SOURCEGRAPH_ACCESS_TOKEN"\n'
+        "required = true\n"
+        "startup_timeout_sec = 30\n"
+        "tool_timeout_sec = 120\n"
+        'default_tools_approval_mode = "approve"\n'
+    )
+
+
+def _configure_codex_mcp(container_id: str, mode: str) -> bool:
+    """Write isolated Codex config and verify the CLI resolves Sourcegraph."""
+    sg_token = os.environ.get("SOURCEGRAPH_ACCESS_TOKEN", "")
+    if not sg_token:
+        logger.error("SOURCEGRAPH_ACCESS_TOKEN is required for Codex MCP")
+        return False
+    if not _verify_mcp_endpoint(container_id, sg_token):
+        return False
+
+    config_path = "/home/agent/.codex/config.toml"
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as fh:
+        fh.write(_codex_mcp_config(_mcp_endpoint_for_mode(mode)))
+        temporary_config = fh.name
+    try:
+        created = _docker_exec(container_id, ["mkdir", "-p", "/home/agent/.codex"])
+        if created.returncode != 0:
+            return False
+        _docker_cp(temporary_config, f"{container_id}:{config_path}")
+        for argv in (
+            ["chown", "agent:agent", config_path],
+            ["chmod", "600", config_path],
+        ):
+            if _docker_exec(container_id, argv).returncode != 0:
+                return False
+    except RuntimeError as exc:
+        logger.error("Failed to write Codex MCP config: %s", exc)
+        return False
+    finally:
+        Path(temporary_config).unlink(missing_ok=True)
+
+    listed = _mcp_exec(
+        container_id,
+        ["codex", "mcp", "list"],
+        env_names=("SOURCEGRAPH_ACCESS_TOKEN",),
+    )
+    configured = listed.returncode == 0 and "sourcegraph" in listed.stdout.lower()
+    if not configured:
+        logger.error(
+            "Codex MCP pre-flight failed (mode=%s, rc=%d): %s",
+            mode,
+            listed.returncode,
+            (listed.stderr or listed.stdout).strip()[:200],
+        )
+    return configured
+
+
+def _opencode_mcp_config(endpoint: str = SOURCEGRAPH_MCP_ENDPOINT) -> str:
+    """Build a secret-free OpenCode MCP configuration for Sourcegraph."""
+    return (
+        json.dumps(
+            {
+                "$schema": "https://opencode.ai/config.json",
+                "mcp": {
+                    "sourcegraph": {
+                        "type": "remote",
+                        "url": endpoint,
+                        "enabled": True,
+                        "oauth": False,
+                        "headers": {
+                            "Authorization": (
+                                "token {env:SOURCEGRAPH_ACCESS_TOKEN}"
+                            ),
+                        },
+                    },
+                },
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
+
+def _configure_opencode_mcp(container_id: str, mode: str) -> bool:
+    """Write isolated OpenCode config and verify it resolves Sourcegraph."""
+    sg_token = os.environ.get("SOURCEGRAPH_ACCESS_TOKEN", "")
+    if not sg_token:
+        logger.error("SOURCEGRAPH_ACCESS_TOKEN is required for OpenCode MCP")
+        return False
+    if not _verify_mcp_endpoint(container_id, sg_token):
+        return False
+
+    config_dir = "/home/agent/.config/opencode"
+    config_path = f"{config_dir}/opencode.jsonc"
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonc", delete=False) as fh:
+        fh.write(_opencode_mcp_config(_mcp_endpoint_for_mode(mode)))
+        temporary_config = fh.name
+    try:
+        if _docker_exec(container_id, ["mkdir", "-p", config_dir]).returncode != 0:
+            return False
+        _docker_cp(temporary_config, f"{container_id}:{config_path}")
+        for argv in (
+            ["chown", "agent:agent", config_path],
+            ["chmod", "600", config_path],
+        ):
+            if _docker_exec(container_id, argv).returncode != 0:
+                return False
+    except RuntimeError as exc:
+        logger.error("Failed to write OpenCode MCP config: %s", exc)
+        return False
+    finally:
+        Path(temporary_config).unlink(missing_ok=True)
+
+    listed = _mcp_exec(
+        container_id,
+        ["opencode", "mcp", "list"],
+        env_names=("SOURCEGRAPH_ACCESS_TOKEN",),
+    )
+    configured = listed.returncode == 0 and "sourcegraph" in listed.stdout.lower()
+    if not configured:
+        logger.error(
+            "OpenCode MCP pre-flight failed (mode=%s, rc=%d): %s",
+            mode,
+            listed.returncode,
+            (listed.stderr or listed.stdout).strip()[:200],
+        )
+    return configured
+
+
+def _configure_claude_mcp(container_id: str, mode: str) -> bool:
     """Configure Sourcegraph MCP endpoint with pre-flight verification.
 
     Strategy for 100% reliability:
@@ -2340,14 +3380,15 @@ def _configure_mcp(container_id: str, mode: str) -> bool:
     False when the pre-flight failed — the caller must treat that as a hard
     gate and route the run to the infra-error re-run channel, never score it.
     """
-    if mode not in ("mcp_only", "hybrid"):
+    if mode not in MCP_MODES:
         return True
 
     sg_token = os.environ.get("SOURCEGRAPH_ACCESS_TOKEN", "")
-    if not sg_token:
+    if not sg_token and mode not in TOAST_MODES:
         logger.warning("SOURCEGRAPH_ACCESS_TOKEN not set; MCP will not authenticate")
 
-    logger.info("Configuring Sourcegraph MCP endpoint (mode=%s)", mode)
+    server_name, server_url, server_headers = _mcp_server_for_mode(mode, sg_token)
+    logger.info("Configuring %s MCP endpoint (mode=%s)", server_name, mode)
 
     # Step 1: Verify endpoint is reachable and auth works via HTTP.
     # A failure here (unreachable host, or a rejected/expired token returning
@@ -2356,24 +3397,27 @@ def _configure_mcp(container_id: str, mode: str) -> bool:
     # agent whose result would masquerade as a real MCP measurement
     # (bead EnterpriseBench-c7wb). The caller routes a False return to the
     # infra-error re-run channel.
-    if sg_token:
-        if not _verify_mcp_endpoint(container_id, sg_token):
-            logger.error(
-                "MCP endpoint unreachable or auth rejected (mode=%s) — "
-                "failing MCP pre-flight; run will be routed to the infra-error "
-                "re-run channel, never scored as a degraded run",
-                mode,
-            )
-            return False
+    if mode in TOAST_MODES:
+        reachable = _verify_toast_endpoint(container_id)
+    else:
+        reachable = _verify_mcp_endpoint(container_id, sg_token) if sg_token else True
+    if not reachable:
+        logger.error(
+            "MCP endpoint unreachable or auth rejected (mode=%s) — "
+            "failing MCP pre-flight; run will be routed to the infra-error "
+            "re-run channel, never scored as a degraded run",
+            mode,
+        )
+        return False
 
     # Step 2: Write MCP config files (using docker cp to avoid shell escaping)
     mcp_config_json = json.dumps(
         {
             "mcpServers": {
-                "sourcegraph": {
+                server_name: {
                     "type": "http",
-                    "url": SOURCEGRAPH_MCP_ENDPOINT,
-                    "headers": {"Authorization": f"token {sg_token}"},
+                    "url": server_url,
+                    "headers": server_headers,
                 }
             }
         }
@@ -2390,48 +3434,89 @@ def _configure_mcp(container_id: str, mode: str) -> bool:
         fh.write(mcp_config_json)
         tmp_user = fh.name
 
+    # Every chown below runs as root explicitly. The image's default exec user
+    # is `agent`, so an unqualified chown here is a no-op that reports success
+    # in the only way anyone was checking: not at all. `docker cp` gives the
+    # copied file the *host* temp file's uid (1000) and its 0600 mode, so
+    # whether `agent` can read its own MCP config came down to whether uid 1000
+    # happened to be `agent` in that task's base image. It is in the Python
+    # images and it is `node` in the Node ones -- which is why the JS-repo tasks
+    # failed MCP pre-flight while everything else passed. Claude Code reports
+    # the unreadable file as "[Failed to parse] Project config", pointing
+    # diagnosis at the config's contents rather than its mode bits.
+    config_paths = (
+        "/workspace/.mcp.json",
+        "/home/agent/.claude/.mcp.json",
+        "/home/agent/.mcp.json",
+    )
     try:
-        # Project-level config: /workspace/.mcp.json
         _docker_cp(tmp_project, f"{container_id}:/workspace/.mcp.json")
-        _docker_exec(
-            container_id,
-            ["chown", "agent:agent", "/workspace/.mcp.json"],
-        )
 
-        # User-level config: /home/agent/.claude/.mcp.json
-        _docker_exec(
+        prepared = _docker_exec(
             container_id,
             [
                 "bash",
                 "-c",
                 "mkdir -p /home/agent/.claude && chown agent:agent /home/agent/.claude",
             ],
+            user="root",
         )
-        _docker_cp(tmp_user, f"{container_id}:/home/agent/.claude/.mcp.json")
-        _docker_exec(
-            container_id,
-            ["chown", "agent:agent", "/home/agent/.claude/.mcp.json"],
-        )
+        if prepared.returncode != 0:
+            logger.error(
+                "Could not prepare /home/agent/.claude: %s",
+                (prepared.stderr or prepared.stdout).strip()[:200],
+            )
+            return False
 
-        # Also write to /home/agent/.mcp.json for --mcp-config flag
+        _docker_cp(tmp_user, f"{container_id}:/home/agent/.claude/.mcp.json")
         _docker_cp(tmp_project, f"{container_id}:/home/agent/.mcp.json")
-        _docker_exec(
-            container_id,
-            ["chown", "agent:agent", "/home/agent/.mcp.json"],
-        )
+
+        for config_path in config_paths:
+            for argv in (
+                ["chown", "agent:agent", config_path],
+                # 0600 owned by agent is readable by the agent and by nobody
+                # else; the file carries a bearer token, so it stays 0600.
+                ["chmod", "600", config_path],
+            ):
+                applied = _docker_exec(container_id, argv, user="root")
+                if applied.returncode != 0:
+                    logger.error(
+                        "Failed to %s %s: %s",
+                        argv[0],
+                        config_path,
+                        (applied.stderr or applied.stdout).strip()[:200],
+                    )
+                    return False
+
         logger.info(
-            "MCP config written to /workspace/.mcp.json, "
-            "/home/agent/.claude/.mcp.json, and /home/agent/.mcp.json"
+            "MCP config written to %s (owned by agent, mode 600)",
+            ", ".join(config_paths),
         )
     finally:
         os.unlink(tmp_project)
         os.unlink(tmp_user)
 
+    # The pre-flight below fails with an unhelpful parse error when the config
+    # is merely unreadable, so prove readability as the agent here, where the
+    # message can name the real cause.
+    for config_path in config_paths:
+        readable = _docker_exec(
+            container_id, ["test", "-r", config_path], user="agent"
+        )
+        if readable.returncode != 0:
+            logger.error(
+                "MCP config %s is not readable by the agent -- failing "
+                "pre-flight rather than letting it surface as a config parse "
+                "error",
+                config_path,
+            )
+            return False
+
     # Step 2b: trust the project MCP server we just wrote, or Claude Code >=2.1
     # leaves it "Pending approval" and the handshake below never reaches
     # "Connected" (EnterpriseBench-rryas.4). The server key must match the one
     # written into .mcp.json above.
-    if not _trust_project_mcp_servers(container_id, "sourcegraph"):
+    if not _trust_project_mcp_servers(container_id, server_name):
         logger.error(
             "Could not write MCP trust settings (mode=%s) — failing MCP pre-flight; "
             "run will be routed to the infra-error re-run channel",
@@ -2445,11 +3530,12 @@ def _configure_mcp(container_id: str, mode: str) -> bool:
     for attempt in range(1, max_retries + 1):
         check = _mcp_exec(container_id, ["claude", "mcp", "list"])
         stdout = check.stdout.strip()
-        if "sourcegraph" in stdout.lower():
+        if server_name in stdout.lower():
             if "Connected" in stdout:
                 logger.info(
-                    "MCP pre-flight OK (attempt %d): sourcegraph connected",
+                    "MCP pre-flight OK (attempt %d): %s connected",
                     attempt,
+                    server_name,
                 )
                 handshake_ok = True
                 break
@@ -2752,17 +3838,75 @@ def _count_mcp_tool_calls(record: dict) -> int:
     the agent narrating it, a tool_result echoing it back — and this count gates
     mcp_only invalidation (:func:`_route_zero_mcp_run`).
     """
+    return len(_mcp_tool_names(record))
+
+
+def _mcp_tool_names(record: dict) -> list[str]:
+    """Return Sourcegraph tool names from genuine provider tool-call records."""
+    item = record.get("item")
+    if (
+        record.get("type") == "item.completed"
+        and isinstance(item, dict)
+        and item.get("type") == "mcp_tool_call"
+        and item.get("server") in ("sourcegraph", TOAST_MCP_SERVER_NAME)
+    ):
+        return [str(item.get("tool") or "unknown")]
+
+    part = record.get("part")
+    if (
+        record.get("type") == "tool_use"
+        and isinstance(part, dict)
+        and part.get("type") == "tool"
+        and str(part.get("tool", "")).startswith("sourcegraph_")
+    ):
+        return [str(part["tool"]).removeprefix("sourcegraph_")]
+
     message = record.get("message")
     blocks = message.get("content") if isinstance(message, dict) else None
     if not isinstance(blocks, list):
-        return 0
-    return sum(
-        1
+        return []
+    names = []
+    for block in blocks:
+        if not isinstance(block, dict) or block.get("type") != "tool_use":
+            continue
+        bare = _strip_mcp_prefix(str(block.get("name", "")))
+        if bare is not None:
+            names.append(bare)
+    return names
+
+
+def _mcp_tool_use_ids(record: dict) -> list[str]:
+    """tool_use ids of the MCP calls in one record, for joining to their results."""
+    message = record.get("message")
+    blocks = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(blocks, list):
+        return []
+    ids = []
+    for block in blocks:
+        if not isinstance(block, dict) or block.get("type") != "tool_use":
+            continue
+        if _strip_mcp_prefix(str(block.get("name", ""))) is None:
+            continue
+        block_id = block.get("id")
+        if block_id:
+            ids.append(str(block_id))
+    return ids
+
+
+def _errored_tool_result_ids(record: dict) -> list[str]:
+    """tool_use ids whose result came back flagged ``is_error``."""
+    message = record.get("message")
+    blocks = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(blocks, list):
+        return []
+    return [
+        str(block["tool_use_id"])
         for block in blocks
         if isinstance(block, dict)
-        and block.get("type") == "tool_use"
-        and str(block.get("name", "")).startswith(_MCP_TOOL_PREFIX)
-    )
+        and block.get("type") == "tool_result"
+        and block.get("is_error") is True
+        and block.get("tool_use_id")
+    ]
 
 
 def _count_sgx_tool_calls(record: dict) -> int:
@@ -2776,6 +3920,38 @@ def _count_sgx_tool_calls(record: dict) -> int:
     this stream (tagged ``parent_tool_use_id``) are counted like any other
     record — a compliant Task-subagent run must not read as 0 sgx.
     """
+    item = record.get("item")
+    if (
+        record.get("type") == "item.completed"
+        and isinstance(item, dict)
+        and item.get("type") == "command_execution"
+    ):
+        command = str(item.get("command", ""))
+        try:
+            argv = shlex.split(command)
+        except ValueError:
+            argv = []
+        if (
+            len(argv) >= 3
+            and argv[0].rsplit("/", 1)[-1] in {"bash", "sh"}
+            and argv[1].startswith("-")
+            and "c" in argv[1][1:]
+        ):
+            command = argv[2]
+        return len(_SGX_COMMAND_RE.findall(command))
+
+    part = record.get("part")
+    if (
+        record.get("type") == "tool_use"
+        and isinstance(part, dict)
+        and part.get("type") == "tool"
+        and part.get("tool") == "bash"
+    ):
+        state = part.get("state")
+        tool_input = state.get("input") if isinstance(state, dict) else None
+        command = tool_input.get("command") if isinstance(tool_input, dict) else ""
+        return len(_SGX_COMMAND_RE.findall(str(command)))
+
     message = record.get("message")
     blocks = message.get("content") if isinstance(message, dict) else None
     if not isinstance(blocks, list):
@@ -2789,47 +3965,383 @@ def _count_sgx_tool_calls(record: dict) -> int:
     )
 
 
-def _extract_tool_usage(output_dir: Path) -> dict:
-    """Parse the agent's stdout log for tool-usage metadata.
+def _extract_tool_usage(
+    output_dir: Path,
+    *,
+    graded_artifact_path: str = ANSWER_ARTIFACT_PATH,
+    graded_artifact_exists: bool | None = None,
+) -> dict:
+    """Parse provider output into usage plus explicitly native activity units."""
+    usage = _empty_tool_usage()
+    activity_counts = _empty_provider_activity_counts()
+    providers: set[str] = set()
 
-    Claude Code JSON output includes modelUsage data with token counts,
-    cost, and turn information. modelUsage may be flat (single model)
-    or keyed by model name (multi-model). Returns a dict for results.json.
+    stdout_log = output_dir / "agent_stdout.log"
+    if stdout_log.exists():
+        records = tuple(_iter_agent_records(stdout_log.read_text()))
+        mcp_call_ids: set[str] = set()
+        errored_ids: set[str] = set()
+        for record in records:
+            mcp_call_ids.update(_mcp_tool_use_ids(record))
+            errored_ids.update(_errored_tool_result_ids(record))
+            mcp_tools = _mcp_tool_names(record)
+            usage["mcp_tool_calls"] += len(mcp_tools)
+            usage["mcp_tool_breakdown"] = {
+                **usage["mcp_tool_breakdown"],
+                **{
+                    tool: usage["mcp_tool_breakdown"].get(tool, 0)
+                    + mcp_tools.count(tool)
+                    for tool in set(mcp_tools)
+                },
+            }
+            usage["sgx_tool_calls"] += _count_sgx_tool_calls(record)
+            _consume_codex_usage(record, usage, activity_counts, providers)
+            _consume_opencode_usage(record, usage, activity_counts, providers)
+            _consume_claude_usage(record, usage, activity_counts, providers)
+        lifecycle = _extract_opencode_lifecycle(
+            records,
+            graded_artifact_path=graded_artifact_path,
+            graded_artifact_exists=graded_artifact_exists,
+        )
+        if lifecycle is not None:
+            usage["opencode_lifecycle"] = lifecycle
+        usage["mcp_tool_errors"] = len(mcp_call_ids & errored_ids)
+
+    usage["provider_activity"] = _provider_activity(activity_counts, providers)
+    return usage
+
+
+def _extract_opencode_lifecycle(
+    records: Sequence[dict[str, Any]],
+    *,
+    graded_artifact_path: str = ANSWER_ARTIFACT_PATH,
+    graded_artifact_exists: bool | None = None,
+) -> dict[str, Any] | None:
+    """Summarize OpenCode progress and terminal state without response content."""
+    opencode_records = tuple(
+        record
+        for record in records
+        if isinstance(record.get("part"), dict)
+        and (
+            record.get("type") in {"step_start", "step_finish", "tool_use", "text"}
+        )
+    )
+    if not opencode_records:
+        return None
+
+    timestamps = tuple(
+        timestamp
+        for record in opencode_records
+        if isinstance((timestamp := record.get("timestamp")), int)
+        and not isinstance(timestamp, bool)
+    )
+    first_timestamp = min(timestamps) if timestamps else None
+    last_timestamp = max(timestamps) if timestamps else None
+
+    writes = tuple(
+        str(tool_input["filePath"])
+        for record in opencode_records
+        if record.get("type") == "tool_use"
+        and isinstance((part := record.get("part")), dict)
+        and part.get("tool") == "write"
+        and isinstance((state := part.get("state")), dict)
+        and state.get("status") == "completed"
+        and isinstance((tool_input := state.get("input")), dict)
+        and isinstance(tool_input.get("filePath"), str)
+    )
+    timestamped_writes = tuple(
+        (str(tool_input["filePath"]), record["timestamp"])
+        for record in opencode_records
+        if record.get("type") == "tool_use"
+        and isinstance((part := record.get("part")), dict)
+        and part.get("tool") == "write"
+        and isinstance((state := part.get("state")), dict)
+        and state.get("status") == "completed"
+        and isinstance((tool_input := state.get("input")), dict)
+        and isinstance(tool_input.get("filePath"), str)
+        and isinstance(record.get("timestamp"), int)
+        and not isinstance(record["timestamp"], bool)
+    )
+    write_timestamps = {
+        path: min(
+            timestamp
+            for candidate, timestamp in timestamped_writes
+            if candidate == path
+        )
+        for path in {candidate for candidate, _timestamp in timestamped_writes}
+    }
+    step_starts = sum(record.get("type") == "step_start" for record in opencode_records)
+    step_finishes = sum(
+        record.get("type") == "step_finish" for record in opencode_records
+    )
+
+    graded_write_traced = graded_artifact_path in writes
+    graded_written = graded_write_traced or graded_artifact_exists is True
+    lifecycle = {
+        "first_event_at_ms": first_timestamp,
+        "last_event_at_ms": last_timestamp,
+        "observed_duration_ms": (
+            last_timestamp - first_timestamp
+            if first_timestamp is not None and last_timestamp is not None
+            else None
+        ),
+        "step_starts": step_starts,
+        "step_finishes": step_finishes,
+        "last_event_type": opencode_records[-1].get("type"),
+        "unfinished_step": step_starts > step_finishes,
+        "graded_artifact_path": graded_artifact_path,
+        "graded_artifact_written": graded_written,
+        "graded_artifact_write_at_ms": write_timestamps.get(graded_artifact_path),
+        "canonical_answer_written": (
+            ANSWER_ARTIFACT_PATH in writes
+            or (
+                graded_artifact_path == ANSWER_ARTIFACT_PATH
+                and graded_artifact_exists is True
+            )
+        ),
+        "canonical_answer_write_at_ms": write_timestamps.get(ANSWER_ARTIFACT_PATH),
+        "artifact_writes": list(dict.fromkeys(writes)),
+    }
+    if graded_written and not graded_write_traced:
+        lifecycle["graded_artifact_write_source"] = "filesystem_probe"
+    return lifecycle
+
+
+def _capture_mcp_telemetry(
+    result: TaskRunResult,
+    container_id: str,
+    output_dir: Path,
+    *,
+    mode: str,
+    expected_repo_count: int,
+    expected_repositories: Sequence[str] = (),
+) -> None:
+    """Copy the root-owned MCP trace and attach retrieval aggregate telemetry."""
+    if mode not in PROXY_MODES:
+        return
+    destination = output_dir / "mcp_trace.jsonl"
+    try:
+        _docker_cp(
+            f"{container_id}:{MCP_PROXY_TRACE_PATH}",
+            str(destination),
+        )
+        retrieval = build_retrieval_telemetry(
+            destination,
+            mode=mode,
+            expected_repo_count=expected_repo_count,
+            outer_usage=result.tool_usage,
+            expected_repositories=expected_repositories,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        retrieval = {
+            "trace_captured": False,
+            "valid": False,
+            "invalid_reason": f"MCP telemetry capture failed: {exc}",
+            "code_finder_calls": 0,
+            "direct_retrieval_calls": 0,
+            "raw_meta": [],
+        }
+    result.tool_usage["retrieval"] = {
+        **retrieval,
+        "endpoint": SOURCEGRAPH_MCP_ENDPOINT,
+        "expected_repo_count": expected_repo_count,
+        "trace_file": destination.name,
+        # Which unshipped server change the agent was served, so a treated run
+        # can be tied back to the branch that produced its tool descriptions.
+        **(
+            {"server_treatment": sourcegraph_server_treatment.provenance()}
+            if mode in TREATMENT_MODES
+            else {}
+        ),
+    }
+    result.tool_usage["code_finder_cost"] = code_finder_cost(
+        result.tool_usage["cost_usd"], retrieval.get("code_finder_calls", 0)
+    )
+
+
+def _expected_sourcegraph_repositories(
+    repos: Sequence[dict[str, Any]],
+) -> list[str]:
+    """Return the exact Sourcegraph mirror names represented by task repos."""
+    return [
+        f"github.com/{derive_mirror_name(repo['url'], repo.get('rev', ''))}"
+        for repo in repos
+    ]
+
+
+def code_finder_cost(client_cost_usd: float, calls: int) -> dict[str, Any]:
+    """Price a run's Code Finder calls alongside its client-side token cost.
+
+    `client_cost_usd` counts only what the agent's own model spent. Code Finder
+    executes on Sourcegraph's side, so a run is charged twice over: once in the
+    tokens Sourcegraph burns answering the call, and once in the credits the
+    customer is billed. Both totals are reported next to the client cost rather
+    than folded into it, so `cost_usd` keeps meaning exactly one thing.
     """
-    usage: dict = {
+    if calls < 0:
+        raise ValueError(f"code_finder call count must be non-negative, got {calls}")
+    token_cost = calls * CODE_FINDER_TOKEN_COST_USD
+    credit_cost = calls * CODE_FINDER_CREDIT_COST_USD
+    return {
+        "calls": calls,
+        "token_rate_usd": CODE_FINDER_TOKEN_COST_USD,
+        "credit_rate_usd": CODE_FINDER_CREDIT_COST_USD,
+        "finder_token_cost_usd": token_cost,
+        "finder_credit_cost_usd": credit_cost,
+        "cost_usd_with_finder_tokens": client_cost_usd + token_cost,
+        "cost_usd_customer_credits": client_cost_usd + credit_cost,
+    }
+
+
+def _empty_tool_usage() -> dict[str, Any]:
+    return {
         "total_input_tokens": 0,
         "total_output_tokens": 0,
         "cost_usd": 0.0,
         "num_turns": 0,
         "mcp_tool_calls": 0,
+        "mcp_tool_errors": 0,
+        "mcp_tool_breakdown": {},
         "sgx_tool_calls": 0,
     }
 
-    stdout_log = output_dir / "agent_stdout.log"
-    if not stdout_log.exists():
-        return usage
 
-    content = stdout_log.read_text()
-    if not content.strip():
-        return usage
+def _empty_provider_activity_counts() -> dict[str, int]:
+    return {
+        "codex_turns": 0,
+        "opencode_steps": 0,
+        "claude_turns": 0,
+        "work_items": 0,
+        "tool_uses": 0,
+        "agent_messages": 0,
+        "file_changes": 0,
+    }
 
-    for record in _iter_agent_records(content):
-        usage["mcp_tool_calls"] += _count_mcp_tool_calls(record)
-        usage["sgx_tool_calls"] += _count_sgx_tool_calls(record)
 
-        model_usage = record.get("modelUsage")
-        if isinstance(model_usage, dict):
-            inp, out, cost = _sum_model_usage(model_usage)
-            usage["total_input_tokens"] = inp
-            usage["total_output_tokens"] = out
-            usage["cost_usd"] = cost or record.get("total_cost_usd", 0.0)
+def _token_count(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return 0
+    return value
 
-        for key in ("numTurns", "num_turns"):
-            turns = record.get(key)
-            if isinstance(turns, int):
-                usage["num_turns"] = max(usage["num_turns"], turns)
 
-    return usage
+def _consume_codex_usage(
+    record: dict,
+    usage: dict[str, Any],
+    counts: dict[str, int],
+    providers: set[str],
+) -> None:
+    if record.get("type") == "item.completed":
+        item = record.get("item")
+        if not isinstance(item, dict):
+            return
+        providers.add("codex")
+        counts["work_items"] += 1
+        counter = {
+            "command_execution": "tool_uses",
+            "mcp_tool_call": "tool_uses",
+            "agent_message": "agent_messages",
+            "file_change": "file_changes",
+        }.get(item.get("type"))
+        if counter:
+            counts[counter] += 1
+    elif record.get("type") == "turn.completed":
+        event_usage = record.get("usage")
+        if not isinstance(event_usage, dict):
+            return
+        providers.add("codex")
+        usage["total_input_tokens"] += _token_count(event_usage.get("input_tokens"))
+        usage["total_output_tokens"] += _token_count(event_usage.get("output_tokens"))
+        usage["num_turns"] += 1
+        counts["codex_turns"] += 1
+
+
+def _consume_opencode_usage(
+    record: dict,
+    usage: dict[str, Any],
+    counts: dict[str, int],
+    providers: set[str],
+) -> None:
+    record_type = record.get("type")
+    part = record.get("part")
+    if not isinstance(part, dict):
+        return
+    if record_type == "tool_use" and part.get("type") == "tool":
+        providers.add("opencode")
+        counts["tool_uses"] += 1
+        if part.get("tool") == "write":
+            counts["file_changes"] += 1
+    elif record_type == "text" and part.get("type") == "text":
+        providers.add("opencode")
+        counts["agent_messages"] += 1
+    elif record_type == "step_finish" and part.get("type") == "step-finish":
+        providers.add("opencode")
+        tokens = part.get("tokens")
+        if isinstance(tokens, dict):
+            usage["total_input_tokens"] += _token_count(tokens.get("input"))
+            usage["total_output_tokens"] += _token_count(tokens.get("output"))
+        cost = part.get("cost")
+        if _valid_cost(cost):
+            usage["cost_usd"] += float(cost)
+        usage["num_turns"] += 1
+        counts["opencode_steps"] += 1
+
+
+def _valid_cost(value: Any) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and value >= 0
+    )
+
+
+def _consume_claude_usage(
+    record: dict,
+    usage: dict[str, Any],
+    counts: dict[str, int],
+    providers: set[str],
+) -> None:
+    model_usage = record.get("modelUsage")
+    if isinstance(model_usage, dict):
+        providers.add("claude")
+        inp, out, cost = _sum_model_usage(model_usage)
+        usage["total_input_tokens"] = inp
+        usage["total_output_tokens"] = out
+        usage["cost_usd"] = cost or record.get("total_cost_usd", 0.0)
+    for key in ("numTurns", "num_turns"):
+        turns = record.get(key)
+        if isinstance(turns, int):
+            usage["num_turns"] = max(usage["num_turns"], turns)
+            providers.add("claude")
+            counts["claude_turns"] = max(counts["claude_turns"], turns)
+
+
+def _provider_activity(counts: dict[str, int], providers: set[str]) -> dict:
+    """Describe activity without pretending provider event loops are equivalent."""
+    if providers == {"codex"}:
+        provider, unit, count = "codex", "turn", counts["codex_turns"]
+    elif providers == {"opencode"}:
+        provider, unit, count = "opencode", "step", counts["opencode_steps"]
+    elif providers == {"claude"}:
+        provider, unit, count = "claude", "turn", counts["claude_turns"]
+    elif providers:
+        provider, unit = "mixed", "provider event"
+        count = (
+            counts["codex_turns"]
+            + counts["opencode_steps"]
+            + counts["claude_turns"]
+        )
+    else:
+        provider, unit, count = "unknown", "provider event", 0
+    return {
+        "provider": provider,
+        "primary_unit": unit,
+        "primary_count": count,
+        "work_items": counts["work_items"],
+        "tool_uses": counts["tool_uses"],
+        "agent_messages": counts["agent_messages"],
+        "file_changes": counts["file_changes"],
+    }
 
 
 def _effective_status(result: "TaskRunResult") -> str:
@@ -2852,13 +4364,12 @@ def _effective_status(result: "TaskRunResult") -> str:
     return RUN_STATUS_INVALID
 
 
-def _newest_trace_path(find_stdout: str) -> str | None:
-    """Pick the newest trace path from NUL-delimited ``<mtime> <path>`` records.
+def _validated_trace_paths(find_stdout: str) -> list[str]:
+    """All trace paths from NUL-delimited ``<mtime> <path>`` records, oldest first.
 
-    Returns None when no well-formed record survives validation. A record is
-    dropped unless its mtime parses as a float and its path sits under
-    ``TRACE_ROOT`` — the container is agent-controlled, so a path that claims to
-    live elsewhere is treated as hostile rather than copied out.
+    A record is dropped unless its mtime parses as a float and its path sits
+    under ``TRACE_ROOT`` — the container is agent-controlled, so a path that
+    claims to live elsewhere is treated as hostile rather than copied out.
     """
     candidates: list[tuple[float, str]] = []
 
@@ -2876,10 +4387,13 @@ def _newest_trace_path(find_stdout: str) -> str | None:
             continue
         candidates.append((mtime, path))
 
-    if not candidates:
-        return None
+    return [path for _, path in sorted(candidates, key=lambda c: c[0])]
 
-    return max(candidates, key=lambda candidate: candidate[0])[1]
+
+def _newest_trace_path(find_stdout: str) -> str | None:
+    """The single newest validated trace path, or None."""
+    paths = _validated_trace_paths(find_stdout)
+    return paths[-1] if paths else None
 
 
 def _copy_agent_trace(container_id: str, output_dir: Path) -> bool:
@@ -2913,15 +4427,41 @@ def _copy_agent_trace(container_id: str, output_dir: Path) -> bool:
             logger.info("No agent conversation trace found in container")
             return False
 
-        trace_path = _newest_trace_path(find_result.stdout)
-        if trace_path is None:
+        trace_paths = _validated_trace_paths(find_result.stdout)
+        if not trace_paths:
             logger.info("No agent conversation trace found in container")
             return False
 
-        dest = str(output_dir / "agent_trace.jsonl")
-        _docker_cp(f"{container_id}:{trace_path}", dest)
+        # Every JSONL under TRACE_ROOT, not just the newest one. Claude Code
+        # writes a subagent's turns to <session>/subagents/agent-*.jsonl rather
+        # than into the parent session file, so copying one file drops every
+        # tool call an Agent-delegating run made. That is not a cosmetic loss:
+        # retrieval recall is computed from the tool calls in this file, so a
+        # baseline run that delegated its searching measured as if it had
+        # searched nothing. Concatenated oldest-first; consumers read this as a
+        # record stream, and the container is single-use so no unrelated
+        # session can be mixed in.
+        dest = output_dir / "agent_trace.jsonl"
+        with tempfile.TemporaryDirectory() as staging:
+            parts: list[Path] = []
+            for index, trace_path in enumerate(trace_paths):
+                part = Path(staging) / f"{index:04d}.jsonl"
+                _docker_cp(f"{container_id}:{trace_path}", str(part))
+                if part.is_file():
+                    parts.append(part)
+            if not parts:
+                logger.warning("Trace files were found but none could be copied out")
+                return False
+            with dest.open("wb") as out:
+                for part in parts:
+                    data = part.read_bytes()
+                    out.write(data)
+                    if data and not data.endswith(b"\n"):
+                        out.write(b"\n")
 
-        logger.info("Copied agent conversation trace to %s", dest)
+        logger.info(
+            "Copied %d agent conversation trace file(s) to %s", len(parts), dest
+        )
         return True
 
     except subprocess.TimeoutExpired:
@@ -2970,6 +4510,9 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
     """
     timings: dict[str, float] = {}
     result = TaskRunResult(task_id="unknown")
+    harness_plan: HarnessPlan | None = None
+    harness_cli_installed = False
+    staged_harness_credentials: dict[str, str] = {}
 
     try:
         # --- Phase 1: Parse ---
@@ -2993,19 +4536,33 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         result.image_tag = image_tag
         timings["parse"] = time.monotonic() - t0
 
-        # Resolve output directory
-        # Layout: results/runs/<task_id>/<mode>/rep<N>/  (mode + rep partitioned)
-        # This prevents concurrent and repeated runs from overwriting each other.
-        if config.output_dir is not None:
-            output_dir = config.output_dir
-        else:
-            base = REPO_ROOT / "results" / "runs" / task_id / config.mode
-            if config.rep is not None:
-                output_dir = base / f"rep{config.rep}"
-            else:
-                output_dir = base
+        output_dir = _resolve_output_dir(config, task_id)
         output_dir.mkdir(parents=True, exist_ok=True)
         result.output_dir = str(output_dir)
+
+        try:
+            harness_plan = build_harness_plan(
+                config.harness,
+                model=config.model,
+                mode=config.mode,
+                agent_command=config.agent_command,
+                reasoning_effort=config.reasoning_effort,
+            )
+            if config.account is not None and harness_plan.name != "claude":
+                raise HarnessConfigurationError(
+                    "--account selects a Claude OAuth account and cannot be "
+                    f"combined with --harness {harness_plan.name}"
+                )
+        except HarnessConfigurationError as exc:
+            result.phase = "harness_preflight_failed"
+            result.status = RUN_STATUS_INVALID
+            result.success = False
+            result.failure_class = "infra_harness_config"
+            result.error = str(exc)
+            result.timing = timings
+            _save_results(result, task_data, output_dir, config)
+            return result
+        result.agent_command = harness_plan.rendered_command
 
         # --- Arm eligibility: refuse the task, do not score it near zero ---
         # A code_patch task cannot be solved by an agent forbidden to read the
@@ -3019,7 +4576,11 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         # arm can run is a separate, still-open question: the reported run set
         # predates this check (EnterpriseBench-yxu3k).
         try:
-            check_eligibility(task_data, config.mode)
+            check_eligibility(
+                task_data,
+                config.mode,
+                graded_artifact_path=_derive_graded_artifact_path(task_dir),
+            )
         except IneligibleTask as exc:
             logger.error(
                 "Task %s is ineligible for mode=%s: %s", task_id, config.mode, exc
@@ -3086,11 +4647,36 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         timings["setup"] = time.monotonic() - t0
 
         if not healthy:
-            logger.warning("Health check reported issues (continuing anyway)")
+            result.phase = "repository_health_failed"
+            result.status = RUN_STATUS_INVALID
+            result.success = False
+            result.failure_class = "infra_repository_health"
+            result.error = (
+                "Repository health check failed: one or more required "
+                "repositories are unavailable or invalid"
+            )
+            result.timing = timings
+            logger.error("%s; refusing to run the agent", result.error)
+            _save_results(result, task_data, output_dir, config)
+            return result
+
+        if config.mode in MCP_MODES and harness_plan.name in ("codex", "opencode"):
+            if not _install_harness_cli(container_id, harness_plan):
+                result.phase = "setup_failed"
+                result.error = "Failed to install codex CLI"
+                result.failure_class = "infra_harness_install"
+                result.timing = timings
+                _save_results(result, task_data, output_dir, config)
+                return result
+            harness_cli_installed = True
 
         # --- Configure MCP if needed ---
-        if config.mode in ("mcp_only", "hybrid"):
-            mcp_handshake_ok = _configure_mcp(container_id, config.mode)
+        if config.mode in MCP_MODES:
+            mcp_handshake_ok = _configure_mcp(
+                container_id,
+                config.mode,
+                harness=harness_plan.name,
+            )
 
             # MCP pre-flight is a HARD gate for the MCP arms. If the endpoint
             # never handshaked (unreachable / expired or rejected token), the
@@ -3190,11 +4776,39 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
         # --- Phase 4: Agent ---
         # Resolve OAuth token if --account was specified
         env_extra: dict[str, str] = {}
-        agent_command = config.agent_command
+        agent_command: str | Sequence[str] = harness_plan.command
+
+        if harness_plan.name != "claude":
+            if not harness_cli_installed and not _install_harness_cli(
+                container_id, harness_plan
+            ):
+                result.phase = "setup_failed"
+                result.error = f"Failed to install {harness_plan.name} CLI"
+                result.failure_class = "infra_harness_install"
+                result.timing = timings
+                _save_results(result, task_data, output_dir, config)
+                return result
+            try:
+                staged_harness_credentials = _prepare_harness_credentials(
+                    container_id, harness_plan
+                )
+                env_extra.update(staged_harness_credentials)
+            except (FileNotFoundError, RuntimeError) as auth_exc:
+                result.phase = "setup_failed"
+                result.error = str(auth_exc)
+                result.failure_class = "infra_auth"
+                result.timing = timings
+                _save_results(result, task_data, output_dir, config)
+                return result
 
         # Set Sourcegraph access token and TLS bypass for MCP modes
-        if config.mode in ("mcp_only", "hybrid"):
+        if config.mode in MCP_MODES:
             env_extra["NODE_TLS_REJECT_UNAUTHORIZED"] = "0"
+            # Keep every MCP tool description in the model's context. Without
+            # this the harness may offer tool names and load descriptions only
+            # on request, which makes an arm defined as "the server as shipped"
+            # measure a toolset whose text the agent never saw.
+            env_extra.update(full_tool_schema_env(harness_plan.name))
             sg_token = os.environ.get("SOURCEGRAPH_ACCESS_TOKEN", "")
             if sg_token:
                 env_extra["SOURCEGRAPH_ACCESS_TOKEN"] = sg_token
@@ -3231,16 +4845,19 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
                 _save_results(result, task_data, output_dir, config)
                 return result
             env_extra["CLAUDE_CODE_OAUTH_TOKEN"] = oauth_token
-            # Use default OAuth agent command if none was explicitly provided
-            if not agent_command:
-                agent_command = DEFAULT_OAUTH_AGENT_COMMAND
             # For MCP modes, add --mcp-config flag for explicit config loading
             # (auto-discovery from project dir is less reliable)
-            if (
-                config.mode in ("mcp_only", "hybrid")
-                and "--mcp-config" not in agent_command
-            ):
-                agent_command = agent_command + " --mcp-config /home/agent/.mcp.json"
+            if config.mode in MCP_MODES and "--mcp-config" not in agent_command:
+                if isinstance(agent_command, str):
+                    agent_command = (
+                        agent_command + " --mcp-config /home/agent/.mcp.json"
+                    )
+                else:
+                    agent_command = (
+                        *agent_command,
+                        "--mcp-config",
+                        "/home/agent/.mcp.json",
+                    )
             # Install Claude Code CLI inside the container
             if not _install_claude_cli(container_id):
                 result.phase = "setup_failed"
@@ -3251,6 +4868,13 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
                 return result
 
         if agent_command:
+            result.agent_command = (
+                agent_command
+                if isinstance(agent_command, str)
+                else shlex.join(agent_command)
+            )
+
+        if agent_command:
             # --- Pre-agent readability gate (fail loud, never fake-0) ---
             # Re-assert ownership then verify the AGENT user can actually read
             # the files it needs. A silent EACCES here previously let the agent
@@ -3258,11 +4882,18 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
             # num_turns=0, task_score=0.0 — a fake 0 that corrupted the
             # MCP-vs-baseline comparison (bead EnterpriseBench-s58f).
             readability_targets = ["/workspace/instruction.md"]
-            if config.mode in ("mcp_only", "hybrid"):
-                readability_targets += [
-                    "/workspace/.mcp.json",
-                    "/home/agent/.mcp.json",
-                ]
+            if config.mode in MCP_MODES:
+                if harness_plan.name == "codex":
+                    readability_targets.append("/home/agent/.codex/config.toml")
+                elif harness_plan.name == "opencode":
+                    readability_targets.append(
+                        "/home/agent/.config/opencode/opencode.jsonc"
+                    )
+                else:
+                    readability_targets += [
+                        "/workspace/.mcp.json",
+                        "/home/agent/.mcp.json",
+                    ]
             _chown_to_agent(container_id, readability_targets)
             readable, read_err = _assert_agent_readable(
                 container_id, readability_targets
@@ -3283,7 +4914,9 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
             # (clone, health check, MCP config) and immediately before the agent
             # starts, so the ablation is a kernel-enforced fact for every tool the
             # agent has, including ones a future CLI release adds.
-            gated, gate_err = _apply_mode_gate(container_id, task_data, config.mode)
+            gate = _apply_mode_gate(container_id, task_data, config.mode)
+            result.mode_gate = gate.proof
+            gated, gate_err = gate.ok, gate.error
             if not gated:
                 logger.error("Mode gate FAILED: %s", gate_err)
                 result.phase = "mode_gate_failed"
@@ -3296,13 +4929,21 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
                 return result
 
             t0 = time.monotonic()
-            agent_exit, agent_duration = _run_agent(
-                container_id,
-                agent_command,
-                config.timeout,
-                output_dir,
-                env_extra=env_extra,
-            )
+            try:
+                agent_exit, agent_duration = _run_agent(
+                    container_id,
+                    agent_command,
+                    config.timeout,
+                    output_dir,
+                    env_extra=env_extra,
+                )
+            finally:
+                _cleanup_harness_credentials(
+                    container_id,
+                    harness_plan,
+                    staged_harness_credentials,
+                )
+                staged_harness_credentials = {}
             timings["agent"] = agent_duration
 
             # A non-zero agent exit (OOM, timeout, rate-limit, or crash) is an
@@ -3312,7 +4953,30 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
             _route_agent_exit(result, agent_exit, output_dir)
 
             # Extract tool-usage metadata from agent output
-            result.tool_usage = _extract_tool_usage(output_dir)
+            graded_artifact_path = _derive_graded_artifact_path(task_dir)
+            graded_artifact_exists = None
+            if harness_plan.name == "opencode":
+                graded_artifact_exists = (
+                    _docker_exec(
+                        container_id,
+                        ["test", "-f", graded_artifact_path],
+                        timeout=5,
+                    ).returncode
+                    == 0
+                )
+            result.tool_usage = _extract_tool_usage(
+                output_dir,
+                graded_artifact_path=graded_artifact_path,
+                graded_artifact_exists=graded_artifact_exists,
+            )
+            _capture_mcp_telemetry(
+                result,
+                container_id,
+                output_dir,
+                mode=config.mode,
+                expected_repo_count=len(repos),
+                expected_repositories=_expected_sourcegraph_repositories(repos),
+            )
 
             # An MCP-config parse / EACCES error means the agent never really
             # started: route to the infra-error re-run channel instead of
@@ -3327,8 +4991,13 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
                 )
 
             _route_zero_mcp_run(result, config.mode)
+            _route_code_finder_run(result, config.mode)
             _route_zero_sgx_run(result, config.mode)
-            _record_agent_trace(result, container_id, output_dir)
+            if harness_plan.name == "claude":
+                _record_agent_trace(result, container_id, output_dir)
+            _route_deferred_tool_run(
+                result, config.mode, harness_plan.name, output_dir
+            )
         elif should_gate(config.mode):
             # The mode gate lives inside the agent block above (it must run after
             # build/clone/health-check, right before the agent). A gated arm that
@@ -3369,7 +5038,14 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
             "llm_curator" in verification_modes
             and result.phase not in UNTRUSTED_SCORE_PHASES
         ):
-            scores = _apply_llm_judge(scores, task_dir, container_id, task_data)
+            scores = _apply_llm_judge(
+                scores,
+                task_dir,
+                container_id,
+                task_data,
+                judge_model=config.judge_model,
+                judge_account=config.judge_account,
+            )
             _route_verifier_infra_error(result, scores)
 
         result.scores = scores
@@ -3406,6 +5082,29 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
 
     finally:
         # --- Phase 6: Cleanup ---
+        if (
+            result.container_id
+            and harness_plan is not None
+            and staged_harness_credentials
+        ):
+            try:
+                _cleanup_harness_credentials(
+                    result.container_id,
+                    harness_plan,
+                    staged_harness_credentials,
+                )
+                staged_harness_credentials = {}
+            except RuntimeError as cleanup_exc:
+                logger.error("%s", cleanup_exc)
+                # Never retain a debugging container that may still hold a
+                # copied login file.
+                if config.keep_container:
+                    logger.error(
+                        "Removing container despite --keep-container because "
+                        "credential cleanup failed"
+                    )
+                    _docker_stop_rm(result.container_id)
+                    result.container_id = ""
         if result.container_id and not config.keep_container:
             if not config.dry_run or not config.keep_container:
                 logger.info("Cleaning up container: %s", result.container_id)
@@ -3445,7 +5144,32 @@ Examples:
         "--agent",
         dest="agent_command",
         default="",
-        help="Agent command to run (e.g. 'claude -p')",
+        help="Legacy Claude command override (e.g. 'claude -p')",
+    )
+    parser.add_argument(
+        "--harness",
+        choices=list(HARNESS_NAMES),
+        default="claude",
+        help="Agent harness to run (default: claude)",
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Explicit model ID. Required for codex and opencode; OpenCode "
+            "uses provider/model form such as "
+            "openrouter/deepseek/deepseek-v4-pro."
+        ),
+    )
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=CODEX_REASONING_EFFORTS,
+        default=None,
+        help=(
+            "Codex reasoning effort (codex harness only). Pin it explicitly: "
+            "the same model at a different effort is a different system under "
+            "test, and the CLI default has moved between releases."
+        ),
     )
     parser.add_argument(
         "--timeout",
@@ -3504,12 +5228,28 @@ Examples:
         ),
     )
     parser.add_argument(
+        "--judge-model",
+        default="cc:haiku",
+        help="Tier-2 judge model/backend identifier (default: cc:haiku).",
+    )
+    parser.add_argument(
+        "--judge-account",
+        type=int,
+        default=None,
+        help=(
+            "Claude account wrapper used only by a cc:* judge "
+            "(for example 1 selects claude-1)."
+        ),
+    )
+    parser.add_argument(
         "--mode",
         choices=list(VALID_MODES),
         default="baseline",
         help=(
             "Tool-access mode: 'baseline' (no MCP), 'mcp_only' "
-            "(Sourcegraph MCP only), 'hybrid' (local + MCP), or 'cli' "
+            "(direct Sourcegraph MCP), 'mcp_code_finder' (forced Finder), "
+            "'mcp_assisted' (Finder plus targeted MCP), 'hybrid' "
+            "(local + MCP), or 'cli' "
             "(Sourcegraph via the sgx bash CLI, no MCP registered). "
             "Default: baseline"
         ),
@@ -3539,6 +5279,15 @@ Examples:
             "Ablation variant name (e.g. excluded repo name). When set, "
             "Docker image tag includes '-ablate-<variant>' to prevent "
             "build cache returning non-ablated images."
+        ),
+    )
+    parser.add_argument(
+        "--variant-label",
+        type=_validate_variant_label,
+        default=None,
+        help=(
+            "Lowercase label used to isolate a tuning run. Codex/OpenCode "
+            "derive one from harness and model when omitted."
         ),
     )
     parser.add_argument(
@@ -3578,6 +5327,9 @@ def main() -> None:
         task_toml=args.task_toml.resolve(),
         source=args.source,
         agent_command=args.agent_command,
+        harness=args.harness,
+        reasoning_effort=args.reasoning_effort,
+        model=args.model,
         timeout=args.timeout,
         build_timeout=args.build_timeout,
         verifier_timeout=args.verifier_timeout,
@@ -3588,10 +5340,13 @@ def main() -> None:
         keep_container=args.keep_container,
         verbose=args.verbose,
         account=args.account,
+        judge_model=args.judge_model,
+        judge_account=args.judge_account,
         mode=args.mode,
         rep=args.rep,
         ablation_variant=args.ablation_variant,
         min_disk_gb=args.min_disk_gb,
+        variant_label=args.variant_label,
     )
 
     result = run_task(config)

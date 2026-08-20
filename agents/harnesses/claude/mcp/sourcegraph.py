@@ -46,6 +46,9 @@ Available tools for searching the remote repository:
 | `compare_revisions` | Compare two branches/commits/tags |
 | `deepsearch` | AI-powered deep analysis (async: returns a polling link) |
 | `deepsearch_read` | Read Deep Search results (call 60+ seconds after deepsearch) |
+| `code_finder` | Launch a bounded search agent that returns task-relevant code context |
+| `evaluator` | Judge whether returned context answers the question |
+| `get_contributor_repos` | List the repositories a contributor has worked in |
 
 Note: Sourcegraph indexes the remote repository. Local source files are present \
 in /workspace, but whether you may READ them depends on the access mode.
@@ -94,6 +97,76 @@ latency and waste turns.
 2. **Read locally** — use Read/cat for files in /workspace
 3. **Navigate with MCP** — trace references and definitions across repo boundaries
 4. **Edit locally** — modify /workspace files based on what you learned"""
+
+_FORCED_FINDER_WORKFLOW = """\
+## Required Code Finder Workflow
+
+Use `code_finder` **exactly once per repository** listed below. Give each call \
+a comprehensive description of the task, failure symptoms, and the evidence \
+you need from that repository.
+
+Do not call any direct Sourcegraph retrieval tool. This prohibition includes \
+`keyword_search`, `nls_search`, `read_file`, `list_files`, `list_repos`, \
+`go_to_definition`, `find_references`, `commit_search`, `diff_search`, \
+`compare_revisions`, `deepsearch`, `deepsearch_read`, `evaluator`, and \
+`get_contributor_repos`. The purpose of this \
+arm is to measure Code Finder as the sole remote retrieval path.
+
+You may use the shell only to reason over already-returned context and to write \
+the required `/workspace/agent_output/answer.json`. Local repository source is \
+filesystem-gated and must not be read."""
+
+_ASSISTED_FINDER_WORKFLOW = """\
+## Required Code Finder Bootstrap
+
+Call `code_finder` at least once before using another Sourcegraph retrieval \
+tool. Give it a comprehensive description of the task and failure symptoms. \
+Use its result as the discovery plan, then make only targeted follow-up calls \
+such as `read_file`, `go_to_definition`, `find_references`, or a narrowly \
+scoped search when the returned context identifies a concrete gap.
+
+Local repository source is filesystem-gated. Use Sourcegraph for code access \
+and the shell only to write the required `/workspace/agent_output/answer.json`."""
+
+_TOAST_HEADER = (
+    "**IMPORTANT: The repositories exist in /workspace but you do not have "
+    "permission to read them — every local read will fail with Permission "
+    "denied. Do not try to work around this; it is enforced by the filesystem, "
+    "not by instruction. Your only path to code is the `toast_search` tool.**"
+)
+
+_TOAST_WORKFLOW = """\
+## Required Toast Search Workflow
+
+`toast_search` is an agentic retrieval subagent: it runs its own multi-round \
+search over the repositories you name and answers with the ranked files and \
+snippets it found. Give it a comprehensive description of the task, the failure \
+symptoms, and the evidence you need — not a bare keyword.
+
+Call it as often as you need, one focused question per call, and pass `repos` \
+using the identifiers listed above exactly as written. No other remote \
+retrieval tool is available in this arm.
+
+You may use the shell only to reason over already-returned context and to write \
+the required `/workspace/agent_output/answer.json`. Local repository source is \
+filesystem-gated and must not be read."""
+
+_DIRECT_MCP_RULE = """\
+## Direct MCP Arm
+
+Do not call `code_finder`. This arm measures direct Sourcegraph retrieval with \
+the search, navigation, and file-reading tools below; Code Finder is measured \
+separately."""
+
+_DEFAULT_MCP_RULE = """\
+## Default MCP Arm
+
+Every tool in the table above is available, `code_finder` included. Nothing \
+here steers you toward or away from any of them: choose whatever retrieval \
+path you judge best for this task, exactly as you would against a Sourcegraph \
+MCP server you had not been given instructions about. This arm measures that \
+unprompted choice."""
+
 
 _TOOL_SELECTION = """\
 ## Tool Selection
@@ -195,6 +268,33 @@ def _build_repo_scope(repos: Sequence[dict]) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _build_toast_repo_scope(repos: Sequence[dict]) -> str:
+    """Repo identifiers in the shape ``toast_search``'s ``repos`` field takes.
+
+    The Sourcegraph preamble renders scoping as ``repo:^...$`` filter syntax,
+    which is a search-query fragment. Toast takes plain store identifiers, so
+    handing it the filter form would send the regex anchors through as part of
+    the repo name.
+    """
+    if not repos:
+        return ""
+
+    lines = ["## Repositories to Search\n"]
+    lines.append(
+        "Pass these identifiers verbatim as the `repos` argument to "
+        "`toast_search`:\n"
+    )
+    for repo in repos:
+        url = repo.get("url", "")
+        rev = repo.get("rev", "")
+        if not url:
+            continue
+        path = repo.get("path", "") or url.rstrip("/").split("/")[-1]
+        lines.append(f"- `github.com/{derive_mirror_name(url, rev)}` — {path}")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def build_system_prompt(
     mode: str,
     repos: Sequence[dict] | None = None,
@@ -202,7 +302,10 @@ def build_system_prompt(
     """Assemble the full MCP preamble for a given tool-access mode.
 
     Args:
-        mode: One of "mcp_only" or "hybrid". Returns empty string for "baseline".
+        mode: One of "mcp_only", "mcp_default", "mcp_treatment", "hybrid",
+            "mcp_code_finder",
+            "mcp_assisted", or "mcp_toast". Returns empty string for
+            "baseline".
         repos: List of repo dicts from task.toml (each with url, rev, path keys).
 
     Returns:
@@ -213,7 +316,21 @@ def build_system_prompt(
 
     parts: list[str] = []
 
-    if mode == "mcp_only":
+    if mode == "mcp_toast":
+        parts.append(_TOAST_HEADER)
+        toast_scope = _build_toast_repo_scope(repos or [])
+        if toast_scope:
+            parts.append(toast_scope)
+        parts.append(_TOAST_WORKFLOW)
+        return "\n\n".join(parts)
+
+    if mode in {
+        "mcp_only",
+        "mcp_default",
+        "mcp_treatment",
+        "mcp_code_finder",
+        "mcp_assisted",
+    }:
         parts.append(_MCP_ONLY_HEADER)
     elif mode == "hybrid":
         parts.append(_HYBRID_HEADER)
@@ -225,6 +342,24 @@ def build_system_prompt(
     repo_scope = _build_repo_scope(repos or [])
     if repo_scope:
         parts.append(repo_scope)
+
+    if mode == "mcp_code_finder":
+        parts.append(_FORCED_FINDER_WORKFLOW)
+        return "\n\n".join(parts)
+    if mode == "mcp_assisted":
+        parts.append(_ASSISTED_FINDER_WORKFLOW)
+    elif mode == "mcp_only":
+        parts.append(_DIRECT_MCP_RULE)
+    elif mode in ("mcp_default", "mcp_treatment"):
+        # No directive either way. The three Finder arms all tell the agent
+        # what to do with code_finder (forbid, bootstrap, or force one call per
+        # repo), which measures the tool rather than the server as shipped.
+        # This arm leaves the choice to the agent so the result answers "what
+        # happens when a customer points an agent at the default endpoint".
+        # mcp_treatment shares this preamble exactly: it varies only the
+        # server's own tool descriptions and initialize instructions, so any
+        # difference between the two arms is attributable to the server change.
+        parts.append(_DEFAULT_MCP_RULE)
 
     # Common sections for both modes
     parts.append(_TOOL_SELECTION)
