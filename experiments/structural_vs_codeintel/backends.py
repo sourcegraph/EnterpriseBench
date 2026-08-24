@@ -10,8 +10,14 @@ different things:
   semantic code intelligence.
 * **code intel** -- Sourcegraph's ``sg_go_to_definition`` /
   ``sg_find_references`` over the ``sg-evals`` mirrors of the same pinned
-  revisions. SCIP-backed, so this is the only primitive that knows resolved
-  symbol identity.
+  revisions. It is the only primitive that *can* know resolved symbol
+  identity, and on part of the corpus it does not: the instance serves the
+  same two calls from a semantic SCIP index where one exists and from
+  ``scip-syntax`` (tree-sitter, name shape only) where one does not, and the
+  MCP seam returns no provenance either way. ``index_tier.py`` records which
+  tier each store carries so a result can be re-cut by it; on the pilot's
+  stores it is 17 semantic and 10 syntax-only. Describing this arm's answers
+  as semantic without that cut would claim a mechanism it did not always have.
 
 Reading and listing are held CONSTANT across every condition (local clones,
 identical code path), so a condition's delta is attributable to its search or

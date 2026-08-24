@@ -65,15 +65,17 @@ def test_within_task_sd_measures_run_to_run_spread():
 def test_contrasts_are_scoped_per_category():
     """An overall wash can hide two real, opposite per-category effects."""
     reports = []
-    for task in ("t1", "t2"):
+    for task in ("t1", "t2", "t3"):
         reports += [_report("lexical", task, 1.0), _report("structural", task, 0.0)]
-    for task in ("t3", "t4"):
+    for task in ("t4", "t5", "t6"):
         reports += [_report("lexical", task, 0.0), _report("structural", task, 1.0)]
     categories = {
         "t1": ["lexical_exactness"],
         "t2": ["lexical_exactness"],
-        "t3": ["syntactic_pattern"],
+        "t3": ["lexical_exactness"],
         "t4": ["syntactic_pattern"],
+        "t5": ["syntactic_pattern"],
+        "t6": ["syntactic_pattern"],
     }
     result = contrasts(reports, categories)["lexical - structural"]
     assert result["mean_difference"] == 0.0  # the two effects cancel overall
@@ -86,6 +88,61 @@ def test_a_category_with_one_task_reports_no_interval_rather_than_a_fake_one():
                _report("lexical", "t2", 1.0), _report("structural", "t2", 0.0)]
     result = contrasts(reports, {"t1": ["solo"], "t2": ["other"]})["lexical - structural"]
     assert result["by_category"] == {}
+
+
+def test_a_two_task_stratum_keeps_its_estimate_and_loses_its_interval():
+    """A paired bootstrap over two tasks has three distinct resamples; its
+    interval can exclude zero on arithmetic alone, so only the mean survives."""
+    left = {"t1": 1.0, "t2": 1.0, "t3": 0.5}
+    right = {"t1": 0.0, "t2": 0.0, "t3": 0.5}
+    cell = compare_conditions._scoped(left, right, {"t1", "t2"})
+    assert cell == {"n_tasks": 2, "underpowered": True, "mean_difference": 1.0}
+    assert "ci95" not in cell and "excludes_zero" not in cell
+
+
+def test_an_empty_stratum_reports_its_size_and_no_estimate():
+    cell = compare_conditions._scoped({"t1": 1.0}, {"t1": 0.0}, {"absent"})
+    assert cell == {"n_tasks": 0, "underpowered": True}
+
+
+def test_contrasts_are_stratified_by_index_tier():
+    """The tier the code-intel arm actually had is a separate cut from category:
+    a whole-corpus win can live entirely in the stratum with the weakest index."""
+    reports = []
+    for task in ("t1", "t2", "t3"):
+        reports += [_report("codeintel", task, 0.5), _report("lexical", task, 0.5)]
+    for task in ("t4", "t5", "t6"):
+        reports += [_report("codeintel", task, 1.0), _report("lexical", task, 0.0)]
+    tiers = dict.fromkeys(("t1", "t2", "t3"), "semantic")
+    tiers.update(dict.fromkeys(("t4", "t5", "t6"), "syntactic"))
+    result = contrasts(reports, {}, tiers)["codeintel - lexical"]
+    assert result["mean_difference"] == 0.5
+    assert result["by_index_tier"]["semantic"]["mean_difference"] == 0.0
+    assert result["by_index_tier"]["syntactic"]["mean_difference"] == 1.0
+
+
+def test_tier_stratification_is_absent_when_no_tier_map_was_recorded():
+    """index_tier.json is optional; its absence must not fabricate a tier column."""
+    reports = [_report("codeintel", "t1", 1.0), _report("lexical", "t1", 0.0),
+               _report("codeintel", "t2", 1.0), _report("lexical", "t2", 0.0)]
+    result = contrasts(reports, {})["codeintel - lexical"]
+    assert "by_index_tier" not in result
+
+
+def test_unknown_tier_tasks_are_dropped_rather_than_binned(tmp_path: Path):
+    """An unasked instance is an absent measurement, not a fourth tier."""
+    manifest = tmp_path / "index_tier.json"
+    manifest.write_text(
+        '{"tasks": {"t1": "semantic", "t2": "unknown", "t3": "syntactic"}}'
+    )
+    assert compare_conditions.load_task_tiers(manifest) == {
+        "t1": "semantic",
+        "t3": "syntactic",
+    }
+
+
+def test_missing_tier_manifest_is_not_an_error(tmp_path: Path):
+    assert compare_conditions.load_task_tiers(tmp_path / "nope.json") == {}
 
 
 def test_file_precision_and_f1_are_derived_from_the_scorer_s_real_keys():

@@ -109,6 +109,77 @@ def category_table(comparison: dict) -> str:
     return _table(rows, ["category", "runs/cond"] + conditions)
 
 
+#: The tier speaks to one contrast's mechanism -- whether the code-intel arm's
+#: advantage comes from resolved symbol identity -- so it is rendered for that
+#: contrast rather than for all ten pairs.
+_TIER_CONTRAST = "codeintel - lexical"
+
+
+def _cell(entry: dict | None) -> str:
+    """A stratum cell: the estimate, and `n` so a thin cell reads as thin."""
+    if not entry:
+        return "-"
+    estimate = entry.get("mean_difference")
+    shown = "n/a" if estimate is None else format(estimate, "+.3f")
+    return f"{shown} (n={entry['n_tasks']})"
+
+
+def index_tier_table(comparison: dict) -> str:
+    contrast = comparison.get("contrasts", {}).get(_TIER_CONTRAST, {})
+    rows = []
+    for tier, row in sorted((contrast.get("by_index_tier") or {}).items()):
+        if row.get("underpowered"):
+            rows.append([tier, str(row["n_tasks"]), _f(row.get("mean_difference"), "+.3f"),
+                         "too few tasks", "-"])
+            continue
+        low, high = row["ci95"]
+        rows.append([tier, str(row["n_tasks"]), _f(row["mean_difference"], "+.3f"),
+                     f"[{low:+.3f}, {high:+.3f}]",
+                     "yes" if row["excludes_zero"] else "no"])
+    return _table(rows, [f"index tier ({_TIER_CONTRAST}, recall)", "tasks",
+                         "difference", "CI95", "excludes 0"])
+
+
+def index_tier_category_table(comparison: dict) -> str:
+    contrast = comparison.get("contrasts", {}).get(_TIER_CONTRAST, {})
+    crossing = contrast.get("by_category_and_index_tier") or {}
+    tiers = sorted((contrast.get("by_index_tier") or {}))
+    categories = sorted({key.split("|", 1)[0] for key in crossing})
+    rows = [
+        [category] + [_cell(crossing.get(f"{category}|{tier}")) for tier in tiers]
+        for category in categories
+    ]
+    return _table(rows, ["category"] + tiers)
+
+
+def tier_section(comparison: dict) -> str:
+    """The tier cut, or nothing at all when this report set has no such contrast.
+
+    The ablation arms never run code intel, so rendering an empty tier table for
+    them would imply a stratification that was not made.
+    """
+    contrast = comparison.get("contrasts", {}).get(_TIER_CONTRAST, {})
+    if not contrast.get("by_index_tier"):
+        return ""
+    return f"""### By index tier (file recall)
+
+What kind of index answered the code-intel arm's calls, from
+`index_tier.json`: `semantic` means every store the task spans carries a
+COMPLETED SCIP language index that resolves symbol identity, `syntactic` means
+`scip-syntax` only (tree-sitter, name shape, no resolution), `mixed` is a task
+that spans both. The whole-corpus difference is the task-weighted combination
+of these, so a difference that lives in one tier is not a property of precise
+navigation.
+
+{index_tier_table(comparison)}
+
+Crossing the two cuts. This is where the per-category claims have to survive,
+because the categories the code-intel arm leads on are also where the
+syntax-only stores sit. Cells carry `n` because most of them are small:
+
+{index_tier_category_table(comparison)}"""
+
+
 def render(comparison: dict, stats: dict, traces: dict) -> str:
     seam = comparison.get("generation_seam")
     return f"""# Structural search vs precise code intelligence: pilot findings
@@ -138,6 +209,7 @@ Runs excluded from the quality means because they produced no score:
 
 {category_table(comparison)}
 
+{tier_section(comparison)}
 ## Claim 3 -- what produces the best END-TASK outcome
 
 {comparison['end_task_reward']}

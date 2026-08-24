@@ -230,10 +230,54 @@ def _by_category(runs: list[dict], categories: dict[str, list[str]]) -> dict:
     }
 
 
-def contrasts(reports: list[dict], categories: dict[str, list[str]]) -> dict:
-    """Paired differences between every condition pair, overall and per category."""
+#: Below this, a stratum gets a point estimate and no interval. A paired
+#: bootstrap over two tasks has three distinct resamples, so its 95% interval is
+#: an artifact of that arithmetic rather than a measurement -- and it can come
+#: out excluding zero, which would decorate the smallest cell in the table with
+#: the strongest-looking evidence in it.
+_MIN_STRATUM_TASKS = 3
+
+
+def _scoped(left: dict[str, float], right: dict[str, float], members: set[str]) -> dict:
+    """One stratum's paired difference, with the interval withheld when too small.
+
+    A stratum too small to bootstrap keeps its `n_tasks` and, where there is
+    anything to average, its mean difference. Dropping it silently would make a
+    stratified table read as though every cell had been tested and the missing
+    ones had nothing to show, when what is missing is the power to look.
+    """
+    shared = sorted((set(left) & set(right)) & members)
+    if len(shared) >= _MIN_STRATUM_TASKS:
+        return paired_bootstrap(
+            {t: left[t] for t in shared}, {t: right[t] for t in shared}
+        )
+    cell = {"n_tasks": len(shared), "underpowered": True}
+    if shared:
+        cell["mean_difference"] = round(
+            statistics.mean(left[t] - right[t] for t in shared), 4
+        )
+    return cell
+
+
+def contrasts(
+    reports: list[dict],
+    categories: dict[str, list[str]],
+    tiers: dict[str, str] | None = None,
+) -> dict:
+    """Paired differences between every condition pair, overall and per stratum.
+
+    Three cuts, because they answer different questions and the aggregate
+    answers none of them alone: by task category (what kind of question), by
+    index tier (what kind of navigation the code-intel arm actually had), and
+    the crossing of the two. The crossing is where the "code intel wins on
+    dependency and cross-repo questions" claim has to survive, since those
+    categories are also where the syntax-only stores cluster.
+    """
+    tiers = tiers or {}
     per_task = _per_task(reports, "file_recall")
     names = sorted(per_task)
+    all_categories = sorted({c for cs in categories.values() for c in cs})
+    all_tiers = sorted(set(tiers.values()))
     out = {}
     for i, left in enumerate(names):
         for right in names[i + 1 :]:
@@ -241,22 +285,56 @@ def contrasts(reports: list[dict], categories: dict[str, list[str]]) -> dict:
             if result is None:
                 continue
             result["by_category"] = {}
-            for category in sorted({c for cs in categories.values() for c in cs}):
+            for category in all_categories:
                 members = {t for t, cs in categories.items() if category in cs}
-                scoped = paired_bootstrap(
-                    {t: v for t, v in per_task[left].items() if t in members},
-                    {t: v for t, v in per_task[right].items() if t in members},
-                )
-                if scoped:
+                scoped = _scoped(per_task[left], per_task[right], members)
+                if not scoped.get("underpowered"):
                     result["by_category"][category] = scoped
+            if all_tiers:
+                result["by_index_tier"] = {
+                    tier: _scoped(
+                        per_task[left],
+                        per_task[right],
+                        {t for t, v in tiers.items() if v == tier},
+                    )
+                    for tier in all_tiers
+                }
+                result["by_category_and_index_tier"] = {
+                    f"{category}|{tier}": _scoped(
+                        per_task[left],
+                        per_task[right],
+                        {t for t, cs in categories.items() if category in cs}
+                        & {t for t, v in tiers.items() if v == tier},
+                    )
+                    for category in all_categories
+                    for tier in all_tiers
+                }
             out[f"{left} - {right}"] = result
     return out
+
+
+def load_task_tiers(path: Path) -> dict[str, str]:
+    """{task_id: index tier} from index_tier.json, or {} when it has not been run.
+
+    A tier of "unknown" is dropped rather than kept as its own stratum: it means
+    the instance could not be asked, so those tasks belong in no tier column at
+    all.
+    """
+    if not path.is_file():
+        return {}
+    manifest = json.loads(path.read_text())
+    return {
+        task_id: tier
+        for task_id, tier in (manifest.get("tasks") or {}).items()
+        if tier != "unknown"
+    }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reports", type=Path, nargs="+", required=True)
     parser.add_argument("--categories", type=Path, default=HERE / "task_categories.json")
+    parser.add_argument("--index-tiers", type=Path, default=HERE / "index_tier.json")
     parser.add_argument("--json", type=Path, default=HERE / "comparison.json")
     args = parser.parse_args()
 
@@ -322,6 +400,23 @@ def main() -> int:
             task_id: entry["categories"] for task_id, entry in manifest["tasks"].items()
         }
 
+    tiers = load_task_tiers(args.index_tiers)
+    if tiers:
+        # A tier map that covers only some of the scored tasks would produce a
+        # stratified table whose columns quietly sum to less than the corpus.
+        # That is the silent-truncation failure, so it stops the comparison
+        # instead of being reported as a smaller n.
+        uncovered = sorted({r["task_id"] for r in reports} - set(tiers))
+        if uncovered:
+            print(
+                f"{args.index_tiers.name} has no tier for "
+                f"{len(uncovered)} scored task(s): {', '.join(uncovered)}; "
+                f"re-run index_tier.py --tasks <manifest> or pass "
+                f"--index-tiers /dev/null to compare without the stratum",
+                file=sys.stderr,
+            )
+            return 2
+
     result = {
         "scoring": SCORING_CONTRACT,
         "bootstrap_samples": _BOOTSTRAP_SAMPLES,
@@ -333,7 +428,8 @@ def main() -> int:
         "unscored_runs_excluded": len(unscored),
         "completion": completion_rows,
         "conditions": by_condition(reports, categories, completion_rows),
-        "contrasts": contrasts(reports, categories),
+        "index_tiers": tiers,
+        "contrasts": contrasts(reports, categories, tiers),
     }
     args.json.write_text(json.dumps(result, indent=2) + "\n")
 
@@ -363,6 +459,27 @@ def main() -> int:
             f"CI95=[{values['ci95'][0]:+.3f}, {values['ci95'][1]:+.3f}] "
             f"n={values['n_tasks']}"
         )
+    split = (result["contrasts"].get("codeintel - lexical") or {}).get(
+        "by_index_tier", {}
+    )
+    if split:
+        print()
+        print("codeintel - lexical, split by the index tier the arm actually had:")
+        for tier, values in sorted(split.items()):
+            if values.get("underpowered"):
+                estimate = values.get("mean_difference")
+                shown = "--" if estimate is None else format(estimate, "+.3f")
+                print(
+                    f"  {tier:10s} d={shown} n={values['n_tasks']} "
+                    "(no interval: stratum too small to bootstrap)"
+                )
+                continue
+            marker = "*" if values["excludes_zero"] else " "
+            print(
+                f"{marker} {tier:10s} d={values['mean_difference']:+.3f} "
+                f"CI95=[{values['ci95'][0]:+.3f}, {values['ci95'][1]:+.3f}] "
+                f"n={values['n_tasks']}"
+            )
     return 0
 
 

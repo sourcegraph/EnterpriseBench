@@ -78,6 +78,30 @@ and nothing can beat sufficient), and slightly behind on `symbol_tracing`
 cases where index information was expected to run out, and code intel still
 led.
 
+Three of those four do not survive being re-cut by what kind of index the arm
+actually had. `index_tier.py` reads the tier from the instance rather than
+inferring it from the answers, and on the pilot's 27 stores it is 17 semantic
+SCIP and 10 `scip-syntax` only, which puts 12 tasks on fully semantic stores,
+4 mixed and 2 syntax-only. Within the 12 fully semantic tasks, codeintel minus
+lexical is:
+
+* `dependency_impact`  +0.046 [+0.000, +0.083]  (n=3, does not exclude zero)
+* `cross_repo`          0.000 [ 0.000,  0.000]  (n=3, exactly level)
+* `framework_noise`    +0.023 [+0.000, +0.051]  (n=6, does not exclude zero)
+* `dynamic_ambiguous`  +0.051 [+0.009, +0.106]  (n=6, excludes zero)
+
+Only `dynamic_ambiguous` holds, and it is the one category where precise
+resolution was supposed to be least decisive. The other three are carried by
+the mixed and syntax-only strata, where the arm had the least symbol
+resolution available. Two readings survive this pilot and it cannot separate
+them: the code-intel advantage is not driven by symbol resolution, or the
+fully-indexed tasks are too easy to separate arms on. Tier is badly confounded
+with difficulty here -- lexical recall is 0.975 on the semantic tasks, 0.569 on
+the mixed and 0.458 on the syntax-only -- so the semantic stratum is a ceiling
+where no arm can pull ahead. The cells are 3 to 6 tasks wide either way. The
+answer to question 4 is one category, not four, until the corpus is indexed
+evenly enough to tell those two readings apart.
+
 ## 5. Does giving the agent every tool improve outcomes, or create
 tool-selection overhead?
 
@@ -130,9 +154,13 @@ query string:
 
 * Identifier or literal lookup -> lexical. Every arm reaches 1.000; anything
   more expensive is wasted.
-* Dependency impact, cross-repo reasoning, framework-heavy code, and
-  semantically ambiguous cases -> precise code intel. These are the four
-  categories where its advantage over lexical excludes zero.
+* Semantically ambiguous cases -> precise code intel. This is the one category
+  whose advantage over lexical excludes zero both whole-corpus and inside the
+  fully-semantic-index stratum.
+* Dependency impact, cross-repo reasoning, and framework-heavy code -> precise
+  code intel whole-corpus, but the advantage does not survive the index-tier
+  cut (see question 4). Route these there provisionally, and treat the tier
+  re-cut, not the whole-corpus interval, as the thing to reproduce.
 * Everything else -> lexical as default, on cost.
 
 Structural search does not earn a slot in this policy on the pilot evidence.
@@ -150,7 +178,8 @@ agent will not select code intel on its own.
 The pilot supports the two ends and not the middle. Lexical is the right
 cheap default (cheapest, fastest, statistically level with everything except
 codeintel). Precise code intel is the right escalation for symbol identity
-and dependency questions (four categories with intervals excluding zero).
+and dependency questions, on a whole-corpus reading of four categories that
+thins to one under the index-tier cut.
 The structural rung is not supported: it does not beat lexical anywhere
 measurably, does not reduce the need for code intel, costs more than lexical,
 and is skipped by the agent whenever grep is available.
@@ -165,7 +194,13 @@ Stated because the brief asks for a falsifiable design and these results
 favour a claim the brief was skeptical of:
 
 * N. Eighteen tasks; most intervals touch zero, and only three whole-corpus
-  contrasts exclude it.
+  contrasts exclude it. Stratified by index tier the cells run 2 to 12 tasks,
+  and a 2-task stratum gets a point estimate and no interval on purpose.
+* Index tier. Codeintel minus lexical is -0.016 [-0.116, +0.051] on the 12
+  fully semantic tasks, +0.069 [+0.000, +0.139] on the 4 mixed, and +0.333 on
+  the 2 syntax-only. The whole-corpus +0.042 is a task-weighted combination of
+  those, so it is not evidence about resolved symbol identity, and this is
+  the finding most likely to reverse with a corpus indexed evenly.
 * The structural interface, now partly closed. The metavariable-syntax
   ablation ran (`structural_lexical_syntax`, `structural_syntax`): the
   example did not raise usage at all, while modestly improving the forced

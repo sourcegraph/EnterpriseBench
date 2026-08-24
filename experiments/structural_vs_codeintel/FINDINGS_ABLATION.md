@@ -75,6 +75,39 @@ Runs excluded from the quality means because they produced no score:
 | symbol_tracing | 15 | 0.717 | 0.717 | 0.783 | 0.717 | 0.700 | 0.683 | 0.750 |
 | syntactic_pattern | 12 | 0.868 | 0.847 | 0.757 | 0.771 | 0.764 | 0.771 | 0.826 |
 
+### By index tier (file recall)
+
+What kind of index answered the code-intel arm's calls, from
+`index_tier.json`: `semantic` means every store the task spans carries a
+COMPLETED SCIP language index that resolves symbol identity, `syntactic` means
+`scip-syntax` only (tree-sitter, name shape, no resolution), `mixed` is a task
+that spans both. The whole-corpus difference is the task-weighted combination
+of these, so a difference that lives in one tier is not a property of precise
+navigation.
+
+| index tier (codeintel - lexical, recall) | tasks | difference | CI95 | excludes 0 |
+|---|---|---|---|---|
+| mixed | 4 | +0.069 | [+0.000, +0.139] | no |
+| semantic | 12 | -0.016 | [-0.116, +0.051] | no |
+| syntactic | 2 | +0.333 | too few tasks | - |
+
+Crossing the two cuts. This is where the per-category claims have to survive,
+because the categories the code-intel arm leads on are also where the
+syntax-only stores sit. Cells carry `n` because most of them are small:
+
+| category | mixed | semantic | syntactic |
+|---|---|---|---|
+| api_call_sites | +0.167 (n=1) | +0.044 (n=7) | n/a (n=0) |
+| cross_file | +0.069 (n=4) | -0.016 (n=12) | +0.333 (n=2) |
+| cross_repo | +0.069 (n=4) | +0.000 (n=3) | +0.333 (n=2) |
+| dependency_impact | +0.093 (n=3) | +0.046 (n=3) | +0.500 (n=1) |
+| dynamic_ambiguous | +0.167 (n=1) | +0.051 (n=6) | +0.167 (n=1) |
+| framework_noise | +0.056 (n=3) | +0.023 (n=6) | +0.500 (n=1) |
+| identifier_lookup | n/a (n=0) | +0.000 (n=4) | n/a (n=0) |
+| interface_implementations | +0.000 (n=2) | +0.000 (n=2) | +0.500 (n=1) |
+| refactor_discovery | +0.093 (n=3) | +0.070 (n=2) | n/a (n=0) |
+| symbol_tracing | +0.000 (n=1) | -0.167 (n=3) | +0.167 (n=1) |
+| syntactic_pattern | +0.111 (n=1) | +0.083 (n=2) | +0.167 (n=1) |
 ## Claim 3 -- what produces the best END-TASK outcome
 
 not measured at this layer; this experiment scores retrieval only

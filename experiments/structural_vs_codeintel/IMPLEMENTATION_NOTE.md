@@ -195,6 +195,42 @@ stores across the merged corpus currently probe as indexed, including
 `django--5.0` and `tokio--tokio-1.29.1`, which `configs/sg_indexing_list.json`
 does not list.
 
+## The index tier, which the preflight cannot see
+
+The preflight proves a definition comes back. It cannot say what answered,
+because the MCP seam returns text content and no provenance. Sourcegraph serves
+`sg_go_to_definition` from a semantic SCIP index where one exists and from
+`scip-syntax` — a tree-sitter pass that knows a name's shape, not its resolved
+symbol identity — where one does not. The two are indistinguishable in a usage
+count, and only one is the mechanism the code-intel result gets attributed to.
+
+`index_tier.py` reads the tier from the instance's GraphQL API
+(`repository.codeIntelSummary.recentActivity`), counts only COMPLETED indexes,
+and writes `index_tier.json`: `semantic`, `syntactic`, `none`, or `unknown`
+when the API could not be asked. `unknown` is kept out of every stratum, since
+an unanswered query is an absent measurement rather than a fourth tier. A
+task's tier is the weakest tier among the stores it spans. `--check` fails when
+any recorded tier has moved, so a published stratified result cannot quietly
+rest on a re-indexed corpus.
+
+This is a stratification input, not an eligibility gate; `preflight_index.py`
+still owns eligibility. `compare_conditions.py` picks the map up automatically
+and adds `by_index_tier` and `by_category_and_index_tier` to every contrast,
+and refuses to run (exit 2) if the map covers only some of the scored tasks —
+a partial stratification whose columns sum to less than the corpus is the
+silent-truncation failure this file exists to prevent. Strata under three tasks
+get a point estimate and no interval: a paired bootstrap over two tasks has
+three distinct resamples, and its interval can exclude zero on arithmetic
+alone.
+
+On the pilot's 27 stores: 17 semantic, 10 `scip-syntax` only, putting 12 tasks
+on fully semantic stores, 4 mixed, 2 syntax-only. The consequence is in
+`FINDINGS.md` and question 4 of `ANALYSIS_QUESTIONS.md`: codeintel over lexical
+is -0.016 on the fully semantic tasks and +0.333 on the syntax-only pair, so the
+whole-corpus +0.042 is not evidence about resolved symbol identity. Tier is also
+confounded with difficulty (lexical recall 0.975 / 0.569 / 0.458 across the
+three strata), which this pilot cannot separate.
+
 ## A language-mapping defect this work surfaced
 
 `backends.py` mapped `.h` to ast-grep's `c` grammar. In this corpus `.h` is
