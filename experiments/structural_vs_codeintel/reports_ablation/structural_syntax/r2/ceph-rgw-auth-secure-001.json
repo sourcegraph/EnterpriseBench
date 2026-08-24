@@ -1,0 +1,311 @@
+{
+  "task_id": "ceph-rgw-auth-secure-001",
+  "policy": "condition:structural_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "security_operations",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/ceph--v19.2.0"
+  ],
+  "retrieved_paths": [
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_rest_s3.h",
+    "src/rgw/rgw_auth.cc",
+    "src/rgw/rgw_auth.h",
+    "src/rgw/rgw_auth_registry.h",
+    "src/rgw/rgw_common.h",
+    "src/rgw/rgw_common.cc",
+    "src/rgw/rgw_rest.cc",
+    "src/rgw/rgw_rest.h",
+    "src/rgw/driver/rados/rgw_user.cc",
+    "src/rgw/rgw_auth_filters.h",
+    "src/rgw/rgw_auth_keystone.h",
+    "src/rgw/rgw_swift_auth.h"
+  ],
+  "required_files": [
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_auth.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_syntax",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 18,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.6141367999999999,
+  "elapsed_seconds": 75.7,
+  "wall_seconds": 75.7,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0"
+      },
+      "seconds": 0.023,
+      "result_chars": 14377,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$OBJ.get_secret_key($$$ARGS)",
+        "language": "cpp"
+      },
+      "seconds": 1.718,
+      "result_chars": 920,
+      "hit_paths": [
+        "src/rgw/driver/rados/rgw_user.cc",
+        "src/rgw/driver/rados/rgw_user.cc",
+        "src/rgw/driver/rados/rgw_user.cc",
+        "src/rgw/driver/rados/rgw_user.cc"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0/src/rgw"
+      },
+      "seconds": 0.0,
+      "result_chars": 0,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$FUNC($$$ARGS) { $$$BODY }",
+        "language": "cpp"
+      },
+      "seconds": 0.827,
+      "result_chars": 223,
+      "hit_paths": [
+        "src/include/rados/librados.hpp"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0"
+      },
+      "seconds": 0.022,
+      "result_chars": 208696,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth_s3.h"
+      },
+      "seconds": 0.001,
+      "result_chars": 27192,
+      "hit_paths": [
+        "src/rgw/rgw_auth_s3.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 31433,
+      "hit_paths": [
+        "src/rgw/rgw_auth.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_rest_s3.h"
+      },
+      "seconds": 0.007,
+      "result_chars": 36344,
+      "hit_paths": [
+        "src/rgw/rgw_rest_s3.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth_s3.cc"
+      },
+      "seconds": 0.002,
+      "result_chars": 57115,
+      "hit_paths": [
+        "src/rgw/rgw_auth_s3.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$SIG == $OTHER",
+        "language": "cpp"
+      },
+      "seconds": 0.987,
+      "result_chars": 5673,
+      "hit_paths": [
+        "src/cls/version/cls_version.cc",
+        "src/cls/version/cls_version.cc",
+        "src/cls/version/cls_version.cc",
+        "src/tools/kvstore_tool.cc",
+        "src/tools/kvstore_tool.cc",
+        "src/tools/kvstore_tool.cc",
+        "src/tools/kvstore_tool.cc",
+        "src/tools/kvstore_tool.cc",
+        "src/cls/log/cls_log_client.cc",
+        "src/libradosstriper/libradosstriper.cc",
+        "src/libradosstriper/libradosstriper.cc",
+        "src/libradosstriper/libradosstriper.cc",
+        "src/tools/rbd/action/Watch.cc",
+        "src/tools/ceph-diff-sorted.cc",
+        "src/cls/log/cls_log.cc",
+        "src/tools/rbd_mirror/pool_watcher/RefreshImagesRequest.cc",
+        "src/tools/rbd_mirror/pool_watcher/RefreshImagesRequest.cc",
+        "src/tools/rbd_mirror/pool_watcher/RefreshImagesRequest.cc",
+        "src/tools/ceph-dencoder/ceph_dencoder.cc",
+        "src/tools/ceph-dencoder/ceph_dencoder.cc",
+        "src/tools/ceph-dencoder/ceph_dencoder.cc",
+        "src/tools/ceph-dencoder/ceph_dencoder.cc",
+        "src/tools/ceph-dencoder/ceph_dencoder.cc",
+        "src/tools/ceph-dencoder/ceph_dencoder.cc",
+        "src/tools/ceph-dencoder/ceph_dencoder.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "boost::equals($$$ARGS)",
+        "language": "cpp"
+      },
+      "seconds": 0.623,
+      "result_chars": 81,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth.cc"
+      },
+      "seconds": 0.0,
+      "result_chars": 42679,
+      "hit_paths": [
+        "src/rgw/rgw_auth.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "bool is_time_skew_ok($$$ARGS)",
+        "language": "cpp"
+      },
+      "seconds": 0.591,
+      "result_chars": 81,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class RGWAccessKey",
+        "language": "cpp"
+      },
+      "seconds": 0.678,
+      "result_chars": 81,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth_registry.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 3080,
+      "hit_paths": [
+        "src/rgw/rgw_auth_registry.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_common.h"
+      },
+      "seconds": 0.001,
+      "result_chars": 65414,
+      "hit_paths": [
+        "src/rgw/rgw_common.h"
+      ]
+    }
+  ],
+  "tool_seconds": 5.48,
+  "retrieval_result_chars": 493389,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the 15 source files needed for the S3 authentication security audit, in priority order:\n\n**Core signature verification (highest priority)**\n1. `src/rgw/rgw_auth_s3.cc` \u2014 AWS SigV2/SigV4 signature computation, canonical request/header building, `is_time_skew_ok()` timestamp validation, chunked-upload signature verification\n2. `src/rgw/rgw_auth_s3.h` \u2014 declarations for the above, `AWSAuthStrategy`, `AWSv4ComplMulti/Single` streaming signature completers\n\n**REST layer / auth entry point**\n3. `src/rgw/rgw_rest_s3.cc` \u2014 `RGW_Auth_S3::authorize`, `AWSGeneralAbstractor::get_auth_data_v2/v4` (where V2 vs V4 dispatch happens)\n4. `src/rgw/rgw_rest_s3.h` \u2014 `AWSEngine`, `LocalEngine`, `S3AnonymousEngine`, `AWSGeneralAbstractor`/`AWSGeneralBoto2Abstractor` class definitions\n\n**Auth framework**\n5. `src/rgw/rgw_auth.cc` / `.h` \u2014 `Engine`/`Strategy`/`IdentityApplier` base framework, engine fallback chain logic (`strategy_handle_denied`, etc. \u2014 relevant to V2/V4 fallback ordering)\n6. `src/rgw/rgw_auth_registry.h` \u2014 `StrategyRegistry`, wires up the SUFFICIENT/FALLBACK ordering between plain and boto2 (V2-compat) strategies\n\n**Secret key storage/access**\n7. `src/rgw/rgw_common.h` / `.cc` \u2014 `RGWAccessKey` struct (secret key storage)\n8. `src/rgw/driver/rados/rgw_user.cc` \u2014 secret key access patterns (`get_secret_key`)\n\n**Supporting**\n9. `src/rgw/rgw_rest.cc` / `.h` \u2014 request parsing/dispatch feeding into auth\n10. `src/rgw/rgw_auth_filters.h`, `rgw_auth_keystone.h`, `rgw_swift_auth.h` \u2014 auth engine composition/decorators referenced by the S3 strategy",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 1138324,
+  "output_tokens": 5918,
+  "input_tokens_uncached": 20,
+  "cache_creation_input_tokens": 86120,
+  "cache_read_input_tokens": 1052184,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "ceph-rgw-auth-secure-001",
+    "config_name": "condition:structural_syntax",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 0.75,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.6667,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8319,
+      "10": 0.9709
+    },
+    "mrr": 1.0,
+    "map_score": 0.9167,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2667,
+    "n_retrieved": 15,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 3
+}

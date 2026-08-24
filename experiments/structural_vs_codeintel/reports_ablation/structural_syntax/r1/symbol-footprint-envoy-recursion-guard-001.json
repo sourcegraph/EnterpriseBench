@@ -1,0 +1,902 @@
+{
+  "task_id": "symbol-footprint-envoy-recursion-guard-001",
+  "policy": "condition:structural_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.31.2"
+  ],
+  "retrieved_paths": [],
+  "required_files": [
+    "source/common/common/debug_recursion_checker.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/upstream/conn_pool_map_impl.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_syntax",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 41,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 2.1420502000000003,
+  "elapsed_seconds": 887.3,
+  "wall_seconds": 887.3,
+  "tool_log": [
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker",
+        "top_k": 50
+      },
+      "seconds": 0.925,
+      "result_chars": 204,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker $X",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.595,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class AutoDebugRecursionChecker",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.687,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$X",
+        "top_k": 5
+      },
+      "seconds": 249.175,
+      "result_chars": 1266,
+      "hit_paths": [
+        "mobile/third_party/rbe_configs/cc/tools/cpp/empty.cc",
+        "mobile/third_party/rbe_configs/cc/tools/cpp/empty.cc",
+        "mobile/third_party/rbe_configs/cc/tools/cpp/empty.cc",
+        "mobile/third_party/rbe_configs/cc/tools/cpp/empty.cc",
+        "mobile/third_party/rbe_configs/cc/tools/cpp/empty.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker $NAME;",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.366,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker $NAME($$$ARGS);",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.343,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "int main() {}",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 0.417,
+      "result_chars": 266,
+      "hit_paths": [
+        "mobile/third_party/rbe_configs/cc/tools/cpp/empty.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "int nonExistentFunctionXYZ() { return 1; }",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 0.393,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class $NAME { $$$BODY };",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 0.001,
+      "result_chars": 372,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.375,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2"
+      },
+      "seconds": 0.011,
+      "result_chars": 28,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker;",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.418,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker recursion_checker;",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.675,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "RecursionChecker checker;",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.407,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class AutoDebugRecursionChecker {};",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.001,
+      "result_chars": 372,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class AutoDebugRecursionChecker {}",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.49,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "struct AutoDebugRecursionChecker {}",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.48,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class AutoDebugRecursionChecker {$$$BODY}",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.414,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "struct AutoDebugRecursionChecker {$$$BODY}",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.408,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker $$$X;",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.372,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$$$X AutoDebugRecursionChecker $$$Y;",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.338,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "void f() { AutoDebugRecursionChecker; }",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.368,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "void f() { AutoDebugRecursionChecker($$$ARGS); }",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.713,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "using AutoDebugRecursionChecker = $$$T;",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.397,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "typedef $$$T AutoDebugRecursionChecker;",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.378,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "using AutoDebugRecursionChecker = $T;",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.348,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class AutoDebugRecursionChecker : public $T {$$$BODY}",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.79,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "using AutoDebugRecursionChecker = $T",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.759,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class AutoDebugRecursionChecker final {$$$BODY}",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.408,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$M(AutoDebugRecursionChecker)",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.435,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$M(AutoDebugRecursionChecker, $$$REST)",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.367,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "std::make_unique<AutoDebugRecursionChecker>($$$ARGS)",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.852,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2"
+      },
+      "seconds": 0.009,
+      "result_chars": 242458,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/protobuf/utility.h"
+      },
+      "seconds": 0.001,
+      "result_chars": 34956,
+      "hit_paths": [
+        "source/common/protobuf/utility.h"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class $AT AutoDebugRecursionChecker {$$$BODY}",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.401,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/protobuf/utility.cc"
+      },
+      "seconds": 0.0,
+      "result_chars": 41669,
+      "hit_paths": [
+        "source/common/protobuf/utility.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class MessageUtil {$$$BODY}",
+        "language": "cpp",
+        "top_k": 10
+      },
+      "seconds": 0.343,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class ScopeTrackedObject {$$$BODY}",
+        "language": "cpp",
+        "top_k": 10
+      },
+      "seconds": 0.375,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2"
+      },
+      "seconds": 0.008,
+      "result_chars": 98224,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2"
+      },
+      "seconds": 0.006,
+      "result_chars": 8781,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/common/assert.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 15592,
+      "hit_paths": [
+        "source/common/common/assert.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/matcher/matcher.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 15002,
+      "hit_paths": [
+        "source/common/matcher/matcher.h"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class TypeUtil {$$$BODY}",
+        "language": "cpp",
+        "top_k": 10
+      },
+      "seconds": 0.394,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class ActionRegistration {$$$BODY}",
+        "language": "cpp",
+        "top_k": 10
+      },
+      "seconds": 0.441,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker",
+        "language": "python",
+        "top_k": 50
+      },
+      "seconds": 0.015,
+      "result_chars": 85,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class AutoDebugRecursionChecker",
+        "language": "python",
+        "top_k": 50
+      },
+      "seconds": 0.015,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "void resetEnvoyBugCountersForTest();",
+        "language": "cpp",
+        "top_k": 10
+      },
+      "seconds": 0.321,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class ActionRegistration",
+        "language": "cpp",
+        "top_k": 10
+      },
+      "seconds": 0.317,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2"
+      },
+      "seconds": 0.006,
+      "result_chars": 28340,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/protobuf/visitor.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 1121,
+      "hit_paths": [
+        "source/common/protobuf/visitor.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/protobuf/visitor.cc"
+      },
+      "seconds": 0.0,
+      "result_chars": 4005,
+      "hit_paths": [
+        "source/common/protobuf/visitor.cc"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/protobuf/visitor_helper.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 1571,
+      "hit_paths": [
+        "source/common/protobuf/visitor_helper.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/formatter/substitution_formatter.h"
+      },
+      "seconds": 0.001,
+      "result_chars": 16080,
+      "hit_paths": [
+        "source/common/formatter/substitution_formatter.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/common/scope_tracker.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 1729,
+      "hit_paths": [
+        "source/common/common/scope_tracker.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/access_log/access_log_impl.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 8287,
+      "hit_paths": [
+        "source/common/access_log/access_log_impl.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/access_log/access_log_impl.cc"
+      },
+      "seconds": 0.0,
+      "result_chars": 14488,
+      "hit_paths": [
+        "source/common/access_log/access_log_impl.cc"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/http/filter_manager.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 51791,
+      "hit_paths": [
+        "source/common/http/filter_manager.h"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "namespace Envoy {$$$BODY}",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 0.854,
+      "result_chars": 1668,
+      "hit_paths": [
+        "tools/testdata/check_format/counter_from_string.cc",
+        "tools/testdata/check_format/condvar_wait_for.cc",
+        "tools/testdata/check_format/unpack_to.cc",
+        "tools/testdata/check_format/condition_variable_any.cc",
+        "tools/testdata/check_format/condition_variable.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "virtual ~$NAME() = default;",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 0.343,
+      "result_chars": 1366,
+      "hit_paths": [
+        "test/common/filter/config_discovery_impl_test.cc",
+        "source/extensions/filters/http/cache/cache_insert_queue.cc",
+        "test/common/singleton/threadsafe_singleton_test.cc",
+        "test/common/secret/sds_api_test.cc",
+        "test/common/secret/sds_api_test.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class AutoDebugRecursionChecker {$$$BODY}",
+        "language": "cpp",
+        "top_k": 20
+      },
+      "seconds": 0.456,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker $NAME;",
+        "language": "cpp",
+        "top_k": 20
+      },
+      "seconds": 0.433,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker($$$ARGS)",
+        "language": "cpp",
+        "top_k": 20
+      },
+      "seconds": 0.623,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "struct AutoDebugRecursionChecker {$$$BODY}",
+        "language": "cpp",
+        "top_k": 20
+      },
+      "seconds": 0.743,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker($$$ARGS);",
+        "language": "cpp",
+        "top_k": 20
+      },
+      "seconds": 0.757,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$T AutoDebugRecursionChecker;",
+        "language": "cpp",
+        "top_k": 20
+      },
+      "seconds": 0.66,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "bool $NAME;",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 0.804,
+      "result_chars": 1164,
+      "hit_paths": [
+        "source/server/backtrace.cc",
+        "test/tools/router_check/router.cc",
+        "test/tools/router_check/router.cc",
+        "test/tools/router_check/router.cc",
+        "test/tools/router_check/router.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "std::make_unique<AutoDebugRecursionChecker>($$$ARGS)",
+        "language": "cpp",
+        "top_k": 20
+      },
+      "seconds": 0.667,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "using $NAME = $T;",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 0.387,
+      "result_chars": 1598,
+      "hit_paths": [
+        "test/tools/schema_validator/test/schema_validator_test.cc",
+        "contrib/vcl/source/vcl_interface.cc",
+        "mobile/test/cc/unit/envoy_config_test.cc",
+        "contrib/kafka/filters/network/test/response_codec_unit_test.cc",
+        "contrib/kafka/filters/network/test/response_codec_unit_test.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "using ProtoValidationException = $T;",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 0.375,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$RET AutoDebugRecursionChecker($$$ARGS) {$$$BODY}",
+        "language": "cpp",
+        "top_k": 10
+      },
+      "seconds": 0.444,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "void AutoDebugRecursionChecker($$$ARGS) {$$$BODY}",
+        "language": "cpp",
+        "top_k": 10
+      },
+      "seconds": 0.414,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker($$$PARAMS) {$$$BODY}",
+        "language": "cpp",
+        "top_k": 10
+      },
+      "seconds": 0.413,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$RET checkAndReturnDefault($$$ARGS) {$$$BODY}",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 0.375,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "uint64_t checkAndReturnDefault($$$ARGS) {$$$BODY}",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 0.376,
+      "result_chars": 82,
+      "hit_paths": []
+    }
+  ],
+  "tool_seconds": 274.883,
+  "retrieval_result_chars": 595567,
+  "denied_tools": [],
+  "cli_result_text": "",
+  "cli_is_error": true,
+  "cli_subtype": "error_max_turns",
+  "cli_stop_reason": "tool_use",
+  "input_tokens": 5001427,
+  "output_tokens": 49822,
+  "input_tokens_uncached": 80,
+  "cache_creation_input_tokens": 169316,
+  "cache_read_input_tokens": 4832031,
+  "status": "invalid_turn_limit",
+  "ir_scores": null,
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 3
+}

@@ -1,0 +1,215 @@
+{
+  "task_id": "symbol-footprint-envoy-recursion-guard-001",
+  "policy": "condition:structural_lexical_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.31.2"
+  ],
+  "retrieved_paths": [
+    "source/common/common/debug_recursion_checker.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/upstream/conn_pool_map_impl.h"
+  ],
+  "required_files": [
+    "source/common/common/debug_recursion_checker.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/upstream/conn_pool_map_impl.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical_syntax",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 10,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.20511459999999998,
+  "elapsed_seconds": 31.8,
+  "wall_seconds": 31.8,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker",
+        "case_sensitive": false
+      },
+      "seconds": 0.149,
+      "result_chars": 2348,
+      "hit_paths": [
+        "source/common/common/debug_recursion_checker.h",
+        "source/common/common/debug_recursion_checker.h",
+        "source/common/common/debug_recursion_checker.h",
+        "source/common/conn_pool/conn_pool_base.cc",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "debug_recursion_checker",
+        "case_sensitive": false
+      },
+      "seconds": 0.149,
+      "result_chars": 2086,
+      "hit_paths": [
+        "source/common/common/BUILD",
+        "source/common/common/BUILD",
+        "source/common/conn_pool/BUILD",
+        "source/common/conn_pool/conn_pool_base.cc",
+        "source/common/conn_pool/conn_pool_base.h",
+        "source/common/upstream/BUILD",
+        "source/common/upstream/BUILD",
+        "source/common/upstream/conn_pool_map.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "recursion_checker_",
+        "case_sensitive": false
+      },
+      "seconds": 0.152,
+      "result_chars": 3027,
+      "hit_paths": [
+        "source/common/common/BUILD",
+        "source/common/conn_pool/BUILD",
+        "source/common/conn_pool/conn_pool_base.cc",
+        "source/common/conn_pool/conn_pool_base.h",
+        "source/common/upstream/BUILD",
+        "source/common/upstream/BUILD",
+        "source/common/upstream/conn_pool_map.h",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/common/debug_recursion_checker.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 785,
+      "hit_paths": [
+        "source/common/common/debug_recursion_checker.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/conn_pool/conn_pool_base.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 18126,
+      "hit_paths": [
+        "source/common/conn_pool/conn_pool_base.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/upstream/conn_pool_map.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 2741,
+      "hit_paths": [
+        "source/common/upstream/conn_pool_map.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/upstream/conn_pool_map_impl.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 5703,
+      "hit_paths": [
+        "source/common/upstream/conn_pool_map_impl.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/conn_pool/conn_pool_base.cc"
+      },
+      "seconds": 0.0,
+      "result_chars": 37747,
+      "hit_paths": [
+        "source/common/conn_pool/conn_pool_base.cc"
+      ]
+    }
+  ],
+  "tool_seconds": 0.45,
+  "retrieval_result_chars": 72563,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Blast radius of removing `AutoDebugRecursionChecker` is exactly three files:\n\n1. **`source/common/common/debug_recursion_checker.h`** \u2014 declares the type (the RAII guard class itself, alongside its `DebugRecursionChecker` companion).\n2. **`source/common/conn_pool/conn_pool_base.cc`** \u2014 one call site (`closeIdleConnectionsForDrainingPool`), instantiates `Common::AutoDebugRecursionChecker` to guard against reentrancy.\n3. **`source/common/upstream/conn_pool_map_impl.h`** \u2014 four call sites across `ConnPoolMap`'s `getPool`, `erasePool`, `clear`, and `addIdleCallback`, same guard pattern.\n\nTwo other files (`source/common/conn_pool/conn_pool_base.h` and `source/common/upstream/conn_pool_map.h`) include `debug_recursion_checker.h` and hold a `Common::DebugRecursionChecker recursion_checker_` member, but neither names `AutoDebugRecursionChecker` itself \u2014 the underlying `DebugRecursionChecker` type and its member fields survive this cleanup untouched, so those two headers aren't in scope for this specific removal.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 491868,
+  "output_tokens": 2364,
+  "input_tokens_uncached": 12,
+  "cache_creation_input_tokens": 21863,
+  "cache_read_input_tokens": 469993,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "symbol-footprint-envoy-recursion-guard-001",
+    "config_name": "condition:structural_lexical_syntax",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 3,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 1
+}

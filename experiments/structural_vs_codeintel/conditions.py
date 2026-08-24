@@ -95,6 +95,45 @@ AST_SEARCH_TOOL = {
     },
 }
 
+#: The ablation variant. Identical to AST_SEARCH_TOOL except that its `pattern`
+#: argument shows two worked patterns instead of only naming the metavariable
+#: forms. The tool, backend and top-level claim are unchanged, so a difference
+#: between an arm holding this and an arm holding AST_SEARCH_TOOL is a
+#: difference in how the query language was explained, not in what the tool can
+#: do.
+#:
+#: This is the ablation `DECLARED_ASYMMETRIES` says to run rather than take on
+#: faith: the pilot found ast_search unused in 52 of 54 runs that also held
+#: grep, and avoiding a capability and avoiding a calling convention look
+#: identical in that number.
+AST_SEARCH_TOOL_WITH_EXAMPLE = {
+    "type": "function",
+    "function": {
+        "name": AST_SEARCH_TOOL["function"]["name"],
+        "description": AST_SEARCH_TOOL["function"]["description"],
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": (
+                        "Source code in which `$NAME` matches one node and "
+                        "`$$$NAME` matches a sequence of nodes. In python, "
+                        "`def $F($$$ARGS)` matches any function definition, "
+                        "and `$OBJ.get($KEY)` matches any call to a `get` "
+                        "method."
+                    ),
+                },
+                "language": AST_SEARCH_TOOL["function"]["parameters"]["properties"][
+                    "language"
+                ],
+                "top_k": _TOP_K,
+            },
+            "required": ["pattern"],
+        },
+    },
+}
+
 DEFINITION_TOOL = {
     "type": "function",
     "function": {
@@ -147,6 +186,15 @@ REFERENCES_TOOL = {
 #: shared verbatim and carry no retrieval claim.
 RETRIEVAL_TOOLS = (GREP_TOOL, AST_SEARCH_TOOL, DEFINITION_TOOL, REFERENCES_TOOL)
 
+#: The same registry with the exampled ast_search substituted in. Ablation arms
+#: draw from here; every other arm draws from RETRIEVAL_TOOLS.
+ABLATION_TOOLS = (
+    GREP_TOOL,
+    AST_SEARCH_TOOL_WITH_EXAMPLE,
+    DEFINITION_TOOL,
+    REFERENCES_TOOL,
+)
+
 
 @dataclass(frozen=True)
 class Condition:
@@ -156,12 +204,17 @@ class Condition:
     #: every report so the analysis cannot quietly upgrade ast_search to
     #: "semantic code intelligence".
     knows: str
+    #: Set only on an arm that deliberately departs from the shared tool
+    #: schemas, and says how. Carried into every report, so an ablation arm
+    #: cannot be read later as another sample of the arm it departs from.
+    description_ablation: str | None = None
 
     @property
     def tools(self) -> list[dict]:
-        by_name = {
-            t["function"]["name"]: t for t in (*RETRIEVAL_TOOLS, *COMMON_TOOLS)
-        }
+        registry = (
+            ABLATION_TOOLS if self.description_ablation else RETRIEVAL_TOOLS
+        )
+        by_name = {t["function"]["name"]: t for t in (*registry, *COMMON_TOOLS)}
         return [by_name[n] for n in self.tool_names] + list(COMMON_TOOLS)
 
     def backend(self) -> ConditionBackend:
@@ -194,7 +247,41 @@ CONDITIONS: dict[str, Condition] = {
             ("grep", "ast_search", "definition", "references"),
             "text + syntax + resolved symbol identity",
         ),
+        # The ablation pair. `structural_lexical_syntax` is the preference test
+        # -- does the agent reach for ast_search once its syntax is shown? --
+        # against `structural_lexical` as its control. `structural_syntax` is
+        # the capability test: with no grep to fall back on, does the example
+        # change how well the arm retrieves? Without the second arm, a null
+        # result on the first cannot distinguish "the example did not persuade
+        # the agent" from "the example was not usable".
+        Condition(
+            "structural_lexical_syntax",
+            ("grep", "ast_search"),
+            "text + syntax",
+            description_ablation="ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+        ),
+        Condition(
+            "structural_syntax",
+            ("ast_search",),
+            "syntax",
+            description_ablation="ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+        ),
     )
+}
+
+#: The default sweep: the arms whose tool schemas are the shared ones. Ablation
+#: arms are opt-in by name, so a re-run of the pilot cannot silently grow arms
+#: (and cost) it was not asked for.
+PILOT_CONDITIONS = tuple(
+    name for name, condition in CONDITIONS.items() if not condition.description_ablation
+)
+
+#: Arms that depart from the shared schemas, and the arm each one is read
+#: against. A contrast that crosses this mapping is an ablation result; any
+#: other use of these arms is a category error.
+ABLATION_CONTROLS = {
+    "structural_lexical_syntax": "structural_lexical",
+    "structural_syntax": "structural",
 }
 
 # Language that tells the model when to reach for a tool. Any of these in a
@@ -265,3 +352,49 @@ DECLARED_ASYMMETRIES = (
     "grep and ast_search require only a query. This is a property of precise "
     "navigation, not a handicap imposed by the harness.",
 )
+
+
+def check_ablation_declarations() -> list[str]:
+    """Reasons an ablation arm is not a usable ablation of its control.
+
+    Parity governs how the shared descriptions are written. This governs the
+    ablation pairs: that each one names a control, that the control is an
+    ordinary arm, that the pair differs in exactly one schema, and that it
+    differs at all. A no-op ablation is the dangerous case, because it reports
+    as an ablation and reads as a second sample of its control.
+    """
+    problems: list[str] = []
+    for name, condition in CONDITIONS.items():
+        if condition.description_ablation and name not in ABLATION_CONTROLS:
+            problems.append(f"{name}: ablation arm names no control arm")
+    for arm, control in ABLATION_CONTROLS.items():
+        if arm not in CONDITIONS:
+            problems.append(f"{arm}: ablation arm does not exist")
+            continue
+        if not CONDITIONS[arm].description_ablation:
+            problems.append(f"{arm}: listed as an ablation but declares nothing")
+        if control not in CONDITIONS:
+            problems.append(f"{arm}: control arm {control!r} does not exist")
+            continue
+        if CONDITIONS[control].description_ablation:
+            problems.append(f"{arm}: control arm {control!r} is itself an ablation")
+        if CONDITIONS[arm].tool_names != CONDITIONS[control].tool_names:
+            problems.append(
+                f"{arm}: holds {CONDITIONS[arm].tool_names} against control "
+                f"{CONDITIONS[control].tool_names}; the pair would differ in "
+                "more than the description"
+            )
+            continue
+        differing = [
+            a["function"]["name"]
+            for a, b in zip(CONDITIONS[arm].tools, CONDITIONS[control].tools)
+            if a != b
+        ]
+        if not differing:
+            problems.append(
+                f"{arm}: identical to control {control!r}, so the ablation "
+                "would record as a second sample of it"
+            )
+        elif len(differing) > 1:
+            problems.append(f"{arm}: differs from {control!r} in {differing}")
+    return problems

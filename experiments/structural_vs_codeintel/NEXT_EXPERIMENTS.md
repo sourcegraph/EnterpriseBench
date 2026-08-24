@@ -3,21 +3,23 @@
 Ordered by how much each one would change a conclusion in
 `ANALYSIS_QUESTIONS.md`, not by cost.
 
-## 1. Ablate the structural arm's calling convention
+## 1. Ablate the structural arm's calling convention -- RUN, null result
 
-The pilot's central behavioural result -- `ast_search` unused in 52/54 runs
-that also had grep -- has two explanations it cannot separate: the agent does
-not want structural search, or it does not want to write ast-grep
-metavariable patterns. This is the declared asymmetry already recorded in
-`conditions.py`, and it is cheap to test: add one condition whose
-`ast_search` description carries a two-line syntax example, hold everything
-else fixed, and re-run `structural_lexical`.
+Done: `structural_lexical_syntax` and `structural_syntax`, 108 runs on the
+same tasks, differing from their controls in one argument description (worked
+patterns instead of the metavariable forms named abstractly), with the parity
+gate still passing on the ablated schema.
 
-If use jumps, the finding is about the interface, and the hypothesis under
-test deserves a second hearing. If it does not, the avoidance is real.
-Deliberately not done in the pilot, because writing that example into only
-one arm's description is precisely the tool-description optimisation the
-brief forbids -- as an ablation it is legitimate, as a default it is not.
+`ast_search` usage did not rise. It fell to zero: 0 calls in 54 runs against
+6 calls in the control. In the forced arm the same example helped a little
+(recall -0.025 [-0.059, +0.003], first relevant result at call 4.7 rather
+than 6.6), which is what rules out "the example was unusable" as the reason
+the preference did not move.
+
+What is still open is a larger interface change, not another wording tweak:
+a pattern builder that accepts a code snippet instead of a pattern, or
+examples placed in the system prompt where the agent reads them before
+choosing a tool rather than while calling one.
 
 ## 2. Forced-primitive arms
 

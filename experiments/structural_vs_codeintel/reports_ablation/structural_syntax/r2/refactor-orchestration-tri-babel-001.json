@@ -1,0 +1,277 @@
+{
+  "task_id": "refactor-orchestration-tri-babel-001",
+  "policy": "condition:structural_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/babel--v7.22.9",
+    "github.com/sg-evals/webpack--v5.88.2",
+    "github.com/sg-evals/next.js--v13.4.12"
+  ],
+  "retrieved_paths": [
+    "packages/next/src/bundles/babel/bundle.js",
+    "packages/babel-parser/package.json",
+    "packages/next/package.json",
+    "package.json",
+    "lib/javascript/JavascriptParser.js",
+    "test/cases/parsing/precreated-ast/ast-loader.js",
+    "packages/next/taskfile-ncc.js"
+  ],
+  "required_files": [
+    "packages/babel-parser/package.json",
+    "package.json",
+    "packages/next/package.json"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_syntax",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 18,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.7614456,
+  "elapsed_seconds": 113.0,
+  "wall_seconds": 113.0,
+  "tool_log": [
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/webpack--v5.88.2",
+        "path": "package.json"
+      },
+      "seconds": 0.004,
+      "result_chars": 10520,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "package.json"
+      },
+      "seconds": 0.001,
+      "result_chars": 9659,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.22.9",
+        "path": "package.json"
+      },
+      "seconds": 0.003,
+      "result_chars": 4598,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "packages/next/package.json"
+      },
+      "seconds": 0.0,
+      "result_chars": 9190,
+      "hit_paths": [
+        "packages/next/package.json"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12"
+      },
+      "seconds": 0.023,
+      "result_chars": 8533,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12"
+      },
+      "seconds": 0.019,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "packages/next/taskfile-ncc.js"
+      },
+      "seconds": 0.002,
+      "result_chars": 3582,
+      "hit_paths": [
+        "packages/next/taskfile-ncc.js"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12"
+      },
+      "seconds": 0.016,
+      "result_chars": 25990,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "require('@babel/parser')",
+        "language": "javascript"
+      },
+      "seconds": 2.091,
+      "result_chars": 403,
+      "hit_paths": [
+        "packages/next/src/bundles/babel/bundle.js"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "require(\"babel-loader\")",
+        "language": "javascript"
+      },
+      "seconds": 1.733,
+      "result_chars": 226,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "packages/next/src/bundles/babel/bundle.js"
+      },
+      "seconds": 0.001,
+      "result_chars": 3434,
+      "hit_paths": [
+        "packages/next/src/bundles/babel/bundle.js"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "require(\"acorn\")",
+        "language": "javascript"
+      },
+      "seconds": 2.332,
+      "result_chars": 1106,
+      "hit_paths": [
+        "lib/util/registerExternalSerializer.js",
+        "lib/util/registerExternalSerializer.js",
+        "test/cases/parsing/precreated-ast/ast-loader.js",
+        "lib/javascript/JavascriptParser.js"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/webpack--v5.88.2"
+      },
+      "seconds": 0.017,
+      "result_chars": 21380,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "require('../../bundles/babel/bundle')",
+        "language": "javascript"
+      },
+      "seconds": 1.257,
+      "result_chars": 226,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "getBabel",
+        "language": "javascript"
+      },
+      "seconds": 1.379,
+      "result_chars": 226,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.22.9",
+        "path": "packages/babel-parser/package.json"
+      },
+      "seconds": 0.0,
+      "result_chars": 1921,
+      "hit_paths": [
+        "packages/babel-parser/package.json"
+      ]
+    }
+  ],
+  "tool_seconds": 8.878,
+  "retrieval_result_chars": 101006,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file set establishing the dependency graph for the Babel parser AST change:\n\n**Confirmed edge: Next.js \u2192 Babel** (direct, real)\n- `packages/next/src/bundles/babel/bundle.js` \u2014 `next` directly `require('@babel/parser')`, `require('@babel/types')`, `require('@babel/traverse')`, `require('@babel/generator')`, `require('@babel/core')`\n- `packages/next/package.json` devDependencies pin `@babel/parser@7.12.11`, `@babel/types@7.18.0`, `@babel/traverse@7.18.0`, `@babel/generator@7.18.0`, `@babel/core@7.18.0`\n- Root `package.json` `resolutions` re-pins the same four packages workspace-wide\n- `packages/next/taskfile-ncc.js` explains why these are devDependencies yet still ship: `@vercel/ncc` bundles them into `next/dist/compiled/*`, which is inside the `files` array of the published package \u2014 so despite living in `devDependencies`, they are vendored into the runtime artifact.\n\n**Expected edge that doesn't hold: webpack \u2192 Babel**\n- Root `package.json` lists `@babel/core` and `@babel/preset-react` only under `devDependencies` (alongside `babel-loader`), not `dependencies`.\n- `lib/javascript/JavascriptParser.js` \u2014 webpack's actual module parser `require(\"acorn\")`, not Babel.\n- `test/cases/parsing/precreated-ast/ast-loader.js` \u2014 webpack's \"precreated AST\" loader hook is acorn-shaped, confirming loaders don't hand webpack a Babel AST either.\n- So the Babel package is present only for webpack's own test fixtures (exercising `babel-loader`), not for anything the published `webpack` npm package executes.\n\n**Babel side**\n- `packages/babel-parser/package.json` and root `package.json` \u2014 identify `@babel/parser` as the origin package and the yarn-workspaces structure other babel packages (`@babel/traverse`, `@babel/types`) live in.\n\nThe retrieval task is complete \u2014 file selection only, no plan authored here.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 843217,
+  "output_tokens": 9386,
+  "input_tokens_uncached": 16,
+  "cache_creation_input_tokens": 131293,
+  "cache_read_input_tokens": 711908,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "condition:structural_syntax",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.7328,
+      "10": 0.7328
+    },
+    "mrr": 0.5,
+    "map_score": 0.6389,
+    "file_recall": 1.0,
+    "context_efficiency": 0.4286,
+    "n_retrieved": 7,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 3
+}

@@ -90,13 +90,13 @@ def select(summaries: list[dict]) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--reports", type=Path, required=True)
+    parser.add_argument("--reports", type=Path, nargs="+", required=True)
     parser.add_argument("--out", type=Path, default=HERE / "traces.json")
     args = parser.parse_args()
 
-    reports = analyze_traces.load_reports(args.reports)
+    reports = analyze_traces.load_reports(*args.reports)
     if not reports:
-        print(f"no reports under {args.reports}", file=sys.stderr)
+        print(f"no reports under {[str(p) for p in args.reports]}", file=sys.stderr)
         return 2
     summaries = []
     for report in reports:

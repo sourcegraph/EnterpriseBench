@@ -255,14 +255,14 @@ def contrasts(reports: list[dict], categories: dict[str, list[str]]) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--reports", type=Path, required=True)
+    parser.add_argument("--reports", type=Path, nargs="+", required=True)
     parser.add_argument("--categories", type=Path, default=HERE / "task_categories.json")
     parser.add_argument("--json", type=Path, default=HERE / "comparison.json")
     args = parser.parse_args()
 
-    reports = load_reports(args.reports)
+    reports = load_reports(*args.reports)
     if not reports:
-        print(f"no reports under {args.reports}", file=sys.stderr)
+        print(f"no reports under {[str(p) for p in args.reports]}", file=sys.stderr)
         return 2
 
     # A pre-fix sweep under a different scoring contract must never be averaged

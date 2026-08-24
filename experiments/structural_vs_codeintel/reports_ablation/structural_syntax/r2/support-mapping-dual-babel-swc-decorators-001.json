@@ -1,0 +1,279 @@
+{
+  "task_id": "support-mapping-dual-babel-swc-decorators-001",
+  "policy": "condition:structural_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/babel--v7.24.0",
+    "github.com/sg-evals/swc--v1.4.6"
+  ],
+  "retrieved_paths": [
+    "crates/swc/src/config/mod.rs",
+    "packages/babel-plugin-proposal-decorators/src/index.ts",
+    "packages/babel-plugin-proposal-decorators/src/transformer-legacy.ts",
+    "packages/babel-plugin-transform-typescript/src/index.ts",
+    "crates/swc_ecma_transforms_typescript/src/typescript.rs",
+    "crates/swc_ecma_transforms_typescript/src/config.rs",
+    "packages/babel-preset-typescript/src/index.ts",
+    "packages/babel-helper-create-class-features-plugin/src/decorators.ts",
+    "packages/babel-plugin-syntax-decorators/src/index.ts"
+  ],
+  "required_files": [
+    "babel/packages/babel-plugin-proposal-decorators/src/index.ts",
+    "babel/packages/babel-plugin-transform-typescript/src/index.ts",
+    "swc/crates/swc_ecma_transforms_proposal/src/decorators.rs",
+    "swc/crates/swc_ecma_transforms_typescript/src/lib.rs"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_syntax",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 18,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.3477114,
+  "elapsed_seconds": 49.8,
+  "wall_seconds": 49.8,
+  "tool_log": [
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "legacy",
+        "language": "javascript"
+      },
+      "seconds": 2.309,
+      "result_chars": 1199,
+      "hit_paths": [
+        "crates/swc_ecma_minifier/tests/fixture/next/wrap-contracts/output.js",
+        "crates/swc_ecma_minifier/tests/fixture/next/wrap-contracts/output.js",
+        "crates/swc_ecma_minifier/tests/fixture/next/wrap-contracts/input.js",
+        "crates/swc_ecma_minifier/tests/fixture/next/wrap-contracts/input.js"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0"
+      },
+      "seconds": 0.026,
+      "result_chars": 157806,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0"
+      },
+      "seconds": 0.027,
+      "result_chars": 157806,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6"
+      },
+      "seconds": 0.037,
+      "result_chars": 143162,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0",
+        "path": "packages/babel-plugin-proposal-decorators/src/index.ts"
+      },
+      "seconds": 0.001,
+      "result_chars": 2022,
+      "hit_paths": [
+        "packages/babel-plugin-proposal-decorators/src/index.ts"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6",
+        "path": "crates/swc_ecma_transforms_typescript/src/lib.rs"
+      },
+      "seconds": 0.001,
+      "result_chars": 239,
+      "hit_paths": [
+        "crates/swc_ecma_transforms_typescript/src/lib.rs"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6",
+        "path": "crates/swc_ecma_transforms_typescript/src/typescript.rs"
+      },
+      "seconds": 0.0,
+      "result_chars": 6361,
+      "hit_paths": [
+        "crates/swc_ecma_transforms_typescript/src/typescript.rs"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0",
+        "path": "packages/babel-plugin-transform-typescript/src/index.ts"
+      },
+      "seconds": 0.0,
+      "result_chars": 24867,
+      "hit_paths": [
+        "packages/babel-plugin-transform-typescript/src/index.ts"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0",
+        "path": "packages/babel-plugin-proposal-decorators/src/transformer-legacy.ts"
+      },
+      "seconds": 0.0,
+      "result_chars": 12099,
+      "hit_paths": [
+        "packages/babel-plugin-proposal-decorators/src/transformer-legacy.ts"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6"
+      },
+      "seconds": 0.028,
+      "result_chars": 143162,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6",
+        "path": "crates/swc_ecma_transforms_typescript/src/config.rs"
+      },
+      "seconds": 0.0,
+      "result_chars": 2385,
+      "hit_paths": [
+        "crates/swc_ecma_transforms_typescript/src/config.rs"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6",
+        "path": "crates/swc_ecma_transforms_proposal/src/decorators.rs"
+      },
+      "seconds": 0.0,
+      "result_chars": 0,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6"
+      },
+      "seconds": 0.046,
+      "result_chars": 203937,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "decorator_metadata",
+        "language": "rust"
+      },
+      "seconds": 0.249,
+      "result_chars": 892,
+      "hit_paths": [
+        "crates/swc/tests/tsc.rs",
+        "crates/swc/tests/tsc.rs",
+        "crates/swc/tests/tsc.rs",
+        "crates/swc/src/config/mod.rs"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "legacy_decorator",
+        "language": "rust"
+      },
+      "seconds": 0.199,
+      "result_chars": 290,
+      "hit_paths": [
+        "crates/swc/src/config/mod.rs"
+      ]
+    }
+  ],
+  "tool_seconds": 2.923,
+  "retrieval_result_chars": 856227,
+  "denied_tools": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "grep -io '\"[^\"]*decorator[^\"]*\"' /home/ds/.claude-homes/account4/.claude/projects/-home-ds-projects-EnterpriseBench-experiments-structural-vs-codeintel/43c6080c-7b07-4633-a746-079e2b3b17a3/tool-results/toolu_01DXsxXx52jiPxtbRKW7dHQk.json | sort -u"
+      },
+      "condition": "structural_syntax"
+    }
+  ],
+  "cli_result_text": "Submitted the file set mapping the regression boundary:\n\n- **Babel side**: `plugin-proposal-decorators/src/index.ts` selects legacy vs stage-3 based on `version`/`legacy` option; `transformer-legacy.ts` implements the legacy visitor (which is what emits `Reflect.metadata`-compatible descriptor calls via `applyDecoratedDescriptor`); `plugin-transform-typescript/src/index.ts` and `preset-typescript/src/index.ts` establish plugin ordering (decorators plugin must run before/inherit from typescript's syntax plugin); `helper-create-class-features-plugin/src/decorators.ts` is the shared class-features engine both stage-3 and legacy paths funnel through; `plugin-syntax-decorators/src/index.ts` validates the `legacy` option.\n- **SWC side**: `crates/swc/src/config/mod.rs` is where `jsc.transform.legacyDecorator` and `decoratorMetadata` are read from `.swcrc`/config and wired into the pass pipeline \u2014 this is the customer-facing config surface that determines whether `Reflect.metadata` calls are emitted at all; `swc_ecma_transforms_typescript/{typescript.rs,config.rs}` show the TS strip pass itself does not carry decorator/metadata logic \u2014 that's gated separately by the `legacyDecorator`/`decoratorMetadata` flags in the top-level config, not implied by TS transform alone.\n\nThe divergence: Babel's `legacy: true` on `plugin-proposal-decorators` implicitly emits Reflect-metadata-compatible descriptors as part of the legacy visitor: it's inseparable from turning legacy mode on. SWC treats `legacyDecorator` and `decoratorMetadata` as two independent boolean flags in `jsc.transform`; setting only `legacyDecorator: true` (matching Babel's `legacy: true` semantics) does **not** imply metadata emission \u2014 `decoratorMetadata` must be explicitly set `true` as well, and it requires `experimentalDecorators`-equivalent config plus `emitDecoratorMetadata` in tsconfig to be honored. A swc config migrated from a Babel `legacy: true` setup that only sets `legacyDecorator: true` silently drops all `design:type`/`design:paramtypes`/`design:returntype` metadata, which is exactly the customer's failure: decorators still execute (class construction unaffected) but Nest's `Reflect.getMetadata` calls return `undefined` because no metadata was ever emitted.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 947848,
+  "output_tokens": 3567,
+  "input_tokens_uncached": 22,
+  "cache_creation_input_tokens": 32219,
+  "cache_read_input_tokens": 915607,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "support-mapping-dual-babel-swc-decorators-001",
+    "config_name": "condition:structural_syntax",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4144,
+      "10": 0.4144
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 4
+}

@@ -2,7 +2,7 @@
 
 The hypothesis was that structural search would be the more agent-natural interface. AST patterns match code the way a developer thinks about code, and go-to-definition/find-references feels like an IDE affordance built for humans clicking around. So: give a coding agent both, and it should prefer the structural one.
 
-It didn't. Across 270 controlled runs, the agent reached for text search first in every single run where it had a choice, and in 52 of 54 runs it never touched the AST tool at all.
+It didn't. Across 270 controlled runs, the agent reached for text search first in every single run where it had a choice, and in 52 of 54 runs it never touched the AST tool at all. Showing it worked examples of the AST syntax pushed that to zero.
 
 ## The setup
 
@@ -64,10 +64,16 @@ The arm that retrieves best is the arm the agent never picks, and the arm that w
 
 So the fix belongs in routing. If the runner imposes the primitive, the ordering is: grep for identifier lookup, code intel for dependency and cross-repo and framework-noise questions, grep as the cheap default everywhere else. If tool choice is left to the agent, it stays on grep and none of the above happens.
 
-## What would falsify this
+## Was it the tool or the syntax?
 
-`ast_search` takes ast-grep metavariable syntax. An agent avoiding it might be avoiding the capability or the calling convention, and this pilot can't tell those apart. The next experiment is the ablation: add a two-line syntax example to that one tool description, hold everything else fixed, re-run. If usage jumps, the finding is about the interface and the original hypothesis deserves another hearing. Writing that example into one arm's description as a default would be exactly the coaching the parity check exists to prevent, which is why it's an ablation and not part of the pilot.
+`ast_search` takes ast-grep metavariable syntax, and an agent avoiding it could be avoiding the capability or the calling convention. Those look identical in a usage count, so we ran the ablation: 108 more runs on the same tasks, with the `pattern` argument showing two worked patterns (`def $F($$$ARGS)` matches any Python function definition, `$OBJ.get($KEY)` matches any `.get` call) instead of naming the metavariable forms abstractly. One argument description changed. Same backend, same tool description, same everything else, and the parity check still passes on the ablated schema: the arm shows syntax without arguing for the tool.
 
-The other limits: 18 tasks, so most intervals touch zero and only two whole-corpus contrasts exclude it, both of them codeintel against a structural arm. One model, one generation seam, and the Claude Code CLI has no temperature flag, so "model configuration held constant" currently means "held by the provider's defaults." And this measures retrieval only. Whether better retrieval converts into better task completion needs the end-to-end layer, which isn't built yet.
+Usage went down. `ast_search` was called zero times in 54 runs, against six calls in the control arm. Showing the agent how to write the pattern did not make it write one.
+
+The second ablation arm is what makes that readable. With grep removed, so the agent has to use ast_search, the same worked patterns helped: recall went from 0.765 to 0.790 (a difference of 0.025 with an interval of [−0.059, +0.003]) and the first relevant result arrived at call 4.7 instead of 6.6. The example was usable. The agent still didn't want the tool.
+
+## What would still falsify this
+
+18 tasks, so most intervals touch zero and only two whole-corpus contrasts exclude it, both of them codeintel against a structural arm. One model, one generation seam, and the Claude Code CLI has no temperature flag, so "model configuration held constant" currently means "held by the provider's defaults." And this measures retrieval only. Whether better retrieval converts into better task completion needs the end-to-end layer, which isn't built yet. The ablation also tested one wording of the structural interface, not the interface itself: a tool that took a code snippet instead of a pattern might land differently.
 
 Run-to-run standard deviation within a task ranged from 0.019 (codeintel) to 0.064 (lexical), so three repeats is enough to separate the codeintel gap from noise and not much else.

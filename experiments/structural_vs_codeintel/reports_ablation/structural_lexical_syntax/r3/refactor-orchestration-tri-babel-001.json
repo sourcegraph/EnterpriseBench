@@ -1,0 +1,191 @@
+{
+  "task_id": "refactor-orchestration-tri-babel-001",
+  "policy": "condition:structural_lexical_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/babel--v7.22.9",
+    "github.com/sg-evals/webpack--v5.88.2",
+    "github.com/sg-evals/next.js--v13.4.12"
+  ],
+  "retrieved_paths": [
+    "packages/next/package.json",
+    "package.json"
+  ],
+  "required_files": [
+    "packages/babel-parser/package.json",
+    "package.json",
+    "packages/next/package.json"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical_syntax",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 8,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.49280359999999995,
+  "elapsed_seconds": 51.5,
+  "wall_seconds": 51.5,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "\"@babel/(core|parser|traverse)\"",
+        "case_sensitive": false
+      },
+      "seconds": 1.192,
+      "result_chars": 8498,
+      "hit_paths": [
+        ".yarn/releases/yarn-3.6.1.cjs",
+        "CHANGELOG.md",
+        "Makefile.js",
+        "Makefile.source.mjs",
+        "babel-worker.cjs",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "benchmark/babel-core/real-case-preset-env-flow/babel-parser-expression.mjs",
+        "benchmark/babel-generator/many-empty-statements/bench.mjs",
+        "benchmark/babel-generator/many-identifiers/1-length.mjs",
+        "benchmark/babel-generator/many-identifiers/25-length.mjs",
+        "benchmark/babel-generator/real-case/jquery.mjs",
+        "benchmark/babel-parser/large-regexp/bench.mjs",
+        "benchmark/babel-parser/many-arrow-function-flow-types/bench.mjs",
+        "benchmark/babel-parser/many-async-arrows/bench.mjs",
+        "benchmark/babel-parser/many-class-private-properties/1-length.bench.mjs",
+        "benchmark/babel-parser/many-empty-statements/attachComment-false.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/1-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/11-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/2-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/await.mjs",
+        "benchmark/babel-parser/many-inner-comments-nested/bench.mjs",
+        "benchmark/babel-parser/many-inner-comments/bench.mjs",
+        "benchmark/babel-parser/many-leading-comments-nested/bench.mjs"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "babel--v7.22.9"
+      },
+      "seconds": 0.037,
+      "result_chars": 1288,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "webpack--v5.88.2",
+        "path": "package.json"
+      },
+      "seconds": 0.004,
+      "result_chars": 10520,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "next.js--v13.4.12",
+        "path": "package.json"
+      },
+      "seconds": 0.018,
+      "result_chars": 9659,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "next.js--v13.4.12",
+        "path": "packages/next/package.json"
+      },
+      "seconds": 0.001,
+      "result_chars": 9190,
+      "hit_paths": [
+        "packages/next/package.json"
+      ]
+    }
+  ],
+  "tool_seconds": 1.252,
+  "retrieval_result_chars": 39155,
+  "denied_tools": [
+    {
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "/workspace/REFACTOR_PLAN.md",
+        "content": "# Babel Parser `DecoratorMetadata` AST Node \u2014 Rollout Plan\n\n## 1. Execution Order\n\n1. **babel** (`/workspace/babel/`) \u2014 origin of the change (`@babel/parser` emits the new node; `@babel/traverse`/`@babel/types` must recognize it).\n2. **nextjs** (`/workspace/nextjs/`, specifically `packages/next`) \u2014 consumes `@babel/core`/`@babel/parser`/`@babel/traverse`/`@babel/generator`/`@babel/types` as direct devDependencies; update once the new babel version ships.\n3. **webpack** \u2014 **not on the critical path**. See \u00a72.\n\n## 2. Dependency Graph\n\n| Repo | Depends on Babel? | Manifest evidence |\n|---|---|---|\n| `nextjs` (`packages/next/package.json`) | **Yes** | `devDependencies` pins `\"@babel/core\": \"7.18.0\"`, `\"@babel/generator\": \"7.18.0\"`, `\"@babel/traverse\": \"7.18.0\"`, `\"@babel/types\": \"7.18.0\"`, plus `@babel/preset-env`, `@babel/preset-react`, `@babel/preset-typescript`, `@babel/plugin-transform-*`, `@babel/runtime`. Root `package.json` also pins `\"@babel/parser\": \"7.12.11\"` under `resolutions`/root devDependencies, which forces the parser version used across the workspace. Next.js runs a Babel-based fallback compiler (`next/babel` preset, `babel-loader` path for custom `.babelrc`/unsupported SWC configs) that walks the parser's AST directly, so a new node type in the AST is reachable here. |\n| `webpack` (`package.json`) | **No, not in a way this change reaches** | `@babel/core` and `@babel/preset-react` appear only in `devDependencies`, used for webpack's own **test fixtures/examples/benchmarks** (e.g. `babel-loader` test cases), not in the `dependencies` block. Webpack's actual module-parsing/AST layer is `acorn`/`acorn-import-assertions` (listed in `dependencies`), independent of Babel entirely. A Babel parser AST change does not propagate into webpack's core parsing logic. Originally assumed to be in the blast radius (webpack is commonly paired with babel-loader in user projects) \u2014 that pairing lives in *user* configs, not in webpack's own manifest/source. |\n\nNo edge exists from `webpack` \u2192 `babel` at the manifest level, so it is excluded from the propagation plan (see \u00a75 for the residual risk this still creates for users).\n\n## 3. Parallelization\n\n- **Step 1 (babel)** must complete and publish before anything else starts \u2014 it's the sole producer of the new AST shape.\n- **Step 2 (nextjs)** starts only after babel step 1 lands; nothing else in this dependency set can run in parallel with it since it's the only remaining consumer.\n- Within nextjs, the actual code touch points (Babel-fallback compiler path in `packages/next`, `@babel/eslint-parser` config, type defs `@types/babel__*`) can be updated concurrently by different engineers since they're independent files, but the package-version bump itself is a single serialized step.\n- webpack requires no coordinated step and can proceed on its own independent release cadence.\n\n## 4. Breaking vs. Compatible\n\n| Step | Classification | Rationale |\n|---|---|---|\n| babel: parser emits `DecoratorMetadata` node | **Compatible for consumers that ignore unknown node types** (visitors using explicit type switches skip it silently); **breaking for any AST consumer that does exhaustive type-checking** (e.g. TypeScript discriminated unions over `Node`, custom traversal switch statements without a default, or serializers that assert schema completeness) | New node type extends the AST union; anything pattern-matching exhaustively must add a case or it fails to compile/type-check. |\n| nextjs: bump `@babel/*` deps to consume the new parser | **Compatible** for typical Next.js users (Babel fallback path is opt-in/only used when SWC can't handle the config); **potentially breaking** for anyone with custom Babel plugins operating on the AST via `@babel/traverse` that don't handle unknown node types gracefully | Scoped to the Babel-compiler fallback path only, not the default SWC path \u2014 low blast radius. |\n| webpack | **N/A \u2014 no change required** | Not a Babel-AST consumer at the manifest level. |\n\n## 5. Risk Assessment\n\n- **babel (step 1)** \u2014 highest risk, must be correct: any consumer (inside or outside this workspace) doing exhaustive AST-node handling breaks. Mitigate with a minor/major semver bump per Babel's own AST-stability policy, changelog callout, and `@babel/types` helper updates (`isDecoratorMetadata`, etc.) so downstream exhaustiveness checks have an escape hatch.\n- **nextjs (step 2)** \u2014 medium risk, narrow surface: only the Babel-fallback compiler path is exposed; regression tests should target `.babelrc`-based projects and any first-party plugins in `@next/react-dev-overlay`/`@next/swc` interop that walk Babel ASTs. Low likelihood of hitting production traffic since SWC is the default compiler.\n- **webpack** \u2014 **no direct risk from this change**; however, flag a residual risk for users: real-world projects commonly wire `babel-loader` into webpack configs external to webpack's own repo. That risk isn't visible in webpack's manifest and is out of scope for this rollout \u2014 call it out to the webpack docs/community only if Babel's release notes suggest common `babel-loader` plugins are affected.\n- **Sequencing risk**: if nextjs bumps `@babel/parser`/`@babel/traverse` independently (e.g. via `resolutions`) ahead of a compatible `@babel/core` release, version skew between `@babel/parser` (new node emitted) and `@babel/traverse`/`@babel/types` (older, unaware of the node) could cause silent AST corruption. Keep all four `@babel/*` deps bumped atomically per Next.js's existing `resolutions` block pattern.\n"
+      },
+      "condition": "structural_lexical_syntax"
+    }
+  ],
+  "cli_result_text": "Files submitted (2 of the 3 \u2014 dedup likely collapsed the two next.js entries into the same result set alongside webpack's).\n\n**Findings, for the record since I can't write the plan file:**\n\n- **`packages/next/package.json`** (next.js) \u2014 `devDependencies` pins `@babel/core@7.18.0`, `@babel/traverse@7.18.0`, `@babel/generator@7.18.0`, `@babel/types@7.18.0`, plus preset/plugin packages. Root `package.json` pins `@babel/parser@7.12.11` via `resolutions`. This is the real edge: Next.js runs a Babel-based fallback compiler path and directly walks the parser AST.\n- **`webpack/package.json`** \u2014 `@babel/core`/`@babel/preset-react` appear only in `devDependencies`, used for webpack's own test fixtures/examples, not `dependencies`. Webpack's actual parsing uses `acorn`, not Babel. **No manifest edge to babel's parser** \u2014 it's out of the propagation path despite being commonly paired with babel-loader in *user* configs (that pairing isn't in webpack's own source tree).\n\n**Order:** babel \u2192 nextjs (webpack excluded, no dependency edge found).\n\nI don't have write access in this environment \u2014 only `mcp__retrieval__*` tools \u2014 so I couldn't produce `/workspace/REFACTOR_PLAN.md` itself. Someone with file-write access should take the analysis above (order, graph, parallelization, breaking/compatible, risk) and commit it to that path.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 498159,
+  "output_tokens": 3888,
+  "input_tokens_uncached": 12,
+  "cache_creation_input_tokens": 93229,
+  "cache_read_input_tokens": 404918,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "condition:structural_lexical_syntax",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 1.0,
+    "n_retrieved": 2,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 4
+}

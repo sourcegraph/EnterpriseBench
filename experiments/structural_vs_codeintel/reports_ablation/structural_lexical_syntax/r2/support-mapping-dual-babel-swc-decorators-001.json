@@ -1,0 +1,720 @@
+{
+  "task_id": "support-mapping-dual-babel-swc-decorators-001",
+  "policy": "condition:structural_lexical_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/babel--v7.24.0",
+    "github.com/sg-evals/swc--v1.4.6"
+  ],
+  "retrieved_paths": [
+    "packages/babel-plugin-proposal-decorators/src/index.ts",
+    "packages/babel-plugin-proposal-decorators/src/transformer-legacy.ts",
+    "crates/swc_ecma_transforms_proposal/src/decorators/legacy/metadata.rs",
+    "crates/swc_ecma_transforms_proposal/src/decorators/legacy/mod.rs",
+    "crates/swc_ecma_transforms_proposal/src/decorators/mod.rs",
+    "crates/swc/src/config/mod.rs",
+    "crates/swc/src/lib.rs",
+    "packages/babel-plugin-transform-typescript/src/index.ts",
+    "packages/babel-helper-create-class-features-plugin/src/decorators-2018-09.ts",
+    "packages/babel-preset-typescript/src/index.ts",
+    "packages/babel-helper-create-class-features-plugin/src/index.ts",
+    "packages/babel-helper-create-class-features-plugin/src/features.ts",
+    "crates/swc/src/builder.rs",
+    "bindings/binding_core_wasm/src/types.rs"
+  ],
+  "required_files": [
+    "babel/packages/babel-plugin-proposal-decorators/src/index.ts",
+    "babel/packages/babel-plugin-transform-typescript/src/index.ts",
+    "swc/crates/swc_ecma_transforms_proposal/src/decorators.rs",
+    "swc/crates/swc_ecma_transforms_typescript/src/lib.rs"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical_syntax",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 33,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 1.0978134,
+  "elapsed_seconds": 169.0,
+  "wall_seconds": 169.0,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "legacy.*decorator|decoratorsBeforeExport|createClassFeaturePlugin",
+        "case_sensitive": false
+      },
+      "seconds": 0.611,
+      "result_chars": 10077,
+      "hit_paths": [
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v8.md",
+        "CHANGELOG.md",
+        "packages/babel-core/test/parse.js",
+        "packages/babel-generator/src/generators/classes.ts",
+        "packages/babel-generator/src/generators/expressions.ts",
+        "packages/babel-generator/src/generators/expressions.ts",
+        "packages/babel-generator/src/generators/expressions.ts",
+        "packages/babel-generator/src/generators/modules.ts",
+        "packages/babel-generator/src/generators/modules.ts",
+        "packages/babel-generator/src/generators/modules.ts",
+        "packages/babel-generator/src/generators/modules.ts",
+        "packages/babel-generator/src/index.ts",
+        "packages/babel-generator/src/index.ts",
+        "packages/babel-generator/src/printer.ts",
+        "packages/babel-generator/test/fixtures/comments/decorators-after-export-to-after/options.json",
+        "packages/babel-generator/test/fixtures/comments/decorators-after-export-to-before/options.json",
+        "packages/babel-generator/test/fixtures/comments/decorators-before-export-to-after/options.json",
+        "packages/babel-generator/test/fixtures/comments/decorators-before-export-to-before/options.json",
+        "packages/babel-generator/test/fixtures/comments/decorators-legacy-before-export/options.json",
+        "packages/babel-generator/test/fixtures/decorator-auto-accessors/options.json"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0"
+      },
+      "seconds": 0.012,
+      "result_chars": 1294,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0"
+      },
+      "seconds": 0.011,
+      "result_chars": 36486,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "legacyDecorator|decoratorMetadata|decorator_metadata",
+        "case_sensitive": false
+      },
+      "seconds": 1.107,
+      "result_chars": 11401,
+      "hit_paths": [
+        "bindings/binding_core_wasm/src/types.rs",
+        "bindings/binding_core_wasm/src/types.rs",
+        "bindings/binding_core_wasm/src/types.rs",
+        "bindings/binding_core_wasm/src/types.rs",
+        "bindings/binding_minifier_wasm/src/types.rs",
+        "bindings/binding_minifier_wasm/src/types.rs",
+        "bindings/binding_minifier_wasm/src/types.rs",
+        "bindings/binding_minifier_wasm/src/types.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/tests/exec/issues-1xxx/1592/set_public_class_fields/.swcrc",
+        "crates/swc/tests/exec/issues-1xxx/1592/set_public_class_fields/.swcrc",
+        "crates/swc/tests/exec/issues-5xxx/.5474/.swcrc",
+        "crates/swc/tests/exec/issues-5xxx/.5474/.swcrc",
+        "crates/swc/tests/exec/issues-8xxx/8155/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1135/1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1160/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1160/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1278/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1278/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1309/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1309/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1345/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1345/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1358/case4/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1358/case4/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1358/case5/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1358/case5/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case2/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case2/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1421/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1421/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1454/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1454/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1454/case2/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1454/case2/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/input/.swcrc"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "decorator_metadata|legacy_decorator|proposal::decorators",
+        "case_sensitive": false
+      },
+      "seconds": 1.595,
+      "result_chars": 4557,
+      "hit_paths": [
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/tests/projects.rs",
+        "crates/swc/tests/tsc.rs",
+        "crates/swc/tests/tsc.rs",
+        "crates/swc/tests/tsc.rs",
+        "crates/swc_bundler/tests/common/mod.rs",
+        "crates/swc_ecma_parser/src/parser/stmt/module_item.rs",
+        "crates/swc_ecma_transforms/tests/es2015_function_name.rs",
+        "crates/swc_ecma_transforms_optimization/tests/simplify.rs",
+        "crates/swc_ecma_transforms_optimization/tests/simplify_dce.rs",
+        "crates/swc_ecma_transforms_typescript/tests/strip.rs",
+        "crates/swc_node_bundler/src/loaders/swc.rs",
+        "crates/swc_node_bundler/src/loaders/swc.rs"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0"
+      },
+      "seconds": 0.013,
+      "result_chars": 36486,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0",
+        "path": "packages/babel-plugin-proposal-decorators/src/index.ts"
+      },
+      "seconds": 0.0,
+      "result_chars": 2022,
+      "hit_paths": [
+        "packages/babel-plugin-proposal-decorators/src/index.ts"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "decorators-2018-09|legacyDecorators|require\\(.\\./decorators",
+        "case_sensitive": false
+      },
+      "seconds": 0.709,
+      "result_chars": 686,
+      "hit_paths": [
+        "packages/babel-helper-create-class-features-plugin/src/features.ts",
+        "packages/babel-helper-create-class-features-plugin/src/index.ts"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0",
+        "path": "packages/babel-plugin-proposal-decorators/src/transformer-legacy.ts"
+      },
+      "seconds": 0.0,
+      "result_chars": 12099,
+      "hit_paths": [
+        "packages/babel-plugin-proposal-decorators/src/transformer-legacy.ts"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0",
+        "path": "packages/babel-preset-typescript/src/index.ts"
+      },
+      "seconds": 0.001,
+      "result_chars": 3411,
+      "hit_paths": [
+        "packages/babel-preset-typescript/src/index.ts"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "emit_metadata|design:paramtypes|Reflect\\.metadata",
+        "case_sensitive": false
+      },
+      "seconds": 0.152,
+      "result_chars": 11168,
+      "hit_paths": [
+        ".yarn/releases/yarn-4.0.2.cjs",
+        "packages/babel-plugin-transform-runtime/test/fixtures/runtime-corejs3/built-in-static-methods-proposals/input.js",
+        "packages/babel-plugin-transform-runtime/test/fixtures/runtime-corejs3/built-in-static-methods/input.js",
+        "packages/babel-plugin-transform-runtime/test/fixtures/runtime-corejs3/built-in-static-methods/output.js",
+        "packages/babel-preset-env/test/fixtures/corejs3-babel-7/entry-all-chrome-71/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3-babel-7/entry-all/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3-babel-7/entry-entries-es-proposals-stage-chrome-71/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3-babel-7/entry-entries-es-proposals-stage/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3-babel-7/entry-entries-mixed-chrome-71/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3-babel-7/entry-entries-mixed/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3-babel-7/entry-entries-proposals-chrome-71/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3-babel-7/entry-entries-proposals/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3-babel-7/entry-entries-stage-chrome-71/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3-babel-7/entry-entries-stage/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3-babel-7/entry-require-all/output.js",
+        "packages/babel-preset-env/test/fixtures/corejs3-babel-7/entry-require-es-proposals/output.js",
+        "packages/babel-preset-env/test/fixtures/corejs3/entry-all-chrome-71/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3/entry-all/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3/entry-entries-es-proposals-stage-chrome-71/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3/entry-entries-es-proposals-stage/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3/entry-entries-mixed-chrome-71/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3/entry-entries-mixed/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3/entry-entries-proposals-chrome-71/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3/entry-entries-proposals/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3/entry-entries-stage-chrome-71/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3/entry-entries-stage/output.mjs",
+        "packages/babel-preset-env/test/fixtures/corejs3/entry-require-all/output.js",
+        "packages/babel-preset-env/test/fixtures/corejs3/entry-require-es-proposals/output.js",
+        "packages/babel-preset-env/test/fixtures/debug-babel-7/entry-corejs3-all-chrome-71/stdout.txt",
+        "packages/babel-preset-env/test/fixtures/debug-babel-7/entry-corejs3-all/stdout.txt"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6",
+        "path": "crates/swc_ecma_transforms_proposal/src/decorators.rs"
+      },
+      "seconds": 0.0,
+      "result_chars": 0,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0",
+        "path": "packages/babel-plugin-transform-typescript/src/index.ts"
+      },
+      "seconds": 0.0,
+      "result_chars": 24867,
+      "hit_paths": [
+        "packages/babel-plugin-transform-typescript/src/index.ts"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "emitDecoratorMetadata|Babel does not support decorator metadata|does not support emitDecoratorMetadata",
+        "case_sensitive": false
+      },
+      "seconds": 0.912,
+      "result_chars": 6538,
+      "hit_paths": [
+        "crates/swc/tests/tsc-references/esDecorators-emitDecoratorMetadata(target=es2015).1.normal.js",
+        "crates/swc/tests/tsc-references/esDecorators-emitDecoratorMetadata(target=es2015).2.minified.js",
+        "crates/swc/tests/tsc-references/esDecorators-emitDecoratorMetadata(target=es2022).1.normal.js",
+        "crates/swc/tests/tsc-references/esDecorators-emitDecoratorMetadata(target=es2022).2.minified.js",
+        "crates/swc/tests/tsc-references/esDecorators-emitDecoratorMetadata(target=es5).1.normal.js",
+        "crates/swc/tests/tsc-references/esDecorators-emitDecoratorMetadata(target=es5).2.minified.js",
+        "crates/swc/tests/tsc-references/esDecorators-emitDecoratorMetadata(target=esnext).1.normal.js",
+        "crates/swc/tests/tsc-references/esDecorators-emitDecoratorMetadata(target=esnext).2.minified.js",
+        "crates/swc/tests/tsc.rs",
+        "crates/swc_ecma_minifier/benches/full/typescript.js",
+        "crates/swc_ecma_minifier/benches/full/typescript.js",
+        "crates/swc_ecma_minifier/benches/full/typescript.js",
+        "crates/swc_ecma_minifier/benches/full/typescript.js",
+        "crates/swc_ecma_minifier/benches/full/typescript.js",
+        "crates/swc_ecma_minifier/benches/full/typescript.js",
+        "crates/swc_ecma_minifier/benches/full/typescript.js",
+        "crates/swc_ecma_minifier/benches/full/typescript.js",
+        "crates/swc_ecma_minifier/benches/full/typescript.js",
+        "crates/swc_ecma_parser/tests/tsc/decoratedClassExportsCommonJS1.ts",
+        "crates/swc_ecma_parser/tests/tsc/decoratedClassExportsCommonJS2.ts"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "struct Metadata|fn metadata|design:paramtypes|design:type|design:returntype",
+        "case_sensitive": false
+      },
+      "seconds": 0.913,
+      "result_chars": 9280,
+      "hit_paths": [
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "crates/swc/tests/fixture/issues-1xxx/1160/output/entry.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1278/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1421/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "ts_metadata|\"design:type\"|inject_helper.*metadata",
+        "case_sensitive": false
+      },
+      "seconds": 2.262,
+      "result_chars": 9217,
+      "hit_paths": [
+        "crates/swc/tests/fixture/issues-1xxx/1160/output/entry.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1160/output/entry.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1278/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1278/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1345/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1421/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1421/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "pub struct Config.*legacy|pub fn decorators\\(",
+        "case_sensitive": false
+      },
+      "seconds": 0.677,
+      "result_chars": 542,
+      "hit_paths": [
+        "crates/swc_ecma_parser/src/lib.rs",
+        "crates/swc_ecma_transforms_proposal/src/decorators/mod.rs"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6",
+        "path": "crates/swc_ecma_transforms_proposal/src/decorators/mod.rs"
+      },
+      "seconds": 0.0,
+      "result_chars": 25121,
+      "hit_paths": [
+        "crates/swc_ecma_transforms_proposal/src/decorators/mod.rs"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6",
+        "path": "crates/swc/src/config/mod.rs"
+      },
+      "seconds": 0.0,
+      "result_chars": 55831,
+      "hit_paths": [
+        "crates/swc/src/config/mod.rs"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "decorators\\(decorators::Config|typescript::.*strip|class_properties|Optional::new",
+        "case_sensitive": false
+      },
+      "seconds": 1.062,
+      "result_chars": 9985,
+      "hit_paths": [
+        "scripts/parser-tests/flow/allowlist.txt",
+        "scripts/parser-tests/flow/allowlist.txt",
+        "crates/swc/benches/typescript.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/builder.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/lib.rs",
+        "crates/swc_bundler/tests/common/mod.rs",
+        "crates/swc_bundler/tests/common/mod.rs",
+        "crates/swc_ecma_compat_common/src/macros.rs",
+        "crates/swc_ecma_compat_es2015/src/classes/mod.rs",
+        "crates/swc_ecma_compat_es2015/src/classes/mod.rs",
+        "crates/swc_ecma_compat_es2015/src/classes/mod.rs",
+        "crates/swc_ecma_compat_es2015/src/lib.rs",
+        "crates/swc_ecma_compat_es2015/src/lib.rs",
+        "crates/swc_ecma_compat_es2015/src/lib.rs",
+        "crates/swc_ecma_compat_es2015/src/lib.rs"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6",
+        "path": "crates/swc_ecma_transforms_proposal/src/decorators/legacy.rs"
+      },
+      "seconds": 0.0,
+      "result_chars": 0,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "typescript::strip is invoked at the start",
+        "case_sensitive": false
+      },
+      "seconds": 0.361,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6"
+      },
+      "seconds": 0.019,
+      "result_chars": 143162,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "design:paramtypes|fn new\\(metadata|struct Legacy|LegacyDecorator",
+        "case_sensitive": false
+      },
+      "seconds": 0.848,
+      "result_chars": 8751,
+      "hit_paths": [
+        "bindings/binding_core_wasm/src/types.rs",
+        "bindings/binding_core_wasm/src/types.rs",
+        "bindings/binding_minifier_wasm/src/types.rs",
+        "bindings/binding_minifier_wasm/src/types.rs",
+        "crates/swc/tests/exec/issues-1xxx/1592/set_public_class_fields/.swcrc",
+        "crates/swc/tests/exec/issues-5xxx/.5474/.swcrc",
+        "crates/swc/tests/exec/issues-8xxx/8155/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1135/1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1160/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1278/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1309/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1345/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1358/case4/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1358/case5/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case2/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1421/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1454/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1454/case2/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case2/input/.swcrc"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "typescript::strip is invoked",
+        "case_sensitive": false
+      },
+      "seconds": 0.477,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6",
+        "path": "crates/swc_ecma_transforms_proposal/src/decorators/legacy/mod.rs"
+      },
+      "seconds": 0.0,
+      "result_chars": 11095,
+      "hit_paths": [
+        "crates/swc_ecma_transforms_proposal/src/decorators/legacy/mod.rs"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "mod legacy;|pub use self::legacy|pub(crate) mod legacy",
+        "case_sensitive": false
+      },
+      "seconds": 0.672,
+      "result_chars": 271,
+      "hit_paths": [
+        "crates/swc_ecma_transforms_proposal/src/decorators/mod.rs"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6",
+        "path": "crates/swc_ecma_transforms_proposal/src/decorators/legacy/metadata.rs"
+      },
+      "seconds": 0.0,
+      "result_chars": 18762,
+      "hit_paths": [
+        "crates/swc_ecma_transforms_proposal/src/decorators/legacy/metadata.rs"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0",
+        "path": "packages/babel-helper-create-class-features-plugin/src/decorators-2018-09.ts"
+      },
+      "seconds": 0.0,
+      "result_chars": 6372,
+      "hit_paths": [
+        "packages/babel-helper-create-class-features-plugin/src/decorators-2018-09.ts"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "typically fine as|strip is invoked at the start|removes type",
+        "case_sensitive": false
+      },
+      "seconds": 0.808,
+      "result_chars": 268,
+      "hit_paths": [
+        "crates/swc/src/lib.rs"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/swc--v1.4.6",
+        "path": "crates/swc/src/lib.rs"
+      },
+      "seconds": 0.0,
+      "result_chars": 36136,
+      "hit_paths": [
+        "crates/swc/src/lib.rs"
+      ]
+    }
+  ],
+  "tool_seconds": 13.222,
+  "retrieval_result_chars": 495909,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Summary of the root-cause chain found across both repos:\n\n**Babel side** (`packages/babel-plugin-proposal-decorators/src/index.ts`) branches on `legacy: true` \u2192 `transformer-legacy.ts`, a fork of `babel-plugin-transform-decorators-legacy`. That file builds `__decorate`-style calls but **never inspects TS type annotations or emits `design:type`/`design:paramtypes`/`Reflect.metadata` calls at all** \u2014 confirmed by reading `babel-plugin-transform-typescript/src/index.ts`, which only strips types (enums, namespaces, parameter properties) and has zero metadata-emission logic. Babel's stock toolchain (`preset-typescript` \u2192 `plugin-proposal-decorators`) structurally cannot produce NestJS's DI metadata; that behavior only exists via third-party packages like `babel-plugin-transform-typescript-metadata` (not in this repo), which the customer's babel pipeline evidently lacked.\n\n**SWC side**, `crates/swc_ecma_transforms_proposal/src/decorators/mod.rs` routes `legacyDecorator: true` to `legacy/mod.rs` (`TscDecorator`), which \u2014 only `if self.metadata` (wired from `.swcrc`'s `decoratorMetadata`) \u2014 runs `ParamMetadata` and `Metadata` visitors (`legacy/metadata.rs`) that read live `TsTypeAnn` nodes off class props/params/methods to synthesize `_ts_metadata(\"design:type\", ...)` calls, faithfully porting `tsc`'s `emitDecoratorMetadata`. Critically, `crates/swc/src/lib.rs` documents the pass-ordering guarantee: decorators are handled **before** `typescript::strip` runs, so type annotations are still present when `Metadata` visits the class \u2014 this is why SWC's legacy-decorator + decoratorMetadata combo works at all.\n\n**The divergence**: SWC requires *both* `jsc.transform.legacyDecorator: true` **and** `decoratorMetadata: true` (`crates/swc/src/config/mod.rs`, `bindings/binding_core_wasm/src/types.rs`) to emit the `_ts_metadata` calls Nest's `Reflect.getMetadata` reads at bootstrap. If the customer's `.swcrc` set `legacyDecorator: true` but left `decoratorMetadata` at its default `false`, SWC silently produces zero metadata \u2014 classes construct fine, decorators fire, but no `design:paramtypes` ever reaches `Reflect`, exactly matching the reported symptom. This is the config gap to check first, since it reproduces the bug without any Babel/SWC semantic bug at all.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 2439978,
+  "output_tokens": 10034,
+  "input_tokens_uncached": 34,
+  "cache_creation_input_tokens": 134057,
+  "cache_read_input_tokens": 2305887,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "support-mapping-dual-babel-swc-decorators-001",
+    "config_name": "condition:structural_lexical_syntax",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.5135
+    },
+    "mrr": 1.0,
+    "map_score": 0.3125,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 14,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 3
+}

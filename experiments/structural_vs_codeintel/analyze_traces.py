@@ -197,15 +197,28 @@ def _evidence_indices(log: list[dict], required: list[str]):
 _REPORT_KEYS = ("condition", "task_id")
 
 
-def load_reports(directory: Path) -> list[dict]:
-    reports = []
-    for path in sorted(directory.rglob("*.json")):
-        payload = json.loads(path.read_text())
-        if not isinstance(payload, dict):
-            continue
-        if all(payload.get(key) for key in _REPORT_KEYS):
-            reports.append(payload)
-    return reports
+def load_reports(*directories: Path) -> list[dict]:
+    """Run reports under one or more directories.
+
+    Several directories are accepted because an ablation arm is swept into its
+    own tree, and reading it beside the arm it is controlled against is the
+    whole point of running it. Duplicate (condition, repeat, task) keys across
+    trees are refused rather than merged: two files claiming the same run are
+    a mistake somewhere, and averaging them would hide it.
+    """
+    reports: dict[tuple, dict] = {}
+    for directory in directories:
+        for path in sorted(directory.rglob("*.json")):
+            payload = json.loads(path.read_text())
+            if not isinstance(payload, dict):
+                continue
+            if not all(payload.get(key) for key in _REPORT_KEYS):
+                continue
+            key = (payload["condition"], payload.get("repeat"), payload["task_id"])
+            if key in reports:
+                raise ValueError(f"{path} duplicates run {key}")
+            reports[key] = payload
+    return list(reports.values())
 
 
 def aggregate(summaries: list[dict]) -> dict:
@@ -276,14 +289,14 @@ def _mean(values) -> float | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--reports", type=Path, required=True)
+    parser.add_argument("--reports", type=Path, nargs="+", required=True)
     parser.add_argument("--json", type=Path, default=HERE / "trace_stats.json")
     parser.add_argument("--runs-json", type=Path, default=HERE / "trace_runs.json")
     args = parser.parse_args()
 
-    reports = load_reports(args.reports)
+    reports = load_reports(*args.reports)
     if not reports:
-        print(f"no reports under {args.reports}", file=sys.stderr)
+        print(f"no reports under {[str(p) for p in args.reports]}", file=sys.stderr)
         return 2
     summaries = [summarize_run(report) for report in reports]
     args.runs_json.write_text(json.dumps(summaries, indent=2) + "\n")

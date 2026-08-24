@@ -1,0 +1,188 @@
+{
+  "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+  "policy": "condition:structural_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/flask--2.3.3",
+    "github.com/sg-evals/werkzeug--2.3.7"
+  ],
+  "retrieved_paths": [
+    "src/werkzeug/local.py",
+    "src/flask/ctx.py",
+    "src/flask/globals.py",
+    "src/flask/app.py",
+    "docs/async-await.rst",
+    "docs/reqcontext.rst",
+    "tests/test_local.py",
+    "tests/test_reqctx.py"
+  ],
+  "required_files": [
+    "flask/src/flask/globals.py",
+    "flask/src/flask/ctx.py",
+    "werkzeug/src/werkzeug/local.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_syntax",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 10,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.3499086,
+  "elapsed_seconds": 37.5,
+  "wall_seconds": 37.5,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3"
+      },
+      "seconds": 0.017,
+      "result_chars": 7041,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/werkzeug--2.3.7"
+      },
+      "seconds": 0.008,
+      "result_chars": 9521,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/globals.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 2945,
+      "hit_paths": [
+        "src/flask/globals.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/werkzeug--2.3.7",
+        "path": "src/werkzeug/local.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 22003,
+      "hit_paths": [
+        "src/werkzeug/local.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/ctx.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 14841,
+      "hit_paths": [
+        "src/flask/ctx.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "pattern": "async_to_sync"
+      },
+      "seconds": 0.107,
+      "result_chars": 700,
+      "hit_paths": [
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "pattern": "def ensure_sync($$$ARGS)"
+      },
+      "seconds": 0.085,
+      "result_chars": 856,
+      "hit_paths": [
+        "src/flask/app.py"
+      ]
+    }
+  ],
+  "tool_seconds": 0.217,
+  "retrieval_result_chars": 57907,
+  "denied_tools": [
+    {
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "/dev/null"
+      },
+      "condition": "structural_syntax"
+    }
+  ],
+  "cli_result_text": "Submitted. Summary of the trace for the customer report:\n\n**1. `request` proxy binding** \u2014 `src/flask/globals.py` defines `_cv_request: ContextVar[RequestContext] = ContextVar(\"flask.request_ctx\")` and `request = LocalProxy(_cv_request, \"request\", unbound_message=_no_req_msg)`. Every attribute access on the global `request` object goes through `LocalProxy.__getattr__` \u2192 `_get_current_object()` \u2192 `_cv_request.get()`.\n\n**2. Werkzeug's threadlocal\u2192contextvars switch** \u2014 `src/werkzeug/local.py`. `Local` and `LocalStack` (docstrings note \"`.. versionchanged:: 2.0` Uses `ContextVar` instead of a custom storage implementation\") wrap a `contextvars.ContextVar` directly rather than `threading.local`. `LocalProxy.__init__` special-cases `ContextVar` inputs (as Flask 2.3 passes): `_get_current_object` calls `local.get()` and raises `RuntimeError(unbound_message)` on `LookupError` \u2014 this is the exact exception path that produces \"Working outside of request context.\"\n\n**3. The chain**: `flask.app.Flask.wsgi_app` \u2192 `RequestContext.push()` in `src/flask/ctx.py` calls `_cv_request.set(self)`, binding the context in the *current* `contextvars.Context` (implicitly copied per-task/thread by Python's asyncio and threading runtime \u2014 this is stdlib behavior, not werkzeug/Flask code, so it's not literally \"in\" either repo, but it's the mechanism `ctx.push()` relies on). Any code running inside that same logical Context sees `_cv_request.get()` succeed \u2192 `LocalProxy` resolves \u2192 `request.path` etc. work. Code running in a *different* Context (one that wasn't forked from the request-bound one, or was created before the `set()` happened) gets `LookupError` \u2192 `RuntimeError`.\n\n**4. Why `create_task` differs from `ensure_future` off a thread-pool worker**: `asyncio.Task.__init__` (stdlib) calls `contextvars.copy_context()` at task-creation time and runs the coroutine inside that captured copy \u2014 so a task created *while* the request context is pushed (same event-loop-driven coroutine chain as the view function) inherits the `ContextVar` binding and `request` resolves fine. Flask's own async-view bridge (`Flask.ensure_sync` / `async_to_sync` in `src/flask/app.py`) uses `asgiref.sync.async_to_sync`, which runs the coroutine's event loop in a **separate thread** and explicitly propagates the calling contextvars.Context into that thread for the *duration of that single coroutine run*. The customer's failure is `asyncio.create_task(coro)` spawned *from inside* that bridged coroutine but scheduled to run detached, outside the request handler's `async_to_sync` call/await boundary \u2014 by the time it executes, either the parent Context has already been torn down (`RequestContext.pop()` called `_cv_request.reset(token)` once the synchronous view function returned) or the task is running against a thread-pool executor context via `ensure_future`/`run_in_executor` that never received `copy_context()` propagation at all (thread-pool workers get a fresh/default Context unless something like `contextvars.copy_context().run(...)` explicitly threads it through). Either way `_cv_request.get()` misses in that execution context, `LocalProxy._get_current_object` raises, and the customer sees `RuntimeError: Working outside of request context.` \u2014 a regression relative to Flask 2.0/werkzeug pre-2.0 `threading.local`-based `LocalStack`, where the stack was keyed by OS thread id, not by asyncio Context, so a detached task on the *same* thread still saw the same threadlocal storage (that behavior is intrinsically thread-identity-only and doesn't distinguish concurrent coroutines, which is precisely why werkzeug 2.0 moved to `ContextVar` \u2014 trading \"detached same-thread tasks see stale state\" for \"detached tasks need explicit context propagation\").",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 523719,
+  "output_tokens": 2811,
+  "input_tokens_uncached": 12,
+  "cache_creation_input_tokens": 57114,
+  "cache_read_input_tokens": 466593,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "condition:structural_syntax",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.375,
+    "n_retrieved": 8,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 5
+}

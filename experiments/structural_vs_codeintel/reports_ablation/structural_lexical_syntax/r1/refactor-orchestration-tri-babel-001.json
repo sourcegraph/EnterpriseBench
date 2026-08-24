@@ -1,0 +1,568 @@
+{
+  "task_id": "refactor-orchestration-tri-babel-001",
+  "policy": "condition:structural_lexical_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/babel--v7.22.9",
+    "github.com/sg-evals/webpack--v5.88.2",
+    "github.com/sg-evals/next.js--v13.4.12"
+  ],
+  "retrieved_paths": [
+    "packages/next/src/bundles/babel/bundle.js",
+    "packages/next/src/build/babel/preset.ts",
+    "packages/next/package.json",
+    "package.json",
+    "lib/javascript/JavascriptParser.js",
+    "packages/babel-core/src/index.ts",
+    "packages/babel-core/package.json"
+  ],
+  "required_files": [
+    "packages/babel-parser/package.json",
+    "package.json",
+    "packages/next/package.json"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical_syntax",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 21,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.7185264,
+  "elapsed_seconds": 106.5,
+  "wall_seconds": 106.5,
+  "tool_log": [
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/webpack--v5.88.2",
+        "path": "package.json"
+      },
+      "seconds": 0.002,
+      "result_chars": 10520,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "package.json"
+      },
+      "seconds": 0.001,
+      "result_chars": 9659,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "packages/next/package.json"
+      },
+      "seconds": 0.001,
+      "result_chars": 9190,
+      "hit_paths": [
+        "packages/next/package.json"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "@babel/core|babel-loader|@babel/parser|babylon",
+        "case_sensitive": false
+      },
+      "seconds": 0.102,
+      "result_chars": 11955,
+      "hit_paths": [
+        ".github/CHANGELOG-v5.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "require\\(['\\\"]@babel|from ['\\\"]@babel",
+        "case_sensitive": false
+      },
+      "seconds": 0.118,
+      "result_chars": 18299,
+      "hit_paths": [
+        "CHANGELOG.md",
+        "Gulpfile.mjs",
+        "babel-worker.cjs",
+        "babel.config.js",
+        "babel.config.js",
+        "benchmark/babel-core/real-case-preset-env-flow/babel-parser-expression.mjs",
+        "benchmark/babel-core/real-case-preset-env-flow/babel-parser-expression.mjs",
+        "benchmark/babel-core/real-case-preset-env-flow/babel-parser-expression.mjs",
+        "benchmark/babel-generator/many-empty-statements/bench.mjs",
+        "benchmark/babel-generator/many-empty-statements/bench.mjs",
+        "benchmark/babel-generator/many-empty-statements/bench.mjs",
+        "benchmark/babel-generator/many-identifiers/1-length.mjs",
+        "benchmark/babel-generator/many-identifiers/1-length.mjs",
+        "benchmark/babel-generator/many-identifiers/1-length.mjs",
+        "benchmark/babel-generator/many-identifiers/25-length.mjs",
+        "benchmark/babel-generator/many-identifiers/25-length.mjs",
+        "benchmark/babel-generator/many-identifiers/25-length.mjs",
+        "benchmark/babel-generator/real-case/jquery.mjs",
+        "benchmark/babel-generator/real-case/jquery.mjs",
+        "benchmark/babel-generator/real-case/jquery.mjs",
+        "benchmark/babel-helper-compilation-targets/getTargets.mjs",
+        "benchmark/babel-helper-compilation-targets/getTargets.mjs",
+        "benchmark/babel-helper-validator-identifier/isIdentifierChar.bench.mjs",
+        "benchmark/babel-helper-validator-identifier/isIdentifierChar.bench.mjs",
+        "benchmark/babel-helper-validator-identifier/isIdentifierName.bench.mjs",
+        "benchmark/babel-helper-validator-identifier/isIdentifierName.bench.mjs",
+        "benchmark/babel-helper-validator-identifier/isIdentifierStart.bench.mjs",
+        "benchmark/babel-helper-validator-identifier/isIdentifierStart.bench.mjs",
+        "benchmark/babel-helper-validator-identifier/isKeyword.bench.mjs",
+        "benchmark/babel-helper-validator-identifier/isKeyword.bench.mjs",
+        "benchmark/babel-helper-validator-identifier/isStrictBindReservedWord.bench.mjs",
+        "benchmark/babel-helper-validator-identifier/isStrictBindReservedWord.bench.mjs",
+        "benchmark/babel-parser/large-regexp/bench.mjs",
+        "benchmark/babel-parser/large-regexp/bench.mjs",
+        "benchmark/babel-parser/many-arrow-function-flow-types/bench.mjs",
+        "benchmark/babel-parser/many-arrow-function-flow-types/bench.mjs",
+        "benchmark/babel-parser/many-async-arrows/bench.mjs",
+        "benchmark/babel-parser/many-async-arrows/bench.mjs",
+        "benchmark/babel-parser/many-class-private-properties/1-length.bench.mjs",
+        "benchmark/babel-parser/many-class-private-properties/1-length.bench.mjs",
+        "benchmark/babel-parser/many-empty-statements/attachComment-false.bench.mjs",
+        "benchmark/babel-parser/many-empty-statements/attachComment-false.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/1-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/1-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/11-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/2-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/2-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/await.mjs",
+        "benchmark/babel-parser/many-inner-comments-nested/bench.mjs",
+        "benchmark/babel-parser/many-inner-comments-nested/bench.mjs",
+        "benchmark/babel-parser/many-inner-comments/bench.mjs",
+        "benchmark/babel-parser/many-inner-comments/bench.mjs",
+        "benchmark/babel-parser/many-leading-comments-nested/bench.mjs",
+        "benchmark/babel-parser/many-leading-comments-nested/bench.mjs",
+        "benchmark/babel-parser/many-leading-comments/bench.mjs",
+        "benchmark/babel-parser/many-leading-comments/bench.mjs",
+        "benchmark/babel-parser/many-leading-trailing-comments/attachComment-false.bench.mjs",
+        "benchmark/babel-parser/many-leading-trailing-comments/bench.mjs",
+        "benchmark/babel-parser/many-leading-trailing-comments/bench.mjs",
+        "benchmark/babel-parser/many-let-declarations-within-block/10-length-binding.mjs"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "@babel/core|babel-loader",
+        "case_sensitive": false
+      },
+      "seconds": 0.402,
+      "result_chars": 9717,
+      "hit_paths": [
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".yarn/releases/yarn-3.6.1.cjs",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "Makefile.js",
+        "Makefile.source.mjs",
+        "README.md",
+        "babel-worker.cjs",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12"
+      },
+      "seconds": 0.008,
+      "result_chars": 94393,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/webpack--v5.88.2"
+      },
+      "seconds": 0.007,
+      "result_chars": 83546,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "packages/next/src/build/babel",
+        "case_sensitive": false
+      },
+      "seconds": 0.704,
+      "result_chars": 466,
+      "hit_paths": [
+        "docs/03-pages/01-building-your-application/06-configuring/08-babel.mdx"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "require\\(.acorn.\\)|require\\(.@babel/core.\\)",
+        "case_sensitive": false
+      },
+      "seconds": 1.49,
+      "result_chars": 2980,
+      "hit_paths": [
+        "babel-worker.cjs",
+        "babel.config.js",
+        "codemods/babel-plugin-codemod-object-assign-to-object-spread/README.md",
+        "codemods/babel-plugin-codemod-optional-catch-binding/README.md",
+        "eslint/babel-eslint-parser/src/worker/babel-core.cjs",
+        "packages/babel-register/src/worker/babel-core.js",
+        "lib/javascript/JavascriptParser.js",
+        "lib/util/registerExternalSerializer.js",
+        "lib/util/registerExternalSerializer.js",
+        "test/cases/parsing/precreated-ast/ast-loader.js",
+        "packages/next/src/bundles/babel/bundle.js"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "decorator",
+        "case_sensitive": false
+      },
+      "seconds": 0.071,
+      "result_chars": 12225,
+      "hit_paths": [
+        ".github/CHANGELOG-v5.md",
+        ".github/CHANGELOG-v5.md",
+        ".github/CHANGELOG-v5.md",
+        ".github/CHANGELOG-v5.md",
+        ".github/CHANGELOG-v5.md",
+        ".github/CHANGELOG-v5.md",
+        ".github/CHANGELOG-v5.md",
+        ".github/CHANGELOG-v5.md",
+        ".github/CHANGELOG-v5.md",
+        ".github/CHANGELOG-v5.md",
+        ".github/CHANGELOG-v5.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "babel/traverse|@babel/traverse|traverse\\(ast",
+        "case_sensitive": false
+      },
+      "seconds": 0.092,
+      "result_chars": 8733,
+      "hit_paths": [
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".yarn/releases/yarn-3.6.1.cjs",
+        "Gulpfile.mjs",
+        "Gulpfile.mjs",
+        "benchmark/babel-traverse/enter-visitor-context-change/bench.mjs",
+        "benchmark/package.json",
+        "benchmark/package.json",
+        "constraints.pro",
+        "constraints.pro",
+        "constraints.pro",
+        "constraints.pro",
+        "eslint/babel-eslint-parser/src/convert/convertAST.cjs",
+        "lib/babel-plugin-dynamic-import-node.d.ts",
+        "packages/README.md",
+        "packages/README.md",
+        "packages/babel-core/package.json",
+        "packages/babel-core/src/config/full.ts",
+        "packages/babel-core/src/config/validation/plugins.ts",
+        "packages/babel-core/src/index.ts",
+        "packages/babel-core/src/transformation/block-hoist-plugin.ts",
+        "packages/babel-core/src/transformation/file/file.ts",
+        "packages/babel-core/src/transformation/file/file.ts",
+        "packages/babel-core/src/transformation/file/file.ts",
+        "packages/babel-core/src/transformation/file/merge-map.ts"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "plugins/proposal-decorators|estree/index.ts",
+        "case_sensitive": false
+      },
+      "seconds": 0.456,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "definitions/experimental.ts|definitions/core.ts",
+        "case_sensitive": false
+      },
+      "seconds": 0.417,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "proposal-decorators",
+        "case_sensitive": false
+      },
+      "seconds": 0.077,
+      "result_chars": 19284,
+      "hit_paths": [
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "babel-parser/src/plugins",
+        "case_sensitive": false
+      },
+      "seconds": 0.132,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.22.9"
+      },
+      "seconds": 0.026,
+      "result_chars": 234278,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "packages/next/src/build/babel/preset.ts"
+      },
+      "seconds": 0.0,
+      "result_chars": 6770,
+      "hit_paths": [
+        "packages/next/src/build/babel/preset.ts"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "packages/next/src/bundles/babel/bundle.js"
+      },
+      "seconds": 0.0,
+      "result_chars": 3434,
+      "hit_paths": [
+        "packages/next/src/bundles/babel/bundle.js"
+      ]
+    }
+  ],
+  "tool_seconds": 4.106,
+  "retrieval_result_chars": 535485,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Summary of the dependency graph established from manifests:\n\n- **babel \u2192 (nothing consumes it via `dependencies`; only `webpack` and `next.js` reach it via `devDependencies`)** \u2014 `packages/babel-core/package.json` / `packages/babel-core/src/index.ts` establish babel-core's own export of `parser`, `traverse`, `types`, `generator`.\n- **next.js \u2192 babel** \u2014 real edge. `next.js/package.json` (root) pins `@babel/core` in `devDependencies` + `resolutions`; `next.js/packages/next/package.json` lists `@babel/core`, `@babel/parser`, `@babel/traverse`, `@babel/types`, `@babel/generator`, `@babel/plugin-*`, `@babel/preset-*` in `devDependencies`. Critically, `packages/next/src/bundles/babel/bundle.js` directly `require()`s `@babel/core`, `@babel/types`, `@babel/traverse`, `@babel/generator`, `@babel/parser` \u2014 these get compiled into `next/dist/compiled/babel/*` and shipped in the published `next` package, then consumed by the real transform pipeline in `packages/next/src/build/babel/preset.ts` (used by `babel-loader`/`next-babel-turbo-loader`). This is a genuine runtime dependency despite living in `devDependencies`.\n- **webpack \u219b babel** \u2014 expected edge that doesn't hold. `webpack/package.json` lists `@babel/core`/`babel-loader` only in `devDependencies` (used for webpack's own example/test fixtures), never in `dependencies`. `webpack/lib/javascript/JavascriptParser.js` shows webpack's actual production parser is built on `acorn`, not Babel \u2014 webpack never touches a Babel AST at runtime; loaders like `babel-loader` hand webpack transformed *source text*, not an AST. So a new Babel `DecoratorMetadata` node type has no code path into webpack's core.\n- **next.js \u2192 webpack** (separate edge, not the one in question) \u2014 `next.js/packages/next/package.json` devDependency `\"webpack\": \"5.86.0\"`.\n\nSo the actual propagation order is **babel \u2192 next.js**, with webpack outside the blast radius entirely.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 1318834,
+  "output_tokens": 8487,
+  "input_tokens_uncached": 24,
+  "cache_creation_input_tokens": 97328,
+  "cache_read_input_tokens": 1221482,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "condition:structural_lexical_syntax",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.4367,
+      "10": 0.4367
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2778,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.2857,
+    "n_retrieved": 7,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 1
+}

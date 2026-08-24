@@ -40,6 +40,8 @@ from backends import Instrumented  # noqa: E402
 from conditions import (  # noqa: E402
     CONDITIONS,
     DECLARED_ASYMMETRIES,
+    PILOT_CONDITIONS,
+    check_ablation_declarations,
     check_description_parity,
 )
 
@@ -95,7 +97,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=20260823)
     parser.add_argument(
         "--conditions",
-        default=",".join(CONDITIONS),
+        default=",".join(PILOT_CONDITIONS),
         help="comma-separated condition names",
     )
     parser.add_argument("--task", default=None, help="restrict to one task_id")
@@ -109,9 +111,9 @@ def main() -> int:
     # A coached description would make every downstream number a measurement of
     # the prompt, so the gate runs before the sweep, not in a test someone may
     # not have run.
-    problems = check_description_parity()
+    problems = check_description_parity() + check_ablation_declarations()
     if problems:
-        print("tool description parity FAILED:", file=sys.stderr)
+        print("tool description gate FAILED:", file=sys.stderr)
         for problem in problems:
             print(f"  - {problem}", file=sys.stderr)
         return 2

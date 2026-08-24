@@ -1,0 +1,259 @@
+{
+  "task_id": "error-prov-dual-netty-spring-001",
+  "policy": "condition:structural_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/netty--netty-4.1.100.Final",
+    "github.com/sg-evals/spring-framework--v6.0.11"
+  ],
+  "retrieved_paths": [
+    "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+    "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java",
+    "transport/src/main/java/io/netty/channel/ChannelPipeline.java",
+    "transport/src/main/java/io/netty/channel/ChannelInboundHandlerAdapter.java",
+    "transport/src/main/java/io/netty/channel/ChannelHandlerAdapter.java",
+    "transport/src/main/java/io/netty/channel/ChannelInboundHandler.java",
+    "transport/src/main/java/io/netty/channel/ChannelHandlerContext.java",
+    "transport/src/main/java/io/netty/channel/ChannelInitializer.java",
+    "transport/src/main/java/io/netty/channel/CombinedChannelDuplexHandler.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorServerHttpRequest.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorServerHttpResponse.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/AbstractServerHttpResponse.java",
+    "spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/web/server/handler/ExceptionHandlingWebHandler.java",
+    "spring-web/src/main/java/org/springframework/web/server/WebHandler.java",
+    "spring-web/src/main/java/org/springframework/web/server/WebExceptionHandler.java",
+    "spring-web/src/main/java/org/springframework/web/server/handler/ResponseStatusExceptionHandler.java",
+    "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+    "spring-web/src/testFixtures/java/org/springframework/web/testfixture/http/server/reactive/bootstrap/ReactorHttpServer.java"
+  ],
+  "required_files": [
+    "netty/handler/src/main/java/io/netty/handler/codec/http/HttpServerCodec.java",
+    "spring-framework/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_syntax",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 15,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.2022894,
+  "elapsed_seconds": 51.7,
+  "wall_seconds": 51.7,
+  "tool_log": [
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "exceptionCaught($$$ARGS)",
+        "language": "java"
+      },
+      "seconds": 0.716,
+      "result_chars": 1055,
+      "hit_paths": [
+        "transport/src/main/java/io/netty/channel/ChannelInitializer.java",
+        "handler/src/main/java/io/netty/handler/ssl/ApplicationProtocolNegotiationHandler.java",
+        "handler/src/main/java/io/netty/handler/ssl/SslHandler.java"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-framework--v6.0.11"
+      },
+      "seconds": 0.011,
+      "result_chars": 176390,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class DefaultChannelPipeline",
+        "language": "java"
+      },
+      "seconds": 0.643,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class ReactorHttpHandlerAdapter",
+        "language": "java"
+      },
+      "seconds": 0.509,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class HttpWebHandlerAdapter",
+        "language": "java"
+      },
+      "seconds": 0.452,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class ExceptionHandlingWebHandler",
+        "language": "java"
+      },
+      "seconds": 0.422,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "DefaultChannelPipeline"
+      },
+      "seconds": 1.267,
+      "result_chars": 1658,
+      "hit_paths": [
+        "transport/src/main/java/io/netty/channel/embedded/EmbeddedChannel.java",
+        "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java",
+        "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java",
+        "codec-http2/src/main/java/io/netty/handler/codec/http2/AbstractHttp2StreamChannel.java"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "ReactorHttpHandlerAdapter"
+      },
+      "seconds": 0.474,
+      "result_chars": 1957,
+      "hit_paths": [
+        "spring-web/src/testFixtures/java/org/springframework/web/testfixture/http/server/reactive/bootstrap/ReactorHttpsServer.java",
+        "spring-web/src/testFixtures/java/org/springframework/web/testfixture/http/server/reactive/bootstrap/ReactorHttpServer.java",
+        "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java",
+        "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "HttpWebHandlerAdapter"
+      },
+      "seconds": 0.484,
+      "result_chars": 2156,
+      "hit_paths": [
+        "spring-web/src/test/java/org/springframework/web/server/handler/ExceptionHandlingWebHandlerTests.java",
+        "spring-web/src/test/java/org/springframework/http/server/reactive/MultipartHttpHandlerIntegrationTests.java",
+        "spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java",
+        "spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java",
+        "spring-web/src/main/java/org/springframework/web/server/WebHandler.java"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class AbstractChannelHandlerContext"
+      },
+      "seconds": 0.547,
+      "result_chars": 236,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-framework--v6.0.11"
+      },
+      "seconds": 0.007,
+      "result_chars": 271730,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-framework--v6.0.11",
+        "path": "spring-web/src/main/java/org/springframework/web/server/handler/ExceptionHandlingWebHandler.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 3345,
+      "hit_paths": [
+        "spring-web/src/main/java/org/springframework/web/server/handler/ExceptionHandlingWebHandler.java"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/netty--netty-4.1.100.Final",
+        "path": "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 48991,
+      "hit_paths": [
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java"
+      ]
+    }
+  ],
+  "tool_seconds": 5.532,
+  "retrieval_result_chars": 507566,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file set covering both sides of the trace:\n\n**Netty pipeline exception propagation:**\n- `AbstractChannelHandlerContext.java` \u2014 core `exceptionCaught` propagation/invocation logic\n- `DefaultChannelPipeline.java` \u2014 pipeline-level exception routing, tail's default logging behavior when nothing handles it\n- `ChannelPipeline.java`, `ChannelHandlerContext.java`, `ChannelInboundHandler.java`, `ChannelHandlerAdapter.java` \u2014 interfaces/defaults `exceptionCaught` relies on\n- `ChannelInitializer.java`, `CombinedChannelDuplexHandler.java` \u2014 additional exceptionCaught call sites\n\n**Spring WebFlux \u2194 reactor-netty boundary:**\n- `ReactorHttpHandlerAdapter.java` \u2014 the actual adapter wrapping reactor-netty's `HttpServer`/`HttpServerRequest`/`HttpServerResponse` into Spring's reactive server API (this is where the Netty exception has to cross into Spring's model)\n- `ReactorServerHttpRequest.java`, `ReactorServerHttpResponse.java`, `AbstractServerHttpResponse.java` \u2014 request/response wrapping\n- `HttpWebHandlerAdapter.java` \u2014 top-level `HttpHandler` that owns request handling and last-resort error handling before the response is committed\n- `ExceptionHandlingWebHandler.java`, `WebExceptionHandler.java`, `ResponseStatusExceptionHandler.java`, `WebHandler.java` \u2014 Spring's own exception-handling chain, where original Netty-level context (channel, cause chain) is typically discarded down to just an HTTP status\n- `WebHttpHandlerBuilder.java` \u2014 wires the exception-handling decorator chain together\n- `ReactorHttpServer.java` (test fixture) \u2014 shows the reactor-netty server bootstrap wiring used to bridge the two stacks\n\nThis set is sufficient to trace: Netty handler throws \u2192 `exceptionCaught` propagates through the pipeline \u2192 reactor-netty's own pipeline handler converts it into a reactive error signal \u2192 `ReactorHttpHandlerAdapter` surfaces it as a `Mono` error \u2192 `ExceptionHandlingWebHandler`/`ResponseStatusExceptionHandler` catches it and collapses it to a generic HTTP status, which is the point where the original Netty-level cause/context is lost.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 518922,
+  "output_tokens": 4805,
+  "input_tokens_uncached": 14,
+  "cache_creation_input_tokens": 13271,
+  "cache_read_input_tokens": 505637,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "error-prov-dual-netty-spring-001",
+    "config_name": "condition:structural_syntax",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1772
+    },
+    "mrr": 0.1,
+    "map_score": 0.05,
+    "file_recall": 0.5,
+    "context_efficiency": 0.05,
+    "n_retrieved": 20,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 5
+}

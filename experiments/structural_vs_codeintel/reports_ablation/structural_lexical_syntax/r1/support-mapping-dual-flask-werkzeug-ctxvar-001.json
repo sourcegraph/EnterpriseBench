@@ -1,0 +1,294 @@
+{
+  "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+  "policy": "condition:structural_lexical_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/flask--2.3.3",
+    "github.com/sg-evals/werkzeug--2.3.7"
+  ],
+  "retrieved_paths": [
+    "src/werkzeug/local.py",
+    "src/flask/globals.py",
+    "src/flask/ctx.py",
+    "src/flask/app.py",
+    "docs/async-await.rst",
+    "docs/local.rst",
+    "docs/reqcontext.rst",
+    "tests/test_local.py",
+    "tests/test_async.py",
+    "CHANGES.rst"
+  ],
+  "required_files": [
+    "flask/src/flask/globals.py",
+    "flask/src/flask/ctx.py",
+    "werkzeug/src/werkzeug/local.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical_syntax",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 12,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.3681526,
+  "elapsed_seconds": 38.5,
+  "wall_seconds": 38.5,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "ContextVar",
+        "case_sensitive": false
+      },
+      "seconds": 0.019,
+      "result_chars": 6949,
+      "hit_paths": [
+        "docs/reqcontext.rst",
+        "requirements/typing.in",
+        "requirements/typing.txt",
+        "src/flask/ctx.py",
+        "src/flask/ctx.py",
+        "src/flask/ctx.py",
+        "src/flask/globals.py",
+        "src/flask/globals.py",
+        "src/flask/globals.py",
+        "src/flask/globals.py",
+        "CHANGES.rst",
+        "CHANGES.rst",
+        "CHANGES.rst",
+        "docs/local.rst",
+        "docs/local.rst",
+        "docs/local.rst",
+        "docs/local.rst",
+        "docs/local.rst",
+        "docs/local.rst",
+        "requirements/typing.in",
+        "requirements/typing.txt",
+        "src/werkzeug/debug/console.py",
+        "src/werkzeug/debug/console.py",
+        "src/werkzeug/debug/console.py",
+        "src/werkzeug/local.py",
+        "src/werkzeug/local.py",
+        "src/werkzeug/local.py",
+        "src/werkzeug/local.py",
+        "src/werkzeug/local.py",
+        "src/werkzeug/local.py"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/werkzeug--2.3.7"
+      },
+      "seconds": 0.004,
+      "result_chars": 1178,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3"
+      },
+      "seconds": 0.004,
+      "result_chars": 1174,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "copy_context|ensure_sync|async_to_sync|run_sync",
+        "case_sensitive": false
+      },
+      "seconds": 0.012,
+      "result_chars": 7037,
+      "hit_paths": [
+        "docs/async-await.rst",
+        "docs/async-await.rst",
+        "docs/async-await.rst",
+        "docs/async-await.rst",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/ctx.py",
+        "src/flask/ctx.py",
+        "src/flask/ctx.py",
+        "src/flask/helpers.py",
+        "src/flask/templating.py",
+        "src/flask/templating.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/globals.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 2945,
+      "hit_paths": [
+        "src/flask/globals.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/werkzeug--2.3.7",
+        "path": "src/werkzeug/local.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 22003,
+      "hit_paths": [
+        "src/werkzeug/local.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/ctx.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 14841,
+      "hit_paths": [
+        "src/flask/ctx.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "docs/async-await.rst"
+      },
+      "seconds": 0.0,
+      "result_chars": 5112,
+      "hit_paths": [
+        "docs/async-await.rst"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/werkzeug--2.3.7",
+        "path": "docs/local.rst"
+      },
+      "seconds": 0.0,
+      "result_chars": 3728,
+      "hit_paths": [
+        "docs/local.rst"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "def ensure_sync|def async_to_sync|asyncio",
+        "case_sensitive": false
+      },
+      "seconds": 0.015,
+      "result_chars": 4465,
+      "hit_paths": [
+        "docs/async-await.rst",
+        "docs/async-await.rst",
+        "docs/async-await.rst",
+        "docs/async-await.rst",
+        "docs/deploying/eventlet.rst",
+        "docs/deploying/gevent.rst",
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "tests/test_async.py",
+        "tests/test_async.py",
+        "tests/test_async.py",
+        "tests/test_async.py",
+        "tests/test_async.py",
+        "tests/test_async.py",
+        "docs/deployment/eventlet.rst",
+        "docs/deployment/gevent.rst",
+        "docs/local.rst",
+        "tests/test_local.py",
+        "tests/test_local.py",
+        "tests/test_local.py"
+      ]
+    }
+  ],
+  "tool_seconds": 0.054,
+  "retrieval_result_chars": 69432,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Summary of the trace for the write-up:\n\n1. **`request` proxy binding**: `flask/globals.py` defines `_cv_request: ContextVar[RequestContext] = ContextVar(\"flask.request_ctx\")` and `request = LocalProxy(_cv_request, \"request\", unbound_message=_no_req_msg)`. `flask/ctx.py`'s `RequestContext.push()` calls `_cv_request.set(self)` (via `self._cv_tokens.append((_cv_request.set(self), app_ctx))`), and `pop()` calls `_cv_request.reset(token)`.\n\n2. **Werkzeug's threadlocal \u2192 contextvars switch**: `werkzeug/local.py` (`CHANGES.rst` documents the 2.0 change: *\"`Local` uses `ContextVar` on Python 3.7+ instead of...\"*). `LocalProxy.__init__` branches on `isinstance(local, ContextVar)` and defines `_get_current_object()` to call `local.get()`, raising `RuntimeError(unbound_message)` on `LookupError` \u2014 this is the exact path that produces `\"Working outside of request context.\"` (`_no_req_msg` in `flask/globals.py`).\n\n3. **The chain**: `request.path` \u2192 `LocalProxy.__getattr__` \u2192 `_get_current_object()` \u2192 `_cv_request.get()` \u2192 `contextvars.ContextVar.get()` raises `LookupError` if unset in the *current* context \u2192 wrapped as `RuntimeError`. Whether a spawned `asyncio.Task` sees the set value depends entirely on which `contextvars.Context` it runs under \u2014 `asyncio.Task.__init__` defaults to `contextvars.copy_context()` at task-creation time, snapshotting whatever `ContextVar` values are visible in the *calling* context at that instant.\n\n4. **Why `create_task` from the view usually works but the customer's case doesn't**: `docs/async-await.rst` states the actual root cause plainly \u2014 Flask's async support runs each async view inside a **fresh event loop started in a thread per request** (`ensure_sync`/`async_to_sync` in `flask/app.py`, bridging via `asgiref`), and that loop is torn down as soon as the view coroutine returns. Per the docs: *\"Async functions will run in an event loop until they complete, at which stage the event loop will stop. This means any additional spawned tasks that haven't completed when the async function completes will be cancelled. Therefore you cannot spawn background tasks, for example via `asyncio.create_task`.\"* So even though `copy_context()` correctly captures `_cv_request`'s value into the new Task, the Task is cancelled mid-flight when the view returns and the loop closes \u2014 the customer's \"vanishing\" context is actually the task being killed before it runs its awaited body, not a ContextVar propagation bug per se. Under Flask 2.0's old threadlocal `Local`, behavior differed because that implementation didn't rely on per-task context isolation the same way, and the whole picture is now further complicated by Werkzeug 2.3's `ContextVar`-backed `Local`/`LocalStack` (also in `werkzeug/local.py`) needing `copy()` on mutable list/dict values to avoid cross-context leakage.\n\n5. **`ensure_future` from a thread-pool worker**: `copy_context()` snapshots the caller's *current* context. A bare `asyncio.ensure_future(coro)` called from a `ThreadPoolExecutor` worker thread runs in that thread's own default context (threads don't inherit the main thread's contextvars automatically \u2014 each OS thread starts with a fresh top-level `Context` unless explicitly propagated via `contextvars.copy_context().run(...)`). So `_cv_request` is unset in that thread's context at the moment `ensure_future`/`create_task` captures it, and the resulting task's `request.path` access hits `ContextVar.get()` \u2192 `LookupError` \u2192 Flask's `RuntimeError(\"Working outside of request context.\")`, distinct from (but presenting identically to) the event-loop-teardown cancellation case in point 4.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 520469,
+  "output_tokens": 3568,
+  "input_tokens_uncached": 12,
+  "cache_creation_input_tokens": 60094,
+  "cache_read_input_tokens": 460363,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "condition:structural_lexical_syntax",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 5
+}

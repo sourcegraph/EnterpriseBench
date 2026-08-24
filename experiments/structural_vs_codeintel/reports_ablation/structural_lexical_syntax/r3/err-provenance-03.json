@@ -1,0 +1,359 @@
+{
+  "task_id": "err-provenance-03",
+  "policy": "condition:structural_lexical_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/kubernetes--v1.32.0"
+  ],
+  "retrieved_paths": [
+    "pkg/registry/core/rest/storage_core.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go",
+    "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go",
+    "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/generic/plugin.go",
+    "pkg/util/async/runner.go",
+    "test/e2e/apimachinery/health_handlers.go",
+    "pkg/registry/core/service/ipallocator/controller/repair.go",
+    "staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle/admission.go"
+  ],
+  "required_files": [
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip_test.go"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical_syntax",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 18,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.34714620000000007,
+  "elapsed_seconds": 62.5,
+  "wall_seconds": 62.5,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "start-service-ip-repair-controllers",
+        "case_sensitive": false
+      },
+      "seconds": 0.605,
+      "result_chars": 1203,
+      "hit_paths": [
+        "pkg/registry/core/rest/storage_core.go",
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "unable to perform initial IP and Port allocation check",
+        "case_sensitive": false
+      },
+      "seconds": 0.243,
+      "result_chars": 315,
+      "hit_paths": [
+        "pkg/registry/core/rest/storage_core.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/rest/storage_core.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 22867,
+      "hit_paths": [
+        "pkg/registry/core/rest/storage_core.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "repairip",
+        "case_sensitive": false
+      },
+      "seconds": 0.237,
+      "result_chars": 8570,
+      "hit_paths": [
+        "pkg/registry/core/rest/storage_core.go",
+        "pkg/registry/core/service/ipallocator/controller/metrics.go",
+        "pkg/registry/core/service/ipallocator/controller/metrics.go",
+        "pkg/registry/core/service/ipallocator/controller/metrics.go",
+        "pkg/registry/core/service/ipallocator/controller/repair.go",
+        "pkg/registry/core/service/ipallocator/controller/repair.go",
+        "pkg/registry/core/service/ipallocator/controller/repair.go",
+        "pkg/registry/core/service/ipallocator/controller/repair.go",
+        "pkg/registry/core/service/ipallocator/controller/repair.go",
+        "pkg/registry/core/service/ipallocator/controller/repair.go",
+        "pkg/registry/core/service/ipallocator/controller/repair.go",
+        "pkg/registry/core/service/ipallocator/controller/repair.go",
+        "pkg/registry/core/service/ipallocator/controller/repair_test.go",
+        "pkg/registry/core/service/ipallocator/controller/repair_test.go",
+        "pkg/registry/core/service/ipallocator/controller/repair_test.go",
+        "pkg/registry/core/service/ipallocator/controller/repair_test.go",
+        "pkg/registry/core/service/ipallocator/controller/repair_test.go",
+        "pkg/registry/core/service/ipallocator/controller/repair_test.go",
+        "pkg/registry/core/service/ipallocator/controller/repair_test.go",
+        "pkg/registry/core/service/ipallocator/controller/repair_test.go",
+        "pkg/registry/core/service/ipallocator/controller/repair_test.go",
+        "pkg/registry/core/service/ipallocator/controller/repair_test.go",
+        "pkg/registry/core/service/ipallocator/controller/repair_test.go",
+        "pkg/registry/core/service/ipallocator/controller/repair_test.go",
+        "pkg/registry/core/service/ipallocator/controller/repair_test.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "not yet ready to handle request",
+        "case_sensitive": false
+      },
+      "seconds": 0.223,
+      "result_chars": 3951,
+      "hit_paths": [
+        "plugin/pkg/admission/namespace/autoprovision/admission.go",
+        "plugin/pkg/admission/namespace/exists/admission.go",
+        "plugin/pkg/admission/podnodeselector/admission.go",
+        "plugin/pkg/admission/podnodeselector/admission.go",
+        "plugin/pkg/admission/podtolerationrestriction/admission.go",
+        "plugin/pkg/admission/podtolerationrestriction/admission.go",
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle/admission.go",
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/generic/plugin.go",
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/validating/admission_test.go",
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go",
+        "staging/src/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder/admission.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/generic/plugin.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 7013,
+      "hit_paths": [
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/generic/plugin.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/service/ipallocator/controller/repair.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 14312,
+      "hit_paths": [
+        "pkg/registry/core/service/ipallocator/controller/repair.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "informer-sync",
+        "case_sensitive": false
+      },
+      "seconds": 0.287,
+      "result_chars": 5531,
+      "hit_paths": [
+        "CHANGELOG/CHANGELOG-1.16.md",
+        "CHANGELOG/CHANGELOG-1.17.md",
+        "CHANGELOG/CHANGELOG-1.18.md",
+        "CHANGELOG/CHANGELOG-1.19.md",
+        "CHANGELOG/CHANGELOG-1.19.md",
+        "CHANGELOG/CHANGELOG-1.19.md",
+        "CHANGELOG/CHANGELOG-1.20.md",
+        "CHANGELOG/CHANGELOG-1.20.md",
+        "staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/apiserver.go",
+        "staging/src/k8s.io/apiserver/pkg/server/config_test.go",
+        "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go",
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "func NewRepairIPAddress",
+        "case_sensitive": false
+      },
+      "seconds": 0.257,
+      "result_chars": 321,
+      "hit_paths": [
+        "pkg/registry/core/service/ipallocator/controller/repairip.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "func.*HasSynced\\(\\) bool",
+        "case_sensitive": false
+      },
+      "seconds": 1.289,
+      "result_chars": 4881,
+      "hit_paths": [
+        "pkg/kubelet/util/manager/watch_based_manager.go",
+        "pkg/scheduler/util/assumecache/assume_cache.go",
+        "staging/src/k8s.io/apiserver/pkg/admission/configuration/mutating_webhook_manager.go",
+        "staging/src/k8s.io/apiserver/pkg/admission/configuration/validating_webhook_manager.go",
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/generic/policy_source.go",
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/generic/policy_source.go",
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/internal/generic/controller.go",
+        "staging/src/k8s.io/client-go/tools/cache/controller.go",
+        "staging/src/k8s.io/client-go/tools/cache/delta_fifo.go",
+        "staging/src/k8s.io/client-go/tools/cache/fifo.go",
+        "staging/src/k8s.io/client-go/tools/cache/shared_informer.go",
+        "staging/src/k8s.io/client-go/tools/cache/shared_informer.go",
+        "staging/src/k8s.io/client-go/tools/cache/shared_informer.go",
+        "staging/src/k8s.io/client-go/tools/cache/synctrack/synctrack.go",
+        "staging/src/k8s.io/client-go/tools/cache/synctrack/synctrack.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 10795,
+      "hit_paths": [
+        "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/service/ipallocator/controller/repairip.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 22636,
+      "hit_paths": [
+        "pkg/registry/core/service/ipallocator/controller/repairip.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "poststarthook/start-service-ip-repair-controllers",
+        "case_sensitive": false
+      },
+      "seconds": 0.232,
+      "result_chars": 874,
+      "hit_paths": [
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "test/e2e/apimachinery/health_handlers.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 5965,
+      "hit_paths": [
+        "test/e2e/apimachinery/health_handlers.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 9565,
+      "hit_paths": [
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/util/async/runner.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 1451,
+      "hit_paths": [
+        "pkg/util/async/runner.go"
+      ]
+    }
+  ],
+  "tool_seconds": 3.373,
+  "retrieval_result_chars": 120250,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Summary of the chain for the ticket:\n\n1. **`pkg/registry/core/rest/storage_core.go`** \u2014 the `\"start-service-ip-repair-controllers\"` PostStartHook runs two repair loops (cluster-IP and node-port) via `async.Runner`, and returns `errors.New(\"unable to perform initial IP and Port allocation check\")` if neither loop reports first success within 1 minute (`time.After(time.Minute)`).\n2. **`pkg/registry/core/service/ipallocator/controller/repairip.go`** \u2014 `RepairIPAddress.syncService` (the `MultiCIDRServiceAllocator` repair loop used when that feature gate is on, which v1.33 carries forward) tries to `Create` an `IPAddress` object for any ClusterIP missing one. This `Create` call goes back through the apiserver's own admission chain.\n3. **`staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go`** and **`.../policy/generic/plugin.go`** \u2014 both admission plugins gate every dispatch on `WaitForReady()`; until their informers (`hookSource`/`source`, namespace informer) have synced, any request \u2014 including the `IPAddresses` create \u2014 is rejected with `admission.NewForbidden(a, fmt.Errorf(\"not yet ready to handle request\"))`. This is the literal source of the observed `ipaddresses.networking.k8s.io \"10.211.95.185\" is forbidden: not yet ready to handle request`.\n4. That failure makes `syncService`/`doRunOnce` return an error, so `RunUntil`'s `onFirstSuccess` callback never fires, `wg.Done` never runs, and the PostStartHook's 1-minute wait expires \u2192 the hook fails.\n5. **`staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go`** \u2014 separately, the `informer-sync` readyz check (`NewInformerSyncHealthz`) fails independently while internal informers haven't finished their initial sync.\n6. **`test/e2e/apimachinery/health_handlers.go`** confirms both `poststarthook/start-service-ip-repair-controllers` and `informer-sync` are required entries in `/readyz`, matching the log line `informer-sync,poststarthook/start-service-ip-repair-controllers check failed: readyz`.\n\n**Root cause of the race**: during the mixed-version rolling upgrade window, a newly-started v1.33 apiserver's own admission-webhook/policy informers haven't synced yet (they need to list/watch against the cluster, which is itself under upgrade load), while its `start-service-ip-repair-controllers` PostStartHook is already trying to write `IPAddress` objects on startup. The write gets rejected by the apiserver's own not-yet-ready admission gate, the repair loop keeps failing, and if it doesn't succeed within the 1-minute PostStartHook deadline, the whole node's readiness flips to `NotReady` \u2014 pulling capacity from the rolling upgrade. Once all nodes are on v1.33 and informer sync races stop competing with fresh restarts, it self-resolves.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 833160,
+  "output_tokens": 5021,
+  "input_tokens_uncached": 16,
+  "cache_creation_input_tokens": 34283,
+  "cache_read_input_tokens": 798861,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "err-provenance-03",
+    "config_name": "condition:structural_lexical_syntax",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1111,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 1
+}

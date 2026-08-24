@@ -1,0 +1,356 @@
+{
+  "task_id": "dep-graph-dual-log4j-spring-001",
+  "policy": "condition:structural_lexical_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/logging-log4j2--rel_2.20.0",
+    "github.com/sg-evals/spring-boot--v3.1.0"
+  ],
+  "retrieved_paths": [
+    "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/log4j2/Log4J2LoggingSystem.java",
+    "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/LoggingSystem.java",
+    "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/LoggingSystemFactory.java",
+    "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/DelegatingLoggingSystemFactory.java",
+    "log4j-spring-boot/src/main/java/org/apache/logging/log4j/spring/boot/Log4j2SpringBootLoggingSystem.java",
+    "log4j-spring-boot/src/main/resources/META-INF/spring.factories",
+    "log4j-to-slf4j/pom.xml",
+    "log4j-to-slf4j/src/main/java/org/apache/logging/slf4j/SLF4JLoggerContextFactory.java",
+    "log4j-slf4j-impl/pom.xml",
+    "log4j-slf4j-impl/src/main/java/org/apache/logging/slf4j/Log4jLoggerFactory.java",
+    "log4j-bom/pom.xml",
+    "log4j-spring-boot/src/test/java/org/apache/logging/log4j/spring/boot/Log4j2SpringBootLoggingSystemTest.java",
+    "spring-boot-project/spring-boot-starters/spring-boot-starter-log4j2/build.gradle",
+    "spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/logging.adoc",
+    "RELEASE-NOTES.md"
+  ],
+  "required_files": [
+    "log4j2/log4j-api/src/main/java/org/apache/logging/log4j/LogManager.java",
+    "spring-boot/spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/LoggingSystem.java"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical_syntax",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 13,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.3266944,
+  "elapsed_seconds": 50.5,
+  "wall_seconds": 50.5,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "log4j-to-slf4j",
+        "case_sensitive": false
+      },
+      "seconds": 1.895,
+      "result_chars": 9923,
+      "hit_paths": [
+        "log4j-bom/pom.xml",
+        "log4j-distribution/pom.xml",
+        "log4j-distribution/pom.xml",
+        "log4j-osgi/pom.xml",
+        "log4j-slf4j-impl/pom.xml",
+        "log4j-slf4j-impl/pom.xml",
+        "log4j-slf4j-impl/src/main/java/org/apache/logging/slf4j/Log4jLoggerFactory.java",
+        "log4j-slf4j-impl/src/main/java/org/apache/logging/slf4j/package-info.java",
+        "log4j-slf4j-impl/src/test/java/org/apache/logging/slf4j/OverflowTest.java",
+        "log4j-slf4j-impl/src/test/java/org/apache/logging/slf4j/OverflowTest.java",
+        "log4j-slf4j2-impl/pom.xml",
+        "log4j-slf4j2-impl/pom.xml",
+        "log4j-slf4j2-impl/src/main/java/org/apache/logging/slf4j/Log4jLoggerFactory.java",
+        "log4j-slf4j2-impl/src/main/java/org/apache/logging/slf4j/package-info.java",
+        "log4j-slf4j2-impl/src/test/java/org/apache/logging/slf4j/OverflowTest.java",
+        "log4j-slf4j2-impl/src/test/java/org/apache/logging/slf4j/OverflowTest.java",
+        "log4j-to-slf4j/pom.xml",
+        "log4j-to-slf4j/pom.xml",
+        "log4j-to-slf4j/src/main/java/org/apache/logging/slf4j/SLF4JLoggerContextFactory.java",
+        "pom.xml",
+        "src/changelog/2.1/LOG4J2-796_Fixed_issue_where_log4j_to_slf4j_did_not_work_correctly_with.xml",
+        "src/changelog/2.11.2/LOG4J2-2543_Add_Log4j_to_SLF4J_to_BOM_pom_xml.xml",
+        "src/changelog/2.12.0/LOG4J2-2597_Throw_better_exception_message_when_both_log4j_slf4j_impl_an.xml",
+        "src/changelog/2.17.1/LOG4J2-3284_log4j_to_slf4j_takes_the_provided_MessageFactory_into_accoun.xml",
+        "src/changelog/2.17.1/LOG4J2-3289_log4j_to_slf4j_no_longer_re_interpolates_formatted_message_c.xml",
+        "src/site/markdown/faq.md.vm",
+        "src/site/markdown/faq.md.vm",
+        "src/site/markdown/faq.md.vm",
+        "src/site/markdown/faq.md.vm",
+        "src/site/markdown/faq.md.vm"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "Log4J2LoggingSystem|LoggingSystemFactory",
+        "case_sensitive": false
+      },
+      "seconds": 2.069,
+      "result_chars": 12917,
+      "hit_paths": [
+        "log4j-spring-boot/src/main/java/org/apache/logging/log4j/spring/boot/Log4j2SpringBootLoggingSystem.java",
+        "log4j-spring-boot/src/main/java/org/apache/logging/log4j/spring/boot/Log4j2SpringBootLoggingSystem.java",
+        "log4j-spring-boot/src/main/java/org/apache/logging/log4j/spring/boot/Log4j2SpringBootLoggingSystem.java",
+        "log4j-spring-boot/src/main/java/org/apache/logging/log4j/spring/boot/Log4j2SpringBootLoggingSystem.java",
+        "log4j-spring-boot/src/main/java/org/apache/logging/log4j/spring/boot/Log4j2SpringBootLoggingSystem.java",
+        "log4j-spring-boot/src/main/resources/META-INF/spring.factories",
+        "log4j-spring-boot/src/test/java/org/apache/logging/log4j/spring/boot/Log4j2SpringBootLoggingSystemTest.java",
+        "log4j-spring-boot/src/test/java/org/apache/logging/log4j/spring/boot/Log4j2SpringBootLoggingSystemTest.java",
+        "log4j-spring-boot/src/test/java/org/apache/logging/log4j/spring/boot/Log4j2SpringBootLoggingSystemTest.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/DelegatingLoggingSystemFactory.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/DelegatingLoggingSystemFactory.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/DelegatingLoggingSystemFactory.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/DelegatingLoggingSystemFactory.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/DelegatingLoggingSystemFactory.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/DelegatingLoggingSystemFactory.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/DelegatingLoggingSystemFactory.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/LoggingSystem.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/LoggingSystemFactory.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/LoggingSystemFactory.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/LoggingSystemFactory.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/LoggingSystemFactory.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/LoggingSystemFactory.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/LoggingSystemFactory.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/java/JavaLoggingSystem.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/java/JavaLoggingSystem.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/java/JavaLoggingSystem.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/log4j2/Log4J2LoggingSystem.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/log4j2/Log4J2LoggingSystem.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/log4j2/Log4J2LoggingSystem.java",
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/log4j2/Log4J2LoggingSystem.java"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/logging-log4j2--rel_2.20.0"
+      },
+      "seconds": 0.01,
+      "result_chars": 5659,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-boot--v3.1.0",
+        "path": "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/LoggingSystem.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 6493,
+      "hit_paths": [
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/LoggingSystem.java"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-boot--v3.1.0",
+        "path": "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/log4j2/Log4J2LoggingSystem.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 18728,
+      "hit_paths": [
+        "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/log4j2/Log4J2LoggingSystem.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "org.slf4j.bridge|LogFactory|SLF4JBridgeHandler|jul-to-slf4j",
+        "case_sensitive": false
+      },
+      "seconds": 0.607,
+      "result_chars": 8146,
+      "hit_paths": [
+        "log4j-appserver/src/main/java/org/apache/logging/log4j/appserver/tomcat/TomcatLogger.java",
+        "log4j-jcl/pom.xml",
+        "log4j-jcl/src/main/java/org/apache/logging/log4j/jcl/LogAdapter.java",
+        "log4j-jcl/src/main/java/org/apache/logging/log4j/jcl/LogAdapter.java",
+        "log4j-jcl/src/main/java/org/apache/logging/log4j/jcl/LogFactoryImpl.java",
+        "log4j-jcl/src/main/java/org/apache/logging/log4j/jcl/LogFactoryImpl.java",
+        "log4j-jcl/src/main/resources/META-INF/services/org.apache.commons.logging.LogFactory",
+        "log4j-jcl/src/test/java/org/apache/logging/log4j/jcl/CallerInformationTest.java",
+        "log4j-jcl/src/test/java/org/apache/logging/log4j/jcl/CallerInformationTest.java",
+        "log4j-jcl/src/test/java/org/apache/logging/log4j/jcl/CallerInformationTest.java",
+        "log4j-jcl/src/test/java/org/apache/logging/log4j/jcl/LoggerTest.java",
+        "log4j-jcl/src/test/java/org/apache/logging/log4j/jcl/LoggerTest.java",
+        "log4j-jul/src/main/java/org/apache/logging/log4j/jul/Log4jBridgeHandler.java",
+        "src/changelog/2.0-beta1/LOG4J2-78_LogFactoryImpl_setAttribute_in_the_Commons_Logging_bridge_go.xml",
+        "src/site/markdown/faq.md.vm",
+        "spring-boot-project/spring-boot-actuator-autoconfigure/src/main/java/org/springframework/boot/actuate/autoconfigure/cloudfoundry/reactive/CloudFoundrySecurityInterceptor.java",
+        "spring-boot-project/spring-boot-actuator-autoconfigure/src/main/java/org/springframework/boot/actuate/autoconfigure/cloudfoundry/reactive/CloudFoundrySecurityInterceptor.java",
+        "spring-boot-project/spring-boot-actuator-autoconfigure/src/main/java/org/springframework/boot/actuate/autoconfigure/cloudfoundry/servlet/CloudFoundrySecurityInterceptor.java",
+        "spring-boot-project/spring-boot-actuator-autoconfigure/src/main/java/org/springframework/boot/actuate/autoconfigure/cloudfoundry/servlet/CloudFoundrySecurityInterceptor.java",
+        "spring-boot-project/spring-boot-actuator-autoconfigure/src/main/java/org/springframework/boot/actuate/autoconfigure/cloudfoundry/servlet/CloudFoundryWebEndpointServletHandlerMapping.java"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/logging-log4j2--rel_2.20.0",
+        "path": "log4j-to-slf4j/pom.xml"
+      },
+      "seconds": 0.001,
+      "result_chars": 3694,
+      "hit_paths": [
+        "log4j-to-slf4j/pom.xml"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/logging-log4j2--rel_2.20.0",
+        "path": "log4j-spring-boot/src/main/java/org/apache/logging/log4j/spring/boot/Log4j2SpringBootLoggingSystem.java"
+      },
+      "seconds": 0.001,
+      "result_chars": 11878,
+      "hit_paths": [
+        "log4j-spring-boot/src/main/java/org/apache/logging/log4j/spring/boot/Log4j2SpringBootLoggingSystem.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "log4j-to-slf4j|log4j-slf4j|LOG4J2_XML|ClassUtils.isPresent.*[Ll]og4j",
+        "case_sensitive": false
+      },
+      "seconds": 0.315,
+      "result_chars": 9070,
+      "hit_paths": [
+        "RELEASE-NOTES.md",
+        "log4j-bom/pom.xml",
+        "log4j-bom/pom.xml",
+        "log4j-bom/pom.xml",
+        "log4j-cassandra/pom.xml",
+        "log4j-couchdb/pom.xml",
+        "log4j-distribution/pom.xml",
+        "log4j-distribution/pom.xml",
+        "log4j-distribution/pom.xml",
+        "log4j-distribution/pom.xml",
+        "log4j-distribution/pom.xml",
+        "log4j-distribution/pom.xml",
+        "log4j-flume-ng/pom.xml",
+        "log4j-osgi/pom.xml",
+        "log4j-slf4j-impl/pom.xml",
+        "log4j-slf4j-impl/pom.xml",
+        "log4j-slf4j-impl/pom.xml",
+        "log4j-slf4j-impl/src/main/java/org/apache/logging/slf4j/Log4jLoggerFactory.java",
+        "log4j-slf4j-impl/src/main/java/org/apache/logging/slf4j/package-info.java",
+        "log4j-slf4j-impl/src/test/java/org/apache/logging/slf4j/OverflowTest.java",
+        "log4j-slf4j-impl/src/test/java/org/apache/logging/slf4j/OverflowTest.java",
+        "log4j-slf4j2-impl/pom.xml",
+        "log4j-slf4j2-impl/pom.xml",
+        "log4j-slf4j2-impl/pom.xml",
+        "log4j-slf4j2-impl/src/main/java/org/apache/logging/slf4j/Log4jLoggerFactory.java",
+        "log4j-slf4j2-impl/src/main/java/org/apache/logging/slf4j/package-info.java",
+        "log4j-slf4j2-impl/src/test/java/org/apache/logging/slf4j/OverflowTest.java",
+        "log4j-slf4j2-impl/src/test/java/org/apache/logging/slf4j/OverflowTest.java",
+        "log4j-spring-boot/pom.xml",
+        "log4j-spring-cloud-config/log4j-spring-cloud-config-samples/log4j-spring-cloud-config-sample-server/pom.xml"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "spring-boot-starter-log4j2|spring-boot-starter-logging",
+        "case_sensitive": false
+      },
+      "seconds": 0.561,
+      "result_chars": 5535,
+      "hit_paths": [
+        "log4j-spring-cloud-config/log4j-spring-cloud-config-samples/log4j-spring-cloud-config-sample-application/pom.xml",
+        "log4j-spring-cloud-config/log4j-spring-cloud-config-samples/log4j-spring-cloud-config-sample-application/pom.xml",
+        "log4j-spring-cloud-config/log4j-spring-cloud-config-samples/log4j-spring-cloud-config-sample-server/pom.xml",
+        "log4j-spring-cloud-config/log4j-spring-cloud-config-samples/log4j-spring-cloud-config-sample-server/pom.xml",
+        "pom.xml",
+        "spring-boot-project/spring-boot-dependencies/build.gradle",
+        "spring-boot-project/spring-boot-dependencies/build.gradle",
+        "spring-boot-project/spring-boot-docs/build.gradle",
+        "spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/logging.adoc",
+        "spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/logging.adoc",
+        "spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/logging.adoc",
+        "spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/logging.adoc",
+        "spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/logging.adoc",
+        "spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/logging.adoc",
+        "spring-boot-project/spring-boot-starters/spring-boot-starter-log4j2/build.gradle"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/logging-log4j2--rel_2.20.0",
+        "path": "log4j-to-slf4j/src/main/java/org/apache/logging/slf4j/SLF4JLoggerContextFactory.java"
+      },
+      "seconds": 0.002,
+      "result_chars": 2701,
+      "hit_paths": [
+        "log4j-to-slf4j/src/main/java/org/apache/logging/slf4j/SLF4JLoggerContextFactory.java"
+      ]
+    }
+  ],
+  "tool_seconds": 5.461,
+  "retrieval_result_chars": 94744,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Summary of what these files establish for the impact report:\n\n**Detection logic (Spring Boot side):** `Log4J2LoggingSystem.Factory` (in `Log4J2LoggingSystem.java`) gates on presence of `org.apache.logging.log4j.core.impl.Log4jContextFactory` (i.e., `log4j-core`, not `log4j-api` or `log4j-to-slf4j`), registered via `LoggingSystemFactory` + `DelegatingLoggingSystemFactory`/`SpringFactoriesLoader`.\n\n**Bridge modules (Log4j2 side):** `log4j-to-slf4j` (routes Log4j2 API calls \u2192 SLF4J, depends on `log4j-api` + `slf4j-api`) is mutually exclusive with `log4j-slf4j-impl`/`log4j-slf4j2-impl` (routes SLF4J calls \u2192 Log4j2 API), enforced at runtime in `SLF4JLoggerContextFactory`/`Log4jLoggerFactory` via classpath checks that throw `IllegalStateException`/`LoggingException` if both are present.\n\n**Bridge restructuring artifact:** `log4j-spring-boot` module ships its own `Log4j2SpringBootLoggingSystem` (extends Spring's `Log4J2LoggingSystem`) with a `spring.factories` entry \u2014 an override path that competes with Spring Boot's own factory via `@Order` precedence, relevant to how the two projects' logging-system selection can diverge.\n\n**Dependency chain evidence:** `log4j-bom/pom.xml` and `spring-boot-starter-log4j2/build.gradle` pin the actual bridge versions Spring Boot pulls in; `logging.adoc` documents the starter-swap mechanism (`spring-boot-starter-logging` \u2192 `spring-boot-starter-log4j2`).",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 574214,
+  "output_tokens": 4368,
+  "input_tokens_uncached": 12,
+  "cache_creation_input_tokens": 44250,
+  "cache_read_input_tokens": 529952,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "dep-graph-dual-log4j-spring-001",
+    "config_name": "condition:structural_lexical_syntax",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0667,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 5
+}

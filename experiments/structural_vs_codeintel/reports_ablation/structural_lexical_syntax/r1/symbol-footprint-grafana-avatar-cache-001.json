@@ -1,0 +1,167 @@
+{
+  "task_id": "symbol-footprint-grafana-avatar-cache-001",
+  "policy": "condition:structural_lexical_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/grafana--v10.2.0"
+  ],
+  "retrieved_paths": [
+    "pkg/api/avatar/avatar.go",
+    "pkg/api/http_server.go",
+    "pkg/api/api.go",
+    "pkg/server/wire.go"
+  ],
+  "required_files": [
+    "pkg/api/api.go",
+    "pkg/api/avatar/avatar.go",
+    "pkg/api/http_server.go"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical_syntax",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 5,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.19642999999999997,
+  "elapsed_seconds": 16.8,
+  "wall_seconds": 16.8,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "AvatarCacheServer",
+        "case_sensitive": false
+      },
+      "seconds": 0.326,
+      "result_chars": 4424,
+      "hit_paths": [
+        "pkg/api/api.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar_test.go",
+        "pkg/api/avatar/avatar_test.go",
+        "pkg/api/avatar/avatar_test.go",
+        "pkg/api/avatar/avatar_test.go",
+        "pkg/api/http_server.go",
+        "pkg/api/http_server.go",
+        "pkg/api/http_server.go",
+        "pkg/server/wire.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "api/avatar",
+        "case_sensitive": false
+      },
+      "seconds": 0.128,
+      "result_chars": 466,
+      "hit_paths": [
+        "pkg/api/http_server.go",
+        "pkg/server/wire.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "avatarCacheServer|AvatarCacheServer",
+        "case_sensitive": false
+      },
+      "seconds": 0.372,
+      "result_chars": 4424,
+      "hit_paths": [
+        "pkg/api/api.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar_test.go",
+        "pkg/api/avatar/avatar_test.go",
+        "pkg/api/avatar/avatar_test.go",
+        "pkg/api/avatar/avatar_test.go",
+        "pkg/api/http_server.go",
+        "pkg/api/http_server.go",
+        "pkg/api/http_server.go",
+        "pkg/server/wire.go"
+      ]
+    }
+  ],
+  "tool_seconds": 0.826,
+  "retrieval_result_chars": 9314,
+  "denied_tools": [],
+  "cli_result_text": "Submitted 4 source files where `AvatarCacheServer` is declared or wired:\n\n1. **pkg/api/avatar/avatar.go** \u2014 declares the `AvatarCacheServer` type, its methods (`Handler`, `GetAvatarForHash`), and the `ProvideAvatarCacheServer` constructor.\n2. **pkg/api/http_server.go** \u2014 holds the `AvatarCacheServer` field on `HTTPServer` and receives it via constructor injection.\n3. **pkg/api/api.go** \u2014 wires the `/avatar/:hash` route to `hs.AvatarCacheServer.Handler`.\n4. **pkg/server/wire.go** \u2014 registers `avatar.ProvideAvatarCacheServer` in the DI provider set.\n\nExcluded `pkg/api/avatar/avatar_test.go` per the test-exclusion instruction.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 280571,
+  "output_tokens": 1071,
+  "input_tokens_uncached": 8,
+  "cache_creation_input_tokens": 34103,
+  "cache_read_input_tokens": 246460,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "symbol-footprint-grafana-avatar-cache-001",
+    "config_name": "condition:structural_lexical_syntax",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.75,
+    "n_retrieved": 4,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 3
+}

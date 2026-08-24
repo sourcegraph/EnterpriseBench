@@ -1,0 +1,256 @@
+{
+  "task_id": "ceph-rgw-auth-secure-001",
+  "policy": "condition:structural_lexical_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "security_operations",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/ceph--v19.2.0"
+  ],
+  "retrieved_paths": [
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_rest_s3.h",
+    "src/rgw/rgw_auth.cc",
+    "src/rgw/rgw_auth.h",
+    "src/rgw/rgw_auth_registry.h",
+    "src/rgw/rgw_rest.cc",
+    "src/rgw/rgw_rest.h",
+    "src/rgw/rgw_common.h",
+    "src/rgw/rgw_common.cc",
+    "doc/dev/radosgw/s3_compliance.rst"
+  ],
+  "required_files": [
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_auth.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical_syntax",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 7,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.275475,
+  "elapsed_seconds": 27.4,
+  "wall_seconds": 27.4,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "rgw_auth_s3|AWS_SIGV4|get_v4_canonical_headers|rgw_check_secure_mon",
+        "case_sensitive": false
+      },
+      "seconds": 0.608,
+      "result_chars": 9123,
+      "hit_paths": [
+        "doc/changelog/v0.67.5.txt",
+        "doc/dev/radosgw/s3_compliance.rst",
+        "doc/dev/radosgw/s3_compliance.rst",
+        "src/rgw/CMakeLists.txt",
+        "src/rgw/driver/rados/rgw_d3n_datacache.cc",
+        "src/rgw/driver/rados/rgw_d3n_datacache.cc",
+        "src/rgw/driver/rados/rgw_tools.cc",
+        "src/rgw/driver/rados/rgw_tools.h",
+        "src/rgw/rgw_auth_keystone.cc",
+        "src/rgw/rgw_auth_registry.h",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_file.cc",
+        "src/rgw/rgw_loadgen.cc",
+        "src/rgw/rgw_rest.cc",
+        "src/rgw/rgw_rest_client.cc",
+        "src/rgw/rgw_rest_config.h",
+        "src/rgw/rgw_rest_iam.cc",
+        "src/rgw/rgw_rest_iam.cc",
+        "src/rgw/rgw_rest_metadata.h",
+        "src/rgw/rgw_rest_pubsub.cc",
+        "src/rgw/rgw_rest_pubsub.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.h",
+        "src/rgw/rgw_rest_s3.h",
+        "src/rgw/rgw_rest_s3.h",
+        "src/rgw/rgw_rest_s3.h",
+        "src/rgw/rgw_rest_sts.cc",
+        "src/rgw/services/svc_config_key_rados.cc"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0"
+      },
+      "seconds": 0.007,
+      "result_chars": 14377,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "clock skew|RGW_AUTH_GRACE|now - date|time_t now|MinTimestampSkew|too old|expired request",
+        "case_sensitive": false
+      },
+      "seconds": 0.522,
+      "result_chars": 8248,
+      "hit_paths": [
+        "doc/changelog/v0.80.11.txt",
+        "doc/changelog/v0.80.11.txt",
+        "doc/changelog/v0.94.3.txt",
+        "doc/changelog/v0.94.3.txt",
+        "doc/changelog/v0.94.4.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/dev/continuous-integration.rst",
+        "doc/dev/osd_internals/stale_read.rst",
+        "doc/rados/configuration/mon-config-ref.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class RGWGetObj_ObjStore_S3|class AWSv4ComplMulti|class AWSEngine|AWSAuthStrategy|class rgw::auth::s3",
+        "case_sensitive": false
+      },
+      "seconds": 0.397,
+      "result_chars": 2305,
+      "hit_paths": [
+        "src/rgw/rgw_auth_registry.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_common.h",
+        "src/rgw/rgw_common.h",
+        "src/rgw/rgw_rest_s3.h",
+        "src/rgw/rgw_rest_s3.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "secret_key|access_key",
+        "case_sensitive": false
+      },
+      "seconds": 0.413,
+      "result_chars": 4746,
+      "hit_paths": [
+        "doc/changelog/v10.2.8.txt",
+        "doc/changelog/v10.2.8.txt",
+        "doc/changelog/v10.2.8.txt",
+        "doc/changelog/v10.2.8.txt",
+        "doc/man/8/radosgw-admin.rst",
+        "doc/man/8/radosgw-admin.rst",
+        "doc/mgr/nfs.rst",
+        "doc/radosgw/STS.rst",
+        "doc/radosgw/STS.rst",
+        "doc/radosgw/STS.rst",
+        "doc/radosgw/STS.rst",
+        "doc/radosgw/STS.rst",
+        "doc/radosgw/STS.rst",
+        "doc/radosgw/STS.rst",
+        "doc/radosgw/STS.rst",
+        "doc/radosgw/STS.rst",
+        "doc/radosgw/STS.rst",
+        "doc/radosgw/STS.rst",
+        "doc/radosgw/STS.rst",
+        "doc/radosgw/STSLite.rst"
+      ]
+    }
+  ],
+  "tool_seconds": 1.947,
+  "retrieval_result_chars": 38799,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file set for the S3 auth security audit, covering the AWS SigV4/V2 implementation (`rgw_auth_s3.{cc,h}`), the S3 REST auth entry points (`rgw_rest_s3.{cc,h}`), the generic auth engine/strategy framework (`rgw_auth.{cc,h}`, `rgw_auth_registry.h`), the REST request-parsing layer (`rgw_rest.{cc,h}`), common structures holding credentials (`rgw_common.{h,cc}`), and the upstream SigV4 compliance reference doc for cross-checking expected behavior.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 325151,
+  "output_tokens": 1926,
+  "input_tokens_uncached": 8,
+  "cache_creation_input_tokens": 50308,
+  "cache_read_input_tokens": 274835,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "ceph-rgw-auth-secure-001",
+    "config_name": "condition:structural_lexical_syntax",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 0.75,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.6667,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8319,
+      "10": 0.9709
+    },
+    "mrr": 1.0,
+    "map_score": 0.9167,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 12,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 1
+}

@@ -1,0 +1,402 @@
+{
+  "task_id": "symbol-footprint-envoy-recursion-guard-001",
+  "policy": "condition:structural_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.31.2"
+  ],
+  "retrieved_paths": [
+    "source/common/common/debug_recursion_checker.h",
+    "source/common/upstream/conn_pool_map_impl.h"
+  ],
+  "required_files": [
+    "source/common/common/debug_recursion_checker.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/upstream/conn_pool_map_impl.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_syntax",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 28,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.599903,
+  "elapsed_seconds": 103.6,
+  "wall_seconds": 103.6,
+  "tool_log": [
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker",
+        "top_k": 50
+      },
+      "seconds": 0.556,
+      "result_chars": 204,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker",
+        "language": "cpp",
+        "top_k": 50
+      },
+      "seconds": 0.462,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class $NAME",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 0.586,
+      "result_chars": 2220,
+      "hit_paths": [
+        "source/extensions/wasm_runtime/wasmtime/config.cc",
+        "test/test_common/network_utility_test.cc",
+        "source/extensions/wasm_runtime/wamr/config.cc",
+        "source/extensions/wasm_runtime/v8/config.cc",
+        "source/extensions/wasm_runtime/null/config.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class AutoDebugRecursionChecker",
+        "language": "cpp",
+        "top_k": 10
+      },
+      "seconds": 0.425,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker $VAR($$$ARGS)",
+        "language": "cpp",
+        "top_k": 30
+      },
+      "seconds": 0.438,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class Foo123NotExist",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 0.349,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "struct AutoDebugRecursionChecker",
+        "language": "cpp",
+        "top_k": 10
+      },
+      "seconds": 0.463,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$T AutoDebugRecursionChecker",
+        "language": "cpp",
+        "top_k": 30
+      },
+      "seconds": 0.426,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$T RecursionChecker",
+        "language": "cpp",
+        "top_k": 30
+      },
+      "seconds": 0.355,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "recursion_checker",
+        "language": "cpp",
+        "top_k": 30
+      },
+      "seconds": 0.488,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$X recursion $Y",
+        "language": "cpp",
+        "top_k": 30
+      },
+      "seconds": 0.64,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "RecursionChecker",
+        "language": "cpp",
+        "top_k": 30
+      },
+      "seconds": 0.768,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2"
+      },
+      "seconds": 0.007,
+      "result_chars": 98224,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2"
+      },
+      "seconds": 0.007,
+      "result_chars": 12823,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "#define $NAME",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 0.343,
+      "result_chars": 1296,
+      "hit_paths": [
+        "test/tools/wee8_compile/wee8_compile.cc",
+        "test/tools/wee8_compile/wee8_compile.cc",
+        "test/tools/wee8_compile/wee8_compile.cc",
+        "test/tools/wee8_compile/wee8_compile.cc",
+        "test/tools/wee8_compile/wee8_compile.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$T checker_",
+        "language": "cpp",
+        "top_k": 30
+      },
+      "seconds": 0.364,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "auto $VAR = AutoDebugRecursionChecker($$$ARGS)",
+        "language": "cpp",
+        "top_k": 20
+      },
+      "seconds": 0.369,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker",
+        "language": "c",
+        "top_k": 20
+      },
+      "seconds": 0.37,
+      "result_chars": 1278,
+      "hit_paths": [
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/common/debug_recursion_checker.h",
+        "source/common/common/debug_recursion_checker.h",
+        "source/common/common/debug_recursion_checker.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/common/debug_recursion_checker.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 785,
+      "hit_paths": [
+        "source/common/common/debug_recursion_checker.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/upstream/conn_pool_map_impl.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 5703,
+      "hit_paths": [
+        "source/common/upstream/conn_pool_map_impl.h"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker",
+        "language": "c",
+        "top_k": 100
+      },
+      "seconds": 0.344,
+      "result_chars": 1278,
+      "hit_paths": [
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/common/debug_recursion_checker.h",
+        "source/common/common/debug_recursion_checker.h",
+        "source/common/common/debug_recursion_checker.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "test/common/common/debug_recursion_checker_test.cc"
+      },
+      "seconds": 0.0,
+      "result_chars": 0,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/upstream/conn_pool_map.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 2741,
+      "hit_paths": [
+        "source/common/upstream/conn_pool_map.h"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2"
+      },
+      "seconds": 0.006,
+      "result_chars": 98224,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "test/common/upstream/conn_pool_map_impl_test.cc"
+      },
+      "seconds": 0.0,
+      "result_chars": 16000,
+      "hit_paths": [
+        "test/common/upstream/conn_pool_map_impl_test.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker $VAR",
+        "language": "c",
+        "top_k": 50
+      },
+      "seconds": 0.571,
+      "result_chars": 580,
+      "hit_paths": [
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h"
+      ]
+    }
+  ],
+  "tool_seconds": 8.337,
+  "retrieval_result_chars": 242270,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. The blast radius for removing `AutoDebugRecursionChecker` is exactly two files:\n\n1. **`source/common/common/debug_recursion_checker.h`** \u2014 declares the type itself (a RAII wrapper around `DebugRecursionChecker::enter()`/`exit()`).\n2. **`source/common/upstream/conn_pool_map_impl.h`** \u2014 the only caller, instantiating `Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);` at the top of four `ConnPoolMap` methods (`getPool`, `erasePool`, `clear`, `addIdleCallback`).\n\nNo other file names the type: `conn_pool_map.h` only holds the underlying `DebugRecursionChecker` member (not the `Auto...` RAII wrapper), and `test/common/upstream/conn_pool_map_impl_test.cc` exercises the recursion assertion indirectly through `ConnPoolMap`'s public API (matching on the assert's death-test message) without referencing `AutoDebugRecursionChecker` by name.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 1425167,
+  "output_tokens": 7485,
+  "input_tokens_uncached": 36,
+  "cache_creation_input_tokens": 63146,
+  "cache_read_input_tokens": 1361985,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "symbol-footprint-envoy-recursion-guard-001",
+    "config_name": "condition:structural_syntax",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 1.0,
+    "n_retrieved": 2,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 5
+}

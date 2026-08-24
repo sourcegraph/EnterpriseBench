@@ -20,7 +20,14 @@ the agent never called `definition` or `references` in **54/54** runs, and
 never called `ast_search` in **53/54**. Given grep and ast_search only, it
 never called `ast_search` in **52/54**. These tools were offered, never
 denied by the allowlist hook, and returned no errors; they were simply not
-chosen. When only one family is offered, it is used (`ast_search` unused in
+chosen. The ablation ran this back with worked patterns in `ast_search`'s argument
+description (`def $F($$$ARGS)`, `$OBJ.get($KEY)`) instead of only naming the
+metavariable forms. Usage did not rise; it went to zero. `ast_search` was
+called **0 times in 54 runs** of `structural_lexical_syntax`, against 6 calls
+in 2 runs of its control. Showing the agent how to write the pattern does not
+make it write one when grep is available.
+
+When only one family is offered, it is used (`ast_search` unused in
 just 4/54 structural runs, `definition`/`references` unused in 21/54 and
 20/54 codeintel runs -- the codeintel numbers reflect runs solved by
 list_files/read_file alone).
@@ -38,6 +45,12 @@ set; it just does not find more of the required files.
 The hypothesis that AST search is the more agent-natural interface is not
 supported here. It is the arm the agent avoids whenever grep is present, and
 when it is forced to use it, it does not retrieve better.
+
+The ablation adds the reason this is not merely a syntax-unfamiliarity
+result. In the forced arm, the same worked patterns did help: `structural`
+minus `structural_syntax` is -0.025 [-0.059, +0.003] on recall, and the mean
+call index of the first relevant result fell from 6.6 to 4.7. So the example
+was usable, and the agent still did not choose the tool.
 
 ## 3. Does structural search reduce the need for precise code intel?
 
@@ -153,11 +166,12 @@ favour a claim the brief was skeptical of:
 
 * N. Eighteen tasks; most intervals touch zero, and only three whole-corpus
   contrasts exclude it.
-* The structural interface. `ast_search` requires ast-grep metavariable
-  syntax; the declared asymmetry is recorded in `conditions.py` and the
-  ablation (offering a syntax cheat-sheet in the tool description) is not
-  run. A structural arm that is avoided may be avoided for its calling
-  convention rather than its capability.
+* The structural interface, now partly closed. The metavariable-syntax
+  ablation ran (`structural_lexical_syntax`, `structural_syntax`): the
+  example did not raise usage at all, while modestly improving the forced
+  arm's retrieval. What remains untested is a different interface shape
+  entirely -- a pattern builder, or examples in the system prompt rather than
+  the tool schema.
 * One model, one seam. Sampling is not settable through the Claude Code CLI
   (`sampling: cli_default_not_settable` in every report); a provider-API
   cross-check has not been run.

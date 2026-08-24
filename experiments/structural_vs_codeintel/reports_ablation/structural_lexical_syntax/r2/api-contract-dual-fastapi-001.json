@@ -1,0 +1,128 @@
+{
+  "task_id": "api-contract-dual-fastapi-001",
+  "policy": "condition:structural_lexical_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/fastapi--0.109.0",
+    "github.com/sg-evals/httpx--0.26.0"
+  ],
+  "retrieved_paths": [
+    "fastapi/dependencies/utils.py",
+    "fastapi/routing.py",
+    "httpx/_content.py",
+    "httpx/_models.py",
+    "httpx/_client.py",
+    "fastapi/exceptions.py",
+    "fastapi/exception_handlers.py",
+    "httpx/_api.py",
+    "httpx/_types.py"
+  ],
+  "required_files": [
+    "fastapi/routing.py",
+    "httpx/_content.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical_syntax",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 4,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.16735660000000002,
+  "elapsed_seconds": 10.8,
+  "wall_seconds": 10.8,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "def request_body_to_args|solve_dependencies|def get_body_field",
+        "case_sensitive": false
+      },
+      "seconds": 0.267,
+      "result_chars": 1660,
+      "hit_paths": [
+        "fastapi/dependencies/utils.py",
+        "fastapi/dependencies/utils.py",
+        "fastapi/dependencies/utils.py",
+        "fastapi/dependencies/utils.py",
+        "fastapi/routing.py",
+        "fastapi/routing.py",
+        "fastapi/routing.py"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0"
+      },
+      "seconds": 0.011,
+      "result_chars": 2503,
+      "hit_paths": []
+    }
+  ],
+  "tool_seconds": 0.278,
+  "retrieval_result_chars": 4163,
+  "denied_tools": [],
+  "cli_result_text": "Submitted.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 205650,
+  "output_tokens": 598,
+  "input_tokens_uncached": 6,
+  "cache_creation_input_tokens": 31641,
+  "cache_read_input_tokens": 174003,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "condition:structural_lexical_syntax",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.8,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.6934,
+      "5": 0.6934,
+      "10": 0.6934
+    },
+    "mrr": 0.5,
+    "map_score": 0.5833,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 4
+}

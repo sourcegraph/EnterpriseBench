@@ -1,0 +1,545 @@
+{
+  "task_id": "schema-evolution-002",
+  "policy": "condition:structural_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "feature_delivery",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/zulip--912c1b59"
+  ],
+  "retrieved_paths": [
+    "zerver/lib/export.py",
+    "zerver/models/realm_audit_logs.py",
+    "zerver/models/__init__.py",
+    "zerver/actions/realm_export.py",
+    "zerver/views/realm_export.py",
+    "zerver/worker/deferred_work.py",
+    "zerver/management/commands/export.py",
+    "zerver/lib/import_realm.py",
+    "zerver/lib/event_schema.py",
+    "zerver/lib/upload/__init__.py",
+    "zerver/lib/upload/base.py",
+    "zerver/lib/upload/s3.py",
+    "zerver/lib/upload/local.py",
+    "zproject/urls.py",
+    "zerver/tests/test_realm_export.py",
+    "zerver/tests/test_import_export.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_management_commands.py",
+    "zerver/tests/test_upload_s3.py",
+    "zerver/tests/test_upload_local.py"
+  ],
+  "required_files": [
+    "zerver/models/realms.py",
+    "zerver/actions/realm_export.py",
+    "zerver/views/realm_export.py",
+    "zerver/worker/deferred_work.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_syntax",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 33,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.7470486000000001,
+  "elapsed_seconds": 118.1,
+  "wall_seconds": 118.1,
+  "tool_log": [
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/migrations/0595_add_realmexport_table_and_backfill.py"
+      },
+      "seconds": 0.001,
+      "result_chars": 0,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59"
+      },
+      "seconds": 0.008,
+      "result_chars": 180674,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class RealmExport",
+        "language": "python"
+      },
+      "seconds": 0.172,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "RealmExport",
+        "language": "python",
+        "top_k": 50
+      },
+      "seconds": 0.149,
+      "result_chars": 86,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "export",
+        "language": "python",
+        "top_k": 10
+      },
+      "seconds": 0.326,
+      "result_chars": 2294,
+      "hit_paths": [
+        "corporate/views/installation_activity.py",
+        "corporate/views/installation_activity.py",
+        "corporate/views/installation_activity.py",
+        "corporate/views/installation_activity.py",
+        "corporate/views/installation_activity.py",
+        "corporate/views/installation_activity.py",
+        "corporate/views/installation_activity.py",
+        "zerver/worker/deferred_work.py",
+        "zerver/management/commands/export_usermessage_batch.py",
+        "zerver/management/commands/export_single_user.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/lib/export.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 87258,
+      "hit_paths": [
+        "zerver/lib/export.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/worker/deferred_work.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 10590,
+      "hit_paths": [
+        "zerver/worker/deferred_work.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/actions/realm_export.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 954,
+      "hit_paths": [
+        "zerver/actions/realm_export.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "def get_realm_exports_serialized($$$ARGS)",
+        "language": "python"
+      },
+      "seconds": 0.135,
+      "result_chars": 496,
+      "hit_paths": [
+        "zerver/lib/export.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "RealmAuditLog.EVENT_TYPES",
+        "language": "python",
+        "top_k": 30
+      },
+      "seconds": 0.134,
+      "result_chars": 86,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59"
+      },
+      "seconds": 0.006,
+      "result_chars": 217714,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/views/realm_export.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 5026,
+      "hit_paths": [
+        "zerver/views/realm_export.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/management/commands/export.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 7773,
+      "hit_paths": [
+        "zerver/management/commands/export.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/tests/test_realm_export.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 14595,
+      "hit_paths": [
+        "zerver/tests/test_realm_export.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/models/__init__.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 4913,
+      "hit_paths": [
+        "zerver/models/__init__.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/models/realm_audit_logs.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 10096,
+      "hit_paths": [
+        "zerver/models/realm_audit_logs.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "realm_export",
+        "language": "python",
+        "top_k": 80
+      },
+      "seconds": 0.16,
+      "result_chars": 832,
+      "hit_paths": [
+        "zproject/urls.py",
+        "zerver/worker/deferred_work.py",
+        "zerver/views/realm_export.py",
+        "zerver/tests/test_realm_export.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "delete_export_tarball",
+        "language": "python",
+        "top_k": 20
+      },
+      "seconds": 0.187,
+      "result_chars": 3089,
+      "hit_paths": [
+        "zerver/actions/realm_export.py",
+        "zerver/actions/realm_export.py",
+        "zerver/lib/upload/s3.py",
+        "zerver/lib/upload/local.py",
+        "zerver/lib/upload/base.py",
+        "zerver/lib/upload/__init__.py",
+        "zerver/lib/upload/__init__.py",
+        "zerver/tests/test_upload_s3.py",
+        "zerver/tests/test_upload_s3.py",
+        "zerver/tests/test_upload_s3.py",
+        "zerver/tests/test_upload_s3.py",
+        "zerver/tests/test_upload_local.py",
+        "zerver/tests/test_upload_local.py",
+        "zerver/tests/test_upload_local.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "REALM_EXPORTED",
+        "language": "python",
+        "top_k": 50
+      },
+      "seconds": 0.135,
+      "result_chars": 3252,
+      "hit_paths": [
+        "zerver/management/commands/export.py",
+        "zerver/views/realm_export.py",
+        "zerver/views/realm_export.py",
+        "zerver/lib/export.py",
+        "zerver/lib/import_realm.py",
+        "zerver/tests/test_events.py",
+        "zerver/models/realm_audit_logs.py",
+        "zerver/tests/test_import_export.py",
+        "zerver/tests/test_import_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "export_type=$X",
+        "language": "python",
+        "top_k": 30
+      },
+      "seconds": 0.134,
+      "result_chars": 1265,
+      "hit_paths": [
+        "zerver/management/commands/export.py",
+        "zerver/management/commands/export.py",
+        "zerver/management/commands/export.py",
+        "zerver/lib/event_schema.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "check_realm_export",
+        "language": "python",
+        "top_k": 20
+      },
+      "seconds": 0.13,
+      "result_chars": 1498,
+      "hit_paths": [
+        "zerver/lib/event_schema.py",
+        "zerver/tests/test_events.py",
+        "zerver/tests/test_events.py",
+        "zerver/tests/test_events.py",
+        "zerver/tests/test_events.py",
+        "zerver/tests/test_events.py",
+        "zerver/tests/test_events.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/management/commands/export_single_user.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 2134,
+      "hit_paths": [
+        "zerver/management/commands/export_single_user.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "import_realm",
+        "language": "python",
+        "top_k": 5
+      },
+      "seconds": 0.12,
+      "result_chars": 1164,
+      "hit_paths": [
+        "zerver/management/commands/import.py",
+        "zerver/tests/test_zulip_update_announcements.py",
+        "zerver/tests/test_mattermost_importer.py",
+        "zerver/tests/test_rocketchat_importer.py",
+        "zerver/tests/test_import_export.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "REALM_EXPORTED",
+        "language": "python",
+        "top_k": 3
+      },
+      "seconds": 0.126,
+      "result_chars": 670,
+      "hit_paths": [
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zproject/urls.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 35449,
+      "hit_paths": [
+        "zproject/urls.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "def check_realm_export($$$ARGS)",
+        "language": "python"
+      },
+      "seconds": 0.122,
+      "result_chars": 514,
+      "hit_paths": [
+        "zerver/lib/event_schema.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AuditLogEventType.REALM_EXPORTED",
+        "language": "python",
+        "top_k": 10
+      },
+      "seconds": 0.126,
+      "result_chars": 2338,
+      "hit_paths": [
+        "zerver/management/commands/export.py",
+        "zerver/views/realm_export.py",
+        "zerver/views/realm_export.py",
+        "zerver/lib/import_realm.py",
+        "zerver/lib/export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class Command(ZulipBaseCommand)",
+        "language": "python",
+        "top_k": 5
+      },
+      "seconds": 0.125,
+      "result_chars": 2803,
+      "hit_paths": [
+        "zerver/management/commands/unarchive_channel.py",
+        "zerver/management/commands/transfer_uploads_to_s3.py",
+        "zerver/management/commands/sync_ldap_user_data.py",
+        "zerver/management/commands/create_realm_internal_bots.py",
+        "zerver/management/commands/soft_deactivate_users.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "manage.py export",
+        "language": "python",
+        "top_k": 10
+      },
+      "seconds": 0.001,
+      "result_chars": 376,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "\"export\"",
+        "language": "python",
+        "top_k": 15
+      },
+      "seconds": 0.13,
+      "result_chars": 240,
+      "hit_paths": [
+        "zerver/tests/test_management_commands.py"
+      ]
+    }
+  ],
+  "tool_seconds": 2.427,
+  "retrieval_result_chars": 598191,
+  "denied_tools": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cat \"/home/ds/.claude-homes/account3/.claude/projects/-home-ds-projects-EnterpriseBench-experiments-structural-vs-codeintel/6eb3646b-d2fa-4efe-8610-d62151050308/tool-results/toolu_01DYuBQyJhJxDrru4YdPScS1.json\" | python3 -c \"\nimport json,sys\ndata = json.load(sys.stdin)\ntext = data[0]['text']\nfiles = json.loads(text)\nfor f in files:\n    if 'migrations' in f and 'zerver' in f:\n        print(f)\n\"\n"
+      },
+      "condition": "structural_syntax"
+    }
+  ],
+  "cli_result_text": "Submitted the 20 files that make up the export-tracking system's full surface area:\n\n**Schema / model layer**\n- `zerver/models/realm_audit_logs.py` \u2014 current tracking lives here: `AuditLogEventType.REALM_EXPORTED` (206) + the `extra_data` JSONField on `RealmAuditLog` that stores `export_path`, `started_timestamp`, `failed_timestamp`, `deleted_timestamp`. This is what `RealmExport` replaces.\n- `zerver/models/__init__.py` \u2014 model registration point; needs the new `RealmExport` import/export added.\n\n**Direct references**\n- `zerver/actions/realm_export.py` \u2014 `notify_realm_export`, `do_delete_realm_export` (reads/writes `extra_data`).\n- `zerver/views/realm_export.py` \u2014 `export_realm`, `get_realm_exports`, `delete_realm_export` endpoints; creates the `RealmAuditLog` row and reads `extra_data` directly.\n- `zerver/lib/export.py` \u2014 `get_realm_exports_serialized` (builds the API-facing dict from `extra_data`) and `export_realm_wrapper`/`do_export_realm`.\n\n**Indirect references (the \"tentacles\")**\n- `zerver/worker/deferred_work.py` \u2014 the `realm_export` background job; reads/writes `extra_data` at each stage (started/failed/export_path).\n- `zerver/management/commands/export.py` \u2014 CLI export path creates its own `RealmAuditLog` row.\n- `zerver/lib/import_realm.py` \u2014 handles `REALM_EXPORTED` entries during realm import.\n- `zerver/lib/upload/{__init__,base,s3,local}.py` \u2014 `delete_export_tarball` and friends, used by `do_delete_realm_export`.\n- `zproject/urls.py` \u2014 routes `export/realm*` to the views above (unlikely to change, but part of the surface).\n- `zerver/lib/event_schema.py` \u2014 `check_realm_export`/`_check_realm_export`, the schema the `realm_export` event must satisfy.\n\n**Test coverage**\n- `zerver/tests/test_realm_export.py` \u2014 primary dedicated export tests (end-to-end, S3 + local).\n- `zerver/tests/test_import_export.py` \u2014 round-trip tests referencing `REALM_EXPORTED`.\n- `zerver/tests/test_events.py` \u2014 event-schema tests for the `realm_export` event.\n- `zerver/tests/test_management_commands.py` \u2014 CLI `export` command tests.\n- `zerver/tests/test_upload_s3.py`, `zerver/tests/test_upload_local.py` \u2014 `delete_export_tarball` coverage per storage backend.\n\nNote: `zerver/migrations/0595_add_realmexport_table_and_backfill.py` itself was not found in this checkout \u2014 the codebase's export tracking is still on `RealmAuditLog.extra_data` (not a JSON file on disk as the ticket describes), so that migration appears not yet present in this snapshot. Flag this discrepancy before writing `SCHEMA_IMPACT.md`.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 1442606,
+  "output_tokens": 10149,
+  "input_tokens_uncached": 30,
+  "cache_creation_input_tokens": 93943,
+  "cache_read_input_tokens": 1348633,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "schema-evolution-002",
+    "config_name": "condition:structural_syntax",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3191,
+      "10": 0.4582
+    },
+    "mrr": 0.25,
+    "map_score": 0.2875,
+    "file_recall": 0.75,
+    "context_efficiency": 0.15,
+    "n_retrieved": 20,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 3
+}

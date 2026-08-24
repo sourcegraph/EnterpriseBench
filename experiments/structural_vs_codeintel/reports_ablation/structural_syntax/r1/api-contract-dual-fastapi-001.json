@@ -1,0 +1,217 @@
+{
+  "task_id": "api-contract-dual-fastapi-001",
+  "policy": "condition:structural_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/fastapi--0.109.0",
+    "github.com/sg-evals/httpx--0.26.0"
+  ],
+  "retrieved_paths": [
+    "fastapi/dependencies/utils.py",
+    "fastapi/_compat.py",
+    "fastapi/routing.py",
+    "fastapi/encoders.py",
+    "httpx/_content.py",
+    "httpx/_models.py",
+    "httpx/_client.py",
+    "httpx/_utils.py",
+    "fastapi/params.py",
+    "fastapi/exceptions.py",
+    "httpx/_types.py",
+    "httpx/_multipart.py"
+  ],
+  "required_files": [
+    "fastapi/routing.py",
+    "httpx/_content.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_syntax",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 12,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.5150676,
+  "elapsed_seconds": 29.9,
+  "wall_seconds": 29.9,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0"
+      },
+      "seconds": 0.008,
+      "result_chars": 21289,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0"
+      },
+      "seconds": 0.004,
+      "result_chars": 2503,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0",
+        "path": "fastapi/dependencies/utils.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 30158,
+      "hit_paths": [
+        "fastapi/dependencies/utils.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0",
+        "path": "fastapi/routing.py"
+      },
+      "seconds": 0.002,
+      "result_chars": 174485,
+      "hit_paths": [
+        "fastapi/routing.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0",
+        "path": "httpx/_content.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 8109,
+      "hit_paths": [
+        "httpx/_content.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0",
+        "path": "httpx/_models.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 42974,
+      "hit_paths": [
+        "httpx/_models.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0",
+        "path": "fastapi/_compat.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 23027,
+      "hit_paths": [
+        "fastapi/_compat.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0",
+        "path": "fastapi/encoders.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 11024,
+      "hit_paths": [
+        "fastapi/encoders.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0",
+        "path": "httpx/_client.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 69273,
+      "hit_paths": [
+        "httpx/_client.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0",
+        "path": "httpx/_utils.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 14069,
+      "hit_paths": [
+        "httpx/_utils.py"
+      ]
+    }
+  ],
+  "tool_seconds": 0.014,
+  "retrieval_result_chars": 396911,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file set covering both sides of the contract:\n\n**FastAPI request validation chain** \u2014 `fastapi/dependencies/utils.py` (dependency injection, `request_body_to_args`, param analysis), `fastapi/_compat.py` (Pydantic v1/v2 shim, `ModelField.validate` via `TypeAdapter`), `fastapi/routing.py` (route handler, content-type/body dispatch), `fastapi/encoders.py` (`jsonable_encoder`), `fastapi/params.py`, `fastapi/exceptions.py`.\n\n**httpx request encoding chain** \u2014 `httpx/_content.py` (`encode_json`, `encode_request`), `httpx/_models.py` (`Request.__init__`, header auto-population), `httpx/_client.py` (`build_request`), `httpx/_utils.py`, `httpx/_types.py`, `httpx/_multipart.py`.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 540128,
+  "output_tokens": 2691,
+  "input_tokens_uncached": 10,
+  "cache_creation_input_tokens": 100030,
+  "cache_read_input_tokens": 440088,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "condition:structural_syntax",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.5438,
+      "10": 0.5438
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 12,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 5
+}

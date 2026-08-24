@@ -1,0 +1,517 @@
+{
+  "task_id": "schema-evolution-001",
+  "policy": "condition:structural_lexical_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "feature_delivery",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/zulip--38053e9c"
+  ],
+  "retrieved_paths": [
+    "zerver/models/groups.py",
+    "zerver/lib/user_groups.py",
+    "zerver/actions/user_groups.py",
+    "zerver/views/user_groups.py",
+    "zerver/lib/events.py",
+    "zerver/lib/event_schema.py",
+    "zerver/models/realm_audit_logs.py",
+    "zerver/lib/mention.py",
+    "zerver/lib/message.py",
+    "zerver/lib/streams.py",
+    "zerver/lib/notification_data.py",
+    "zerver/lib/export.py",
+    "zerver/lib/import_realm.py",
+    "zerver/lib/bulk_create.py",
+    "zerver/actions/create_user.py",
+    "zerver/actions/realm_settings.py",
+    "zerver/actions/users.py",
+    "zproject/urls.py",
+    "zerver/openapi/python_examples.py",
+    "zerver/openapi/curl_param_value_generators.py",
+    "zerver/openapi/zulip.yaml",
+    "zerver/tests/test_user_groups.py",
+    "zerver/tests/test_audit_log.py",
+    "zerver/tests/test_events.py",
+    "zerver/lib/test_classes.py",
+    "analytics/management/commands/populate_analytics_db.py",
+    "analytics/tests/test_counts.py",
+    "web/src/user_groups.ts",
+    "web/src/state_data.ts",
+    "web/src/server_events_dispatch.js",
+    "web/src/user_group_edit.js"
+  ],
+  "required_files": [
+    "zerver/models/groups.py",
+    "zerver/actions/user_groups.py",
+    "zerver/views/user_groups.py",
+    "zerver/lib/events.py",
+    "zerver/lib/event_schema.py",
+    "zerver/lib/user_groups.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical_syntax",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 22,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.4291524,
+  "elapsed_seconds": 41.7,
+  "wall_seconds": 41.7,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class NamedUserGroup",
+        "case_sensitive": false
+      },
+      "seconds": 0.096,
+      "result_chars": 380,
+      "hit_paths": [
+        "zerver/models/groups.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "0578_namedusergroup_deactivated",
+        "case_sensitive": false
+      },
+      "seconds": 0.026,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "NamedUserGroup\\.objects",
+        "case_sensitive": false
+      },
+      "seconds": 0.154,
+      "result_chars": 6665,
+      "hit_paths": [
+        "analytics/management/commands/populate_analytics_db.py",
+        "analytics/tests/test_counts.py",
+        "tools/screenshots/generate-user-messages-screenshot",
+        "zerver/actions/create_user.py",
+        "zerver/actions/realm_settings.py",
+        "zerver/actions/user_groups.py",
+        "zerver/actions/user_groups.py",
+        "zerver/lib/bulk_create.py",
+        "zerver/lib/bulk_create.py",
+        "zerver/lib/bulk_create.py",
+        "zerver/lib/import_realm.py",
+        "zerver/lib/import_realm.py",
+        "zerver/lib/mention.py",
+        "zerver/lib/message.py",
+        "zerver/lib/notification_data.py",
+        "zerver/lib/streams.py",
+        "zerver/lib/test_classes.py",
+        "zerver/lib/test_classes.py",
+        "zerver/lib/user_groups.py",
+        "zerver/lib/user_groups.py",
+        "zerver/lib/user_groups.py",
+        "zerver/lib/user_groups.py",
+        "zerver/lib/user_groups.py",
+        "zerver/lib/user_groups.py",
+        "zerver/lib/user_groups.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "migrations/05[0-9][0-9]_.*usergroup",
+        "case_sensitive": false
+      },
+      "seconds": 0.188,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "do_deactivate_user_group|deactivated.*group|UserGroup.*deactivat",
+        "case_sensitive": false
+      },
+      "seconds": 0.175,
+      "result_chars": 1766,
+      "hit_paths": [
+        "web/templates/input_pill.hbs",
+        "zerver/lib/users.py",
+        "zerver/lib/users.py",
+        "zerver/lib/users.py",
+        "zerver/tests/test_user_groups.py",
+        "zerver/tests/test_user_groups.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "user_group_events|notify_realm_user_groups|realm_user_group",
+        "case_sensitive": false
+      },
+      "seconds": 0.148,
+      "result_chars": 6725,
+      "hit_paths": [
+        "web/src/composebox_typeahead.ts",
+        "web/src/composebox_typeahead.ts",
+        "web/src/settings_components.ts",
+        "web/src/settings_data.ts",
+        "web/src/settings_data.ts",
+        "web/src/settings_org.js",
+        "web/src/settings_org.js",
+        "web/src/state_data.ts",
+        "web/src/state_data.ts",
+        "web/src/stream_edit.js",
+        "web/src/stream_settings_components.js",
+        "web/src/user_group_components.ts",
+        "web/src/user_group_edit.js",
+        "web/src/user_group_edit.js",
+        "web/src/user_group_pill.ts",
+        "web/src/user_groups.ts",
+        "web/src/user_groups.ts",
+        "web/src/user_groups.ts",
+        "web/src/user_groups.ts",
+        "web/src/user_groups.ts",
+        "web/src/user_groups.ts",
+        "web/templates/settings/organization_permissions_admin.hbs",
+        "web/templates/settings/organization_permissions_admin.hbs",
+        "web/tests/compose.test.js",
+        "web/tests/compose_actions.test.js"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "RealmAuditLog.*USER_GROUP|USER_GROUP_.*=",
+        "case_sensitive": false
+      },
+      "seconds": 0.162,
+      "result_chars": 6697,
+      "hit_paths": [
+        "web/src/alert_words_ui.ts",
+        "web/src/alert_words_ui.ts",
+        "web/src/alert_words_ui.ts",
+        "web/src/alert_words_ui.ts",
+        "web/src/composebox_typeahead.ts",
+        "web/src/composebox_typeahead.ts",
+        "web/src/composebox_typeahead.ts",
+        "web/src/markdown.ts",
+        "web/src/markdown.ts",
+        "web/src/markdown_config.ts",
+        "web/src/rendered_markdown.ts",
+        "web/src/rendered_markdown.ts",
+        "web/src/rendered_markdown.ts",
+        "web/src/state_data.ts",
+        "web/src/user_group_components.ts",
+        "web/src/user_group_create.ts",
+        "web/src/user_group_create.ts",
+        "web/src/user_group_create.ts",
+        "web/src/user_group_create.ts",
+        "web/src/user_group_create.ts",
+        "web/src/user_group_create.ts",
+        "web/src/user_group_create.ts",
+        "web/src/user_group_create.ts",
+        "web/src/user_group_edit.js",
+        "web/src/user_group_edit.js"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--38053e9c"
+      },
+      "seconds": 0.005,
+      "result_chars": 171736,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "\"user_group\"",
+        "case_sensitive": false
+      },
+      "seconds": 0.043,
+      "result_chars": 9671,
+      "hit_paths": [
+        "web/src/add_subscribers_pill.ts",
+        "web/src/add_subscribers_pill.ts",
+        "web/src/add_subscribers_pill.ts",
+        "web/src/composebox_typeahead.ts",
+        "web/src/composebox_typeahead.ts",
+        "web/src/composebox_typeahead.ts",
+        "web/src/composebox_typeahead.ts",
+        "web/src/composebox_typeahead.ts",
+        "web/src/pill_typeahead.ts",
+        "web/src/pill_typeahead.ts",
+        "web/src/pill_typeahead.ts",
+        "web/src/pill_typeahead.ts",
+        "web/src/server_events_dispatch.js",
+        "web/src/typeahead_helper.ts",
+        "web/src/user_group_pill.ts",
+        "web/src/user_group_pill.ts",
+        "web/src/user_group_pill.ts",
+        "web/src/user_group_pill.ts",
+        "web/src/user_group_pill.ts",
+        "web/src/user_group_pill.ts",
+        "web/src/user_group_pill.ts",
+        "web/src/user_group_pill.ts",
+        "web/tests/composebox_typeahead.test.js",
+        "web/tests/dispatch.test.js",
+        "web/tests/lib/events.js",
+        "web/tests/lib/events.js",
+        "web/tests/lib/events.js",
+        "web/tests/lib/events.js",
+        "web/tests/lib/events.js",
+        "web/tests/lib/events.js",
+        "web/tests/lib/events.js",
+        "web/tests/pill_typeahead.test.js",
+        "web/tests/user_group_pill.test.js",
+        "web/tests/user_group_pill.test.js",
+        "web/tests/user_group_pill.test.js",
+        "zerver/actions/user_groups.py",
+        "zerver/actions/user_groups.py",
+        "zerver/actions/user_groups.py",
+        "zerver/actions/user_groups.py",
+        "zerver/actions/user_groups.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "user_group.*urls|urls\\.py.*group|r\"^user_groups",
+        "case_sensitive": false
+      },
+      "seconds": 0.183,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "def do_send_user_group_update_event|send_event.*user_group|event\\[\"type\"\\] == \"user_group\"",
+        "case_sensitive": false
+      },
+      "seconds": 0.197,
+      "result_chars": 1608,
+      "hit_paths": [
+        "zerver/actions/user_groups.py",
+        "zerver/actions/user_groups.py",
+        "zerver/actions/user_groups.py",
+        "zerver/actions/user_groups.py",
+        "zerver/actions/user_groups.py",
+        "zerver/lib/events.py"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--38053e9c"
+      },
+      "seconds": 0.008,
+      "result_chars": 209924,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "USER_GROUP_CREATED|USER_GROUP_DELETED|USER_GROUP_DIRECT_USER|RealmAuditLog\\.USER_GROUP",
+        "case_sensitive": false
+      },
+      "seconds": 0.165,
+      "result_chars": 6776,
+      "hit_paths": [
+        "zerver/actions/create_user.py",
+        "zerver/actions/create_user.py",
+        "zerver/actions/user_groups.py",
+        "zerver/actions/user_groups.py",
+        "zerver/actions/user_groups.py",
+        "zerver/actions/user_groups.py",
+        "zerver/actions/users.py",
+        "zerver/actions/users.py",
+        "zerver/lib/bulk_create.py",
+        "zerver/lib/import_realm.py",
+        "zerver/lib/user_groups.py",
+        "zerver/models/realm_audit_logs.py",
+        "zerver/models/realm_audit_logs.py",
+        "zerver/models/realm_audit_logs.py",
+        "zerver/models/realm_audit_logs.py",
+        "zerver/tests/test_audit_log.py",
+        "zerver/tests/test_audit_log.py",
+        "zerver/tests/test_audit_log.py",
+        "zerver/tests/test_audit_log.py",
+        "zerver/tests/test_audit_log.py",
+        "zerver/tests/test_audit_log.py",
+        "zerver/tests/test_audit_log.py",
+        "zerver/tests/test_audit_log.py",
+        "zerver/tests/test_audit_log.py",
+        "zerver/tests/test_audit_log.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "path\\(\"user_groups|user_groups/<int",
+        "case_sensitive": false
+      },
+      "seconds": 0.184,
+      "result_chars": 1453,
+      "hit_paths": [
+        "zproject/urls.py",
+        "zproject/urls.py",
+        "zproject/urls.py",
+        "zproject/urls.py",
+        "zproject/urls.py",
+        "zproject/urls.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "user_groups.*openapi|openapi.*user_group",
+        "case_sensitive": false
+      },
+      "seconds": 0.17,
+      "result_chars": 3122,
+      "hit_paths": [
+        "zerver/openapi/curl_param_value_generators.py",
+        "zerver/openapi/python_examples.py",
+        "zerver/openapi/python_examples.py",
+        "zerver/openapi/python_examples.py",
+        "zerver/openapi/python_examples.py",
+        "zerver/openapi/python_examples.py",
+        "zerver/openapi/python_examples.py",
+        "zerver/openapi/python_examples.py",
+        "zerver/openapi/python_examples.py",
+        "zerver/openapi/python_examples.py",
+        "zerver/openapi/python_examples.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "def export_usermessages_batch|realm_user_groups.*export|NamedUserGroup.*export",
+        "case_sensitive": false
+      },
+      "seconds": 0.175,
+      "result_chars": 221,
+      "hit_paths": [
+        "zerver/lib/export.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "migrations/057[0-9]_",
+        "case_sensitive": false
+      },
+      "seconds": 0.153,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "is_system_group.*bool|deactivated = models\\.BooleanField",
+        "case_sensitive": false
+      },
+      "seconds": 0.151,
+      "result_chars": 2603,
+      "hit_paths": [
+        "web/src/state_data.ts",
+        "zerver/actions/user_groups.py",
+        "zerver/lib/event_schema.py",
+        "zerver/lib/user_groups.py",
+        "zerver/models/groups.py",
+        "zerver/models/realm_emoji.py",
+        "zerver/models/realms.py",
+        "zerver/models/streams.py",
+        "zilencer/models.py",
+        "zilencer/models.py",
+        "zilencer/models.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "def check_event\\(.*user_group|user_group_event_schema|group_id.*schema",
+        "case_sensitive": false
+      },
+      "seconds": 0.166,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--38053e9c"
+      },
+      "seconds": 0.007,
+      "result_chars": 35731,
+      "hit_paths": []
+    }
+  ],
+  "tool_seconds": 2.556,
+  "retrieval_result_chars": 465138,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file list required for the schema-impact analysis of adding `deactivated` to `NamedUserGroup`.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 607043,
+  "output_tokens": 3717,
+  "input_tokens_uncached": 14,
+  "cache_creation_input_tokens": 71197,
+  "cache_read_input_tokens": 535832,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "schema-evolution-001",
+    "config_name": "condition:structural_lexical_syntax",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 0.6
+    },
+    "recall": {
+      "1": 0.1667,
+      "3": 0.5,
+      "5": 0.8333,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.2857,
+      "3": 0.6667,
+      "5": 0.9091,
+      "10": 0.75
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1935,
+    "n_retrieved": 31,
+    "n_ground_truth": 6,
+    "n_overlap": 6
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 1
+}

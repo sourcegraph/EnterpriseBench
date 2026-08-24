@@ -1,0 +1,137 @@
+{
+  "task_id": "symbol-footprint-envoy-token-bucket-001",
+  "policy": "condition:structural_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.31.2"
+  ],
+  "retrieved_paths": [
+    "source/common/common/token_bucket_impl.h",
+    "source/common/common/token_bucket_impl.cc"
+  ],
+  "required_files": [
+    "source/common/common/token_bucket_impl.cc",
+    "source/common/common/token_bucket_impl.h",
+    "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_syntax",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 6,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.0935836,
+  "elapsed_seconds": 17.2,
+  "wall_seconds": 17.2,
+  "tool_log": [
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class AtomicTokenBucketImpl"
+      },
+      "seconds": 1.017,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AtomicTokenBucketImpl"
+      },
+      "seconds": 0.79,
+      "result_chars": 385,
+      "hit_paths": [
+        "source/common/common/token_bucket_impl.cc"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/common/token_bucket_impl.h"
+      },
+      "seconds": 0.002,
+      "result_chars": 4272,
+      "hit_paths": [
+        "source/common/common/token_bucket_impl.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/common/token_bucket_impl.cc"
+      },
+      "seconds": 0.0,
+      "result_chars": 3535,
+      "hit_paths": [
+        "source/common/common/token_bucket_impl.cc"
+      ]
+    }
+  ],
+  "tool_seconds": 1.809,
+  "retrieval_result_chars": 8274,
+  "denied_tools": [],
+  "cli_result_text": "Submitted both files: `source/common/common/token_bucket_impl.h` (class declaration) and `source/common/common/token_bucket_impl.cc` (member definitions). No other source files reference `AtomicTokenBucketImpl`.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 342170,
+  "output_tokens": 753,
+  "input_tokens_uncached": 10,
+  "cache_creation_input_tokens": 4632,
+  "cache_read_input_tokens": 337528,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "symbol-footprint-envoy-token-bucket-001",
+    "config_name": "condition:structural_syntax",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 1.0,
+    "n_retrieved": 2,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 4
+}

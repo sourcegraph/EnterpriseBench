@@ -1,0 +1,552 @@
+{
+  "task_id": "schema-evolution-002",
+  "policy": "condition:structural_lexical_syntax",
+  "model": "claude-sonnet-5",
+  "suite": "feature_delivery",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/zulip--912c1b59"
+  ],
+  "retrieved_paths": [
+    "zerver/models/realm_audit_logs.py",
+    "zerver/models/__init__.py",
+    "zerver/lib/export.py",
+    "zerver/actions/realm_export.py",
+    "zerver/views/realm_export.py",
+    "zerver/worker/deferred_work.py",
+    "zerver/management/commands/export.py",
+    "zerver/management/commands/export_usermessage_batch.py",
+    "zerver/lib/import_realm.py",
+    "zerver/tests/test_realm_export.py",
+    "zerver/tests/test_import_export.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_management_commands.py",
+    "web/src/settings_exports.ts",
+    "zerver/openapi/zulip.yaml",
+    "zerver/migrations/0594_remove_realm_user_group_edit_policy.py",
+    "zerver/models/realms.py"
+  ],
+  "required_files": [
+    "zerver/models/realms.py",
+    "zerver/actions/realm_export.py",
+    "zerver/views/realm_export.py",
+    "zerver/worker/deferred_work.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical_syntax",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "description_ablation": "ast_search's `pattern` argument shows two worked patterns instead of only naming the metavariable forms. Everything else, including the backend and the tool's own description, is unchanged.",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 27,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.5878780000000001,
+  "elapsed_seconds": 73.7,
+  "wall_seconds": 73.7,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "RealmExport",
+        "case_sensitive": false
+      },
+      "seconds": 0.114,
+      "result_chars": 1758,
+      "hit_paths": [
+        "web/src/settings_exports.ts",
+        "web/src/settings_exports.ts",
+        "web/src/settings_exports.ts",
+        "zerver/openapi/zulip.yaml",
+        "zerver/openapi/zulip.yaml",
+        "zerver/openapi/zulip.yaml",
+        "zerver/tests/test_realm_export.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "0595_add_realmexport_table_and_backfill",
+        "case_sensitive": false
+      },
+      "seconds": 0.022,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "realm_export",
+        "case_sensitive": false
+      },
+      "seconds": 0.024,
+      "result_chars": 11954,
+      "hit_paths": [
+        "locale/ar/LC_MESSAGES/django.po",
+        "locale/ar/LC_MESSAGES/django.po",
+        "locale/ar/LC_MESSAGES/django.po",
+        "locale/ar/LC_MESSAGES/django.po",
+        "locale/ar/LC_MESSAGES/django.po",
+        "locale/ar/LC_MESSAGES/django.po",
+        "locale/be/LC_MESSAGES/django.po",
+        "locale/be/LC_MESSAGES/django.po",
+        "locale/be/LC_MESSAGES/django.po",
+        "locale/be/LC_MESSAGES/django.po",
+        "locale/be/LC_MESSAGES/django.po",
+        "locale/be/LC_MESSAGES/django.po",
+        "locale/bg/LC_MESSAGES/django.po",
+        "locale/bg/LC_MESSAGES/django.po",
+        "locale/bg/LC_MESSAGES/django.po",
+        "locale/bg/LC_MESSAGES/django.po",
+        "locale/bg/LC_MESSAGES/django.po",
+        "locale/bg/LC_MESSAGES/django.po",
+        "locale/bqi/LC_MESSAGES/django.po",
+        "locale/bqi/LC_MESSAGES/django.po",
+        "locale/bqi/LC_MESSAGES/django.po",
+        "locale/bqi/LC_MESSAGES/django.po",
+        "locale/bqi/LC_MESSAGES/django.po",
+        "locale/bqi/LC_MESSAGES/django.po",
+        "locale/ca/LC_MESSAGES/django.po",
+        "locale/ca/LC_MESSAGES/django.po",
+        "locale/ca/LC_MESSAGES/django.po",
+        "locale/ca/LC_MESSAGES/django.po",
+        "locale/ca/LC_MESSAGES/django.po",
+        "locale/ca/LC_MESSAGES/django.po",
+        "locale/cs/LC_MESSAGES/django.po",
+        "locale/cs/LC_MESSAGES/django.po",
+        "locale/cs/LC_MESSAGES/django.po",
+        "locale/cs/LC_MESSAGES/django.po",
+        "locale/cs/LC_MESSAGES/django.po",
+        "locale/cs/LC_MESSAGES/django.po",
+        "locale/cy/LC_MESSAGES/django.po",
+        "locale/cy/LC_MESSAGES/django.po",
+        "locale/cy/LC_MESSAGES/django.po",
+        "locale/cy/LC_MESSAGES/django.po",
+        "locale/cy/LC_MESSAGES/django.po",
+        "locale/cy/LC_MESSAGES/django.po",
+        "locale/da/LC_MESSAGES/django.po",
+        "locale/da/LC_MESSAGES/django.po",
+        "locale/da/LC_MESSAGES/django.po",
+        "locale/da/LC_MESSAGES/django.po",
+        "locale/da/LC_MESSAGES/django.po",
+        "locale/da/LC_MESSAGES/django.po",
+        "locale/de/LC_MESSAGES/django.po",
+        "locale/de/LC_MESSAGES/django.po"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "export_usermessage|REALM_EXPORTED|RealmAuditLog.*EXPORT|EXPORT.*RealmAuditLog",
+        "case_sensitive": false
+      },
+      "seconds": 0.176,
+      "result_chars": 7655,
+      "hit_paths": [
+        "zerver/actions/realm_export.py",
+        "zerver/lib/export.py",
+        "zerver/lib/export.py",
+        "zerver/lib/export.py",
+        "zerver/lib/export.py",
+        "zerver/lib/export.py",
+        "zerver/lib/import_realm.py",
+        "zerver/lib/import_realm.py",
+        "zerver/management/commands/export.py",
+        "zerver/management/commands/export_usermessage_batch.py",
+        "zerver/management/commands/export_usermessage_batch.py",
+        "zerver/migrations/0247_realmauditlog_event_type_to_int.py",
+        "zerver/migrations/0247_realmauditlog_event_type_to_int.py",
+        "zerver/models/realm_audit_logs.py",
+        "zerver/tests/test_events.py",
+        "zerver/tests/test_import_export.py",
+        "zerver/tests/test_import_export.py",
+        "zerver/tests/test_import_export.py",
+        "zerver/tests/test_import_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/tests/test_realm_export.py",
+        "zerver/views/realm_export.py",
+        "zerver/views/realm_export.py",
+        "zerver/worker/deferred_work.py"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59"
+      },
+      "seconds": 0.006,
+      "result_chars": 668,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/actions/realm_export.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 954,
+      "hit_paths": [
+        "zerver/actions/realm_export.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/views/realm_export.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 5026,
+      "hit_paths": [
+        "zerver/views/realm_export.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/worker/deferred_work.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 10590,
+      "hit_paths": [
+        "zerver/worker/deferred_work.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/models/realm_audit_logs.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 10096,
+      "hit_paths": [
+        "zerver/models/realm_audit_logs.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/lib/export.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 87258,
+      "hit_paths": [
+        "zerver/lib/export.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/management/commands/export.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 7773,
+      "hit_paths": [
+        "zerver/management/commands/export.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/lib/import_realm.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 83637,
+      "hit_paths": [
+        "zerver/lib/import_realm.py"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59"
+      },
+      "seconds": 0.006,
+      "result_chars": 234,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "get_realm_exports_serialized|export_realm_wrapper|class Command.*export",
+        "case_sensitive": false
+      },
+      "seconds": 0.191,
+      "result_chars": 2826,
+      "hit_paths": [
+        "zerver/actions/realm_export.py",
+        "zerver/actions/realm_export.py",
+        "zerver/lib/export.py",
+        "zerver/lib/export.py",
+        "zerver/management/commands/export.py",
+        "zerver/management/commands/export.py",
+        "zerver/tests/test_management_commands.py",
+        "zerver/views/realm_export.py",
+        "zerver/views/realm_export.py",
+        "zerver/worker/deferred_work.py",
+        "zerver/worker/deferred_work.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "^from zerver\\.models\\.realm_audit_logs import|realm_audit_logs import RealmAuditLog",
+        "case_sensitive": false
+      },
+      "seconds": 0.186,
+      "result_chars": 5294,
+      "hit_paths": [
+        "analytics/lib/counts.py",
+        "analytics/management/commands/populate_analytics_db.py",
+        "analytics/tests/test_counts.py",
+        "corporate/lib/stripe.py",
+        "corporate/lib/support.py",
+        "corporate/tests/test_activity_views.py",
+        "corporate/tests/test_stripe.py",
+        "corporate/tests/test_support_views.py",
+        "corporate/views/audit_logs.py",
+        "corporate/views/installation_activity.py",
+        "zerver/actions/bots.py",
+        "zerver/actions/create_realm.py",
+        "zerver/actions/create_user.py",
+        "zerver/actions/muted_users.py",
+        "zerver/actions/realm_domains.py",
+        "zerver/actions/realm_emoji.py",
+        "zerver/actions/realm_icon.py",
+        "zerver/actions/realm_linkifiers.py",
+        "zerver/actions/realm_logo.py",
+        "zerver/actions/realm_playgrounds.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "export_usermessage_batch|test_management_commands|management/commands/export",
+        "case_sensitive": false
+      },
+      "seconds": 0.209,
+      "result_chars": 1011,
+      "hit_paths": [
+        "tools/linter_lib/custom_check.py",
+        "zerver/lib/export.py",
+        "zerver/lib/export.py",
+        "zerver/tests/test_management_commands.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "^from zerver\\.models\\.realm_audit_logs import RealmAuditLog|RealmAuditLog,$",
+        "case_sensitive": false
+      },
+      "seconds": 0.149,
+      "result_chars": 1158,
+      "hit_paths": [
+        "analytics/management/commands/populate_analytics_db.py",
+        "analytics/tests/test_counts.py",
+        "corporate/lib/activity.py",
+        "corporate/lib/stripe.py",
+        "corporate/tests/test_activity_views.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/models/__init__.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 4913,
+      "hit_paths": [
+        "zerver/models/__init__.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/tests/test_realm_export.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 14595,
+      "hit_paths": [
+        "zerver/tests/test_realm_export.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "def get_realm_exports_serialized|def export_realm_wrapper|def do_export_realm",
+        "case_sensitive": false
+      },
+      "seconds": 0.189,
+      "result_chars": 669,
+      "hit_paths": [
+        "zerver/lib/export.py",
+        "zerver/lib/export.py",
+        "zerver/lib/export.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "REALM_EXPORTED",
+        "case_sensitive": false
+      },
+      "seconds": 0.027,
+      "result_chars": 2636,
+      "hit_paths": [
+        "zerver/lib/export.py",
+        "zerver/lib/import_realm.py",
+        "zerver/management/commands/export.py",
+        "zerver/migrations/0247_realmauditlog_event_type_to_int.py",
+        "zerver/migrations/0247_realmauditlog_event_type_to_int.py",
+        "zerver/models/realm_audit_logs.py",
+        "zerver/tests/test_events.py",
+        "zerver/tests/test_import_export.py",
+        "zerver/tests/test_import_export.py",
+        "zerver/tests/test_realm_export.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "0594_|0593_|0592_",
+        "case_sensitive": false
+      },
+      "seconds": 0.26,
+      "result_chars": 640,
+      "hit_paths": [
+        "zerver/migrations/0593_alter_realm_manage_all_groups.py",
+        "zerver/migrations/0594_remove_realm_user_group_edit_policy.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "realm_export",
+        "case_sensitive": false
+      },
+      "seconds": 0.077,
+      "result_chars": 4786,
+      "hit_paths": [
+        "locale/ar/LC_MESSAGES/django.po",
+        "locale/ar/LC_MESSAGES/django.po",
+        "locale/ar/LC_MESSAGES/django.po",
+        "locale/ar/LC_MESSAGES/django.po",
+        "locale/ar/LC_MESSAGES/django.po",
+        "locale/ar/LC_MESSAGES/django.po",
+        "locale/be/LC_MESSAGES/django.po",
+        "locale/be/LC_MESSAGES/django.po",
+        "locale/be/LC_MESSAGES/django.po",
+        "locale/be/LC_MESSAGES/django.po",
+        "locale/be/LC_MESSAGES/django.po",
+        "locale/be/LC_MESSAGES/django.po",
+        "locale/bg/LC_MESSAGES/django.po",
+        "locale/bg/LC_MESSAGES/django.po",
+        "locale/bg/LC_MESSAGES/django.po",
+        "locale/bg/LC_MESSAGES/django.po",
+        "locale/bg/LC_MESSAGES/django.po",
+        "locale/bg/LC_MESSAGES/django.po",
+        "locale/bqi/LC_MESSAGES/django.po",
+        "locale/bqi/LC_MESSAGES/django.po"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "web/src/settings_exports.ts"
+      },
+      "seconds": 0.0,
+      "result_chars": 5479,
+      "hit_paths": [
+        "web/src/settings_exports.ts"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/zulip--912c1b59",
+        "path": "zerver/tests/test_events.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 197331,
+      "hit_paths": [
+        "zerver/tests/test_events.py"
+      ]
+    }
+  ],
+  "tool_seconds": 1.636,
+  "retrieval_result_chars": 468953,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the 17 files that constitute the full impact surface for the RealmExport schema migration:\n\n**Core schema/model**\n- `zerver/models/realm_audit_logs.py` \u2014 current `RealmAuditLog`/`AuditLogEventType.REALM_EXPORTED` + `extra_data` JSON field being replaced\n- `zerver/models/__init__.py` \u2014 model registration point (needs the new `RealmExport` import)\n- `zerver/models/realms.py` \u2014 export-type constants (`EXPORT_PUBLIC`, etc.) shared across the export code paths\n\n**Direct references**\n- `zerver/actions/realm_export.py` \u2014 actions layer (`notify_realm_export`, `do_delete_realm_export`)\n- `zerver/views/realm_export.py` \u2014 views serving export status/CRUD to the frontend\n- `zerver/lib/export.py` \u2014 `get_realm_exports_serialized`, `export_realm_wrapper`, `do_export_realm`\n\n**Indirect/tentacle references**\n- `zerver/worker/deferred_work.py` \u2014 background worker running the actual export job\n- `zerver/management/commands/export.py` and `export_usermessage_batch.py` \u2014 CLI export tooling\n- `zerver/lib/import_realm.py` \u2014 writes `REALM_EXPORTED`-adjacent audit rows on import\n\n**Test coverage**\n- `zerver/tests/test_realm_export.py` \u2014 dedicated export endpoint tests\n- `zerver/tests/test_import_export.py` \u2014 import/export round-trip tests\n- `zerver/tests/test_events.py` \u2014 event schema tests referencing `REALM_EXPORTED`\n- `zerver/tests/test_management_commands.py` \u2014 CLI command tests\n\n**Frontend/API contract**\n- `web/src/settings_exports.ts` \u2014 TS schema (`realm_export_schema`) consuming the export status JSON\n- `zerver/openapi/zulip.yaml` \u2014 `RealmExport` API schema definition\n\n**Migration context**\n- `zerver/migrations/0594_remove_realm_user_group_edit_policy.py` \u2014 confirms 0595 is the correct next migration number and its dependency chain\n\nNote: today's tracking isn't literally a JSON file on disk \u2014 it's the `extra_data` JSONField on `RealmAuditLog` rows (event_type `REALM_EXPORTED`), which is what the new `RealmExport` table replaces.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 1065545,
+  "output_tokens": 6897,
+  "input_tokens_uncached": 22,
+  "cache_creation_input_tokens": 80463,
+  "cache_read_input_tokens": 985060,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "schema-evolution-002",
+    "config_name": "condition:structural_lexical_syntax",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3191,
+      "10": 0.4582
+    },
+    "mrr": 0.25,
+    "map_score": 0.3463,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2353,
+    "n_retrieved": 17,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 3
+}

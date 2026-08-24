@@ -54,7 +54,15 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "toast_retrieval"))
 
 from aligned_scoring import SCORING_CONTRACT, score as score_retrieval  # noqa: E402
-from conditions import CONDITIONS, DECLARED_ASYMMETRIES, check_description_parity  # noqa: E402
+from conditions import (  # noqa: E402
+    ABLATION_CONTROLS,
+    ABLATION_TOOLS,
+    CONDITIONS,
+    PILOT_CONDITIONS,
+    DECLARED_ASYMMETRIES,
+    check_ablation_declarations,
+    check_description_parity,
+)
 from eb_metrics_shim import import_eb_metrics  # noqa: E402
 from run_conditions import (  # noqa: E402
     COVERAGE,
@@ -264,6 +272,9 @@ def run_one(candidate: dict, condition_name: str, model: str, account: int) -> d
         "condition": condition_name,
         "condition_tools": [t["function"]["name"] for t in condition.tools],
         "condition_knows": condition.knows,
+        # None for every arm but the ablation ones. Recorded on all of them so
+        # a reader of one report does not have to know which arms deviate.
+        "description_ablation": condition.description_ablation,
         "generation_seam": SEAM,
         "generation_seam_note": GENERATION_SEAM_NOTE,
         "sampling": "cli_default_not_settable",
@@ -366,14 +377,14 @@ def main() -> int:
         default="1,2,3,4,5",
         help="OAuth accounts to spread runs across, round-robin",
     )
-    parser.add_argument("--conditions", default=",".join(CONDITIONS))
+    parser.add_argument("--conditions", default=",".join(PILOT_CONDITIONS))
     parser.add_argument("--task", default=None)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    problems = check_description_parity()
+    problems = check_description_parity() + check_ablation_declarations()
     if problems:
-        print("tool description parity FAILED:", file=sys.stderr)
+        print("tool description gate FAILED:", file=sys.stderr)
         for problem in problems:
             print(f"  - {problem}", file=sys.stderr)
         return 2
@@ -387,6 +398,24 @@ def main() -> int:
     if unknown:
         print(f"unknown conditions: {unknown}", file=sys.stderr)
         return 2
+
+    # An ablation arm swaps a schema; it does not get to skip the gate. The
+    # exampled description must still say what the tool matches and nothing
+    # about when to prefer it, or the ablation would measure coaching.
+    ablating = [n for n in condition_names if CONDITIONS[n].description_ablation]
+    if ablating:
+        problems = check_description_parity(ABLATION_TOOLS)
+        if problems:
+            print("ablation description parity FAILED:", file=sys.stderr)
+            for problem in problems:
+                print(f"  - {problem}", file=sys.stderr)
+            return 2
+        for name in ablating:
+            print(
+                f"  ablation arm {name} vs control "
+                f"{ABLATION_CONTROLS[name]}: {CONDITIONS[name].description_ablation}",
+                file=sys.stderr,
+            )
 
     accounts = [int(a) for a in args.accounts.split(",") if a.strip()]
     missing = [
