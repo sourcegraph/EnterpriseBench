@@ -10,7 +10,7 @@ Five tool conditions over the same 18 retrieval tasks, three repeats each:
 
 - **lexical**: grep, read_file, list_files
 - **structural**: ast_search (ast-grep patterns), read_file, list_files
-- **codeintel**: definition, references, read_file, list_files. These are Sourcegraph's `sg_go_to_definition` and `sg_find_references` over SCIP-indexed mirrors of the same pinned revisions, so this is the only arm that knows resolved symbol identity rather than matching text
+- **codeintel**: definition, references, read_file, list_files. These are Sourcegraph's `sg_go_to_definition` and `sg_find_references` over the `sg-evals` mirrors of the same pinned revisions. Index tier varies across the corpus: 75 of 97 stores carry a semantic SCIP index (scip-python, scip-go, scip-typescript, scip-rust, scip-ruby, scip-java) and 22 carry only `scip-syntax`, so this arm resolves symbol identity on most of the corpus rather than all of it
 - **combined**: all of the above
 - **structural + lexical**: no code intel, to see whether AST search substitutes for it or only supplements grep
 
@@ -24,7 +24,9 @@ The second is that the tool descriptions pass a parity check before any sweep st
 
 A zero-usage number has a boring explanation sitting right next to it: the mirror was not indexed, `definition` came back empty, and the agent worked that out before I did. On an unindexed repository the arm posts a clean-looking 0.0 for a task it was never given the means to answer, which is a plumbing failure wearing a measurement's clothes.
 
-So index state is established before anything is scored rather than reconstructed afterwards out of disappointing numbers. `preflight_index.py` pulls three column-zero definitions per store out of the local clone, symbols whose definition has to resolve to the line it was just read from, and asks `sg_go_to_definition` for each. All 97 stores probe as indexed, and `index_coverage.json` lists no task ineligible for the code intel arm. A coverage hole would have routed those units out of the arm as invalid, not scored them.
+So index state is established before anything is scored rather than reconstructed afterwards out of disappointing numbers. `preflight_index.py` pulls three column-zero definitions per store out of the local clone, symbols whose definition has to resolve to the line it was just read from, and asks `sg_go_to_definition` for each. All 97 stores resolve, and `index_coverage.json` lists no task ineligible for the code intel arm. A coverage hole would have routed those units out of the arm as invalid, not scored them.
+
+What that probe establishes is that a definition comes back, not which tier answered it. Sourcegraph's GraphQL API answers the tier question: 75 of the 97 stores have a COMPLETED semantic SCIP index and 22 have only `scip-syntax`. Across the 18 pilot tasks, 12 have a semantic index on every store they use, 4 are mixed, and 2 have none.
 
 The stronger evidence is the codeintel arm itself. Given `definition`, `references`, `read_file` and `list_files`, the agent called definition 129 times and references 129 times across 54 runs, opened with one of them in 38 runs, and posted the best recall in the experiment. The tools resolve and the agent can drive them. In `combined` it does not pick them.
 
@@ -86,5 +88,7 @@ The second ablation arm is what makes that readable. With grep removed, so the a
 ## What would still falsify this
 
 18 tasks, so most intervals touch zero and only two whole-corpus contrasts exclude it, both of them codeintel against a structural arm. One model, one generation seam, and the Claude Code CLI has no temperature flag, so "model configuration held constant" currently means "held by the provider's defaults." The arms also do not read the same substrate: grep and ast-grep read local clones, code intel reads an index, so some part of the codeintel gap could be the index being a better-organized view of the same code rather than symbol resolution being worth more. Clones are pinned to the revisions the mirrors index, which bounds that without removing it. And this measures retrieval only. Whether better retrieval converts into better task completion needs the end-to-end layer, which isn't built yet. The ablation also tested one wording of the structural interface, not the interface itself: a tool that took a code snippet instead of a pattern might land differently.
+
+The index tier matters more than the aggregate suggests, and cuts against the headline. Splitting codeintel minus lexical by tier: **-0.016** on the 12 tasks whose stores all carry a semantic SCIP index, **+0.069** on the 4 mixed tasks, and **+0.333** on the 2 tasks with only syntactic indexes. The whole-corpus +0.042 comes from the tasks where precise resolution was least available, which is the opposite of the mechanism the result gets attributed to. The split is confounded with difficulty: the fully-indexed tasks sit at 0.975 lexical recall, close enough to the ceiling that no arm can separate, and n=2 on the syntax-only side. It is a reason to re-cut the category analysis by tier before anyone leans on the mechanism, not a finished result.
 
 Run-to-run standard deviation within a task ranged from 0.019 (codeintel) to 0.064 (lexical), so three repeats is enough to separate the codeintel gap from noise and not much else.
