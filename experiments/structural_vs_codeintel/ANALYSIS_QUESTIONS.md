@@ -30,8 +30,8 @@ defined tasks?
 
 No, not in this pilot. Overall lexical beats structural on recall by +0.062
 [-0.009, +0.142] -- directionally lexical, interval touching zero. On the
-category built for structural search, `syntactic_pattern`, the difference is
--0.014 [-0.125, +0.083]: indistinguishable. Structural does hold the highest
+category built for structural search, `syntactic_pattern`, lexical minus structural is
+-0.014 [-0.125, +0.083]: structural is 0.014 ahead, and indistinguishable. Structural does hold the highest
 **precision** of any arm (0.424 vs 0.390 lexical), so it returns a tighter
 set; it just does not find more of the required files.
 
@@ -49,7 +49,8 @@ code intel nor supplements grep measurably at this N.
 
 ## 4. On which task classes is precise code intel clearly superior?
 
-Codeintel has the highest recall in 10 of 11 categories, and against lexical
+Codeintel has the highest recall in 10 of 11 categories (tied at 1.000 on
+`identifier_lookup`), and against lexical
 the interval excludes zero on four:
 
 * `dependency_impact`  +0.131 [+0.040, +0.266]
