@@ -10,7 +10,7 @@ Five tool conditions over the same 18 retrieval tasks, three repeats each:
 
 - **lexical**: grep, read_file, list_files
 - **structural**: ast_search (ast-grep patterns), read_file, list_files
-- **codeintel**: definition, references, read_file, list_files, backed by a SCIP index, so resolved symbol identity rather than text
+- **codeintel**: definition, references, read_file, list_files. These are Sourcegraph's `sg_go_to_definition` and `sg_find_references` over SCIP-indexed mirrors of the same pinned revisions, so this is the only arm that knows resolved symbol identity rather than matching text
 - **combined**: all of the above
 - **structural + lexical**: no code intel, to see whether AST search substitutes for it or only supplements grep
 
@@ -20,18 +20,29 @@ Two design choices did most of the work. The first is that the tool surface is e
 
 The second is that the tool descriptions pass a parity check before any sweep starts: comparable length, and no preference language in any of them. It is very easy to write a description that sells one arm ("use this when you need to find all call sites of a function") and then report the resulting win as a property of the tool. The check makes "we accidentally coached one arm" a testable claim.
 
+## Were the code intel tools even usable?
+
+A zero-usage number has a boring explanation sitting right next to it: the mirror was not indexed, `definition` came back empty, and the agent worked that out before I did. On an unindexed repository the arm posts a clean-looking 0.0 for a task it was never given the means to answer, which is a plumbing failure wearing a measurement's clothes.
+
+So index state is established before anything is scored rather than reconstructed afterwards out of disappointing numbers. `preflight_index.py` pulls three column-zero definitions per store out of the local clone, symbols whose definition has to resolve to the line it was just read from, and asks `sg_go_to_definition` for each. All 97 stores probe as indexed, and `index_coverage.json` lists no task ineligible for the code intel arm. A coverage hole would have routed those units out of the arm as invalid, not scored them.
+
+The stronger evidence is the codeintel arm itself. Given `definition`, `references`, `read_file` and `list_files`, the agent called definition 129 times and references 129 times across 54 runs, opened with one of them in 38 runs, and posted the best recall in the experiment. The tools resolve and the agent can drive them. In `combined` it does not pick them.
+
 ## What the agent preferred
 
 | condition | first primitive | grep calls | ast_search calls | definition/references calls |
 |---|---|---|---|---|
 | lexical | lexical 54/54 | 398 | 0 | 0 |
 | structural | structural 50/54 | 0 | 447 | 0 |
+| codeintel | codeintel 38/54 | 0 | 0 | 258 |
 | structural + lexical | lexical 54/54 | 383 | 6 | 0 |
 | combined | lexical 54/54 | 397 | 2 | 0 |
 
 In `combined`, with every tool available, `definition` and `references` were called zero times across all 54 runs. `ast_search` was called twice. The tools were offered, never denied by the hook, and never returned an error. They were just not chosen.
 
 The escalation story is the same. Across the 108 runs holding more than one search family, cross-class transitions total six. There were no lexical → codeintel transitions and no structural → codeintel transitions anywhere in the pilot. When grep stopped resolving the question, the agent ran more greps and read more files.
+
+One number in that table cuts against the summary above. Inside the codeintel arm, `definition` went unused in 21 of 54 runs and `references` in 20, and that arm logged 538 `read_file` calls, the most of any condition by a wide margin. So the pattern is less grep-specific than it looks. Most of the budget goes on reading files, and the search primitive is what picks which ones.
 
 ## What actually retrieved better
 
@@ -74,6 +85,6 @@ The second ablation arm is what makes that readable. With grep removed, so the a
 
 ## What would still falsify this
 
-18 tasks, so most intervals touch zero and only two whole-corpus contrasts exclude it, both of them codeintel against a structural arm. One model, one generation seam, and the Claude Code CLI has no temperature flag, so "model configuration held constant" currently means "held by the provider's defaults." And this measures retrieval only. Whether better retrieval converts into better task completion needs the end-to-end layer, which isn't built yet. The ablation also tested one wording of the structural interface, not the interface itself: a tool that took a code snippet instead of a pattern might land differently.
+18 tasks, so most intervals touch zero and only two whole-corpus contrasts exclude it, both of them codeintel against a structural arm. One model, one generation seam, and the Claude Code CLI has no temperature flag, so "model configuration held constant" currently means "held by the provider's defaults." The arms also do not read the same substrate: grep and ast-grep read local clones, code intel reads an index, so some part of the codeintel gap could be the index being a better-organized view of the same code rather than symbol resolution being worth more. Clones are pinned to the revisions the mirrors index, which bounds that without removing it. And this measures retrieval only. Whether better retrieval converts into better task completion needs the end-to-end layer, which isn't built yet. The ablation also tested one wording of the structural interface, not the interface itself: a tool that took a code snippet instead of a pattern might land differently.
 
 Run-to-run standard deviation within a task ranged from 0.019 (codeintel) to 0.064 (lexical), so three repeats is enough to separate the codeintel gap from noise and not much else.
