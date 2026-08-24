@@ -1,0 +1,312 @@
+{
+  "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+  "policy": "condition:structural",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/fastapi--0.110.0",
+    "github.com/sg-evals/pydantic--v2.6.4"
+  ],
+  "retrieved_paths": [
+    "pydantic/_internal/_discriminated_union.py",
+    "pydantic/_internal/_generate_schema.py",
+    "pydantic/functional_validators.py",
+    "pydantic/_internal/_decorators.py",
+    "pydantic/_internal/_model_construction.py",
+    "fastapi/dependencies/utils.py",
+    "fastapi/_compat.py",
+    "fastapi/routing.py",
+    "pydantic/main.py",
+    "pydantic/fields.py",
+    "fastapi/exceptions.py"
+  ],
+  "required_files": [
+    "fastapi/fastapi/dependencies/utils.py",
+    "fastapi/fastapi/routing.py",
+    "pydantic/pydantic/main.py",
+    "pydantic/pydantic/_internal/_discriminated_union.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 21,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.9597087999999999,
+  "elapsed_seconds": 118.8,
+  "wall_seconds": 118.8,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.110.0"
+      },
+      "seconds": 0.041,
+      "result_chars": 21177,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4"
+      },
+      "seconds": 0.024,
+      "result_chars": 15910,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.110.0"
+      },
+      "seconds": 0.005,
+      "result_chars": 87306,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.110.0",
+        "path": "fastapi/dependencies/utils.py"
+      },
+      "seconds": 0.012,
+      "result_chars": 30158,
+      "hit_paths": [
+        "fastapi/dependencies/utils.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.110.0",
+        "path": "fastapi/routing.py"
+      },
+      "seconds": 0.01,
+      "result_chars": 174181,
+      "hit_paths": [
+        "fastapi/routing.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "path": "pydantic/_internal/_discriminated_union.py"
+      },
+      "seconds": 0.003,
+      "result_chars": 26369,
+      "hit_paths": [
+        "pydantic/_internal/_discriminated_union.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "path": "pydantic/functional_validators.py"
+      },
+      "seconds": 0.001,
+      "result_chars": 24285,
+      "hit_paths": [
+        "pydantic/functional_validators.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.110.0",
+        "path": "fastapi/_compat.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 23027,
+      "hit_paths": [
+        "fastapi/_compat.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "path": "pydantic/_internal/_generate_schema.py"
+      },
+      "seconds": 0.001,
+      "result_chars": 98557,
+      "hit_paths": [
+        "pydantic/_internal/_generate_schema.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "pattern": "def _apply_model_validators($$$ARGS):\n    $$$BODY",
+        "language": "python"
+      },
+      "seconds": 0.102,
+      "result_chars": 151,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "pattern": "def model_validate_json($$$ARGS):\n    $$$BODY",
+        "language": "python"
+      },
+      "seconds": 0.115,
+      "result_chars": 151,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "pattern": "def _apply_model_validators(self, schema, validators, mode):\n    $$$BODY"
+      },
+      "seconds": 0.157,
+      "result_chars": 867,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "pattern": "def model_validate_json(self, $$$ARGS):\n    $$$BODY"
+      },
+      "seconds": 0.097,
+      "result_chars": 867,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "pattern": "self._apply_model_validators($$$ARGS)"
+      },
+      "seconds": 0.121,
+      "result_chars": 287,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "pattern": "no_info_before_validator_function($$$ARGS)"
+      },
+      "seconds": 0.134,
+      "result_chars": 287,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "path": "pydantic/main.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 65892,
+      "hit_paths": [
+        "pydantic/main.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "path": "pydantic/_internal/_decorators.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 30627,
+      "hit_paths": [
+        "pydantic/_internal/_decorators.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "path": "pydantic/_internal/_model_construction.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 28114,
+      "hit_paths": [
+        "pydantic/_internal/_model_construction.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "path": "pydantic/fields.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 45930,
+      "hit_paths": [
+        "pydantic/fields.py"
+      ]
+    }
+  ],
+  "tool_seconds": 0.823,
+  "retrieval_result_chars": 674143,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Summary of the traced flow and root cause:\n\n**FastAPI side (request \u2192 body validation):**\n1. `fastapi/routing.py` \u2014 `get_request_handler()` reads the raw JSON body from the request and calls `solve_dependencies()`.\n2. `fastapi/dependencies/utils.py` \u2014 `solve_dependencies()` collects the body dict and hands it to `request_body_to_args()`, which calls `field.validate(value, values, loc=loc)` on the body `ModelField`. If `errors_` comes back empty, the value is stored with **no exception raised** \u2014 this is the exact point a silently-defaulted field produces 200 OK instead of 422.\n3. `fastapi/_compat.py` \u2014 `ModelField.validate()` (Pydantic v2 branch) delegates to `self._type_adapter.validate_python(value, from_attributes=True)`, i.e. a single pydantic-core validation call over the whole body model.\n\n**Pydantic v2 side (schema construction \u2192 validation):**\n4. `pydantic/_internal/_model_construction.py` \u2014 `complete_model_class()` builds `__pydantic_core_schema__`/`__pydantic_validator__` via `GenerateSchema`, using `cls.__pydantic_decorators__` (built by `DecoratorInfos.build`).\n5. `pydantic/_internal/_decorators.py` \u2014 `DecoratorInfos` collects `@model_validator` methods into `model_validators`, tagged with `ModelValidatorDecoratorInfo(mode=...)`.\n6. `pydantic/_internal/_generate_schema.py` \u2014 wraps the model's core schema with a `no_info_before_validator_function`/`with_info_before_validator_function` for `mode='before'` validators, and applies `_discriminated_union.apply_discriminators()` over the whole schema tree.\n7. `pydantic/_internal/_discriminated_union.py` \u2014 `apply_discriminator()`/`_ApplyInferredDiscriminator` converts the `Union[...]` field into a `tagged-union` schema that inspects the **raw input dict** for the discriminator key to select a branch, *before* any per-branch validation runs.\n8. `pydantic/functional_validators.py` \u2014 defines `model_validator(mode='before')`, whose function receives and can freely mutate the raw dict prior to any field/branch validation.\n9. `pydantic/fields.py` \u2014 `Field(discriminator=...)` / `FieldInfo.discriminator`, the config consumed by step 7.\n\n**Root cause:** a `model_validator(mode='before')` runs at the *whole-model* level, ahead of the tagged-union's discriminator lookup on that model's payload field. If the before-validator's pre-processing (key renaming, allowlist filtering, alias remapping) strips the discriminator key from the nested dict, the tagged-union schema in `_discriminated_union.py` can no longer find a match. If the discriminated-union field itself is `Optional`/has a default, this isn't a `union_tag_not_found` error \u2014 pydantic-core just falls back to the field default (`None`), and `request_body_to_args` sees no `errors_`, so FastAPI returns 200 OK with the field silently `None`. Note `_discriminated_union.py`'s `_infer_discriminator_values_for_inner_schema` explicitly *bans* `mode='before'`/`'wrap'`/`'plain'` validators **on the discriminator field itself** (`discriminator-validator` error) \u2014 but that guard only covers field-level validators; it does nothing to protect against an ancestor **model-level** `mode='before'` validator mutating the dict before the tagged-union ever inspects it, which is the actual gap the customer hit.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 1435384,
+  "output_tokens": 10868,
+  "input_tokens_uncached": 22,
+  "cache_creation_input_tokens": 148398,
+  "cache_read_input_tokens": 1286964,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+    "config_name": "condition:structural",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.7701
+    },
+    "mrr": 1.0,
+    "map_score": 0.5382,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3636,
+    "n_retrieved": 11,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 3
+}

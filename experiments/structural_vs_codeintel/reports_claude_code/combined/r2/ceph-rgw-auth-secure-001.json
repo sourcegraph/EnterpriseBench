@@ -1,0 +1,271 @@
+{
+  "task_id": "ceph-rgw-auth-secure-001",
+  "policy": "condition:combined",
+  "model": "claude-sonnet-5",
+  "suite": "security_operations",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/ceph--v19.2.0"
+  ],
+  "retrieved_paths": [
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_rest_s3.h",
+    "src/rgw/rgw_auth.h",
+    "src/rgw/rgw_auth.cc",
+    "src/rgw/rgw_auth_registry.h",
+    "src/rgw/rgw_auth_keystone.cc",
+    "src/rgw/rgw_auth_keystone.h",
+    "src/rgw/rgw_common.h",
+    "src/rgw/rgw_client_io.h",
+    "doc/radosgw/s3/authentication.rst",
+    "doc/dev/radosgw/s3_compliance.rst"
+  ],
+  "required_files": [
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_auth.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "combined",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "definition",
+    "references",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax + resolved symbol identity",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 8,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.25495880000000004,
+  "elapsed_seconds": 26.4,
+  "wall_seconds": 26.4,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "get_v4_signature|AWS4-HMAC-SHA256|rgw_auth_s3",
+        "case_sensitive": false
+      },
+      "seconds": 0.91,
+      "result_chars": 9113,
+      "hit_paths": [
+        "doc/changelog/v0.67.5.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/dev/radosgw/s3_compliance.rst",
+        "doc/dev/radosgw/s3_compliance.rst",
+        "doc/radosgw/s3/authentication.rst",
+        "doc/radosgw/s3/authentication.rst",
+        "doc/radosgw/s3/java.rst",
+        "doc/radosgw/s3/php.rst",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "src/rgw/CMakeLists.txt",
+        "src/rgw/driver/rados/rgw_d3n_datacache.cc",
+        "src/rgw/driver/rados/rgw_d3n_datacache.cc",
+        "src/rgw/rgw_auth_keystone.cc",
+        "src/rgw/rgw_auth_registry.h",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0"
+      },
+      "seconds": 0.013,
+      "result_chars": 1005,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class RGWRados_AWSEngine|S3AuthFactory|AWS_AUTHV4|rgw_rest_s3\\.h",
+        "case_sensitive": false
+      },
+      "seconds": 0.906,
+      "result_chars": 4483,
+      "hit_paths": [
+        "doc/changelog/v11.2.1.txt",
+        "src/rgw/driver/rados/rgw_rest_bucket.h",
+        "src/rgw/driver/rados/rgw_rest_log.cc",
+        "src/rgw/driver/rados/rgw_rest_log.h",
+        "src/rgw/driver/rados/rgw_rest_realm.cc",
+        "src/rgw/driver/rados/rgw_rest_user.h",
+        "src/rgw/driver/rados/rgw_sync_module_es_rest.cc",
+        "src/rgw/rgw_appmain.cc",
+        "src/rgw/rgw_auth_keystone.cc",
+        "src/rgw/rgw_auth_keystone.h",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_client_io.h",
+        "src/rgw/rgw_crypt.cc",
+        "src/rgw/rgw_crypt.h",
+        "src/rgw/rgw_file.cc",
+        "src/rgw/rgw_op.cc",
+        "src/rgw/rgw_os_lib.cc"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "constant_time|timing.attack|CRYPTO_memcmp|memcmp\\(sig",
+        "case_sensitive": false
+      },
+      "seconds": 0.934,
+      "result_chars": 2452,
+      "hit_paths": [
+        "src/blk/spdk/NVMEDevice.cc",
+        "src/common/ceph_timer.h",
+        "src/common/ceph_timer.h",
+        "src/common/cohort_lru.h",
+        "src/common/cohort_lru.h",
+        "src/crimson/common/operation.h",
+        "src/crimson/os/seastore/cache.h",
+        "src/crimson/os/seastore/cached_extent.h",
+        "src/crimson/os/seastore/cached_extent.h",
+        "src/os/bluestore/AvlAllocator.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "RGW_MAX_AMZ_DATE_RANGE|clock_skew|X-Amz-Expires|date.*skew|check.*expir",
+        "case_sensitive": false
+      },
+      "seconds": 0.809,
+      "result_chars": 5772,
+      "hit_paths": [
+        "doc/changelog/v0.80.11.txt",
+        "doc/changelog/v0.94.3.txt",
+        "doc/changelog/v10.2.8.txt",
+        "doc/changelog/v10.2.8.txt",
+        "doc/changelog/v11.2.1.txt",
+        "doc/changelog/v11.2.1.txt",
+        "doc/rados/operations/health-checks.rst",
+        "doc/radosgw/s3/java.rst",
+        "doc/radosgw/s3/php.rst",
+        "monitoring/ceph-mixin/prometheus_alerts.libsonnet",
+        "monitoring/ceph-mixin/prometheus_alerts.yml",
+        "monitoring/ceph-mixin/tests_alerts/test_alerts.yml",
+        "monitoring/ceph-mixin/tests_alerts/test_alerts.yml",
+        "monitoring/ceph-mixin/tests_alerts/test_alerts.yml",
+        "monitoring/ceph-mixin/tests_alerts/test_alerts.yml",
+        "qa/suites/rados/multimon/tasks/mon_clock_no_skews.yaml",
+        "qa/suites/rados/multimon/tasks/mon_clock_no_skews.yaml",
+        "qa/suites/rados/multimon/tasks/mon_clock_with_skews.yaml",
+        "qa/suites/rados/multimon/tasks/mon_clock_with_skews.yaml",
+        "qa/tasks/mon_clock_skew_check.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class RGWAWSv2Handler|class RGWAWSv4Handler|S3AuthFactory|make_auth_completer|VersionAbstractor",
+        "case_sensitive": false
+      },
+      "seconds": 0.773,
+      "result_chars": 5008,
+      "hit_paths": [
+        "src/rgw/rgw_auth_keystone.cc",
+        "src/rgw/rgw_auth_keystone.h",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc"
+      ]
+    }
+  ],
+  "tool_seconds": 4.345,
+  "retrieval_result_chars": 27833,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file set for the S3 authentication audit, centered on `rgw_auth_s3.cc/.h` (SigV2/SigV4 signing and verification, `get_v4_signature`, streaming payload constants) and `rgw_rest_s3.cc/.h` (REST layer handlers, `VersionAbstractor::auth_data_t`), backed by the generic auth framework (`rgw_auth.h/.cc`, `rgw_auth_registry.h`), Keystone auth integration, `rgw_common.h` and `rgw_client_io.h` for request/header handling, plus the two doc files describing the intended SigV4/SigV2 authentication flow and compliance notes for cross-reference.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 375254,
+  "output_tokens": 1839,
+  "input_tokens_uncached": 10,
+  "cache_creation_input_tokens": 42500,
+  "cache_read_input_tokens": 332744,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "ceph-rgw-auth-secure-001",
+    "config_name": "condition:combined",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.8889,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.9829,
+      "10": 0.9829
+    },
+    "mrr": 1.0,
+    "map_score": 0.95,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3077,
+    "n_retrieved": 13,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 4
+}

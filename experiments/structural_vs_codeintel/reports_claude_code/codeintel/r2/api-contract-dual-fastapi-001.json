@@ -1,0 +1,130 @@
+{
+  "task_id": "api-contract-dual-fastapi-001",
+  "policy": "condition:codeintel",
+  "model": "claude-sonnet-5",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/fastapi--0.109.0",
+    "github.com/sg-evals/httpx--0.26.0"
+  ],
+  "retrieved_paths": [
+    "fastapi/dependencies/utils.py",
+    "fastapi/routing.py",
+    "fastapi/_compat.py",
+    "fastapi/exceptions.py",
+    "fastapi/exception_handlers.py",
+    "fastapi/params.py",
+    "fastapi/encoders.py",
+    "httpx/_content.py",
+    "httpx/_models.py",
+    "httpx/_client.py",
+    "httpx/_api.py",
+    "httpx/_types.py"
+  ],
+  "required_files": [
+    "fastapi/routing.py",
+    "httpx/_content.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "codeintel",
+  "condition_tools": [
+    "definition",
+    "references",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "resolved symbol identity",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 5,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.2492838,
+  "elapsed_seconds": 16.4,
+  "wall_seconds": 16.4,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0"
+      },
+      "seconds": 0.013,
+      "result_chars": 7598,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0"
+      },
+      "seconds": 0.008,
+      "result_chars": 2503,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0"
+      },
+      "seconds": 0.012,
+      "result_chars": 21289,
+      "hit_paths": []
+    }
+  ],
+  "tool_seconds": 0.033,
+  "retrieval_result_chars": 31390,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the relevant files from both repos covering the FastAPI request validation chain (`dependencies/utils.py`, `routing.py`, `_compat.py`, `params.py`, `encoders.py`, `exceptions.py`, `exception_handlers.py`) and the httpx request encoding chain (`_content.py`, `_models.py`, `_client.py`, `_api.py`, `_types.py`).",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 307646,
+  "output_tokens": 1074,
+  "input_tokens_uncached": 8,
+  "cache_creation_input_tokens": 46579,
+  "cache_read_input_tokens": 261059,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "condition:codeintel",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.5803
+    },
+    "mrr": 0.5,
+    "map_score": 0.375,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 12,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 4
+}

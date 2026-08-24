@@ -1,0 +1,224 @@
+{
+  "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+  "policy": "condition:structural",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/fastapi--0.110.0",
+    "github.com/sg-evals/pydantic--v2.6.4"
+  ],
+  "retrieved_paths": [
+    "fastapi/dependencies/utils.py",
+    "fastapi/_compat.py",
+    "fastapi/routing.py",
+    "pydantic/_internal/_discriminated_union.py",
+    "pydantic/_internal/_generate_schema.py",
+    "pydantic/functional_validators.py",
+    "pydantic/main.py",
+    "pydantic/_internal/_decorators.py",
+    "pydantic/_internal/_core_utils.py",
+    "fastapi/dependencies/models.py",
+    "fastapi/exceptions.py"
+  ],
+  "required_files": [
+    "fastapi/fastapi/dependencies/utils.py",
+    "fastapi/fastapi/routing.py",
+    "pydantic/pydantic/main.py",
+    "pydantic/pydantic/_internal/_discriminated_union.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 13,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.592816,
+  "elapsed_seconds": 55.7,
+  "wall_seconds": 55.7,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.110.0"
+      },
+      "seconds": 0.009,
+      "result_chars": 16661,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4"
+      },
+      "seconds": 0.005,
+      "result_chars": 14345,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.110.0"
+      },
+      "seconds": 0.011,
+      "result_chars": 87306,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.110.0",
+        "path": "fastapi/dependencies/utils.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 30158,
+      "hit_paths": [
+        "fastapi/dependencies/utils.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "path": "pydantic/_internal/_discriminated_union.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 26369,
+      "hit_paths": [
+        "pydantic/_internal/_discriminated_union.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "path": "pydantic/functional_validators.py"
+      },
+      "seconds": 0.004,
+      "result_chars": 24285,
+      "hit_paths": [
+        "pydantic/functional_validators.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.110.0",
+        "path": "fastapi/_compat.py"
+      },
+      "seconds": 0.002,
+      "result_chars": 23027,
+      "hit_paths": [
+        "fastapi/_compat.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "path": "pydantic/main.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 65892,
+      "hit_paths": [
+        "pydantic/main.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.110.0",
+        "path": "fastapi/routing.py"
+      },
+      "seconds": 0.007,
+      "result_chars": 174181,
+      "hit_paths": [
+        "fastapi/routing.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "def _apply_model_validators($$$ARGS)",
+        "language": "python"
+      },
+      "seconds": 0.159,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/pydantic--v2.6.4",
+        "path": "pydantic/_internal/_generate_schema.py"
+      },
+      "seconds": 0.001,
+      "result_chars": 98557,
+      "hit_paths": [
+        "pydantic/_internal/_generate_schema.py"
+      ]
+    }
+  ],
+  "tool_seconds": 0.198,
+  "retrieval_result_chars": 560793,
+  "denied_tools": [],
+  "cli_result_text": "Files submitted. Summary of the trace this file set supports:\n\n**1. FastAPI request-body \u2192 validation entry point**\n- `fastapi/dependencies/utils.py`: `get_body_field()` builds the body `ModelField`; `solve_dependencies()` calls `request_body_to_args()`, which invokes `field.validate(value, ...)` on the received JSON body dict for each body param.\n- `fastapi/_compat.py` (`PYDANTIC_V2` branch): `ModelField.validate()` delegates to `self._type_adapter.validate_python(value, from_attributes=True)` \u2014 a `pydantic.TypeAdapter` wrapping the field's annotation (the discriminated-union field), constructed once in `ModelField.__post_init__`.\n- `fastapi/routing.py`: `get_request_handler()` reads/parses the raw request JSON, calls `solve_dependencies`, and raises `RequestValidationError` only if `errors` list is non-empty \u2014 a silently-`None` field with **no error entry** sails through untouched.\n\n**2. Pydantic v2 discriminated-union resolution**\n- `pydantic/_internal/_discriminated_union.py`: `apply_discriminators()` / `_ApplyInferredDiscriminator` rewrites the union's core schema into a `tagged-union` schema keyed on the discriminator field's literal value, inspecting each member's schema (`model-fields`/`typed-dict`) for the discriminator's `validation_alias`.\n- `pydantic/_internal/_generate_schema.py`: wires `model_validator(mode='before')` in as a `no_info_before_validator_function`/`with_info_before_validator_function` wrapper **around** the model's core schema (via `_decorators.py`'s `ModelValidatorDecoratorInfo`) \u2014 this wrapper sits *outside* the tagged-union's own discriminator lookup when the validator is on the parent/enclosing model, but crucially the tagged-union's `pydantic-core` implementation reads the discriminator key from the **raw dict as received at that schema node**, before any nested member validator runs.\n\n**3. The root cause**\nA `model_validator(mode='before')` placed on the *outer* request-body model (or on a member model whose before-hook runs prior to core's tag lookup for a nested union) that mutates/strips keys from the incoming dict \u2014 e.g. normalizing/renaming fields \u2014 removes the discriminator key from the sub-dict handed to the tagged-union schema. `pydantic-core`'s tagged-union, on a genuinely missing tag, would normally raise `union_tag_not_found` (surfacing as a 422 through `request_body_to_args`'s `field.validate` \u2192 `ErrorWrapper`). It only degrades to **silent None** when the discriminated-union field itself is `Optional[...] = None` and the field's default absorbs the validation failure at a higher level in the model schema (i.e., the missing-key condition is indistinguishable from \"field omitted\", which pydantic legitimately maps to the default) \u2014 so FastAPI never sees an error to add to `errors`, `solve_dependencies` proceeds, and `get_request_handler` returns 200 with the field silently defaulted to `None`. `functional_validators.py`'s `ModelBeforeValidator`/`_infer_discriminator_values_for_inner_schema` (which explicitly forbids `mode='before'` *on the discriminator field itself*, raising `discriminator-validator`) confirms Pydantic only guards the narrow case of a before-validator on the tag field \u2014 it does **not** guard against an enclosing/outer before-validator stripping the tag key from the payload before the union ever sees it, which is the actual gap the customer hit.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 891731,
+  "output_tokens": 4605,
+  "input_tokens_uncached": 16,
+  "cache_creation_input_tokens": 96945,
+  "cache_read_input_tokens": 794770,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+    "config_name": "condition:structural",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.75,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.6667,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.7537,
+      "10": 0.8838
+    },
+    "mrr": 1.0,
+    "map_score": 0.747,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3636,
+    "n_retrieved": 11,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 1
+}

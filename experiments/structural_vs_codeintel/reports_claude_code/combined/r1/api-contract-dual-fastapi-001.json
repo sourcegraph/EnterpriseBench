@@ -1,0 +1,359 @@
+{
+  "task_id": "api-contract-dual-fastapi-001",
+  "policy": "condition:combined",
+  "model": "claude-sonnet-5",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/fastapi--0.109.0",
+    "github.com/sg-evals/httpx--0.26.0"
+  ],
+  "retrieved_paths": [
+    "fastapi/dependencies/utils.py",
+    "httpx/_content.py",
+    "httpx/_models.py",
+    "fastapi/_compat.py",
+    "fastapi/routing.py",
+    "fastapi/params.py",
+    "fastapi/encoders.py",
+    "httpx/_client.py",
+    "fastapi/exceptions.py",
+    "fastapi/dependencies/models.py"
+  ],
+  "required_files": [
+    "fastapi/routing.py",
+    "httpx/_content.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "combined",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "definition",
+    "references",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax + resolved symbol identity",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 16,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.6320134,
+  "elapsed_seconds": 48.1,
+  "wall_seconds": 48.1,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0"
+      },
+      "seconds": 0.014,
+      "result_chars": 7598,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0"
+      },
+      "seconds": 0.007,
+      "result_chars": 2503,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "^fastapi/(dependencies|routing|params|encoders|_compat|exception_handlers)\\.py",
+        "case_sensitive": false
+      },
+      "seconds": 0.092,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "def encode_request|class Request\\(",
+        "case_sensitive": false
+      },
+      "seconds": 0.101,
+      "result_chars": 201,
+      "hit_paths": [
+        "httpx/_content.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0",
+        "path": "fastapi/dependencies/utils.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 30158,
+      "hit_paths": [
+        "fastapi/dependencies/utils.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0",
+        "path": "fastapi/_compat.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 23027,
+      "hit_paths": [
+        "fastapi/_compat.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0",
+        "path": "httpx/_content.py"
+      },
+      "seconds": 0.001,
+      "result_chars": 8109,
+      "hit_paths": [
+        "httpx/_content.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "async def body|is_body_allowed_for_status_code|await request.json|await request.body|content-type|Content-Type",
+        "case_sensitive": false
+      },
+      "seconds": 0.085,
+      "result_chars": 13561,
+      "hit_paths": [
+        "docs/em/docs/advanced/custom-response.md",
+        "docs/em/docs/advanced/custom-response.md",
+        "docs/em/docs/advanced/custom-response.md",
+        "docs/em/docs/advanced/custom-response.md",
+        "docs/em/docs/advanced/custom-response.md",
+        "docs/em/docs/tutorial/cors.md",
+        "docs/en/docs/advanced/custom-response.md",
+        "docs/en/docs/advanced/custom-response.md",
+        "docs/en/docs/advanced/custom-response.md",
+        "docs/en/docs/advanced/custom-response.md",
+        "docs/en/docs/advanced/custom-response.md",
+        "docs/en/docs/advanced/custom-response.md",
+        "docs/en/docs/release-notes.md",
+        "docs/en/docs/release-notes.md",
+        "docs/en/docs/release-notes.md",
+        "docs/en/docs/tutorial/cors.md",
+        "docs/ja/docs/advanced/custom-response.md",
+        "docs/ja/docs/advanced/custom-response.md",
+        "docs/ja/docs/advanced/custom-response.md",
+        "docs/ja/docs/advanced/custom-response.md",
+        "docs/ja/docs/advanced/custom-response.md",
+        "docs/ja/docs/advanced/custom-response.md",
+        "docs/ja/docs/tutorial/cors.md",
+        "docs/ko/docs/tutorial/cors.md",
+        "docs/ru/docs/tutorial/cors.md",
+        "docs/zh/docs/advanced/custom-response.md",
+        "docs/zh/docs/advanced/custom-response.md",
+        "docs/zh/docs/advanced/custom-response.md",
+        "docs/zh/docs/advanced/custom-response.md",
+        "docs/zh/docs/advanced/custom-response.md",
+        "docs/zh/docs/advanced/custom-response.md",
+        "docs/zh/docs/tutorial/cors.md",
+        "docs_src/custom_request_and_route/tutorial001.py",
+        "docs_src/custom_request_and_route/tutorial002.py",
+        "docs_src/path_operation_advanced_configuration/tutorial006.py",
+        "docs_src/path_operation_advanced_configuration/tutorial007.py",
+        "docs_src/path_operation_advanced_configuration/tutorial007_pv1.py",
+        "fastapi/dependencies/utils.py",
+        "fastapi/exception_handlers.py",
+        "fastapi/exception_handlers.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class Request\\b|def json\\(|def content\\(|Content-Type|headers\\[.content-type.\\]",
+        "case_sensitive": false
+      },
+      "seconds": 0.104,
+      "result_chars": 13516,
+      "hit_paths": [
+        "docs/em/docs/advanced/custom-response.md",
+        "docs/em/docs/advanced/custom-response.md",
+        "docs/em/docs/advanced/custom-response.md",
+        "docs/em/docs/advanced/custom-response.md",
+        "docs/em/docs/advanced/custom-response.md",
+        "docs/em/docs/tutorial/cors.md",
+        "docs/en/docs/advanced/custom-response.md",
+        "docs/en/docs/advanced/custom-response.md",
+        "docs/en/docs/advanced/custom-response.md",
+        "docs/en/docs/advanced/custom-response.md",
+        "docs/en/docs/advanced/custom-response.md",
+        "docs/en/docs/advanced/custom-response.md",
+        "docs/en/docs/release-notes.md",
+        "docs/en/docs/release-notes.md",
+        "docs/en/docs/release-notes.md",
+        "docs/en/docs/tutorial/cors.md",
+        "docs/ja/docs/advanced/custom-response.md",
+        "docs/ja/docs/advanced/custom-response.md",
+        "docs/ja/docs/advanced/custom-response.md",
+        "docs/ja/docs/advanced/custom-response.md",
+        "docs/ja/docs/advanced/custom-response.md",
+        "docs/ja/docs/advanced/custom-response.md",
+        "docs/ja/docs/tutorial/cors.md",
+        "docs/ko/docs/tutorial/cors.md",
+        "docs/ru/docs/tutorial/cors.md",
+        "docs/zh/docs/advanced/custom-response.md",
+        "docs/zh/docs/advanced/custom-response.md",
+        "docs/zh/docs/advanced/custom-response.md",
+        "docs/zh/docs/advanced/custom-response.md",
+        "docs/zh/docs/advanced/custom-response.md",
+        "docs/zh/docs/advanced/custom-response.md",
+        "docs/zh/docs/tutorial/cors.md",
+        "fastapi/routing.py",
+        "fastapi/routing.py",
+        "tests/test_application.py",
+        "tests/test_application.py",
+        "tests/test_application.py",
+        "tests/test_custom_swagger_ui_redirect.py",
+        "tests/test_custom_swagger_ui_redirect.py",
+        "tests/test_default_response_class.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0",
+        "path": "fastapi/routing.py"
+      },
+      "seconds": 0.001,
+      "result_chars": 174485,
+      "hit_paths": [
+        "fastapi/routing.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0",
+        "path": "fastapi/params.py"
+      },
+      "seconds": 0.001,
+      "result_chars": 27807,
+      "hit_paths": [
+        "fastapi/params.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0",
+        "path": "httpx/_models.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 42974,
+      "hit_paths": [
+        "httpx/_models.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0",
+        "path": "fastapi/encoders.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 11024,
+      "hit_paths": [
+        "fastapi/encoders.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "def build_request|def _merge_url|def _content|self\\.json =|json: typing\\.Optional",
+        "case_sensitive": false
+      },
+      "seconds": 0.108,
+      "result_chars": 4102,
+      "hit_paths": [
+        "httpx/_api.py",
+        "httpx/_api.py",
+        "httpx/_api.py",
+        "httpx/_api.py",
+        "httpx/_api.py",
+        "httpx/_client.py",
+        "httpx/_client.py",
+        "httpx/_client.py",
+        "httpx/_client.py",
+        "httpx/_client.py",
+        "httpx/_client.py",
+        "httpx/_client.py",
+        "httpx/_client.py",
+        "httpx/_client.py",
+        "httpx/_client.py",
+        "httpx/_client.py",
+        "httpx/_client.py",
+        "httpx/_client.py",
+        "httpx/_models.py"
+      ]
+    }
+  ],
+  "tool_seconds": 0.514,
+  "retrieval_result_chars": 359077,
+  "denied_tools": [],
+  "cli_result_text": "Files submitted. Summary of the retrieved chain relevant to the task:\n\n**FastAPI request validation chain:**\n- `fastapi/routing.py` \u2014 `get_request_handler`, reads `content-type` header and negotiates JSON vs form/multipart body parsing before dependency solving.\n- `fastapi/dependencies/utils.py` \u2014 `solve_dependencies`, `request_body_to_args`, `get_body_field`: converts the raw parsed body (dict/FormData) into per-field values, handling `embed`, missing/`None` values (falls back to `deepcopy(field.default)`), and required-field errors.\n- `fastapi/_compat.py` \u2014 `ModelField.validate`, the Pydantic v1/v2 compatibility shim; in v2 it wraps a `TypeAdapter` per field for validation, which governs union-type and nested-model coercion behavior.\n- `fastapi/params.py` \u2014 `Body`/`Form`/`File`/`Param` field-info classes controlling `embed`, `media_type`, alias, and default handling.\n- `fastapi/encoders.py` \u2014 `jsonable_encoder`, used for outbound serialization (relevant contrast point vs. request-side expectations).\n- `fastapi/exceptions.py`, `fastapi/dependencies/models.py` \u2014 error shaping (`RequestValidationError`) and the `Dependant` model that carries body params.\n\n**httpx request encoding chain:**\n- `httpx/_content.py` \u2014 `encode_request`/`encode_json`: JSON body uses plain stdlib `json.dumps`, not Pydantic-aware; doesn't call `.model_dump()` on models, doesn't omit `None`, no `exclude_unset`/`exclude_none` equivalent.\n- `httpx/_models.py` \u2014 `Request.__init__`: sets `Content-Type` only via `encode_request`'s returned headers; `None`/default values pass straight through if present in the dict.\n- `httpx/_client.py` \u2014 `build_request` plumbs `json=` from `post()`/`request()` down to `Request()`.\n\n**Key drift points** (for the report): (1) httpx's `json.dumps` chokes on raw Pydantic model instances \u2014 callers must `.model_dump(mode=\"json\")` themselves; (2) FastAPI's Pydantic v2 `ModelField.validate` via `TypeAdapter` is strict about `None` vs missing keys for `Optional` fields with defaults, while httpx sends whatever dict shape it's given (including explicit `None` for unset optionals if the caller included them); (3) union-type discrimination in Pydantic v2 (`discriminator`) requires exact key shapes that a manually-built httpx `json=` dict may not produce, causing 422s.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 868953,
+  "output_tokens": 4065,
+  "input_tokens_uncached": 16,
+  "cache_creation_input_tokens": 109880,
+  "cache_read_input_tokens": 759057,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "condition:combined",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6241,
+      "10": 0.6241
+    },
+    "mrr": 0.5,
+    "map_score": 0.45,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 5
+}

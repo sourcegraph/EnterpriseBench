@@ -1,0 +1,110 @@
+{
+  "task_id": "symbol-footprint-django-array-maxlen-001",
+  "policy": "condition:structural_lexical",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/django--5.0"
+  ],
+  "retrieved_paths": [
+    "django/contrib/postgres/validators.py",
+    "django/contrib/postgres/fields/array.py",
+    "django/contrib/postgres/forms/array.py"
+  ],
+  "required_files": [
+    "django/contrib/postgres/fields/array.py",
+    "django/contrib/postgres/forms/array.py",
+    "django/contrib/postgres/validators.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 3,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.161858,
+  "elapsed_seconds": 8.2,
+  "wall_seconds": 8.2,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "ArrayMaxLengthValidator",
+        "case_sensitive": false
+      },
+      "seconds": 0.08,
+      "result_chars": 1347,
+      "hit_paths": [
+        "django/contrib/postgres/fields/array.py",
+        "django/contrib/postgres/fields/array.py",
+        "django/contrib/postgres/forms/array.py",
+        "django/contrib/postgres/forms/array.py",
+        "django/contrib/postgres/validators.py"
+      ]
+    }
+  ],
+  "tool_seconds": 0.08,
+  "retrieval_result_chars": 1347,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the three source files under `django/` that define or name `ArrayMaxLengthValidator`:\n\n1. **django/contrib/postgres/validators.py** \u2014 defines the class (`class ArrayMaxLengthValidator(MaxLengthValidator):`)\n2. **django/contrib/postgres/fields/array.py** \u2014 imports and uses it in the model field's validators\n3. **django/contrib/postgres/forms/array.py** \u2014 imports and uses it in the form field's validators",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 204734,
+  "output_tokens": 459,
+  "input_tokens_uncached": 6,
+  "cache_creation_input_tokens": 30608,
+  "cache_read_input_tokens": 174120,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "symbol-footprint-django-array-maxlen-001",
+    "config_name": "condition:structural_lexical",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 3,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 1
+}

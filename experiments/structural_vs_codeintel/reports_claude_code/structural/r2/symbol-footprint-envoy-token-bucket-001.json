@@ -1,0 +1,167 @@
+{
+  "task_id": "symbol-footprint-envoy-token-bucket-001",
+  "policy": "condition:structural",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.31.2"
+  ],
+  "retrieved_paths": [
+    "source/common/common/token_bucket_impl.h",
+    "source/common/common/token_bucket_impl.cc"
+  ],
+  "required_files": [
+    "source/common/common/token_bucket_impl.cc",
+    "source/common/common/token_bucket_impl.h",
+    "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 8,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.22818860000000002,
+  "elapsed_seconds": 18.6,
+  "wall_seconds": 18.6,
+  "tool_log": [
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AtomicTokenBucketImpl"
+      },
+      "seconds": 0.579,
+      "result_chars": 385,
+      "hit_paths": [
+        "source/common/common/token_bucket_impl.cc"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/common/token_bucket_impl.cc"
+      },
+      "seconds": 0.0,
+      "result_chars": 3535,
+      "hit_paths": [
+        "source/common/common/token_bucket_impl.cc"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/common/token_bucket_impl.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 4272,
+      "hit_paths": [
+        "source/common/common/token_bucket_impl.h"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AtomicTokenBucketImpl $$$ARGS"
+      },
+      "seconds": 0.406,
+      "result_chars": 3013,
+      "hit_paths": [
+        "test/common/common/token_bucket_impl_test.cc",
+        "test/common/common/token_bucket_impl_test.cc",
+        "test/common/common/token_bucket_impl_test.cc",
+        "test/common/common/token_bucket_impl_test.cc",
+        "test/common/common/token_bucket_impl_test.cc",
+        "test/common/common/token_bucket_impl_test.cc",
+        "test/common/common/token_bucket_impl_test.cc",
+        "test/common/common/token_bucket_impl_test.cc",
+        "test/common/common/token_bucket_impl_test.cc"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "std::make_shared<AtomicTokenBucketImpl>"
+      },
+      "seconds": 0.603,
+      "result_chars": 82,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "AtomicTokenBucketImpl",
+        "language": "cpp"
+      },
+      "seconds": 0.357,
+      "result_chars": 252,
+      "hit_paths": [
+        "source/common/common/token_bucket_impl.cc"
+      ]
+    }
+  ],
+  "tool_seconds": 1.945,
+  "retrieval_result_chars": 11539,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the two files that declare and define `AtomicTokenBucketImpl`:\n\n- `source/common/common/token_bucket_impl.h` \u2014 class declaration\n- `source/common/common/token_bucket_impl.cc` \u2014 method definitions\n\nSearch confirmed no other production source references the class name (only `test/common/common/token_bucket_impl_test.cc` instantiates it, excluded as a test).",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 421997,
+  "output_tokens": 981,
+  "input_tokens_uncached": 12,
+  "cache_creation_input_tokens": 35252,
+  "cache_read_input_tokens": 386733,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "symbol-footprint-envoy-token-bucket-001",
+    "config_name": "condition:structural",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 1.0,
+    "n_retrieved": 2,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 4
+}

@@ -1,0 +1,194 @@
+{
+  "task_id": "ceph-rgw-auth-secure-001",
+  "policy": "condition:structural",
+  "model": "claude-sonnet-5",
+  "suite": "security_operations",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/ceph--v19.2.0"
+  ],
+  "retrieved_paths": [
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_rest_s3.h",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_auth.cc",
+    "src/rgw/rgw_auth.h",
+    "src/rgw/rgw_auth_filters.h",
+    "src/rgw/rgw_auth_registry.h",
+    "src/rgw/rgw_common.h",
+    "src/rgw/rgw_common.cc"
+  ],
+  "required_files": [
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_auth.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 10,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.5027916,
+  "elapsed_seconds": 217.9,
+  "wall_seconds": 217.9,
+  "tool_log": [
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "$NAME",
+        "language": "cpp",
+        "top_k": 1
+      },
+      "seconds": 166.343,
+      "result_chars": 505,
+      "hit_paths": [
+        "src/journal/Utils.cc"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0"
+      },
+      "seconds": 0.046,
+      "result_chars": 74209,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth_s3.cc"
+      },
+      "seconds": 0.002,
+      "result_chars": 57115,
+      "hit_paths": [
+        "src/rgw/rgw_auth_s3.cc"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth_s3.h"
+      },
+      "seconds": 0.001,
+      "result_chars": 27192,
+      "hit_paths": [
+        "src/rgw/rgw_auth_s3.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth.cc"
+      },
+      "seconds": 0.002,
+      "result_chars": 42679,
+      "hit_paths": [
+        "src/rgw/rgw_auth.cc"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 31433,
+      "hit_paths": [
+        "src/rgw/rgw_auth.h"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "bool $NAME(const std::string& a, const std::string& b)",
+        "language": "cpp",
+        "top_k": 5
+      },
+      "seconds": 2.066,
+      "result_chars": 81,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_rest_s3.h"
+      },
+      "seconds": 0.001,
+      "result_chars": 36344,
+      "hit_paths": [
+        "src/rgw/rgw_rest_s3.h"
+      ]
+    }
+  ],
+  "tool_seconds": 168.461,
+  "retrieval_result_chars": 269558,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the files needed for the RGW S3 authentication security audit.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 585057,
+  "output_tokens": 1812,
+  "input_tokens_uncached": 12,
+  "cache_creation_input_tokens": 96747,
+  "cache_read_input_tokens": 488298,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "ceph-rgw-auth-secure-001",
+    "config_name": "condition:structural",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.75,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.6667,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.8048,
+      "10": 0.9439
+    },
+    "mrr": 1.0,
+    "map_score": 0.8542,
+    "file_recall": 1.0,
+    "context_efficiency": 0.4,
+    "n_retrieved": 10,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 4
+}

@@ -1,0 +1,131 @@
+{
+  "task_id": "refactor-orchestration-tri-spring-001",
+  "policy": "condition:structural",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/spring-kafka--v3.0.9",
+    "github.com/sg-evals/spring-framework--v6.0.11",
+    "github.com/sg-evals/spring-boot--v3.1.2"
+  ],
+  "retrieved_paths": [
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/KafkaMessageListenerContainer.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/AbstractMessageListenerContainer.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/GenericMessageListenerContainer.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/ContainerProperties.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/config/ConcurrentKafkaListenerContainerFactory.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/config/AbstractKafkaListenerContainerFactory.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/config/KafkaListenerContainerFactory.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/config/KafkaListenerEndpointRegistry.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/annotation/EnableKafka.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/annotation/KafkaListenerAnnotationBeanPostProcessor.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/annotation/KafkaBootstrapConfiguration.java"
+  ],
+  "required_files": [
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java",
+    "spring-messaging/src/main/java/org/springframework/messaging/handler/annotation/support/MessageHandlerMethodFactory.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfiguration.java"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 5,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.32097000000000003,
+  "elapsed_seconds": 16.9,
+  "wall_seconds": 16.9,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-kafka--v3.0.9"
+      },
+      "seconds": 0.005,
+      "result_chars": 22674,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class ConcurrentMessageListenerContainer"
+      },
+      "seconds": 0.717,
+      "result_chars": 231,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-boot--v3.1.2"
+      },
+      "seconds": 0.007,
+      "result_chars": 45972,
+      "hit_paths": []
+    }
+  ],
+  "tool_seconds": 0.729,
+  "retrieval_result_chars": 68877,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the required files, focused on Spring Kafka's listener container threading model (the primary implementation surface for this refactor), which is what a topological refactor plan across the three repos would need to inspect first.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 344216,
+  "output_tokens": 1405,
+  "input_tokens_uncached": 8,
+  "cache_creation_input_tokens": 62648,
+  "cache_read_input_tokens": 281560,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "refactor-orchestration-tri-spring-001",
+    "config_name": "condition:structural",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0833,
+    "n_retrieved": 12,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 4
+}

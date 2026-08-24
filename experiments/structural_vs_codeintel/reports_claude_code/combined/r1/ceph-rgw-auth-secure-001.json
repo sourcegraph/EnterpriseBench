@@ -1,0 +1,398 @@
+{
+  "task_id": "ceph-rgw-auth-secure-001",
+  "policy": "condition:combined",
+  "model": "claude-sonnet-5",
+  "suite": "security_operations",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/ceph--v19.2.0"
+  ],
+  "retrieved_paths": [
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_rest_s3.h",
+    "src/rgw/rgw_auth.h",
+    "src/rgw/rgw_auth.cc",
+    "src/rgw/rgw_auth_registry.h",
+    "src/rgw/rgw_auth_filters.h",
+    "src/rgw/rgw_auth_keystone.cc",
+    "src/rgw/rgw_auth_keystone.h",
+    "src/rgw/rgw_common.h",
+    "src/rgw/rgw_common.cc",
+    "src/rgw/rgw_op.cc",
+    "src/rgw/rgw_op.h",
+    "doc/radosgw/s3/authentication.rst",
+    "doc/dev/radosgw/s3_compliance.rst"
+  ],
+  "required_files": [
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_auth.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "combined",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "definition",
+    "references",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax + resolved symbol identity",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 13,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.39931560000000005,
+  "elapsed_seconds": 45.1,
+  "wall_seconds": 45.1,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "AWS4|aws4|get_v4_signature|rgw_auth_s3",
+        "case_sensitive": false
+      },
+      "seconds": 1.286,
+      "result_chars": 8469,
+      "hit_paths": [
+        "doc/changelog/v0.67.5.txt",
+        "doc/changelog/v10.2.1.txt",
+        "doc/changelog/v10.2.1.txt",
+        "doc/changelog/v10.2.10.txt",
+        "doc/changelog/v10.2.10.txt",
+        "doc/changelog/v10.2.10.txt",
+        "doc/changelog/v10.2.10.txt",
+        "doc/changelog/v10.2.10.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/dev/radosgw/s3_compliance.rst",
+        "doc/dev/radosgw/s3_compliance.rst",
+        "doc/radosgw/s3/authentication.rst",
+        "doc/radosgw/s3/authentication.rst",
+        "doc/radosgw/s3/java.rst",
+        "doc/radosgw/s3/php.rst",
+        "examples/rgw/rgw-cache/nginx-default.conf",
+        "examples/rgw/rgw-cache/nginx-default.conf",
+        "examples/rgw/rgw-cache/nginx-default.conf",
+        "examples/rgw/rgw-cache/nginx-lua-file.lua",
+        "examples/rgw/rgw-cache/nginx-noprefetch.conf"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class RGWSignatureV2|class RGWSignatureV4|RGW_Auth_S3",
+        "case_sensitive": false
+      },
+      "seconds": 0.847,
+      "result_chars": 6189,
+      "hit_paths": [
+        "doc/changelog/v0.67.5.txt",
+        "doc/dev/radosgw/s3_compliance.rst",
+        "doc/dev/radosgw/s3_compliance.rst",
+        "src/rgw/CMakeLists.txt",
+        "src/rgw/driver/rados/rgw_d3n_datacache.cc",
+        "src/rgw/driver/rados/rgw_d3n_datacache.cc",
+        "src/rgw/rgw_auth_keystone.cc",
+        "src/rgw/rgw_auth_registry.h",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_file.cc",
+        "src/rgw/rgw_loadgen.cc",
+        "src/rgw/rgw_rest.cc",
+        "src/rgw/rgw_rest_client.cc",
+        "src/rgw/rgw_rest_config.h",
+        "src/rgw/rgw_rest_iam.cc",
+        "src/rgw/rgw_rest_iam.cc",
+        "src/rgw/rgw_rest_metadata.h",
+        "src/rgw/rgw_rest_pubsub.cc",
+        "src/rgw/rgw_rest_pubsub.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.h",
+        "src/rgw/rgw_rest_s3.h",
+        "src/rgw/rgw_rest_sts.cc"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class RGWAuthEngine|rgw_auth.h|SignatureHelper|do_aws4_auth|get_v2_signature",
+        "case_sensitive": false
+      },
+      "seconds": 0.984,
+      "result_chars": 4472,
+      "hit_paths": [
+        "doc/changelog/v12.2.2.txt",
+        "doc/changelog/v12.2.2.txt",
+        "src/rgw/rgw_auth.cc",
+        "src/rgw/rgw_auth_filters.h",
+        "src/rgw/rgw_auth_keystone.h",
+        "src/rgw/rgw_auth_registry.h",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_common.h",
+        "src/rgw/rgw_common.h",
+        "src/rgw/rgw_iam_policy.cc",
+        "src/rgw/rgw_lib.cc",
+        "src/rgw/rgw_loadgen.cc",
+        "src/rgw/rgw_op.cc",
+        "src/rgw/rgw_op.cc",
+        "src/rgw/rgw_op.cc",
+        "src/rgw/rgw_op.cc",
+        "src/rgw/rgw_op.h",
+        "src/rgw/rgw_op.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "constant_time|timing|CRYPTO_memcmp|memcmp\\(.*sig|== .*signature",
+        "case_sensitive": false
+      },
+      "seconds": 1.044,
+      "result_chars": 5284,
+      "hit_paths": [
+        "doc/cephadm/services/mon.rst",
+        "doc/cephfs/snap-schedule.rst",
+        "doc/changelog/v0.67.8.txt",
+        "doc/changelog/v10.2.8.txt",
+        "doc/changelog/v11.2.1.txt",
+        "doc/dev/logs.rst",
+        "doc/man/8/cephfs-shell.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "qa/standalone/ceph-helpers.sh",
+        "qa/tasks/radosbench.py",
+        "qa/workunits/rgw/jcksum/file-1m",
+        "qa/workunits/rgw/jcksum/file-256k",
+        "src/blk/spdk/NVMEDevice.cc",
+        "src/ceph-volume/ceph_volume/util/disk.py",
+        "src/client/Client.cc",
+        "src/common/Cycles.cc",
+        "src/common/ceph_timer.h",
+        "src/common/ceph_timer.h",
+        "src/common/cohort_lru.h",
+        "src/common/cohort_lru.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "rgw_s3_auth_use_.*v2|s3_auth_use_keystone|X-Amz-Expires|clock skew|RGW_NO_TIME_SKEW|req_sec = ",
+        "case_sensitive": false
+      },
+      "seconds": 1.222,
+      "result_chars": 5321,
+      "hit_paths": [
+        "doc/changelog/v0.80.11.txt",
+        "doc/changelog/v0.80.11.txt",
+        "doc/changelog/v0.94.3.txt",
+        "doc/changelog/v0.94.3.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v0.94.7.txt",
+        "doc/changelog/v11.2.1.txt",
+        "doc/changelog/v11.2.1.txt",
+        "doc/dev/osd_internals/stale_read.rst",
+        "doc/rados/configuration/mon-config-ref.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst",
+        "doc/rados/troubleshooting/troubleshooting-mon.rst"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "time_skew|RGW_TIME_SKEW|is_time_skewed|req_sec|now - req|req_date",
+        "case_sensitive": false
+      },
+      "seconds": 1.394,
+      "result_chars": 4456,
+      "hit_paths": [
+        "src/mon/Monitor.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_common.cc",
+        "src/rgw/rgw_common.h",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth_s3.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 27192,
+      "hit_paths": [
+        "src/rgw/rgw_auth_s3.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "LocalEngine::authenticate|dest_str.compare|server_signature|== .*client_signature|access_key_id ==",
+        "case_sensitive": false
+      },
+      "seconds": 0.968,
+      "result_chars": 5209,
+      "hit_paths": [
+        "src/pybind/mgr/nfs/tests/test_nfs.py",
+        "src/pybind/mgr/nfs/tests/test_nfs.py",
+        "src/pybind/mgr/nfs/tests/test_nfs.py",
+        "src/pybind/mgr/nfs/tests/test_nfs.py",
+        "src/pybind/mgr/nfs/tests/test_nfs.py",
+        "src/pybind/mgr/nfs/tests/test_nfs.py",
+        "src/pybind/mgr/nfs/tests/test_nfs.py",
+        "src/pybind/mgr/nfs/tests/test_nfs.py",
+        "src/pybind/mgr/nfs/tests/test_nfs.py",
+        "src/pybind/mgr/nfs/tests/test_nfs.py",
+        "src/rgw/rgw_auth_keystone.cc",
+        "src/rgw/rgw_auth_keystone.cc",
+        "src/rgw/rgw_auth_keystone.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_rest_s3.cc"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0"
+      },
+      "seconds": 0.012,
+      "result_chars": 771,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class LocalEngine|class AWSEngine|class VersionAbstractor",
+        "case_sensitive": false
+      },
+      "seconds": 0.746,
+      "result_chars": 662,
+      "hit_paths": [
+        "src/rgw/rgw_rest_s3.h",
+        "src/rgw/rgw_rest_s3.h",
+        "src/rgw/rgw_rest_s3.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "ldap_password|access_keys\\[|RGWAccessKey",
+        "case_sensitive": false
+      },
+      "seconds": 0.83,
+      "result_chars": 2625,
+      "hit_paths": [
+        "src/pybind/mgr/dashboard/services/rgw_client.py",
+        "src/python-common/ceph/rgw/types.py",
+        "src/python-common/ceph/rgw/types.py",
+        "src/python-common/ceph/rgw/types.py",
+        "src/rgw/driver/daos/rgw_sal_daos.h",
+        "src/rgw/driver/dbstore/common/dbstore.cc",
+        "src/rgw/driver/dbstore/common/dbstore.cc",
+        "src/rgw/driver/dbstore/dbstore_main.cc",
+        "src/rgw/driver/dbstore/dbstore_main.cc",
+        "src/rgw/driver/dbstore/dbstore_main.cc"
+      ]
+    }
+  ],
+  "tool_seconds": 9.333,
+  "retrieval_result_chars": 70650,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file set for the S3 auth security audit:\n\n**Core signature verification (SigV2/SigV4):**\n- `src/rgw/rgw_auth_s3.cc` / `.h` \u2014 canonical request/string-to-sign construction, `get_v2_signature`/`get_v4_signature`, `is_time_skew_ok` (replay/timestamp window)\n- `src/rgw/rgw_rest_s3.cc` / `.h` \u2014 `RGW_Auth_S3::authorize`, `LocalEngine::authenticate`, `AWSEngine`/`VersionAbstractor` classes, time-skew enforcement call site\n\n**Auth framework:**\n- `src/rgw/rgw_auth.h` / `.cc` \u2014 Engine/Strategy/Applier abstractions underpinning all auth engines\n- `src/rgw/rgw_auth_registry.h` \u2014 engine registry wiring\n- `src/rgw/rgw_auth_filters.h` \u2014 applier decorators\n- `src/rgw/rgw_auth_keystone.cc` / `.h` \u2014 external (Keystone/EC2) engine, including its own signature comparison (`sig.compare(server_signature)`)\n\n**Secret key storage / request completion:**\n- `src/rgw/rgw_common.h` / `.cc` \u2014 `RGWAccessKey`/user info structures, error code definitions (e.g. `ERR_REQUEST_TIME_SKEWED`)\n- `src/rgw/rgw_op.cc` / `.h` \u2014 `do_aws4_auth_completion` (chunked payload completion)\n\n**Docs for cross-reference:**\n- `doc/radosgw/s3/authentication.rst`\n- `doc/dev/radosgw/s3_compliance.rst`",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 622351,
+  "output_tokens": 3398,
+  "input_tokens_uncached": 14,
+  "cache_creation_input_tokens": 63379,
+  "cache_read_input_tokens": 558958,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "ceph-rgw-auth-secure-001",
+    "config_name": "condition:combined",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.8889,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.9829,
+      "10": 0.9829
+    },
+    "mrr": 1.0,
+    "map_score": 0.95,
+    "file_recall": 1.0,
+    "context_efficiency": 0.25,
+    "n_retrieved": 16,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 1
+}

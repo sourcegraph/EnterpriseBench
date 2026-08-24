@@ -1,0 +1,206 @@
+{
+  "task_id": "refactor-orchestration-tri-babel-001",
+  "policy": "condition:lexical",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/babel--v7.22.9",
+    "github.com/sg-evals/webpack--v5.88.2",
+    "github.com/sg-evals/next.js--v13.4.12"
+  ],
+  "retrieved_paths": [
+    "packages/next/package.json",
+    "package.json"
+  ],
+  "required_files": [
+    "packages/babel-parser/package.json",
+    "package.json",
+    "packages/next/package.json"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "lexical",
+  "condition_tools": [
+    "grep",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 8,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.46895899999999996,
+  "elapsed_seconds": 32.3,
+  "wall_seconds": 32.3,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "\"@babel",
+        "case_sensitive": false
+      },
+      "seconds": 0.334,
+      "result_chars": 7984,
+      "hit_paths": [
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/workflows/ci.yml",
+        ".github/workflows/ci.yml",
+        ".yarn/releases/yarn-3.6.1.cjs",
+        ".yarn/releases/yarn-3.6.1.cjs",
+        ".yarnrc.yml",
+        ".yarnrc.yml",
+        ".yarnrc.yml",
+        ".yarnrc.yml",
+        ".yarnrc.yml",
+        ".yarnrc.yml",
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "CONTRIBUTING.md",
+        "CONTRIBUTING.md",
+        "Gulpfile.mjs",
+        "Gulpfile.mjs",
+        "Gulpfile.mjs",
+        "Gulpfile.mjs",
+        "Gulpfile.mjs",
+        "Gulpfile.mjs",
+        "Gulpfile.mjs",
+        "Makefile.js",
+        "Makefile.source.mjs",
+        "Makefile.source.mjs",
+        "babel-worker.cjs"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "babel--v7.22.9"
+      },
+      "seconds": 0.026,
+      "result_chars": 901,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "webpack--v5.88.2",
+        "path": "package.json"
+      },
+      "seconds": 0.0,
+      "result_chars": 10520,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "next.js--v13.4.12",
+        "path": "package.json"
+      },
+      "seconds": 0.0,
+      "result_chars": 9659,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "next.js--v13.4.12",
+        "path": "packages/next/package.json"
+      },
+      "seconds": 0.0,
+      "result_chars": 9190,
+      "hit_paths": [
+        "packages/next/package.json"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "require\\(.@babel/core.\\)|from '@babel/core'|from \"@babel/core\"",
+        "case_sensitive": false
+      },
+      "seconds": 0.554,
+      "result_chars": 4854,
+      "hit_paths": [
+        "CHANGELOG.md",
+        "babel-worker.cjs",
+        "babel.config.js",
+        "benchmark/babel-core/real-case-preset-env-flow/babel-parser-expression.mjs",
+        "codemods/babel-plugin-codemod-object-assign-to-object-spread/README.md",
+        "codemods/babel-plugin-codemod-object-assign-to-object-spread/src/index.ts",
+        "codemods/babel-plugin-codemod-optional-catch-binding/README.md",
+        "codemods/babel-plugin-codemod-optional-catch-binding/src/index.ts",
+        "eslint/babel-eslint-parser/src/worker/babel-core.cjs",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js"
+      ]
+    }
+  ],
+  "tool_seconds": 0.914,
+  "retrieval_result_chars": 43108,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Key findings for the plan:\n\n- **webpack** declares `@babel/core`/`@babel/preset-react`/`babel-loader` only under `devDependencies` in `package.json` (used for its own test fixtures/examples). Webpack's own module parsing uses `acorn`, not Babel \u2014 it is not reached by a Babel parser AST change.\n- **next.js** (`packages/next/package.json`) declares `@babel/core`, `@babel/traverse`, `@babel/generator`, `@babel/types`, `@babel/preset-*`, etc. also under `devDependencies`, but these are bundled at build time and power Next's real `babel-loader`/custom `.babelrc` transform pipeline used at runtime for user code \u2014 this is the actual consuming edge for a Babel parser AST change.\n- **babel** itself is the origin of the change.\n\nPlan: Babel (origin) \u2192 next.js (real consumer via its babel-loader compilation path) \u2192 webpack unaffected (parses with acorn, no propagation needed; its Babel devDependency is test-only tooling).",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 495365,
+  "output_tokens": 1822,
+  "input_tokens_uncached": 12,
+  "cache_creation_input_tokens": 92538,
+  "cache_read_input_tokens": 402815,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "condition:lexical",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 1.0,
+    "n_retrieved": 2,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 4
+}

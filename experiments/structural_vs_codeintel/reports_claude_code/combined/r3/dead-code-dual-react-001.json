@@ -1,0 +1,841 @@
+{
+  "task_id": "dead-code-dual-react-001",
+  "policy": "condition:combined",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/react--v18.2.0",
+    "github.com/sg-evals/create-react-app--v5.0.1"
+  ],
+  "retrieved_paths": [
+    "packages/react-scripts/fixtures/kitchensink/template/src/index.js",
+    "packages/react-dom/src/client/ReactDOMLegacy.js",
+    "CHANGELOG.md",
+    "packages/react-scripts/package.json",
+    "packages/cra-template/template/src/index.js",
+    "packages/cra-template-typescript/template/src/index.tsx",
+    "packages/react-scripts/config/webpack.config.js",
+    "packages/react-scripts/lib/react-app.d.ts",
+    "packages/react-scripts/fixtures/kitchensink/template/src/App.js",
+    "packages/react-scripts/fixtures/kitchensink/template/integration/webpack.test.js",
+    "packages/react-scripts/fixtures/kitchensink/template/integration/initDOM.js",
+    "packages/react-app-polyfill/jsdom.js",
+    "packages/react-scripts/scripts/utils/createJestConfig.js",
+    "packages/cra-template/template/src/App.test.js",
+    "packages/cra-template/template/src/setupTests.js"
+  ],
+  "required_files": [
+    "packages/react/src/ReactSharedInternals.js",
+    "packages/react-scripts/config/webpack.config.js"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "combined",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "definition",
+    "references",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax + resolved symbol identity",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 31,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 1.0180094,
+  "elapsed_seconds": 123.1,
+  "wall_seconds": 123.1,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED",
+        "case_sensitive": false
+      },
+      "seconds": 0.019,
+      "result_chars": 16200,
+      "hit_paths": [
+        "fixtures/dom/public/act-dom.html",
+        "fixtures/fiber-debugger/src/App.js",
+        "fixtures/legacy-jsx-runtimes/react-16/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-16/cjs/react-jsx-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-16/cjs/react-jsx-runtime.production.min.js",
+        "fixtures/legacy-jsx-runtimes/react-17/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-17/cjs/react-jsx-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-17/cjs/react-jsx-runtime.production.min.js",
+        "packages/react-cache/src/ReactCacheOld.js",
+        "packages/react-devtools-shared/src/devtools/cache.js",
+        "packages/react-dom/client.js",
+        "packages/react-dom/index.classic.fb.js",
+        "packages/react-dom/index.classic.fb.js",
+        "packages/react-dom/index.classic.fb.js",
+        "packages/react-dom/index.experimental.js",
+        "packages/react-dom/index.js",
+        "packages/react-dom/index.modern.fb.js",
+        "packages/react-dom/index.stable.js",
+        "packages/react-dom/npm/client.js",
+        "packages/react-dom/src/__tests__/ReactCompositeComponent-test.js",
+        "packages/react-dom/src/__tests__/ReactDOMServerIntegrationHooks-test.js",
+        "packages/react-dom/src/__tests__/ReactDOMServerIntegrationNewContext-test.js",
+        "packages/react-dom/src/__tests__/ReactServerRendering-test.js",
+        "packages/react-dom/src/client/ReactDOM.js",
+        "packages/react-dom/src/test-utils/ReactTestUtils.js",
+        "packages/react-native-renderer/src/ReactNativeRenderer.js",
+        "packages/react-native-renderer/src/ReactNativeTypes.js",
+        "packages/react-native-renderer/src/__tests__/ReactNativeError-test.internal.js",
+        "packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js",
+        "packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js",
+        "packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js",
+        "packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js",
+        "packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js",
+        "packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js",
+        "packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js",
+        "packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js",
+        "packages/react-reconciler/src/__tests__/ReactMemo-test.js",
+        "packages/react-reconciler/src/__tests__/ReactNewContext-test.js",
+        "packages/react/index.classic.fb.js",
+        "packages/react/index.experimental.js",
+        "packages/react/index.js",
+        "packages/react/index.modern.fb.js",
+        "packages/react/index.stable.js",
+        "packages/react/src/React.js",
+        "packages/react/src/ReactSharedSubset.experimental.js",
+        "packages/scheduler/npm/umd/scheduler.development.js",
+        "packages/scheduler/npm/umd/scheduler.development.js",
+        "packages/scheduler/npm/umd/scheduler.development.js",
+        "packages/scheduler/npm/umd/scheduler.development.js",
+        "packages/scheduler/npm/umd/scheduler.development.js"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "unstable_|deprecated|Deprecated|DEPRECATED",
+        "case_sensitive": false
+      },
+      "seconds": 0.043,
+      "result_chars": 16871,
+      "hit_paths": [
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "ReactDOM\\.render|ReactDOM\\.hydrate|ReactDOM\\.unmountComponentAtNode|renderSubtreeIntoContainer|unstable_createPortal|unstable_batchedUpdates|__SECRET_INTERNALS",
+        "case_sensitive": false
+      },
+      "seconds": 0.054,
+      "result_chars": 14655,
+      "hit_paths": [
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "fixtures/art/app.js",
+        "fixtures/attribute-behavior/src/App.js",
+        "fixtures/attribute-behavior/src/App.test.js",
+        "fixtures/attribute-behavior/src/index.js",
+        "fixtures/devtools/regression/shared.js",
+        "fixtures/devtools/standalone/index.html",
+        "fixtures/dom/public/act-dom.html",
+        "fixtures/dom/public/act-dom.html",
+        "fixtures/dom/public/renderer.js",
+        "fixtures/dom/public/renderer.js",
+        "fixtures/dom/public/renderer.js",
+        "fixtures/dom/public/renderer.js",
+        "fixtures/dom/src/components/fixtures/custom-elements/index.js",
+        "fixtures/dom/src/components/fixtures/error-handling/index.js",
+        "fixtures/dom/src/components/fixtures/error-handling/index.js",
+        "fixtures/dom/src/components/fixtures/mouse-events/mouse-enter.js",
+        "fixtures/dom/src/components/fixtures/mouse-events/mouse-enter.js",
+        "fixtures/dom/src/components/fixtures/selects/index.js",
+        "fixtures/dom/src/index.js",
+        "fixtures/expiration/src/index.js",
+        "fixtures/fiber-debugger/src/App.js",
+        "fixtures/fiber-debugger/src/index.js",
+        "fixtures/fiber-triangle/index.html",
+        "fixtures/flight-browser/index.html",
+        "fixtures/flight/src/index.js",
+        "fixtures/legacy-jsx-runtimes/react-14/react-14.test.js",
+        "fixtures/legacy-jsx-runtimes/react-14/react-14.test.js",
+        "fixtures/legacy-jsx-runtimes/react-14/react-14.test.js",
+        "fixtures/legacy-jsx-runtimes/react-14/react-14.test.js",
+        "fixtures/legacy-jsx-runtimes/react-14/react-14.test.js"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1"
+      },
+      "seconds": 0.004,
+      "result_chars": 27095,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/cra-template/template/src/index.js"
+      },
+      "seconds": 0.0,
+      "result_chars": 535,
+      "hit_paths": [
+        "packages/cra-template/template/src/index.js"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/cra-template-typescript/template/src/index.tsx"
+      },
+      "seconds": 0.0,
+      "result_chars": 554,
+      "hit_paths": [
+        "packages/cra-template-typescript/template/src/index.tsx"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/react-scripts/fixtures/kitchensink/template/src/index.js"
+      },
+      "seconds": 0.0,
+      "result_chars": 330,
+      "hit_paths": [
+        "packages/react-scripts/fixtures/kitchensink/template/src/index.js"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "react-dom/test-utils|ReactTestUtils|act\\(|test-utils",
+        "case_sensitive": false
+      },
+      "seconds": 0.06,
+      "result_chars": 8940,
+      "hit_paths": [
+        ".eslintrc.js",
+        ".eslintrc.js",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "fixtures/dom/.gitignore",
+        "fixtures/dom/.gitignore",
+        "fixtures/dom/package.json",
+        "fixtures/dom/public/act-dom.html",
+        "fixtures/dom/public/act-dom.html",
+        "fixtures/dom/public/act-dom.html",
+        "fixtures/dom/public/act-dom.html",
+        "fixtures/dom/public/act-dom.html",
+        "fixtures/dom/public/act-dom.html",
+        "fixtures/dom/src/__tests__/nested-act-test.js",
+        "fixtures/dom/src/__tests__/nested-act-test.js",
+        "fixtures/dom/src/__tests__/nested-act-test.js",
+        "fixtures/dom/src/__tests__/nested-act-test.js",
+        "fixtures/dom/src/__tests__/nested-act-test.js",
+        "fixtures/dom/src/__tests__/nested-act-test.js",
+        "fixtures/dom/src/__tests__/nested-act-test.js",
+        "fixtures/dom/src/__tests__/nested-act-test.js",
+        "fixtures/dom/src/__tests__/nested-act-test.js"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "from 'react-dom'|require\\('react-dom'\\)|require\\(\"react-dom\"\\)|react-dom/test-utils|ReactDOM\\.",
+        "case_sensitive": false
+      },
+      "seconds": 0.053,
+      "result_chars": 15090,
+      "hit_paths": [
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "fixtures/art/app.js",
+        "fixtures/art/app.js",
+        "fixtures/attribute-behavior/src/App.js",
+        "fixtures/attribute-behavior/src/App.test.js",
+        "fixtures/attribute-behavior/src/App.test.js",
+        "fixtures/attribute-behavior/src/index.js",
+        "fixtures/attribute-behavior/src/index.js",
+        "fixtures/devtools/regression/shared.js",
+        "fixtures/devtools/standalone/index.html",
+        "fixtures/dom/public/act-dom.html",
+        "fixtures/dom/public/renderer.js",
+        "fixtures/dom/public/renderer.js",
+        "fixtures/dom/public/renderer.js",
+        "fixtures/dom/public/renderer.js",
+        "fixtures/dom/src/__tests__/nested-act-test.js",
+        "fixtures/dom/src/__tests__/nested-act-test.js",
+        "fixtures/dom/src/components/Iframe.js",
+        "fixtures/dom/src/components/Iframe.js",
+        "fixtures/dom/src/components/fixtures/custom-elements/index.js",
+        "fixtures/dom/src/components/fixtures/error-handling/index.js",
+        "fixtures/dom/src/components/fixtures/error-handling/index.js",
+        "fixtures/dom/src/components/fixtures/error-handling/index.js",
+        "fixtures/dom/src/components/fixtures/error-handling/index.js",
+        "fixtures/dom/src/components/fixtures/mouse-events/mouse-enter.js"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/cra-template/template/src/App.test.js"
+      },
+      "seconds": 0.0,
+      "result_chars": 246,
+      "hit_paths": [
+        "packages/cra-template/template/src/App.test.js"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/react-scripts/fixtures/kitchensink/template/integration/webpack.test.js"
+      },
+      "seconds": 0.0,
+      "result_chars": 4186,
+      "hit_paths": [
+        "packages/react-scripts/fixtures/kitchensink/template/integration/webpack.test.js"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "ReactDOM|react-dom",
+        "case_sensitive": false
+      },
+      "seconds": 0.051,
+      "result_chars": 19396,
+      "hit_paths": [
+        ".codesandbox/ci.json",
+        ".codesandbox/ci.json",
+        ".eslintrc.js",
+        ".eslintrc.js",
+        ".gitignore",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "README.md",
+        "ReactVersions.js",
+        "dangerfile.js"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "findDOMNode|renderToNodeStream|unstable_batchedUpdates|renderSubtreeIntoContainer",
+        "case_sensitive": false
+      },
+      "seconds": 0.052,
+      "result_chars": 9566,
+      "hit_paths": [
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "fixtures/dom/src/components/fixtures/hydration/Code.js",
+        "fixtures/dom/src/components/fixtures/hydration/Code.js",
+        "fixtures/dom/src/find-dom-node.js",
+        "fixtures/dom/src/find-dom-node.js",
+        "fixtures/dom/src/find-dom-node.js",
+        "fixtures/nesting/src/legacy/Greeting.js",
+        "fixtures/nesting/src/legacy/Greeting.js",
+        "packages/react-art/src/__tests__/ReactART-test.js",
+        "packages/react-art/src/__tests__/ReactART-test.js",
+        "packages/react-art/src/__tests__/ReactART-test.js",
+        "packages/react-art/src/__tests__/ReactART-test.js",
+        "packages/react-devtools-shared/src/backend/renderer.js",
+        "packages/react-devtools-shared/src/backend/renderer.js",
+        "packages/react-devtools-shared/src/devtools/views/Components/NativeStyleEditor/StyleEditor.js",
+        "packages/react-devtools-shared/src/devtools/views/Components/NativeStyleEditor/context.js"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "'react-dom'|\"react-dom\"|react-dom\\$|react/jsx-runtime|ReactCurrentOwner|ReactCurrentDispatcher",
+        "case_sensitive": false
+      },
+      "seconds": 0.046,
+      "result_chars": 12614,
+      "hit_paths": [
+        ".codesandbox/ci.json",
+        "CHANGELOG.md",
+        "ReactVersions.js",
+        "fixtures/art/app.js",
+        "fixtures/art/package.json",
+        "fixtures/attribute-behavior/package.json",
+        "fixtures/attribute-behavior/src/App.test.js",
+        "fixtures/attribute-behavior/src/index.js",
+        "fixtures/blocks/package.json",
+        "fixtures/concurrent/time-slicing/package.json",
+        "fixtures/dom/package.json",
+        "fixtures/expiration/package.json",
+        "fixtures/fiber-debugger/src/index.js",
+        "fixtures/fizz/package.json",
+        "fixtures/flight/config/webpack.config.js",
+        "fixtures/flight/config/webpack.config.js",
+        "fixtures/flight/src/index.js",
+        "fixtures/legacy-jsx-runtimes/react-14/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-14/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-14/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-14/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-14/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-14/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-14/cjs/react-jsx-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-14/cjs/react-jsx-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-14/cjs/react-jsx-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-14/cjs/react-jsx-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-14/cjs/react-jsx-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-14/cjs/react-jsx-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-14/cjs/react-jsx-runtime.production.min.js",
+        "fixtures/legacy-jsx-runtimes/react-14/package.json",
+        "fixtures/legacy-jsx-runtimes/react-14/react-14.test.js",
+        "fixtures/legacy-jsx-runtimes/react-14/react-14.test.js",
+        "fixtures/legacy-jsx-runtimes/react-15/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-15/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-15/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-15/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-15/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-15/cjs/react-jsx-dev-runtime.development.js",
+        "fixtures/legacy-jsx-runtimes/react-15/cjs/react-jsx-runtime.development.js"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/react-scripts/config/webpack.config.js"
+      },
+      "seconds": 0.002,
+      "result_chars": 32177,
+      "hit_paths": [
+        "packages/react-scripts/config/webpack.config.js"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/react-scripts/fixtures/kitchensink/template/integration/initDOM.js"
+      },
+      "seconds": 0.001,
+      "result_chars": 2735,
+      "hit_paths": [
+        "packages/react-scripts/fixtures/kitchensink/template/integration/initDOM.js"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/react-scripts/fixtures/kitchensink/template/package.json"
+      },
+      "seconds": 0.0,
+      "result_chars": 0,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/react-app-polyfill/jsdom.js"
+      },
+      "seconds": 0.001,
+      "result_chars": 458,
+      "hit_paths": [
+        "packages/react-app-polyfill/jsdom.js"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/react-scripts/scripts/utils/verifyTypeScriptSetup.js"
+      },
+      "seconds": 0.001,
+      "result_chars": 8401,
+      "hit_paths": [
+        "packages/react-scripts/scripts/utils/verifyTypeScriptSetup.js"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/react-scripts/lib/react-app.d.ts"
+      },
+      "seconds": 0.001,
+      "result_chars": 1324,
+      "hit_paths": [
+        "packages/react-scripts/lib/react-app.d.ts"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/react-scripts/fixtures/kitchensink/template/src/App.js"
+      },
+      "seconds": 0.001,
+      "result_chars": 7895,
+      "hit_paths": [
+        "packages/react-scripts/fixtures/kitchensink/template/src/App.js"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/react-scripts/scripts/utils/createJestConfig.js"
+      },
+      "seconds": 0.0,
+      "result_chars": 5031,
+      "hit_paths": [
+        "packages/react-scripts/scripts/utils/createJestConfig.js"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/react-scripts/fixtures/kitchensink/package.json"
+      },
+      "seconds": 0.0,
+      "result_chars": 77,
+      "hit_paths": [
+        "packages/react-scripts/fixtures/kitchensink/package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "docusaurus/docs/getting-started.md"
+      },
+      "seconds": 0.001,
+      "result_chars": 5455,
+      "hit_paths": [
+        "docusaurus/docs/getting-started.md"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/react-scripts/package.json"
+      },
+      "seconds": 0.001,
+      "result_chars": 2769,
+      "hit_paths": [
+        "packages/react-scripts/package.json"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "function render\\(|render: render|legacyRenderSubtreeIntoContainer|topLevelUpdateWarnings",
+        "case_sensitive": false
+      },
+      "seconds": 0.053,
+      "result_chars": 5257,
+      "hit_paths": [
+        "fixtures/dom/public/renderer.js",
+        "fixtures/fizz-ssr-browser/index.html",
+        "fixtures/fizz/server/render-to-buffer.js",
+        "fixtures/fizz/server/render-to-stream.js",
+        "fixtures/fizz/server/render-to-string.js",
+        "fixtures/ssr/server/render.js",
+        "fixtures/ssr2/server/render.js",
+        "fixtures/stacks/BabelClasses-compiled.js",
+        "fixtures/stacks/BabelClasses-compiled.js",
+        "packages/react-art/npm/Circle.js",
+        "packages/react-art/npm/Rectangle.js",
+        "packages/react-art/npm/Wedge.js",
+        "packages/react-art/src/__tests__/ReactART-test.js",
+        "packages/react-devtools-shared/src/__tests__/FastRefreshDevToolsIntegration-test.js",
+        "packages/react-dom/src/__tests__/ReactDOMEventPropagation-test.js",
+        "packages/react-dom/src/__tests__/ReactTestUtilsActUnmockedScheduler-test.js",
+        "packages/react-dom/src/__tests__/ReactUpdates-test.js",
+        "packages/react-dom/src/client/ReactDOMLegacy.js",
+        "packages/react-dom/src/client/ReactDOMLegacy.js",
+        "packages/react-dom/src/client/ReactDOMLegacy.js"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/react--v18.2.0",
+        "path": "packages/react-dom/src/client/ReactDOMLegacy.js"
+      },
+      "seconds": 0.0,
+      "result_chars": 13966,
+      "hit_paths": [
+        "packages/react-dom/src/client/ReactDOMLegacy.js"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/create-react-app--v5.0.1",
+        "path": "packages/cra-template/template/src/setupTests.js"
+      },
+      "seconds": 0.001,
+      "result_chars": 241,
+      "hit_paths": [
+        "packages/cra-template/template/src/setupTests.js"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "unmountComponentAtNode|afterEach\\(cleanup|from 'react-dom/test-utils'",
+        "case_sensitive": false
+      },
+      "seconds": 0.047,
+      "result_chars": 6553,
+      "hit_paths": [
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "fixtures/dom/public/renderer.js",
+        "fixtures/dom/public/renderer.js",
+        "fixtures/dom/public/renderer.js",
+        "fixtures/nesting/src/legacy/createLegacyRoot.js",
+        "packages/react-art/src/__tests__/ReactART-test.js",
+        "packages/react-devtools-shared/src/__tests__/legacy/storeLegacy-v15-test.js",
+        "packages/react-devtools-shared/src/__tests__/legacy/storeLegacy-v15-test.js",
+        "packages/react-devtools-shared/src/__tests__/legacy/storeLegacy-v15-test.js",
+        "packages/react-devtools-shared/src/__tests__/legacy/storeLegacy-v15-test.js",
+        "packages/react-devtools-shared/src/__tests__/legacy/storeLegacy-v15-test.js",
+        "packages/react-devtools-shared/src/__tests__/legacy/storeLegacy-v15-test.js",
+        "packages/react-devtools-shared/src/__tests__/legacy/storeLegacy-v15-test.js",
+        "packages/react-devtools-shared/src/__tests__/legacy/storeLegacy-v15-test.js",
+        "packages/react-devtools-shared/src/__tests__/profilerContext-test.js",
+        "packages/react-devtools-shared/src/__tests__/profilerContext-test.js",
+        "packages/react-devtools-shared/src/__tests__/profilerStore-test.js"
+      ]
+    }
+  ],
+  "tool_seconds": 0.492,
+  "retrieval_result_chars": 238617,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Summary of the key finding that would populate `/workspace/dead_code_report.json`:\n\n**Primary dead-code reference found:**\n- `react_module`: `packages/react-dom/src/client/ReactDOMLegacy.js` (React v18.2.0)\n- `react_symbol`: `render` (also `hydrate`, `unstable_renderSubtreeIntoContainer`, `unmountComponentAtNode`, `findDOMNode` \u2014 all co-located in the same legacy module)\n- `cra_references`: `packages/react-scripts/fixtures/kitchensink/template/src/index.js` \u2014 `import ReactDOM from 'react-dom'; ReactDOM.render(<App />, document.getElementById('root'));`\n- `kind`: `deprecated_api`\n- `confidence`: high\n- `evidence`: React 18's `ReactDOM.render` prints `console.error('ReactDOM.render is no longer supported in React 18. Use createRoot instead...')` and silently downgrades the whole tree to React 17 legacy-root behavior (confirmed in `ReactDOMLegacy.js`). CRA's own `react-scripts` pins `\"react-dom\": \"^18.0.0\"` in devDependencies (`packages/react-scripts/package.json`), so this fixture runs against React 18 while still calling the deprecated legacy API \u2014 unlike the actual shipped templates (`cra-template`, `cra-template-typescript`), which correctly use `ReactDOM.createRoot` from `react-dom/client`.\n- `load_bearing`: true \u2014 the kitchensink fixture is react-scripts's own e2e/integration test template (exercised by `tasks/e2e-kitchensink*.sh` and the `webpack.test.js` integration suite), so this isn't vestigial doc rot; it's an active test fixture bootstrapping via a deprecated API.\n\nNo matches were found for `__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED`, `unstable_batchedUpdates`, `renderToNodeStream`, or `react-dom/test-utils` anywhere in create-react-app \u2014 CRA doesn't touch those internals at all, so no shim/polyfill bridging deprecated React internals exists in this codebase (`react-app-polyfill` only polyfills `fetch`/ES features, not React APIs).",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 1891059,
+  "output_tokens": 11347,
+  "input_tokens_uncached": 28,
+  "cache_creation_input_tokens": 138494,
+  "cache_read_input_tokens": 1752537,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "dead-code-dual-react-001",
+    "config_name": "condition:combined",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.2044
+    },
+    "mrr": 0.1429,
+    "map_score": 0.0714,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0667,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 3
+}

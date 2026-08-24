@@ -1,0 +1,213 @@
+{
+  "task_id": "err-provenance-03",
+  "policy": "condition:structural",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/kubernetes--v1.32.0"
+  ],
+  "retrieved_paths": [
+    "pkg/registry/core/rest/storage_core.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "pkg/registry/core/service/ipallocator/controller/repair.go",
+    "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go",
+    "staging/src/k8s.io/apiserver/pkg/server/genericapiserver.go",
+    "pkg/controlplane/instance.go"
+  ],
+  "required_files": [
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip_test.go"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 13,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.4792272000000001,
+  "elapsed_seconds": 40.5,
+  "wall_seconds": 40.5,
+  "tool_log": [
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "start-service-ip-repair-controllers"
+      },
+      "seconds": 2.489,
+      "result_chars": 215,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "unable to perform initial IP and Port allocation check"
+      },
+      "seconds": 1.547,
+      "result_chars": 732,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0"
+      },
+      "seconds": 0.011,
+      "result_chars": 85554,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/service/ipallocator/controller/repair.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 14312,
+      "hit_paths": [
+        "pkg/registry/core/service/ipallocator/controller/repair.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/controlplane/instance.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 21233,
+      "hit_paths": [
+        "pkg/controlplane/instance.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/rest/storage_core.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 22867,
+      "hit_paths": [
+        "pkg/registry/core/rest/storage_core.go"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "repairip"
+      },
+      "seconds": 1.898,
+      "result_chars": 215,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/service/ipallocator/controller/repairip.go"
+      },
+      "seconds": 0.001,
+      "result_chars": 22636,
+      "hit_paths": [
+        "pkg/registry/core/service/ipallocator/controller/repairip.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 10795,
+      "hit_paths": [
+        "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/service/ipallocator/allocator.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 0,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/server/genericapiserver.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 45315,
+      "hit_paths": [
+        "staging/src/k8s.io/apiserver/pkg/server/genericapiserver.go"
+      ]
+    }
+  ],
+  "tool_seconds": 5.946,
+  "retrieval_result_chars": 223874,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file set that addresses the ticket:\n\n- **`pkg/registry/core/rest/storage_core.go`** \u2014 where `\"start-service-ip-repair-controllers\"` PostStartHook is defined, where `\"unable to perform initial IP and Port allocation check\"` is generated (1-minute timeout waiting on both repair loops), and where `RepairIPAddress` vs the legacy `Repair` controller is selected based on `MultiCIDRServiceAllocator`.\n- **`pkg/registry/core/service/ipallocator/controller/repairip.go`** \u2014 the new IPAddress-based repair controller (v1.33+ default) that creates/reconciles `networking.k8s.io/IPAddress` objects; source of the \"not yet ready to handle request\" forbidden error path during its initial sync.\n- **`pkg/registry/core/service/ipallocator/controller/repair.go`** \u2014 legacy bitmap-based repair controller, relevant for understanding the mixed-version behavior during rolling upgrade.\n- **`staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go`** \u2014 defines the `informer-sync` health checker whose failure produces the `readyz` message in the ticket.\n- **`staging/src/k8s.io/apiserver/pkg/server/genericapiserver.go`** \u2014 PostStartHook execution/readyz wiring that ties the repair controller's blocking behavior to apiserver readiness.\n- **`pkg/controlplane/instance.go`** \u2014 control-plane wiring context for how these controllers/hooks are assembled at startup.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 801413,
+  "output_tokens": 2559,
+  "input_tokens_uncached": 16,
+  "cache_creation_input_tokens": 77191,
+  "cache_read_input_tokens": 724206,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "err-provenance-03",
+    "config_name": "condition:structural",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 6,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 4
+}

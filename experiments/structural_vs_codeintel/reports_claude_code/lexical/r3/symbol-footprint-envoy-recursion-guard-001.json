@@ -1,0 +1,143 @@
+{
+  "task_id": "symbol-footprint-envoy-recursion-guard-001",
+  "policy": "condition:lexical",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.31.2"
+  ],
+  "retrieved_paths": [
+    "source/common/common/debug_recursion_checker.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/upstream/conn_pool_map_impl.h"
+  ],
+  "required_files": [
+    "source/common/common/debug_recursion_checker.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/upstream/conn_pool_map_impl.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "lexical",
+  "condition_tools": [
+    "grep",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 5,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.1981866,
+  "elapsed_seconds": 26.2,
+  "wall_seconds": 26.2,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker",
+        "case_sensitive": false
+      },
+      "seconds": 0.204,
+      "result_chars": 2348,
+      "hit_paths": [
+        "source/common/common/debug_recursion_checker.h",
+        "source/common/common/debug_recursion_checker.h",
+        "source/common/common/debug_recursion_checker.h",
+        "source/common/conn_pool/conn_pool_base.cc",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/common/debug_recursion_checker.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 785,
+      "hit_paths": [
+        "source/common/common/debug_recursion_checker.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "debug_recursion_checker",
+        "case_sensitive": false
+      },
+      "seconds": 0.177,
+      "result_chars": 2086,
+      "hit_paths": [
+        "source/common/common/BUILD",
+        "source/common/common/BUILD",
+        "source/common/conn_pool/BUILD",
+        "source/common/conn_pool/conn_pool_base.cc",
+        "source/common/conn_pool/conn_pool_base.h",
+        "source/common/upstream/BUILD",
+        "source/common/upstream/BUILD",
+        "source/common/upstream/conn_pool_map.h"
+      ]
+    }
+  ],
+  "tool_seconds": 0.381,
+  "retrieval_result_chars": 5219,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Blast radius for removing `AutoDebugRecursionChecker`:\n\n1. **`source/common/common/debug_recursion_checker.h`** \u2014 declares the type; the class definition itself must be deleted.\n2. **`source/common/conn_pool/conn_pool_base.cc`** \u2014 instantiates `Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);` as a guard; must be replaced with a direct `recursion_checker_.enter()`/`exit()` (or equivalent inline assertion).\n3. **`source/common/upstream/conn_pool_map_impl.h`** \u2014 instantiates the same guard pattern in three separate member functions; each call site needs the same inline fold.\n\nFiles that reference the *sibling* type `DebugRecursionChecker` (which is staying) but not `AutoDebugRecursionChecker` \u2014 `conn_pool_base.h`, `conn_pool_map.h`, and the two `BUILD` files \u2014 don't need edits, since they only declare/depend on the checker member itself, not the RAII wrapper being removed.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 277494,
+  "output_tokens": 1616,
+  "input_tokens_uncached": 8,
+  "cache_creation_input_tokens": 33293,
+  "cache_read_input_tokens": 244193,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "symbol-footprint-envoy-recursion-guard-001",
+    "config_name": "condition:lexical",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 3,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 1
+}

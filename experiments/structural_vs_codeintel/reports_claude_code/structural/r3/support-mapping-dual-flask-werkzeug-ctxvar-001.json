@@ -1,0 +1,182 @@
+{
+  "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+  "policy": "condition:structural",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/flask--2.3.3",
+    "github.com/sg-evals/werkzeug--2.3.7"
+  ],
+  "retrieved_paths": [
+    "src/werkzeug/local.py",
+    "src/flask/ctx.py",
+    "src/flask/globals.py",
+    "src/flask/app.py",
+    "docs/async-await.rst"
+  ],
+  "required_files": [
+    "flask/src/flask/globals.py",
+    "flask/src/flask/ctx.py",
+    "werkzeug/src/werkzeug/local.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 10,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.34790139999999997,
+  "elapsed_seconds": 31.2,
+  "wall_seconds": 31.2,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3"
+      },
+      "seconds": 0.01,
+      "result_chars": 5530,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/werkzeug--2.3.7"
+      },
+      "seconds": 0.009,
+      "result_chars": 5929,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/werkzeug--2.3.7",
+        "path": "src/werkzeug/local.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 22003,
+      "hit_paths": [
+        "src/werkzeug/local.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/globals.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 2945,
+      "hit_paths": [
+        "src/flask/globals.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/ctx.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 14841,
+      "hit_paths": [
+        "src/flask/ctx.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "docs/async-await.rst"
+      },
+      "seconds": 0.007,
+      "result_chars": 5112,
+      "hit_paths": [
+        "docs/async-await.rst"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/app.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 87620,
+      "hit_paths": [
+        "src/flask/app.py"
+      ]
+    }
+  ],
+  "tool_seconds": 0.026,
+  "retrieval_result_chars": 143980,
+  "denied_tools": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "grep -n \"ensure_sync\\|async_to_sync\\|def wsgi_app\\|def full_dispatch_request\\|iscoroutinefunction\" /home/ds/.claude-homes/account1/.claude/projects/-home-ds-projects-EnterpriseBench-experiments-structural-vs-codeintel/d2fd9a96-0c07-4469-b152-97f669741ad3/tool-results/toolu_01E4RDmowtq1fGoFxy9grvK2.json | head -50"
+      },
+      "condition": "structural"
+    }
+  ],
+  "cli_result_text": "Submitted the five files needed to trace this issue:\n\n1. **`werkzeug/local.py`** \u2014 defines `Local`, `LocalStack`, and `LocalProxy`, all backed by `contextvars.ContextVar` since Werkzeug 2.0 (per the class docstrings: \"Uses `ContextVar` instead of a custom storage implementation\"). `LocalProxy._get_current_object()` is the function that resolves the proxy to the real object via `ContextVar.get()`, raising `RuntimeError` (the \"Working outside of...\" message) via the `unbound_message` path when the var has no value in the current `Context`.\n\n2. **`flask/globals.py`** \u2014 where Flask builds the public `request`, `session`, `g`, `current_app` proxies as `LocalProxy(_cv_request, ...)` / `LocalProxy(_cv_app, ...)`, bound to module-level `ContextVar`s `_cv_request` / `_cv_app`. This is Flask's side of the boundary described in the ticket.\n\n3. **`flask/ctx.py`** \u2014 `RequestContext.push()`/`pop()` and `AppContext.push()`/`pop()`, which call `_cv_request.set(self)` / `_cv_app.reset(token)`. This is where the context value actually gets bound into the *current* `contextvars.Context` \u2014 critically, `ContextVar.set()` only affects the Context object active in the calling task/thread, which is the root of the customer's bug.\n\n4. **`flask/app.py`** \u2014 contains `ensure_sync`/async view wrapping (async views run via `asgiref.async_to_sync` inside the request-bound context), showing why the *view itself* has request context but anything it spawns off to a separate asyncio Task afterward runs in a fresh copy.\n\n5. **`docs/async-await.rst`** \u2014 Flask's own documented explanation (\"Background tasks\" section) that `asyncio.create_task` inside an async view will have its task cancelled when the view's event loop stops, and that spawned tasks aren't a supported background-task mechanism under Flask's WSGI-based async model \u2014 directly explaining the customer's observed `RuntimeError`.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 519073,
+  "output_tokens": 2422,
+  "input_tokens_uncached": 12,
+  "cache_creation_input_tokens": 57854,
+  "cache_read_input_tokens": 461207,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "condition:structural",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.6,
+    "n_retrieved": 5,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 1
+}

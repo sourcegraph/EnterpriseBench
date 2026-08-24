@@ -1,0 +1,911 @@
+{
+  "source": "slice_tasks.json",
+  "labelling": "Assigned from each task's own instruction.md and ground_truth.json. Labels slice results after the fact; they never select tasks into a condition, and every condition runs every task.",
+  "categories": {
+    "identifier_lookup": "Find a known identifier or literal string.",
+    "syntactic_pattern": "Find code matching a syntactic shape rather than a name.",
+    "api_call_sites": "Enumerate the call sites of an API.",
+    "interface_implementations": "Locate implementations behind an interface or trait.",
+    "symbol_tracing": "Trace a definition or its references across a call path.",
+    "dependency_impact": "Analyse dependency edges or the blast radius of a change.",
+    "cross_file": "Evidence is spread over several files in one repository.",
+    "cross_repo": "Evidence is spread over more than one repository.",
+    "refactor_discovery": "Enumerate every site a planned refactor must touch.",
+    "framework_noise": "Framework-heavy code where textual matches are noisy.",
+    "dynamic_ambiguous": "Dynamic or reflective code where syntax alone underdetermines the target."
+  },
+  "category_counts": {
+    "identifier_lookup": 6,
+    "syntactic_pattern": 10,
+    "api_call_sites": 14,
+    "interface_implementations": 18,
+    "symbol_tracing": 38,
+    "dependency_impact": 23,
+    "cross_file": 74,
+    "cross_repo": 47,
+    "refactor_discovery": 10,
+    "framework_noise": 23,
+    "dynamic_ambiguous": 20
+  },
+  "coverage_gaps": {
+    "identifier_lookup": "Absent from the original slice: the disclosure gate that makes it leak-free removes exactly the tasks whose answer is one known identifier. Closed by the symbol-footprint-* tasks in benchmarks/technical_debt/, whose answer key is derived by a word-boundary text match -- the same class of tool as the lexical condition's primitive, which is a bias to state alongside any claim drawn from this cell.",
+    "syntactic_pattern": "Only five tasks in the original slice, none of them defined purely by code shape. Supplemented by the shape-audit-* tasks, whose answer key is derived by a parser -- the same class of tool as the structural condition's primitive, the mirror image of the bias above."
+  },
+  "tasks": {
+    "calibration-002": {
+      "suite": "customer_escalation",
+      "repo_count": 1,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "dynamic_ambiguous",
+        "symbol_tracing"
+      ],
+      "rationale": "Asks where Click resolves flag_value against default; decorator kwargs are consumed reflectively, so the target is a parameter's flow, not a name."
+    },
+    "calibration-003": {
+      "suite": "customer_escalation",
+      "repo_count": 1,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "dynamic_ambiguous",
+        "symbol_tracing"
+      ],
+      "rationale": "Where requests strips Proxy-Authorization across redirect/rebuild-auth paths."
+    },
+    "calibration-005": {
+      "suite": "customer_escalation",
+      "repo_count": 1,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "dynamic_ambiguous",
+        "symbol_tracing"
+      ],
+      "rationale": "Traces a Sentinel default value from parameter construction to callback invocation."
+    },
+    "calibration-007": {
+      "suite": "customer_escalation",
+      "repo_count": 1,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "dynamic_ambiguous",
+        "symbol_tracing"
+      ],
+      "rationale": "Precedence between session.verify and REQUESTS_CA_BUNDLE: a merge path, not a symbol."
+    },
+    "calibration-008": {
+      "suite": "customer_escalation",
+      "repo_count": 1,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "dynamic_ambiguous",
+        "symbol_tracing"
+      ],
+      "rationale": "Stream lifetime inside CliRunner.invoke; ownership crosses context managers."
+    },
+    "chain-err-flask-import-001": {
+      "suite": "customer_escalation",
+      "repo_count": 1,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "dependency_impact",
+        "dynamic_ambiguous",
+        "framework_noise"
+      ],
+      "rationale": "Verify each claimed import edge against the source; Flask's lazy imports make the textual import list an unreliable proxy for the real edge."
+    },
+    "err-provenance-03": {
+      "suite": "customer_escalation",
+      "repo_count": 1,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "symbol_tracing"
+      ],
+      "rationale": "Trace a kube-apiserver poststarthook failure string to the controller that emits it."
+    },
+    "support-mapping-001": {
+      "suite": "customer_escalation",
+      "repo_count": 1,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "framework_noise",
+        "symbol_tracing"
+      ],
+      "rationale": "Map an Envoy overflow reset reason to the conn-pool code that raises it."
+    },
+    "support-mapping-002": {
+      "suite": "customer_escalation",
+      "repo_count": 1,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "symbol_tracing"
+      ],
+      "rationale": "Locate the LLVM assertion and the type-legalization path that reaches it."
+    },
+    "support-mapping-003": {
+      "suite": "customer_escalation",
+      "repo_count": 1,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "framework_noise",
+        "symbol_tracing"
+      ],
+      "rationale": "Grafana dashboard field-config import path across schema migration code."
+    },
+    "schema-evolution-001": {
+      "suite": "feature_delivery",
+      "repo_count": 1,
+      "required_file_count": 6,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "dependency_impact",
+        "dynamic_ambiguous",
+        "framework_noise",
+        "refactor_discovery"
+      ],
+      "rationale": "Enumerate every Python reference to a Django model field being added; Django ORM access is attribute-based, so references are not import edges."
+    },
+    "schema-evolution-002": {
+      "suite": "feature_delivery",
+      "repo_count": 1,
+      "required_file_count": 4,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "dependency_impact",
+        "dynamic_ambiguous",
+        "framework_noise",
+        "refactor_discovery"
+      ],
+      "rationale": "Same shape for the export-tracking model replacing a JSON file."
+    },
+    "ansible-galaxy-tar-regression-prove-001": {
+      "suite": "incident_response",
+      "repo_count": 1,
+      "required_file_count": 2,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "dynamic_ambiguous",
+        "syntactic_pattern"
+      ],
+      "rationale": "Find a custom tar-member cache used in place of the stdlib lookup, then its call sites: the defect is a code shape, not a named symbol."
+    },
+    "ccx-incident-032": {
+      "suite": "incident_response",
+      "repo_count": 1,
+      "required_file_count": 5,
+      "categories": [
+        "cross_file",
+        "framework_noise",
+        "symbol_tracing"
+      ],
+      "rationale": "Envoy overflow string plus the conn-pool files and the protobuf that configures it."
+    },
+    "ceph-rgw-auth-secure-001": {
+      "suite": "security_operations",
+      "repo_count": 1,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "interface_implementations",
+        "syntactic_pattern"
+      ],
+      "rationale": "Locate the SigV4 auth engine implementations in a large C++ tree by their shape."
+    },
+    "refactor-orchestration-006": {
+      "suite": "technical_debt",
+      "repo_count": 1,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "dependency_impact",
+        "refactor_discovery",
+        "syntactic_pattern"
+      ],
+      "rationale": "Derive from the checkout which files a Go toolchain pin actually governs; the targets are version-pin expressions across manifests, not symbols."
+    },
+    "err-provenance-dual-grafana-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "framework_noise",
+        "symbol_tracing"
+      ],
+      "rationale": "Grafana proxy deadline to the Prometheus query engine timeout."
+    },
+    "err-provenance-dual-requests-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dynamic_ambiguous",
+        "symbol_tracing"
+      ],
+      "rationale": "requests SSLError down into urllib3 certificate verification."
+    },
+    "error-prov-dual-netty-spring-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "framework_noise",
+        "interface_implementations",
+        "symbol_tracing"
+      ],
+      "rationale": "Netty pipeline exception through reactor-netty into WebFlux error handling."
+    },
+    "error-prov-dual-otel-jaeger-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "interface_implementations",
+        "symbol_tracing"
+      ],
+      "rationale": "Span-export errors across the OTel exporter interface into the Jaeger exporter."
+    },
+    "error-prov-dual-tokio-tower-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "interface_implementations",
+        "symbol_tracing"
+      ],
+      "rationale": "A tokio JoinError through tower's Service layers: the boundary is a trait impl."
+    },
+    "support-mapping-004": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "framework_noise",
+        "symbol_tracing"
+      ],
+      "rationale": "Grafana alert evaluation scheduling into Alertmanager delivery."
+    },
+    "support-mapping-dual-axum-tower-middleware-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "interface_implementations",
+        "symbol_tracing"
+      ],
+      "rationale": "Router layer composition against tower ServiceBuilder ordering."
+    },
+    "support-mapping-dual-babel-swc-decorators-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dynamic_ambiguous",
+        "symbol_tracing",
+        "syntactic_pattern"
+      ],
+      "rationale": "Decorator transform stage selection in two compilers; the subject is AST-node handling, and both repos are full of the syntax being discussed."
+    },
+    "support-mapping-dual-envoy-istio-xds-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "framework_noise",
+        "symbol_tracing"
+      ],
+      "rationale": "Envoy ListenerManager drain decision against Istio ADS push ordering."
+    },
+    "support-mapping-dual-fastapi-pydantic-validator-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dynamic_ambiguous",
+        "framework_noise",
+        "symbol_tracing"
+      ],
+      "rationale": "FastAPI body validation into Pydantic v2 discriminated-union resolution, which is driven by runtime-constructed validator chains."
+    },
+    "support-mapping-dual-flask-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "framework_noise",
+        "symbol_tracing"
+      ],
+      "rationale": "Flask add_url_rule through Werkzeug routing method matching."
+    },
+    "support-mapping-dual-flask-werkzeug-ctxvar-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dynamic_ambiguous",
+        "framework_noise",
+        "symbol_tracing"
+      ],
+      "rationale": "The `request` proxy binding onto a ContextVar-backed Local: the definition the agent needs is behind a proxy object, not the name it reads."
+    },
+    "support-mapping-dual-httpx-httpcore-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "symbol_tracing"
+      ],
+      "rationale": "How a None timeout becomes a bounded read timeout across the httpcore boundary."
+    },
+    "support-mapping-dual-jest-babel-cache-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dynamic_ambiguous",
+        "framework_noise",
+        "symbol_tracing"
+      ],
+      "rationale": "Transform cache-key inputs across jest-runtime and babel-jest."
+    },
+    "support-mapping-dual-nextjs-webpack-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "framework_noise"
+      ],
+      "rationale": "Module Federation shared-dependency resolution between Next.js and webpack."
+    },
+    "support-mapping-dual-react-relay-suspense-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "framework_noise",
+        "symbol_tracing"
+      ],
+      "rationale": "Reconciler Suspense re-render decision against Relay invalidation notification."
+    },
+    "support-mapping-dual-sqlalchemy-alembic-metadata-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dynamic_ambiguous",
+        "symbol_tracing"
+      ],
+      "rationale": "Which MetaData instance autogenerate compares against; registration is implicit and happens at import time."
+    },
+    "support-mapping-dual-tokio-hyper-graceful-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "symbol_tracing"
+      ],
+      "rationale": "hyper graceful-shutdown connection tracking against tokio task drain."
+    },
+    "support-mapping-dual-tonic-tokio-streamcancel-001": {
+      "suite": "customer_escalation",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "interface_implementations",
+        "symbol_tracing"
+      ],
+      "rationale": "tonic Streaming over a tokio mpsc Receiver: a Stream impl over a channel."
+    },
+    "api-contract-dual-fastapi-001": {
+      "suite": "dependency_management",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "dynamic_ambiguous",
+        "framework_noise",
+        "interface_implementations"
+      ],
+      "rationale": "FastAPI body validation contract against httpx request encoding."
+    },
+    "api-contract-dual-serde-csv-001": {
+      "suite": "dependency_management",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "interface_implementations"
+      ],
+      "rationale": "The Deserializer trait serde exposes and csv's implementation of it: the canonical find-the-implementation-behind-the-abstraction shape."
+    },
+    "dep-graph-dual-log4j-spring-001": {
+      "suite": "dependency_management",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "framework_noise",
+        "interface_implementations"
+      ],
+      "rationale": "Log4j bridge modules against Spring Boot logging auto-configuration detection."
+    },
+    "dep-graph-dual-prometheus-thanos-001": {
+      "suite": "dependency_management",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "cross_repo",
+        "dependency_impact"
+      ],
+      "rationale": "Which Prometheus TSDB APIs Thanos consumes, and where it calls them."
+    },
+    "schema-evolution-dual-django-001": {
+      "suite": "feature_delivery",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "dynamic_ambiguous",
+        "framework_noise",
+        "refactor_discovery"
+      ],
+      "rationale": "Django 5.0 field internals against Wagtail's Page/StreamField assumptions."
+    },
+    "incident-investigation-dual-cilium-001": {
+      "suite": "incident_response",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "symbol_tracing"
+      ],
+      "rationale": "BPF program load and map creation across the agent and its loader library."
+    },
+    "incident-investigation-dual-cortex-001": {
+      "suite": "incident_response",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "symbol_tracing"
+      ],
+      "rationale": "UTF-8 label validation between the ruler and the alert-delivery path."
+    },
+    "incident-investigation-dual-flux-001": {
+      "suite": "incident_response",
+      "repo_count": 2,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "symbol_tracing"
+      ],
+      "rationale": "HelmRelease readiness condition across helm-controller and its API types."
+    },
+    "incident-investigation-dual-loki-001": {
+      "suite": "incident_response",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "symbol_tracing"
+      ],
+      "rationale": "Ring health accounting for LEAVING instances across Loki and dskit."
+    },
+    "incident-investigation-dual-nats-001": {
+      "suite": "incident_response",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "symbol_tracing"
+      ],
+      "rationale": "Consumer pending-state bookkeeping against stream retention reclaim."
+    },
+    "incident-investigation-dual-opa-001": {
+      "suite": "incident_response",
+      "repo_count": 2,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "symbol_tracing"
+      ],
+      "rationale": "Which OPA compiler version Gatekeeper vendors and how rego.v1 parsing differs."
+    },
+    "incident-investigation-dual-prometheus-001": {
+      "suite": "incident_response",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "symbol_tracing"
+      ],
+      "rationale": "Inhibition-rule matching in Alertmanager against the recording rule."
+    },
+    "config-drift-dual-setuptools-pip-001": {
+      "suite": "platform_engineering",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "dynamic_ambiguous"
+      ],
+      "rationale": "Which pip features use the vendored pkg_resources APIs setuptools deprecated."
+    },
+    "config-drift-dual-terraform-001": {
+      "suite": "platform_engineering",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "interface_implementations"
+      ],
+      "rationale": "Terraform core state refresh against provider Read implementations."
+    },
+    "dead-code-dual-react-001": {
+      "suite": "technical_debt",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "dynamic_ambiguous",
+        "framework_noise",
+        "refactor_discovery"
+      ],
+      "rationale": "Exports with no internal callers, then external references to them: an absence-of-call-sites question over dynamically re-exported modules."
+    },
+    "refactor-dual-axum-tower-001": {
+      "suite": "technical_debt",
+      "repo_count": 2,
+      "required_file_count": 2,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "interface_implementations",
+        "refactor_discovery"
+      ],
+      "rationale": "Router type parameters against tower's middleware-composition traits."
+    },
+    "err-provenance-tri-httpx-proxy-001": {
+      "suite": "customer_escalation",
+      "repo_count": 3,
+      "required_file_count": 4,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "symbol_tracing"
+      ],
+      "rationale": "A truncated proxied response across httpx, httpcore, and the CONNECT tunnel."
+    },
+    "err-provenance-tri-httpx-socks-001": {
+      "suite": "customer_escalation",
+      "repo_count": 3,
+      "required_file_count": 5,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "symbol_tracing"
+      ],
+      "rationale": "Header-line parsing strictness across httpx, httpcore, and the SOCKS transport."
+    },
+    "api-contract-tri-envoy-001": {
+      "suite": "dependency_management",
+      "repo_count": 3,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "interface_implementations"
+      ],
+      "rationale": "The xDS contract as implemented by Envoy, Istio pilot, and go-control-plane."
+    },
+    "api-contract-tri-protobuf-001": {
+      "suite": "dependency_management",
+      "repo_count": 3,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "interface_implementations"
+      ],
+      "rationale": "Well-known-type definitions, their gRPC runtime handling, and googleapis usage."
+    },
+    "dep-graph-tri-boto3-urllib3-requests-001": {
+      "suite": "dependency_management",
+      "repo_count": 3,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact"
+      ],
+      "rationale": "Version pins and a vendored urllib3 divergence across three manifests."
+    },
+    "dep-graph-tri-prometheus-alertmanager-grafana-001": {
+      "suite": "dependency_management",
+      "repo_count": 3,
+      "required_file_count": 3,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "cross_repo",
+        "dependency_impact"
+      ],
+      "rationale": "The three-way alert format contract and where each side reads it."
+    },
+    "schema-evolution-tri-supabase-001": {
+      "suite": "feature_delivery",
+      "repo_count": 3,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "refactor_discovery"
+      ],
+      "rationale": "An auth-table migration against PostgREST schema reflection and GoTrue's hardcoded column expectations."
+    },
+    "incident-investigation-tri-containerd-001": {
+      "suite": "incident_response",
+      "repo_count": 3,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "symbol_tracing"
+      ],
+      "rationale": "Platform matching and exec setup across containerd, runc, and image spec."
+    },
+    "config-drift-tri-kustomize-001": {
+      "suite": "platform_engineering",
+      "repo_count": 3,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "interface_implementations"
+      ],
+      "rationale": "Strategic-merge-patch handling in Kustomize, ArgoCD, and Flux."
+    },
+    "refactor-orchestration-tri-babel-001": {
+      "suite": "technical_debt",
+      "repo_count": 3,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "refactor_discovery",
+        "syntactic_pattern"
+      ],
+      "rationale": "Which repos consume Babel, cited from manifests, plus the AST-walking sites a new node type reaches."
+    },
+    "refactor-orchestration-tri-spring-001": {
+      "suite": "technical_debt",
+      "repo_count": 3,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "framework_noise",
+        "interface_implementations",
+        "refactor_discovery"
+      ],
+      "rationale": "Listener-container threading across framework, kafka, and boot autoconfiguration."
+    },
+    "refactor-orchestration-tri-tokio-001": {
+      "suite": "technical_debt",
+      "repo_count": 3,
+      "required_file_count": 3,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "cross_repo",
+        "dependency_impact",
+        "refactor_discovery"
+      ],
+      "rationale": "Every Runtime construction site across tokio, hyper, and axum, plus the manifest edges that order the rollout."
+    },
+    "symbol-footprint-envoy-recursion-guard-001": {
+      "suite": "technical_debt",
+      "repo_count": 1,
+      "required_file_count": 3,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "identifier_lookup"
+      ],
+      "rationale": "Authored to close a coverage gap; categories come from its spec."
+    },
+    "symbol-footprint-envoy-token-bucket-001": {
+      "suite": "technical_debt",
+      "repo_count": 1,
+      "required_file_count": 3,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "identifier_lookup"
+      ],
+      "rationale": "Authored to close a coverage gap; categories come from its spec."
+    },
+    "symbol-footprint-k8s-runningpod-conv-001": {
+      "suite": "technical_debt",
+      "repo_count": 1,
+      "required_file_count": 3,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "identifier_lookup"
+      ],
+      "rationale": "Authored to close a coverage gap; categories come from its spec."
+    },
+    "symbol-footprint-django-array-maxlen-001": {
+      "suite": "technical_debt",
+      "repo_count": 1,
+      "required_file_count": 3,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "framework_noise",
+        "identifier_lookup"
+      ],
+      "rationale": "Authored to close a coverage gap; categories come from its spec."
+    },
+    "symbol-footprint-tokio-barrier-result-001": {
+      "suite": "technical_debt",
+      "repo_count": 1,
+      "required_file_count": 3,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "identifier_lookup"
+      ],
+      "rationale": "Authored to close a coverage gap; categories come from its spec."
+    },
+    "symbol-footprint-grafana-avatar-cache-001": {
+      "suite": "technical_debt",
+      "repo_count": 1,
+      "required_file_count": 3,
+      "categories": [
+        "api_call_sites",
+        "cross_file",
+        "identifier_lookup"
+      ],
+      "rationale": "Authored to close a coverage gap; categories come from its spec."
+    },
+    "shape-audit-envoy-http-downcast-001": {
+      "suite": "technical_debt",
+      "repo_count": 1,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "syntactic_pattern"
+      ],
+      "rationale": "Authored to close a coverage gap; categories come from its spec."
+    },
+    "shape-audit-grafana-panic-recovery-001": {
+      "suite": "technical_debt",
+      "repo_count": 1,
+      "required_file_count": 11,
+      "categories": [
+        "cross_file",
+        "syntactic_pattern"
+      ],
+      "rationale": "Authored to close a coverage gap; categories come from its spec."
+    },
+    "shape-audit-tokio-scheduler-drop-001": {
+      "suite": "technical_debt",
+      "repo_count": 1,
+      "required_file_count": 3,
+      "categories": [
+        "cross_file",
+        "interface_implementations",
+        "syntactic_pattern"
+      ],
+      "rationale": "Authored to close a coverage gap; categories come from its spec."
+    },
+    "shape-audit-django-backend-hooks-001": {
+      "suite": "technical_debt",
+      "repo_count": 1,
+      "required_file_count": 7,
+      "categories": [
+        "cross_file",
+        "framework_noise",
+        "interface_implementations",
+        "syntactic_pattern"
+      ],
+      "rationale": "Authored to close a coverage gap; categories come from its spec."
+    },
+    "shape-audit-ansible-plugin-hooks-001": {
+      "suite": "technical_debt",
+      "repo_count": 1,
+      "required_file_count": 6,
+      "categories": [
+        "cross_file",
+        "dynamic_ambiguous",
+        "interface_implementations",
+        "syntactic_pattern"
+      ],
+      "rationale": "Authored to close a coverage gap; categories come from its spec."
+    }
+  }
+}

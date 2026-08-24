@@ -1,0 +1,302 @@
+{
+  "task_id": "err-provenance-03",
+  "policy": "condition:structural",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/kubernetes--v1.32.0"
+  ],
+  "retrieved_paths": [
+    "pkg/registry/core/rest/storage_core.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "pkg/registry/core/service/ipallocator/ipallocator.go",
+    "pkg/registry/core/service/ipallocator/interfaces.go",
+    "pkg/util/async/runner.go",
+    "pkg/controlplane/instance.go",
+    "staging/src/k8s.io/apiserver/pkg/server/genericapiserver.go",
+    "pkg/registry/networking/ipaddress/strategy.go",
+    "staging/src/k8s.io/apiserver/pkg/endpoints/handlers/create.go"
+  ],
+  "required_files": [
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip_test.go"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 21,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.8564735999999998,
+  "elapsed_seconds": 85.7,
+  "wall_seconds": 85.7,
+  "tool_log": [
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "start-service-ip-repair-controllers"
+      },
+      "seconds": 3.361,
+      "result_chars": 215,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "unable to perform initial IP and Port allocation check"
+      },
+      "seconds": 3.723,
+      "result_chars": 732,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "start-service-ip-repair-controllers",
+        "language": "go"
+      },
+      "seconds": 3.251,
+      "result_chars": 86,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "RepairIPAddress",
+        "language": "go"
+      },
+      "seconds": 3.431,
+      "result_chars": 86,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0"
+      },
+      "seconds": 0.021,
+      "result_chars": 85554,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/controlplane/instance.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 21233,
+      "hit_paths": [
+        "pkg/controlplane/instance.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/rest/storage_core.go"
+      },
+      "seconds": 0.001,
+      "result_chars": 22867,
+      "hit_paths": [
+        "pkg/registry/core/rest/storage_core.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/service/ipallocator/controller/repairip.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 22636,
+      "hit_paths": [
+        "pkg/registry/core/service/ipallocator/controller/repairip.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/util/async/runner.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 1451,
+      "hit_paths": [
+        "pkg/util/async/runner.go"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "not yet ready to handle request",
+        "language": "go"
+      },
+      "seconds": 2.906,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/service/ipallocator/ipallocator.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 17563,
+      "hit_paths": [
+        "pkg/registry/core/service/ipallocator/ipallocator.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/networking/ipaddress/strategy.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 3705,
+      "hit_paths": [
+        "pkg/registry/networking/ipaddress/strategy.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/server/genericapiserver.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 45315,
+      "hit_paths": [
+        "staging/src/k8s.io/apiserver/pkg/server/genericapiserver.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/service/ipallocator/errors.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 0,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/registry/generic/registry/storage_readiness.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 0,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/service/ipallocator/interfaces.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 1597,
+      "hit_paths": [
+        "pkg/registry/core/service/ipallocator/interfaces.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/server/healthz/readyz.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 0,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0"
+      },
+      "seconds": 0.03,
+      "result_chars": 24015,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/endpoints/handlers/create.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 10386,
+      "hit_paths": [
+        "staging/src/k8s.io/apiserver/pkg/endpoints/handlers/create.go"
+      ]
+    }
+  ],
+  "tool_seconds": 16.724,
+  "retrieval_result_chars": 257453,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Summary of the retrieval:\n\n- **`pkg/registry/core/rest/storage_core.go`** \u2014 root of the error. `legacyProvider.PostStartHook()` registers the `\"start-service-ip-repair-controllers\"` hook, runs `startServiceClusterIPRepair` and `startServiceNodePortsRepair` concurrently via `async.Runner`, waits up to 1 minute on a `sync.WaitGroup`, and returns `errors.New(\"unable to perform initial IP and Port allocation check\")` on timeout \u2014 this is the exact error in the ticket.\n- **`pkg/registry/core/service/ipallocator/controller/repairip.go`** \u2014 the `RepairIPAddress` controller (`NewRepairIPAddress`/`RunUntil`) used when `MultiCIDRServiceAllocator` is enabled (v1.33 default path). `RunUntil` blocks on informer cache sync and on the default `ServiceCIDR` object existing before calling `onFirstSuccess()` (the `wg.Done` that satisfies the PostStartHook's wait group).\n- **`pkg/registry/core/service/ipallocator/ipallocator.go`** \u2014 `Allocator.allocateService`/`allocateNextService` return `ErrNotReady` when `!a.ready.Load() || !a.ipAddressSynced()`; this is what surfaces as the `\"is forbidden: not yet ready to handle request\"` condition on `ipaddresses.networking.k8s.io` during the mixed-version window.\n- **`pkg/util/async/runner.go`** \u2014 the `Runner` primitive used to run both repair loops concurrently and fail together.\n- **`pkg/controlplane/instance.go`** \u2014 wires `RepairServicesInterval`/feature-gated construction and the default-ServiceCIDR post-start hook that the repair controller depends on.\n- **`staging/src/k8s.io/apiserver/pkg/server/genericapiserver.go`** \u2014 generic PostStartHook/readyz machinery (`installReadyz`, `RunPostStartHooks`) that turns a hook failure into the `readyz` check failure reported (`poststarthook/start-service-ip-repair-controllers`).\n- **`pkg/registry/networking/ipaddress/strategy.go`**, **`staging/.../endpoints/handlers/create.go`** \u2014 the REST create path IPAddress objects go through, relevant to why creation requests get rejected while the allocator isn't ready.\n\nThe race: during a rolling upgrade, an old-version (v1.32) apiserver still using the legacy in-memory bitmap allocator races against the new v1.33 IPAddress-based repair controller, which requires the default `ServiceCIDR` object and informer caches to sync before `onFirstSuccess()` fires \u2014 under mixed-version load this can exceed the hardcoded 1-minute timeout, or the allocator is not marked ready before the readyz probe hits.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 1593118,
+  "output_tokens": 4991,
+  "input_tokens_uncached": 28,
+  "cache_creation_input_tokens": 128392,
+  "cache_read_input_tokens": 1464698,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "err-provenance-03",
+    "config_name": "condition:structural",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1111,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 4
+}

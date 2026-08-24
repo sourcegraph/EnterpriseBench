@@ -1,0 +1,294 @@
+{
+  "task_id": "api-contract-dual-fastapi-001",
+  "policy": "condition:structural",
+  "model": "claude-sonnet-5",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/fastapi--0.109.0",
+    "github.com/sg-evals/httpx--0.26.0"
+  ],
+  "retrieved_paths": [
+    "fastapi/dependencies/utils.py",
+    "fastapi/routing.py",
+    "fastapi/_compat.py",
+    "fastapi/encoders.py",
+    "fastapi/params.py",
+    "fastapi/exceptions.py",
+    "httpx/_content.py",
+    "httpx/_models.py",
+    "httpx/_client.py",
+    "httpx/_utils.py",
+    "httpx/_types.py",
+    "httpx/_multipart.py"
+  ],
+  "required_files": [
+    "fastapi/routing.py",
+    "httpx/_content.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 19,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.6024807999999999,
+  "elapsed_seconds": 58.2,
+  "wall_seconds": 58.2,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0"
+      },
+      "seconds": 0.014,
+      "result_chars": 17238,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0"
+      },
+      "seconds": 0.01,
+      "result_chars": 2503,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "def request_body_to_args($$$ARGS)",
+        "language": "python"
+      },
+      "seconds": 0.255,
+      "result_chars": 518,
+      "hit_paths": [
+        "fastapi/dependencies/utils.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0",
+        "path": "httpx/_content.py"
+      },
+      "seconds": 0.005,
+      "result_chars": 8109,
+      "hit_paths": [
+        "httpx/_content.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "async def app($$$ARGS)",
+        "language": "python"
+      },
+      "seconds": 0.569,
+      "result_chars": 1464,
+      "hit_paths": [
+        "fastapi/routing.py",
+        "fastapi/routing.py",
+        "tests/conftest.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "def field_type_validate($$$ARGS)",
+        "language": "python"
+      },
+      "seconds": 0.271,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class Request($$$ARGS)",
+        "language": "python"
+      },
+      "seconds": 0.143,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0",
+        "path": "fastapi/dependencies/utils.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 30158,
+      "hit_paths": [
+        "fastapi/dependencies/utils.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0",
+        "path": "fastapi/routing.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 174485,
+      "hit_paths": [
+        "fastapi/routing.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0",
+        "path": "httpx/_models.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 42974,
+      "hit_paths": [
+        "httpx/_models.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0",
+        "path": "fastapi/_compat.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 23027,
+      "hit_paths": [
+        "fastapi/_compat.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0",
+        "path": "httpx/_client.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 69273,
+      "hit_paths": [
+        "httpx/_client.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0",
+        "path": "httpx/_utils.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 14069,
+      "hit_paths": [
+        "httpx/_utils.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "async def get_request_handler($$$ARGS)",
+        "language": "python"
+      },
+      "seconds": 0.5,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "def jsonable_encoder($$$ARGS)",
+        "language": "python"
+      },
+      "seconds": 0.193,
+      "result_chars": 511,
+      "hit_paths": [
+        "fastapi/encoders.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "body = await request.json()",
+        "language": "python"
+      },
+      "seconds": 0.212,
+      "result_chars": 148,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "content_type_value = request.headers.get($$$ARGS)",
+        "language": "python"
+      },
+      "seconds": 0.184,
+      "result_chars": 317,
+      "hit_paths": [
+        "fastapi/routing.py"
+      ]
+    }
+  ],
+  "tool_seconds": 2.356,
+  "retrieval_result_chars": 384830,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file set required to trace both sides of the contract:\n\n**FastAPI request validation chain:**\n- `fastapi/routing.py` \u2014 `content_type_value = request.headers.get(\"content-type\")` negotiation, body-await (`request.json()`/`request.body()`), and dispatch into dependency solving.\n- `fastapi/dependencies/utils.py` \u2014 `request_body_to_args`, `solve_dependencies`, `get_body_field`, embed logic for single vs. multi-field bodies.\n- `fastapi/_compat.py` \u2014 Pydantic v1/v2 compat shim (`ModelField.validate`/`.serialize`, `create_body_model`), where None/missing/default handling actually resolves.\n- `fastapi/encoders.py` \u2014 `jsonable_encoder`, the asymmetric counterpart used server-side for non-JSON-native types.\n- `fastapi/params.py`, `fastapi/exceptions.py` \u2014 `Body(embed=...)` field definitions and `RequestValidationError`/422 shape.\n\n**httpx request encoding chain:**\n- `httpx/_content.py` \u2014 `encode_json` (bare `json.dumps`, no custom encoder), `encode_request` content/data/files/json precedence.\n- `httpx/_models.py` \u2014 `Request.__init__`/`_prepare`, Content-Type/Content-Length header derivation.\n- `httpx/_client.py` \u2014 `build_request`, where `json=` is accepted from the caller.\n- `httpx/_utils.py` \u2014 `primitive_value_to_str` (None \u2192 `\"\"` for form/query encoding, relevant contrast to JSON's `null`).\n- `httpx/_types.py`, `httpx/_multipart.py` \u2014 type contracts and multipart encoding path.\n\nThis gives the full FastAPI validation chain and full httpx encoding chain plus the exact functions where the drift (embed/nested-model shape, None-vs-missing, Union discrimination, non-JSON-native type serialization) originates on each side.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 962187,
+  "output_tokens": 4409,
+  "input_tokens_uncached": 18,
+  "cache_creation_input_tokens": 96295,
+  "cache_read_input_tokens": 865874,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "condition:structural",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.5912
+    },
+    "mrr": 0.5,
+    "map_score": 0.3929,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 12,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 5
+}

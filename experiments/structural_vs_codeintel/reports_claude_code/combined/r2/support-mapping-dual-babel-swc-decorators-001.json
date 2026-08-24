@@ -1,0 +1,333 @@
+{
+  "task_id": "support-mapping-dual-babel-swc-decorators-001",
+  "policy": "condition:combined",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/babel--v7.24.0",
+    "github.com/sg-evals/swc--v1.4.6"
+  ],
+  "retrieved_paths": [
+    "packages/babel-plugin-proposal-decorators/src/index.ts",
+    "packages/babel-plugin-syntax-decorators/src/index.ts",
+    "packages/babel-helper-create-class-features-plugin/src/index.ts",
+    "packages/babel-plugin-transform-typescript/src/index.ts",
+    "crates/swc_ecma_transforms_proposal/src/decorators/mod.rs",
+    "crates/swc_ecma_transforms_proposal/src/decorators/legacy/mod.rs",
+    "crates/swc_ecma_transforms_proposal/src/decorators/legacy/metadata.rs",
+    "crates/swc/src/config/mod.rs",
+    "bindings/binding_core_wasm/src/types.rs",
+    "crates/swc_ecma_transforms/tests/decorators.rs"
+  ],
+  "required_files": [
+    "babel/packages/babel-plugin-proposal-decorators/src/index.ts",
+    "babel/packages/babel-plugin-transform-typescript/src/index.ts",
+    "swc/crates/swc_ecma_transforms_proposal/src/decorators.rs",
+    "swc/crates/swc_ecma_transforms_typescript/src/lib.rs"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "combined",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "definition",
+    "references",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax + resolved symbol identity",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 11,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.29368959999999994,
+  "elapsed_seconds": 72.8,
+  "wall_seconds": 72.8,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "legacy.*decorator|decoratorsBeforeExport|shouldTransform",
+        "case_sensitive": false
+      },
+      "seconds": 2.285,
+      "result_chars": 10077,
+      "hit_paths": [
+        ".github/CHANGELOG-v6.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v8.md",
+        "CHANGELOG.md",
+        "packages/babel-core/test/parse.js",
+        "packages/babel-generator/src/generators/classes.ts",
+        "packages/babel-generator/src/generators/expressions.ts",
+        "packages/babel-generator/src/generators/expressions.ts",
+        "packages/babel-generator/src/generators/expressions.ts",
+        "packages/babel-generator/src/generators/modules.ts",
+        "packages/babel-generator/src/generators/modules.ts",
+        "packages/babel-generator/src/generators/modules.ts",
+        "packages/babel-generator/src/generators/modules.ts",
+        "packages/babel-generator/src/index.ts",
+        "packages/babel-generator/src/index.ts",
+        "packages/babel-generator/src/printer.ts",
+        "packages/babel-generator/test/fixtures/comments/decorators-after-export-to-after/options.json",
+        "packages/babel-generator/test/fixtures/comments/decorators-after-export-to-before/options.json",
+        "packages/babel-generator/test/fixtures/comments/decorators-before-export-to-after/options.json",
+        "packages/babel-generator/test/fixtures/comments/decorators-before-export-to-before/options.json",
+        "packages/babel-generator/test/fixtures/comments/decorators-legacy-before-export/options.json",
+        "packages/babel-generator/test/fixtures/decorator-auto-accessors/options.json"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "legacyDecorator|decoratorMetadata",
+        "case_sensitive": false
+      },
+      "seconds": 6.502,
+      "result_chars": 8525,
+      "hit_paths": [
+        "bindings/binding_core_wasm/src/types.rs",
+        "bindings/binding_core_wasm/src/types.rs",
+        "bindings/binding_core_wasm/src/types.rs",
+        "bindings/binding_core_wasm/src/types.rs",
+        "bindings/binding_minifier_wasm/src/types.rs",
+        "bindings/binding_minifier_wasm/src/types.rs",
+        "bindings/binding_minifier_wasm/src/types.rs",
+        "bindings/binding_minifier_wasm/src/types.rs",
+        "crates/swc/tests/exec/issues-1xxx/1592/set_public_class_fields/.swcrc",
+        "crates/swc/tests/exec/issues-1xxx/1592/set_public_class_fields/.swcrc",
+        "crates/swc/tests/exec/issues-5xxx/.5474/.swcrc",
+        "crates/swc/tests/exec/issues-5xxx/.5474/.swcrc",
+        "crates/swc/tests/exec/issues-8xxx/8155/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1135/1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1160/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1160/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1278/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1278/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1309/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1309/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1345/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1345/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1358/case4/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1358/case4/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1358/case5/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1358/case5/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case2/input/.swcrc",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case2/input/.swcrc"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "legacy_decorator|decorator_metadata|emit_metadata|design:paramtypes",
+        "case_sensitive": false
+      },
+      "seconds": 4.13,
+      "result_chars": 9097,
+      "hit_paths": [
+        ".yarn/releases/yarn-4.0.2.cjs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1362/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case1/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case2/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case2/output/index.ts",
+        "crates/swc/tests/fixture/issues-1xxx/1456/case2/output/index.ts",
+        "crates/swc/tests/fixture/issues-2xxx/2428/1/output/index.ts",
+        "crates/swc/tests/fixture/issues-2xxx/2428/1/output/index.ts",
+        "crates/swc/tests/fixture/sourcemap/011/output/CommentControlller.ts",
+        "crates/swc/tests/fixture/sourcemap/011/output/CommentControlller.ts",
+        "crates/swc/tests/fixture/sourcemap/011/output/CommentControlller.ts",
+        "crates/swc/tests/fixture/sourcemap/012/output/CommentService.ts",
+        "crates/swc/tests/fixture/sourcemap/013/output/PistController.ts",
+        "crates/swc/tests/fixture/sourcemap/013/output/PistController.ts",
+        "crates/swc/tests/fixture/sourcemap/013/output/PistController.ts",
+        "crates/swc/tests/fixture/sourcemap/013/output/PistController.ts",
+        "crates/swc/tests/fixture/sourcemap/013/output/PistController.ts",
+        "crates/swc/tests/fixture/sourcemap/013/output/PistController.ts"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.24.0"
+      },
+      "seconds": 0.07,
+      "result_chars": 1294,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "version.*2018-09|legacy.*api\\.assertVersion|function\\(.*api.*options.*\\{.*legacy",
+        "case_sensitive": false
+      },
+      "seconds": 12.816,
+      "result_chars": 5107,
+      "hit_paths": [
+        "packages/babel-generator/test/fixtures/edgecase/large-file-concise/input.js",
+        "packages/babel-generator/test/fixtures/edgecase/large-file-concise/output.js",
+        "packages/babel-helper-create-class-features-plugin/src/index.ts",
+        "packages/babel-plugin-proposal-decorators/src/index.ts",
+        "packages/babel-plugin-proposal-decorators/test/fixtures/2018-09-integrations-babel-7/class-accessor-property/options.json",
+        "packages/babel-plugin-proposal-decorators/test/fixtures/2018-09-integrations-babel-7/static-block/options.json",
+        "packages/babel-plugin-syntax-decorators/src/index.ts",
+        "packages/babel-plugin-syntax-decorators/src/index.ts",
+        "packages/babel-plugin-syntax-decorators/src/index.ts",
+        "packages/babel-plugin-syntax-decorators/src/index.ts",
+        "packages/babel-plugin-syntax-decorators/src/index.ts",
+        "packages/babel-plugin-syntax-decorators/test/index.js",
+        "packages/babel-plugin-syntax-decorators/test/index.js",
+        "packages/babel-standalone/src/preset-stage-3.ts"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "plugin-proposal-decorators/src|plugin-transform-typescript/src",
+        "case_sensitive": false
+      },
+      "seconds": 2.767,
+      "result_chars": 919,
+      "hit_paths": [
+        "tsconfig.json",
+        "tsconfig.json",
+        "tsconfig.json",
+        "tsconfig.json"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "emit_metadata|fn ts_decorator",
+        "case_sensitive": false
+      },
+      "seconds": 2.926,
+      "result_chars": 3588,
+      "hit_paths": [
+        ".yarn/releases/yarn-4.0.2.cjs",
+        "crates/swc/src/config/mod.rs",
+        "crates/swc_bundler/tests/common/mod.rs",
+        "crates/swc_ecma_transforms/tests/decorators.rs",
+        "crates/swc_ecma_transforms/tests/decorators.rs",
+        "crates/swc_ecma_transforms/tests/decorators.rs",
+        "crates/swc_ecma_transforms/tests/decorators.rs",
+        "crates/swc_ecma_transforms_optimization/tests/simplify_dce.rs",
+        "crates/swc_ecma_transforms_optimization/tests/simplify_dce.rs",
+        "crates/swc_ecma_transforms_proposal/src/decorators/mod.rs",
+        "crates/swc_ecma_transforms_proposal/src/decorators/mod.rs",
+        "crates/swc_ecma_transforms_proposal/src/decorators/mod.rs"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "mod legacy|mod metadata|fn new\\(emit_metadata",
+        "case_sensitive": false
+      },
+      "seconds": 2.928,
+      "result_chars": 1922,
+      "hit_paths": [
+        "crates/swc_common/src/plugin/mod.rs",
+        "crates/swc_core/src/plugin.rs",
+        "crates/swc_css_compat/src/compiler/mod.rs",
+        "crates/swc_ecma_minifier/src/lib.rs",
+        "crates/swc_ecma_transforms_proposal/src/decorators/legacy/mod.rs",
+        "crates/swc_ecma_transforms_proposal/src/decorators/mod.rs",
+        "crates/swc_plugin_proxy/src/lib.rs",
+        "crates/swc_plugin_runner/src/imported_fn/mod.rs"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "strip.*decorator|typescript.*decorator.*before|Program::visit_mut_children_with",
+        "case_sensitive": false
+      },
+      "seconds": 7.768,
+      "result_chars": 1194,
+      "hit_paths": [
+        ".github/CHANGELOG-v7-prereleases.md",
+        "packages/babel-parser/test/fixtures/typescript/decorators/type-arguments-invalid/options.json",
+        "packages/babel-parser/test/fixtures/typescript/decorators/type-arguments/options.json"
+      ]
+    }
+  ],
+  "tool_seconds": 42.192,
+  "retrieval_result_chars": 41723,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file set mapping the divergence:\n\n**Babel side:** `packages/babel-plugin-syntax-decorators/src/index.ts` (chooses `legacy` vs `2018-09`/stage-3 form based on the `legacy` option) \u2192 `packages/babel-plugin-proposal-decorators/src/index.ts` (dispatches transform by `version`, including `\"2018-09\"` and `legacyDecorator` compat) \u2192 `packages/babel-helper-create-class-features-plugin/src/index.ts` (shared class-feature lowering, `decoratorVersion` param governs whether legacy `Reflect.metadata`-compatible output or stage-3 semantics is produced) \u2192 `packages/babel-plugin-transform-typescript/src/index.ts` (must run *after* the legacy decorators plugin in the preset order so class properties aren't stripped before decorators can see them \u2014 CHANGELOG confirms this was a historical bug fix, \"Avoid stripping class properties when a decorator is set\").\n\n**SWC side:** `crates/swc/src/config/mod.rs` wires `jsc.transform.legacyDecorator`/`decoratorMetadata` config flags (both default `false`) into `crates/swc_ecma_transforms_proposal/src/decorators/mod.rs`, which branches `Either::Left(legacy::new(emit_metadata))` vs. a stage-3 path depending on `legacy_decorator`; `emit_metadata` only takes effect inside the legacy branch, implemented in `decorators/legacy/metadata.rs`.\n\n**The divergence:** Nest.js relies on `Reflect.metadata` design-type emission, which only exists in the **legacy (stage-2)** decorator form. Babel's default preset-typescript path historically required explicit `[\"@babel/plugin-proposal-decorators\", {\"legacy\": true}]` ordered before `plugin-transform-typescript`. SWC's default `jsc.transform` has **both** `legacyDecorator` and `decoratorMetadata` off by default \u2014 so a customer who only sets `legacyDecorator: true` without also setting `decoratorMetadata: true` gets stage-2 decorator *invocation* (classes still construct) but no `design:paramtypes`/`design:type` metadata emitted at all, exactly matching the reported symptom: decorators fire, DI metadata table is never populated, `Reflect.getMetadata` returns `undefined`.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 469975,
+  "output_tokens": 2436,
+  "input_tokens_uncached": 12,
+  "cache_creation_input_tokens": 46135,
+  "cache_read_input_tokens": 423828,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "support-mapping-dual-babel-swc-decorators-001",
+    "config_name": "condition:combined",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.5585,
+      "10": 0.5585
+    },
+    "mrr": 1.0,
+    "map_score": 0.375,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 4
+}

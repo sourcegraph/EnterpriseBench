@@ -1,0 +1,488 @@
+{
+  "task_id": "refactor-orchestration-tri-babel-001",
+  "policy": "condition:combined",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/babel--v7.22.9",
+    "github.com/sg-evals/webpack--v5.88.2",
+    "github.com/sg-evals/next.js--v13.4.12"
+  ],
+  "retrieved_paths": [
+    "packages/next/src/bundles/babel/bundle.js",
+    "packages/next/package.json",
+    "package.json",
+    "packages/next/src/build/babel/preset.ts",
+    "packages/next/src/build/babel/loader/get-config.ts",
+    "packages/next/src/build/swc/options.ts",
+    "packages/next/src/build/load-jsconfig.ts",
+    "test/production/emit-decorator-metadata/index.test.ts"
+  ],
+  "required_files": [
+    "packages/babel-parser/package.json",
+    "package.json",
+    "packages/next/package.json"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "combined",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "definition",
+    "references",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax + resolved symbol identity",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 20,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.7099057999999999,
+  "elapsed_seconds": 119.3,
+  "wall_seconds": 119.3,
+  "tool_log": [
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/webpack--v5.88.2",
+        "path": "package.json"
+      },
+      "seconds": 0.001,
+      "result_chars": 10520,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "package.json"
+      },
+      "seconds": 0.004,
+      "result_chars": 9659,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.22.9"
+      },
+      "seconds": 0.033,
+      "result_chars": 1288,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12"
+      },
+      "seconds": 0.021,
+      "result_chars": 3796,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "\"@babel/(parser|traverse|core|generator|types)\"",
+        "case_sensitive": false
+      },
+      "seconds": 0.348,
+      "result_chars": 14577,
+      "hit_paths": [
+        ".yarn/releases/yarn-3.6.1.cjs",
+        ".yarn/releases/yarn-3.6.1.cjs",
+        "CHANGELOG.md",
+        "Makefile.js",
+        "Makefile.source.mjs",
+        "babel-worker.cjs",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "babel.config.js",
+        "benchmark/babel-core/real-case-preset-env-flow/babel-parser-expression.mjs",
+        "benchmark/babel-generator/many-empty-statements/bench.mjs",
+        "benchmark/babel-generator/many-empty-statements/bench.mjs",
+        "benchmark/babel-generator/many-identifiers/1-length.mjs",
+        "benchmark/babel-generator/many-identifiers/1-length.mjs",
+        "benchmark/babel-generator/many-identifiers/25-length.mjs",
+        "benchmark/babel-generator/many-identifiers/25-length.mjs",
+        "benchmark/babel-generator/real-case/jquery.mjs",
+        "benchmark/babel-generator/real-case/jquery.mjs",
+        "benchmark/babel-parser/large-regexp/bench.mjs",
+        "benchmark/babel-parser/many-arrow-function-flow-types/bench.mjs",
+        "benchmark/babel-parser/many-async-arrows/bench.mjs",
+        "benchmark/babel-parser/many-class-private-properties/1-length.bench.mjs",
+        "benchmark/babel-parser/many-empty-statements/attachComment-false.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/1-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/11-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/2-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/await.mjs",
+        "benchmark/babel-parser/many-inner-comments-nested/bench.mjs",
+        "benchmark/babel-parser/many-inner-comments/bench.mjs",
+        "benchmark/babel-parser/many-leading-comments-nested/bench.mjs",
+        "benchmark/babel-parser/many-leading-comments/bench.mjs",
+        "benchmark/babel-parser/many-leading-trailing-comments/bench.mjs",
+        "benchmark/babel-parser/many-let-declarations-within-block/10-length-binding.mjs",
+        "benchmark/babel-parser/many-let-declarations/1-length-binding.mjs",
+        "benchmark/babel-parser/many-named-export/1-length.bench.mjs",
+        "benchmark/babel-parser/many-nested-block-elements/bench.mjs",
+        "benchmark/babel-parser/many-nested-jsx-elements-with-attributes/bench.mjs",
+        "benchmark/babel-parser/many-nested-template-elements/bench.mjs",
+        "benchmark/babel-parser/many-small-all-flags-regexp/bench.mjs",
+        "benchmark/babel-parser/many-template-elements/bench.mjs",
+        "benchmark/babel-parser/many-trailing-comments-nested/bench.mjs",
+        "benchmark/babel-parser/many-trailing-comments/bench.mjs",
+        "benchmark/babel-traverse/enter-visitor-context-change/bench.mjs"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "packages/next/package.json"
+      },
+      "seconds": 0.001,
+      "result_chars": 9190,
+      "hit_paths": [
+        "packages/next/package.json"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "from ['\"]@babel/(parser|traverse|core|generator|types)['\"]",
+        "case_sensitive": false
+      },
+      "seconds": 0.321,
+      "result_chars": 15444,
+      "hit_paths": [
+        "CHANGELOG.md",
+        "babel.config.js",
+        "benchmark/babel-core/real-case-preset-env-flow/babel-parser-expression.mjs",
+        "benchmark/babel-generator/many-empty-statements/bench.mjs",
+        "benchmark/babel-generator/many-empty-statements/bench.mjs",
+        "benchmark/babel-generator/many-identifiers/1-length.mjs",
+        "benchmark/babel-generator/many-identifiers/1-length.mjs",
+        "benchmark/babel-generator/many-identifiers/25-length.mjs",
+        "benchmark/babel-generator/many-identifiers/25-length.mjs",
+        "benchmark/babel-generator/real-case/jquery.mjs",
+        "benchmark/babel-generator/real-case/jquery.mjs",
+        "benchmark/babel-parser/large-regexp/bench.mjs",
+        "benchmark/babel-parser/many-arrow-function-flow-types/bench.mjs",
+        "benchmark/babel-parser/many-async-arrows/bench.mjs",
+        "benchmark/babel-parser/many-class-private-properties/1-length.bench.mjs",
+        "benchmark/babel-parser/many-empty-statements/attachComment-false.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/1-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/11-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/2-length.bench.mjs",
+        "benchmark/babel-parser/many-identifiers/await.mjs",
+        "benchmark/babel-parser/many-inner-comments-nested/bench.mjs",
+        "benchmark/babel-parser/many-inner-comments/bench.mjs",
+        "benchmark/babel-parser/many-leading-comments-nested/bench.mjs",
+        "benchmark/babel-parser/many-leading-comments/bench.mjs",
+        "benchmark/babel-parser/many-leading-trailing-comments/bench.mjs",
+        "benchmark/babel-parser/many-let-declarations-within-block/10-length-binding.mjs",
+        "benchmark/babel-parser/many-let-declarations/1-length-binding.mjs",
+        "benchmark/babel-parser/many-named-export/1-length.bench.mjs",
+        "benchmark/babel-parser/many-nested-block-elements/bench.mjs",
+        "benchmark/babel-parser/many-nested-jsx-elements-with-attributes/bench.mjs",
+        "benchmark/babel-parser/many-nested-template-elements/bench.mjs",
+        "benchmark/babel-parser/many-small-all-flags-regexp/bench.mjs",
+        "benchmark/babel-parser/many-template-elements/bench.mjs",
+        "benchmark/babel-parser/many-trailing-comments-nested/bench.mjs",
+        "benchmark/babel-parser/many-trailing-comments/bench.mjs",
+        "benchmark/babel-traverse/enter-visitor-context-change/bench.mjs",
+        "benchmark/babel-types/builders/memberExpression.mjs",
+        "benchmark/babel-types/builders/stringLiteral.mjs",
+        "codemods/babel-plugin-codemod-object-assign-to-object-spread/src/index.ts",
+        "codemods/babel-plugin-codemod-optional-catch-binding/src/index.ts",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js",
+        "eslint/babel-eslint-plugin-development/test/rules/no-deprecated-clone.js"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "require\\(.@babel/(parser|traverse|core|generator|types).\\)",
+        "case_sensitive": false
+      },
+      "seconds": 0.882,
+      "result_chars": 4003,
+      "hit_paths": [
+        "babel-worker.cjs",
+        "babel.config.js",
+        "codemods/babel-plugin-codemod-object-assign-to-object-spread/README.md",
+        "codemods/babel-plugin-codemod-optional-catch-binding/README.md",
+        "eslint/babel-eslint-parser/src/worker/babel-core.cjs",
+        "eslint/babel-eslint-tests/test/fixtures/parser-override/plugin.js",
+        "packages/babel-register/src/worker/babel-core.js",
+        "bench/nested-deps/fuzzponent.js",
+        "bench/nested-deps/fuzzponent.js",
+        "packages/next/src/bundles/babel/bundle.js",
+        "packages/next/src/bundles/babel/bundle.js",
+        "packages/next/src/bundles/babel/bundle.js",
+        "packages/next/src/bundles/babel/bundle.js",
+        "packages/next/src/bundles/babel/bundle.js",
+        "packages/next/taskfile.js"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12"
+      },
+      "seconds": 0.01,
+      "result_chars": 25990,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "packages/next/src/bundles/babel/bundle.js"
+      },
+      "seconds": 0.0,
+      "result_chars": 3434,
+      "hit_paths": [
+        "packages/next/src/bundles/babel/bundle.js"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "babel-loader|@babel/core",
+        "case_sensitive": false
+      },
+      "seconds": 0.222,
+      "result_chars": 7435,
+      "hit_paths": [
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7-prereleases.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/CHANGELOG-v7.0.0-v7.14.9.md",
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".yarn/releases/yarn-3.6.1.cjs",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "CHANGELOG.md",
+        "Makefile.js",
+        "Makefile.source.mjs"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "require\\(.@babel",
+        "case_sensitive": false
+      },
+      "seconds": 0.275,
+      "result_chars": 10978,
+      "hit_paths": [
+        "babel-worker.cjs",
+        "babel.config.js",
+        "codemods/babel-plugin-codemod-object-assign-to-object-spread/README.md",
+        "codemods/babel-plugin-codemod-optional-catch-binding/README.md",
+        "eslint.config.js",
+        "eslint.config.js",
+        "eslint.config.js",
+        "eslint/babel-eslint-config-internal/index.js",
+        "eslint/babel-eslint-parser/src/worker/babel-core.cjs",
+        "eslint/babel-eslint-tests/test/fixtures/parser-override/plugin.js",
+        "eslint/babel-eslint-tests/test/integration/parser-override.js",
+        "packages/babel-core/src/config/files/module-types.ts",
+        "packages/babel-core/src/config/files/module-types.ts",
+        "packages/babel-helper-replace-supers/src/index.ts",
+        "packages/babel-plugin-transform-modules-commonjs/test/fixtures/interop-loose/imports-hoisting/output.js",
+        "packages/babel-plugin-transform-modules-commonjs/test/fixtures/interop-loose/imports-hoisting/output.js",
+        "packages/babel-plugin-transform-modules-commonjs/test/fixtures/interop-loose/multi-load/output.js",
+        "packages/babel-plugin-transform-modules-commonjs/test/fixtures/interop-loose/multi-load/output.js",
+        "packages/babel-plugin-transform-modules-commonjs/test/fixtures/interop/imports-hoisting/output.js",
+        "packages/babel-plugin-transform-modules-commonjs/test/fixtures/interop/imports-hoisting/output.js",
+        "packages/babel-plugin-transform-modules-commonjs/test/fixtures/interop/multi-load/output.js",
+        "packages/babel-plugin-transform-modules-commonjs/test/fixtures/interop/multi-load/output.js",
+        "packages/babel-plugin-transform-runtime/scripts/build-dist.js",
+        "packages/babel-plugin-transform-runtime/test/fixtures/dual-babel-runtime/import-compiled-modern-runtime/output.js",
+        "packages/babel-plugin-transform-runtime/test/fixtures/dual-babel-runtime/import-compiled-modern-runtime/output.js",
+        "packages/babel-plugin-transform-runtime/test/fixtures/dual-babel-runtime/import-compiled-modern-runtime/output.js",
+        "packages/babel-plugin-transform-runtime/test/fixtures/dual-babel-runtime/import-compiled-old-runtime/output.js",
+        "packages/babel-plugin-transform-runtime/test/fixtures/dual-babel-runtime/import-compiled-old-runtime/output.js",
+        "packages/babel-plugin-transform-runtime/test/fixtures/dual-babel-runtime/import-compiled-old-runtime/output.js",
+        "packages/babel-plugin-transform-runtime/test/fixtures/dual-babel-runtime/require-modern-runtime/output.js"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "DecoratorMetadata|decoratorMetadata",
+        "case_sensitive": false
+      },
+      "seconds": 0.731,
+      "result_chars": 2980,
+      "hit_paths": [
+        "examples/with-tigris/tsconfig.json",
+        "packages/next-swc/crates/next-core/src/transform_options.rs",
+        "packages/next-swc/crates/next-core/src/transform_options.rs",
+        "packages/next/src/build/swc/options.ts",
+        "packages/next/src/build/swc/options.ts",
+        "packages/next/src/build/swc/options.ts",
+        "test/production/emit-decorator-metadata/app/jsconfig.json",
+        "test/production/emit-decorator-metadata/index.test.ts",
+        "test/production/emit-decorator-metadata/index.test.ts",
+        "test/production/emit-decorator-metadata/index.test.ts"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "bundles/babel/bundle|require\\('next/dist/compiled/babel",
+        "case_sensitive": false
+      },
+      "seconds": 0.954,
+      "result_chars": 5993,
+      "hit_paths": [
+        "packages/eslint-config-next/parser.js",
+        "packages/next/src/build/babel/loader/get-config.ts",
+        "packages/next/src/build/babel/preset.ts",
+        "packages/next/src/build/babel/preset.ts",
+        "packages/next/src/build/babel/preset.ts",
+        "packages/next/src/build/babel/preset.ts",
+        "packages/next/src/build/babel/preset.ts",
+        "packages/next/src/build/babel/preset.ts",
+        "packages/next/src/build/babel/preset.ts",
+        "packages/next/src/build/babel/preset.ts",
+        "packages/next/src/build/babel/preset.ts",
+        "packages/next/src/build/babel/preset.ts",
+        "packages/next/src/build/babel/preset.ts",
+        "packages/next/src/build/babel/preset.ts",
+        "packages/next/src/build/load-jsconfig.ts",
+        "packages/next/src/build/webpack/plugins/wellknown-errors-plugin/parseScss.ts",
+        "packages/next/src/bundles/babel/bundle.js",
+        "packages/next/src/bundles/babel/bundle.js",
+        "packages/next/src/bundles/babel/bundle.js",
+        "packages/next/src/bundles/babel/bundle.js"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "from ['\"]\\.\\./\\.\\./bundles/babel/bundle['\"]|from ['\"]\\./bundle['\"]",
+        "case_sensitive": false
+      },
+      "seconds": 0.672,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "bundle\\(\\)\\.traverse|bundle\\.traverse|from ['\"]\\.\\./\\.\\./bundle['\"]",
+        "case_sensitive": false
+      },
+      "seconds": 0.75,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12"
+      },
+      "seconds": 0.008,
+      "result_chars": 12,
+      "hit_paths": []
+    }
+  ],
+  "tool_seconds": 5.233,
+  "retrieval_result_chars": 125323,
+  "denied_tools": [
+    {
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "/workspace/REFACTOR_PLAN.md",
+        "content": "# Refactor Plan: Propagate Babel `DecoratorMetadata` AST Node\n\n## Source change\n\n`babel/packages/babel-parser` starts emitting a new `DecoratorMetadata` AST\nnode type for stage-3 decorators. `@babel/traverse`, `@babel/generator`, and\n`@babel/types` (all in the same monorepo, `babel/packages/`) ship in lockstep\nwith the parser, so the node arrives with visitor/generator/builder support in\nthe same release. Anything that (a) parses JS with `@babel/parser` and walks\nthe resulting tree, or (b) hand-writes a `@babel/traverse` visitor that\nswitches on node `type`, is a candidate consumer.\n\n## Dependency graph (from manifests, not assumption)\n\n```\nbabel (repo)\n  \u2514\u2500\u25b6 next.js   [packages/next/package.json \u2192 devDependencies, PINNED versions:\n                 \"@babel/core\": \"7.18.0\", \"@babel/parser\" (via root package.json\n                 resolutions: \"7.18.0\"), \"@babel/traverse\": \"7.18.0\",\n                 \"@babel/generator\": \"7.18.0\", \"@babel/types\": \"7.18.0\"]\n                 CONFIRMED at the source level: packages/next/src/bundles/babel/bundle.js\n                 does `require('@babel/types')`, `require('@babel/core')`,\n                 `require('@babel/traverse')`, `require('@babel/generator')`,\n                 `require('@babel/parser')` directly \u2014 this is not a transitive/\n                 devtime-only edge, Next.js's own babel transform pipeline\n                 (packages/next/src/build/babel/preset.ts,\n                 packages/next/src/build/babel/loader/get-config.ts) parses and\n                 traverses user code with these packages at build time.\n\nwebpack (repo)\n  \u2514\u2500X\u25b6 NOT a Babel-parser consumer.\n       webpack/package.json declares \"@babel/core\", \"@babel/preset-react\", and\n       \"babel-loader\" only under devDependencies (used to transpile webpack's\n       own examples/tests), and its runtime `dependencies` list has no\n       \"@babel/*\" entry at all \u2014 webpack's own JS parser is `acorn` (see\n       \"acorn\": \"^8.7.1\" in dependencies), which produces an ESTree AST, not a\n       Babel AST. `babel-loader` (a separate userland package, not vendored\n       here) invokes Babel out-of-process and hands webpack back a transformed\n       *string*, never a Babel AST \u2014 so webpack's compiler never walks Babel\n       node types. A `grep` for `require('@babel` in webpack's own source\n       returned zero hits. This is the \"expected to be affected but isn't\"\n       case: webpack is excluded from the rollout.\n\nnext.js (repo) also depends on webpack, but only as its bundler backend, not\nas a Babel-AST consumer:\n  next.js \u2514\u2500\u25b6 webpack  [packages/next/package.json \u2192 devDependencies:\n                        \"webpack\": \"5.86.0\"; root package.json \u2192 resolutions:\n                        \"webpack\": \"5.86.0\"]\n  NOTE: this pins webpack 5.86.0, which does NOT match the vendored\n  github.com/sg-evals/webpack--v5.88.2 checkout in this workspace (5.88.2 >\n  5.86.0). The edge exists in principle (Next.js bundles/depends on webpack),\n  but it is irrelevant to this rollout because the Babel AST never crosses\n  into webpack's parsing/compilation, per the point above, regardless of which\n  patch version is resolved.\n```\n\nNet result: of the three vendored repos, **only next.js actually reaches** the\nchanged Babel parser code. webpack is a dead end for this specific change.\n\n## Execution plan (topological order)\n\n1. **babel** \u2014 land the `DecoratorMetadata` node addition in\n   `@babel/parser`, with matching support in `@babel/types` (node\n   definition/builder), `@babel/traverse` (visitor keys), and\n   `@babel/generator` (codegen). These four packages live in the same\n   babel monorepo and must ship together (Makefile.source.mjs shows they're\n   version-locked via `peerDependencies[\"@babel/core\"]` bumps at release\n   time) \u2014 treat step 1 as one atomic release, not four sequential ones.\n\n2. **next.js** \u2014 update `packages/next/src/build/babel/*` (preset,\n   loader config) and any custom visitor code reachable from\n   `packages/next/src/bundles/babel/bundle.js` to recognize\n   `DecoratorMetadata` where it switches on AST node type, then bump the\n   pinned versions in `packages/next/package.json` (`@babel/core`,\n   `@babel/parser`, `@babel/traverse`, `@babel/generator`, `@babel/types`)\n   and the matching entries in the root `package.json` `resolutions` block.\n   Note: Next.js's own first-class decorator/metadata emission\n   (`emitDecoratorMetadata`) is implemented via SWC\n   (`packages/next/src/build/swc/options.ts`), not Babel \u2014 so this step is\n   about keeping Next's *Babel* transform path (used for legacy\n   `babel.config.js` overrides, `next/font`, styled-jsx's Babel plugin, etc.)\n   from choking on/mis-walking the new node, not about SWC decorator support.\n\n3. **webpack** \u2014 no action. Confirmed unaffected (see graph above). If this\n   turns out wrong later, the falsifying evidence would be a runtime\n   `dependencies` entry for a `@babel/*` package or a `require('@babel/parser')`\n   in `webpack/lib/**`; neither exists today.\n\n## Parallelization\n\n- Steps 1 and 3 have no dependency relationship (webpack doesn't consume\n  babel), so \"step 3\" is really \"no step\" and can be dropped from the critical\n  path entirely \u2014 it does not need to wait on or run alongside anything.\n- Step 2 (next.js) has a hard dependency on step 1 completing and publishing,\n  because next.js pins exact Babel versions (`7.18.0`, no `^`) rather than a\n  range \u2014 there is no float to absorb the change early. Steps 1 and 2 are\n  therefore strictly sequential, not parallelizable, unless next.js\n  temporarily points its `resolutions` at a local/pre-release babel build to\n  develop against ahead of the babel release (recommended, to de-risk step 2\n  before step 1 actually ships).\n\n## Breaking vs. compatible\n\n- **Step 1 (babel)**: compatible/additive at the parser level \u2014 a new node\n  type appearing in the AST for code that uses stage-3 decorators is not a\n  breaking change for consumers who don't pattern-match on an exhaustive\n  node-type switch. It *is* a breaking change for any consumer with a\n  non-exhaustive `switch (node.type)` that throws/asserts on an unrecognized\n  type (a common pattern in hand-rolled Babel visitors), or for tooling that\n  snapshot-tests full ASTs.\n- **Step 2 (next.js)**: compatible, provided next.js's own babel plugins\n  either already fall through safely on unknown node types or are updated in\n  lockstep with step 1. Because `packages/next/package.json` pins exact\n  versions, the *bump itself* is the risk surface, not code behavior \u2014 a bad\n  bump breaks next.js's build pipeline for every consumer, which is why it's\n  gated on step 1 (not done opportunistically via `^` ranges).\n- **Step 3 (webpack)**: N/A \u2014 no change made.\n\n## Risk assessment\n\n- **babel (step 1)** \u2014 Medium. Blast radius is every downstream consumer of\n  `@babel/parser`/`@babel/traverse` globally, not just the two repos in this\n  workspace. Mitigate with a minor (not patch) version bump per semver\n  convention for AST-shape additions, and call it out prominently in the\n  changelog so consumers auditing `switch (node.type)` exhaustiveness know to\n  check.\n- **next.js (step 2)** \u2014 Medium-low, scoped to this workspace. The concrete\n  failure mode is a non-exhaustive visitor in `packages/next/src/build/babel/`\n  silently mis-transforming code that contains stage-3 decorators (e.g.\n  dropping metadata, or a generator producing invalid output for the new\n  node). Because Next's babel path only handles a minority of builds now (SWC\n  is the default compiler), a regression here is more likely to surface as a\n  confusing edge-case bug report (opt-in `babel.config.js` users) than a\n  build-breaking failure for most users. Test plan: add a decorator +\n  stage-3-metadata fixture under `test/production/emit-decorator-metadata/`\n  (existing directory, currently SWC-only) and a parallel Babel-path fixture,\n  since the existing coverage there only exercises the SWC path\n  (`transform_options.rs`, `build/swc/options.ts`), not Babel's.\n- **webpack (step 3)** \u2014 None. No change, no risk, explicitly recorded as\n  out-of-scope with the falsifying evidence above so a future agent doesn't\n  redo this investigation.\n"
+      },
+      "condition": "combined"
+    }
+  ],
+  "cli_result_text": "Submitted. Summary of the investigation (since I only have retrieval tools, not write access \u2014 the actual `/workspace/REFACTOR_PLAN.md` needs to be written by the orchestrating agent with file-write access):\n\n**Dependency graph, established from manifests:**\n\n- **babel \u2192 next.js**: real, source-level edge. `packages/next/package.json` devDependencies pin `@babel/core`, `@babel/parser` (via root `package.json` `resolutions`), `@babel/traverse`, `@babel/generator`, `@babel/types` all at `7.18.0`. Confirmed at the code level: `packages/next/src/bundles/babel/bundle.js` does `require('@babel/parser')`, `require('@babel/traverse')`, etc. directly \u2014 Next's own Babel pipeline (`packages/next/src/build/babel/preset.ts`, `.../loader/get-config.ts`) parses and traverses user code with these packages.\n- **babel \u2192 webpack**: does NOT exist as a runtime edge. `webpack/package.json` lists `@babel/core`/`@babel/preset-react`/`babel-loader` only under `devDependencies` (used to build webpack's own examples/tests); webpack's runtime `dependencies` has no `@babel/*` entry \u2014 it parses JS with `acorn`, producing an ESTree AST, never a Babel AST. `grep` for `require('@babel` in webpack's own source returned zero hits. **webpack is excluded from the rollout** \u2014 this is the \"expected to be affected but isn't\" case the task asked me to watch for.\n- **next.js \u2192 webpack**: exists but is irrelevant here. `packages/next/package.json` pins `webpack: 5.86.0` (note: this doesn't match the vendored `webpack--v5.88.2` checkout). Since Babel ASTs never cross into webpack's compilation, this edge doesn't matter for this change.\n\n**Execution order**: babel (atomic release across parser/types/traverse/generator, which are version-locked in the monorepo) \u2192 next.js (bump the exact-pinned versions + fix any non-exhaustive `switch (node.type)` in its Babel plugin visitors). Sequential, not parallel \u2014 next.js pins exact versions with no `^` float. webpack needs no step at all.\n\n**Notable finding**: Next.js's own `emitDecoratorMetadata` support (`packages/next/src/build/swc/options.ts`) is implemented via SWC, not Babel \u2014 so this rollout affects Next's Babel fallback path (legacy `babel.config.js`, styled-jsx plugin, etc.), not its primary decorator compiler.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 1238375,
+  "output_tokens": 9578,
+  "input_tokens_uncached": 22,
+  "cache_creation_input_tokens": 96424,
+  "cache_read_input_tokens": 1141929,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "condition:combined",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.5307,
+      "10": 0.5307
+    },
+    "mrr": 0.5,
+    "map_score": 0.3889,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.25,
+    "n_retrieved": 8,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 1
+}

@@ -1,0 +1,208 @@
+{
+  "task_id": "refactor-orchestration-tri-babel-001",
+  "policy": "condition:structural",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/babel--v7.22.9",
+    "github.com/sg-evals/webpack--v5.88.2",
+    "github.com/sg-evals/next.js--v13.4.12"
+  ],
+  "retrieved_paths": [
+    "package.json",
+    "packages/next/package.json",
+    "packages/next/src/build/babel/loader/transform.ts",
+    "packages/next/src/build/babel/loader/index.ts"
+  ],
+  "required_files": [
+    "packages/babel-parser/package.json",
+    "package.json",
+    "packages/next/package.json"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 12,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.45072219999999996,
+  "elapsed_seconds": 76.4,
+  "wall_seconds": 76.4,
+  "tool_log": [
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/webpack--v5.88.2",
+        "path": "package.json"
+      },
+      "seconds": 0.0,
+      "result_chars": 10520,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "package.json"
+      },
+      "seconds": 0.0,
+      "result_chars": 9659,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/babel--v7.22.9",
+        "path": "package.json"
+      },
+      "seconds": 0.0,
+      "result_chars": 4598,
+      "hit_paths": [
+        "package.json"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "packages/next/package.json"
+      },
+      "seconds": 0.0,
+      "result_chars": 9190,
+      "hit_paths": [
+        "packages/next/package.json"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "require('@babel/$MOD')",
+        "language": "javascript"
+      },
+      "seconds": 1.52,
+      "result_chars": 226,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12"
+      },
+      "seconds": 0.015,
+      "result_chars": 3796,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12"
+      },
+      "seconds": 0.023,
+      "result_chars": 94393,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "packages/next/src/build/babel/loader/index.ts"
+      },
+      "seconds": 0.0,
+      "result_chars": 1542,
+      "hit_paths": [
+        "packages/next/src/build/babel/loader/index.ts"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/webpack--v5.88.2",
+        "path": "lib/javascript/JavascriptParser.js"
+      },
+      "seconds": 0.0,
+      "result_chars": 136239,
+      "hit_paths": [
+        "lib/javascript/JavascriptParser.js"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/next.js--v13.4.12",
+        "path": "packages/next/src/build/babel/loader/transform.ts"
+      },
+      "seconds": 0.0,
+      "result_chars": 3050,
+      "hit_paths": [
+        "packages/next/src/build/babel/loader/transform.ts"
+      ]
+    }
+  ],
+  "tool_seconds": 1.558,
+  "retrieval_result_chars": 273213,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the required files. Summary of what the manifests establish:\n\n**babel/package.json** \u2014 root of the change; a monorepo (`workspaces: [\"packages/*\", ...]`) publishing `@babel/parser`, `@babel/core`, `@babel/traverse`, `@babel/types`, `@babel/generator`, etc.\n\n**next.js** consumes Babel \u2014 established at the workspace-package level, not the repo root:\n- `packages/next/package.json` `devDependencies` pins `@babel/core@7.18.0`, `@babel/traverse@7.18.0`, `@babel/types@7.18.0`, `@babel/generator@7.18.0` (root `package.json`'s `devDependencies`/`resolutions` also pin these, but the real consuming package is `packages/next`).\n- `packages/next/src/build/babel/loader/transform.ts` proves this isn't a dormant devDependency: it imports `traverse`/`generate`/`normalizeFile` from `next/dist/compiled/babel/*` (Next's own ncc-compiled bundle of those packages) and directly calls `traverse(file.ast, visitor, file.scope)` \u2014 Next.js walks Babel's AST itself in its own custom Babel loader (used for the legacy/non-SWC compile path, custom `.babelrc`, etc.). A new `DecoratorMetadata` node type is exactly the kind of thing this traversal layer needs to know about.\n\n**webpack does NOT consume Babel** \u2014 this is the \"expected but not affected\" case the task asked me to check for. `webpack/package.json` `dependencies` (the only list that reaches webpack's runtime) declares `\"acorn\": \"^8.7.1\"` as its JS parser, no `@babel/*` entry anywhere. `@babel/core`, `@babel/preset-react`, and `babel-loader` appear only in `devDependencies`, used for webpack's own lint/test tooling (e.g. JSX fixtures), not for parsing modules it bundles. So webpack's runtime AST is acorn's ESTree-shaped tree, never a Babel AST \u2014 a `DecoratorMetadata` node babel emits is invisible to it.\n\n**next.js \u2192 webpack** exists (`packages/next/package.json` devDependency `\"webpack\": \"5.86.0\"`, bundled into `next/dist` for its default bundler), but that edge is irrelevant to this change since webpack never touches Babel's AST \u2014 confirmed independently.\n\nNet reachability graph for the Babel parser AST change: **babel \u2192 next.js** only. webpack is an unreached leaf for this specific change, despite depending on babel-adjacent tooling in devDependencies.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 734983,
+  "output_tokens": 6169,
+  "input_tokens_uncached": 16,
+  "cache_creation_input_tokens": 63686,
+  "cache_read_input_tokens": 671281,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "condition:structural",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.5,
+    "n_retrieved": 4,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 1
+}

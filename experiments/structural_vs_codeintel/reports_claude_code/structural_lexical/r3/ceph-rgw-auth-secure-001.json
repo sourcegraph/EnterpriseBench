@@ -1,0 +1,165 @@
+{
+  "task_id": "ceph-rgw-auth-secure-001",
+  "policy": "condition:structural_lexical",
+  "model": "claude-sonnet-5",
+  "suite": "security_operations",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/ceph--v19.2.0"
+  ],
+  "retrieved_paths": [
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_rest_s3.h",
+    "src/rgw/rgw_auth.h",
+    "src/rgw/rgw_auth.cc",
+    "src/rgw/rgw_auth_registry.h",
+    "src/rgw/rgw_rest_client.cc",
+    "doc/radosgw/s3/authentication.rst",
+    "doc/dev/radosgw/s3_compliance.rst"
+  ],
+  "required_files": [
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_auth.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 4,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.18286760000000002,
+  "elapsed_seconds": 12.9,
+  "wall_seconds": 12.9,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "v4_auth|AWS4-HMAC-SHA256|rgw_auth_s3",
+        "case_sensitive": false
+      },
+      "seconds": 0.811,
+      "result_chars": 9161,
+      "hit_paths": [
+        "doc/changelog/v0.67.5.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/dev/radosgw/s3_compliance.rst",
+        "doc/dev/radosgw/s3_compliance.rst",
+        "doc/radosgw/s3/authentication.rst",
+        "doc/radosgw/s3/authentication.rst",
+        "doc/radosgw/s3/java.rst",
+        "doc/radosgw/s3/php.rst",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "src/rgw/CMakeLists.txt",
+        "src/rgw/driver/rados/rgw_d3n_datacache.cc",
+        "src/rgw/driver/rados/rgw_d3n_datacache.cc",
+        "src/rgw/rgw_auth_keystone.cc",
+        "src/rgw/rgw_auth_registry.h",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "get_v2_signature|get_v4_signature|rgw_check_secret_key",
+        "case_sensitive": false
+      },
+      "seconds": 0.753,
+      "result_chars": 2638,
+      "hit_paths": [
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_loadgen.cc",
+        "src/rgw/rgw_rest_client.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc"
+      ]
+    }
+  ],
+  "tool_seconds": 1.564,
+  "retrieval_result_chars": 11799,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the relevant files for the S3 authentication implementation in Ceph RGW.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 211705,
+  "output_tokens": 812,
+  "input_tokens_uncached": 6,
+  "cache_creation_input_tokens": 34841,
+  "cache_read_input_tokens": 176858,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "ceph-rgw-auth-secure-001",
+    "config_name": "condition:structural_lexical",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.8889,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.9829,
+      "10": 0.9829
+    },
+    "mrr": 1.0,
+    "map_score": 0.95,
+    "file_recall": 1.0,
+    "context_efficiency": 0.4,
+    "n_retrieved": 10,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 4
+}

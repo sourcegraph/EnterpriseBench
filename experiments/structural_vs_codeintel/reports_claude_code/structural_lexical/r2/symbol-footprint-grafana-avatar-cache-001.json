@@ -1,0 +1,163 @@
+{
+  "task_id": "symbol-footprint-grafana-avatar-cache-001",
+  "policy": "condition:structural_lexical",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/grafana--v10.2.0"
+  ],
+  "retrieved_paths": [
+    "pkg/api/avatar/avatar.go",
+    "pkg/api/http_server.go",
+    "pkg/api/api.go",
+    "pkg/server/wire.go"
+  ],
+  "required_files": [
+    "pkg/api/api.go",
+    "pkg/api/avatar/avatar.go",
+    "pkg/api/http_server.go"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 4,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.202015,
+  "elapsed_seconds": 14.7,
+  "wall_seconds": 14.7,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "AvatarCacheServer",
+        "case_sensitive": false
+      },
+      "seconds": 0.06,
+      "result_chars": 4424,
+      "hit_paths": [
+        "pkg/api/api.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar_test.go",
+        "pkg/api/avatar/avatar_test.go",
+        "pkg/api/avatar/avatar_test.go",
+        "pkg/api/avatar/avatar_test.go",
+        "pkg/api/http_server.go",
+        "pkg/api/http_server.go",
+        "pkg/api/http_server.go",
+        "pkg/server/wire.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "avatar\\.",
+        "case_sensitive": false
+      },
+      "seconds": 0.16,
+      "result_chars": 8500,
+      "hit_paths": [
+        "docs/sources/dashboards/assess-dashboard-usage/index.md",
+        "packages/grafana-ui/src/components/UsersIndicator/Avatar.mdx",
+        "packages/grafana-ui/src/components/UsersIndicator/Avatar.mdx",
+        "packages/grafana-ui/src/components/UsersIndicator/Avatar.story.tsx",
+        "packages/grafana-ui/src/components/UsersIndicator/Avatar.story.tsx",
+        "packages/grafana-ui/src/components/UsersIndicator/UserIcon.mdx",
+        "packages/grafana-ui/src/components/UsersIndicator/UserIcon.mdx",
+        "packages/grafana-ui/src/components/UsersIndicator/UserIcon.test.tsx",
+        "packages/grafana-ui/src/components/UsersIndicator/UserIcon.test.tsx",
+        "packages/grafana-ui/src/components/UsersIndicator/UsersIndicator.mdx",
+        "packages/grafana-ui/src/components/UsersIndicator/UsersIndicator.mdx",
+        "packages/grafana-ui/src/components/UsersIndicator/UsersIndicator.mdx",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/avatar/avatar.go",
+        "pkg/api/http_server.go",
+        "pkg/api/http_server.go",
+        "pkg/login/social/gitlab_oauth_test.go",
+        "pkg/login/social/gitlab_oauth_test.go",
+        "pkg/login/social/gitlab_oauth_test.go",
+        "pkg/server/wire.go"
+      ]
+    }
+  ],
+  "tool_seconds": 0.22,
+  "retrieval_result_chars": 12924,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the 4 source files under `pkg/` that declare or name `AvatarCacheServer`:\n\n1. **pkg/api/avatar/avatar.go** \u2014 declares the `AvatarCacheServer` type, its constructor (`ProvideAvatarCacheServer`/`newCacheServer`), and its `Handler` method.\n2. **pkg/api/http_server.go** \u2014 holds it as a field on `HTTPServer`, takes it as a constructor parameter, and assigns it during server construction.\n3. **pkg/api/api.go** \u2014 wires the `/avatar/:hash` route to `hs.AvatarCacheServer.Handler`.\n4. **pkg/server/wire.go** \u2014 registers `avatar.ProvideAvatarCacheServer` in the Wire DI provider set.\n\nExcluded `pkg/api/avatar/avatar_test.go` (test file) per instructions.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 284031,
+  "output_tokens": 1034,
+  "input_tokens_uncached": 8,
+  "cache_creation_input_tokens": 35488,
+  "cache_read_input_tokens": 248535,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "symbol-footprint-grafana-avatar-cache-001",
+    "config_name": "condition:structural_lexical",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.75,
+    "n_retrieved": 4,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 1
+}

@@ -1,0 +1,254 @@
+{
+  "task_id": "refactor-orchestration-tri-spring-001",
+  "policy": "condition:combined",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/spring-kafka--v3.0.9",
+    "github.com/sg-evals/spring-framework--v6.0.11",
+    "github.com/sg-evals/spring-boot--v3.1.2"
+  ],
+  "retrieved_paths": [
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/AbstractMessageListenerContainer.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/KafkaMessageListenerContainer.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/ContainerProperties.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/config/AbstractKafkaListenerContainerFactory.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/config/ConcurrentKafkaListenerContainerFactory.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/MessageListener.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/GenericMessageListener.java",
+    "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerMockTests.java",
+    "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+    "spring-kafka/src/test/java/org/springframework/kafka/listener/KafkaMessageListenerContainerTests.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAnnotationDrivenConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/ConcurrentKafkaListenerContainerFactoryConfigurer.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaProperties.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfigurationTests.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfigurationIntegrationTests.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/kafka/KafkaPropertiesTests.java",
+    "spring-context/src/main/java/org/springframework/context/SmartLifecycle.java",
+    "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+    "spring-kafka-docs/src/main/asciidoc/changes-since-1.0.adoc"
+  ],
+  "required_files": [
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java",
+    "spring-messaging/src/main/java/org/springframework/messaging/handler/annotation/support/MessageHandlerMethodFactory.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfiguration.java"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "combined",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "definition",
+    "references",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax + resolved symbol identity",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 8,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.246563,
+  "elapsed_seconds": 27.0,
+  "wall_seconds": 27.0,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class (KafkaMessageListenerContainer|ConcurrentMessageListenerContainer|AbstractMessageListenerContainer)",
+        "case_sensitive": false
+      },
+      "seconds": 0.466,
+      "result_chars": 2931,
+      "hit_paths": [
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/AbstractMessageListenerContainer.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/KafkaMessageListenerContainer.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerMockTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/KafkaMessageListenerContainerTests.java",
+        "spring-jms/src/main/java/org/springframework/jms/listener/AbstractMessageListenerContainer.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "KafkaListenerContainerFactory|ConcurrentKafkaListenerContainerFactory",
+        "case_sensitive": false
+      },
+      "seconds": 0.048,
+      "result_chars": 8217,
+      "hit_paths": [
+        "spring-kafka-docs/src/main/asciidoc/changes-since-1.0.adoc",
+        "spring-kafka-docs/src/main/asciidoc/changes-since-1.0.adoc",
+        "spring-kafka-docs/src/main/asciidoc/changes-since-1.0.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class KafkaProperties|Listener.*setConcurrency|concurrency",
+        "case_sensitive": false
+      },
+      "seconds": 0.027,
+      "result_chars": 8893,
+      "hit_paths": [
+        "spring-kafka-docs/src/main/asciidoc/changes-since-1.0.adoc",
+        "spring-kafka-docs/src/main/asciidoc/changes-since-1.0.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class KafkaAutoConfiguration|class KafkaProperties|ConcurrentKafkaListenerContainerFactoryConfigurer",
+        "case_sensitive": false
+      },
+      "seconds": 0.661,
+      "result_chars": 4357,
+      "hit_paths": [
+        "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/ConcurrentKafkaListenerContainerFactoryConfigurer.java",
+        "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAnnotationDrivenConfiguration.java",
+        "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAnnotationDrivenConfiguration.java",
+        "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAnnotationDrivenConfiguration.java",
+        "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfiguration.java",
+        "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaProperties.java",
+        "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfigurationIntegrationTests.java",
+        "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfigurationTests.java",
+        "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/kafka/KafkaPropertiesTests.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class AbstractKafkaListenerContainerFactory|class ContainerProperties",
+        "case_sensitive": false
+      },
+      "seconds": 0.504,
+      "result_chars": 852,
+      "hit_paths": [
+        "spring-kafka/src/main/java/org/springframework/kafka/config/AbstractKafkaListenerContainerFactory.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/ContainerProperties.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "interface SmartLifecycle|interface MessageListener\\b",
+        "case_sensitive": false
+      },
+      "seconds": 0.493,
+      "result_chars": 1394,
+      "hit_paths": [
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/MessageListener.java",
+        "framework-docs/modules/ROOT/pages/core/beans/factory-nature.adoc",
+        "spring-context/src/main/java/org/springframework/context/SmartLifecycle.java"
+      ]
+    }
+  ],
+  "tool_seconds": 2.199,
+  "retrieval_result_chars": 26644,
+  "denied_tools": [],
+  "cli_result_text": "Files submitted.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 303534,
+  "output_tokens": 2848,
+  "input_tokens_uncached": 8,
+  "cache_creation_input_tokens": 41411,
+  "cache_read_input_tokens": 262115,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "refactor-orchestration-tri-spring-001",
+    "config_name": "condition:combined",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.2961,
+      "10": 0.2961
+    },
+    "mrr": 0.5,
+    "map_score": 0.2222,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.0952,
+    "n_retrieved": 21,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 5
+}

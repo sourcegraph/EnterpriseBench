@@ -1,0 +1,420 @@
+{
+  "task_id": "refactor-orchestration-tri-spring-001",
+  "policy": "condition:lexical",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/spring-kafka--v3.0.9",
+    "github.com/sg-evals/spring-framework--v6.0.11",
+    "github.com/sg-evals/spring-boot--v3.1.2"
+  ],
+  "retrieved_paths": [
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/AbstractMessageListenerContainer.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/KafkaMessageListenerContainer.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/MessageListenerContainer.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/ContainerProperties.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/config/ConcurrentKafkaListenerContainerFactory.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/config/AbstractKafkaListenerEndpoint.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/config/KafkaListenerEndpoint.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/annotation/KafkaListenerAnnotationBeanPostProcessor.java",
+    "spring-kafka/src/main/java/org/springframework/kafka/annotation/EnableKafka.java",
+    "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+    "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerMockTests.java",
+    "spring-kafka/src/test/java/org/springframework/kafka/listener/KafkaMessageListenerContainerTests.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/ConcurrentKafkaListenerContainerFactoryConfigurer.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAnnotationDrivenConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaProperties.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfigurationTests.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfigurationIntegrationTests.java",
+    "spring-context/src/main/java/org/springframework/context/SmartLifecycle.java",
+    "spring-core/src/main/java/org/springframework/core/task/AsyncTaskExecutor.java",
+    "spring-core/src/main/java/org/springframework/core/task/SimpleAsyncTaskExecutor.java"
+  ],
+  "required_files": [
+    "spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java",
+    "spring-messaging/src/main/java/org/springframework/messaging/handler/annotation/support/MessageHandlerMethodFactory.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfiguration.java"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "lexical",
+  "condition_tools": [
+    "grep",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 21,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.39122360000000006,
+  "elapsed_seconds": 54.8,
+  "wall_seconds": 54.8,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class ConcurrentMessageListenerContainer",
+        "case_sensitive": false
+      },
+      "seconds": 0.194,
+      "result_chars": 1293,
+      "hit_paths": [
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerMockTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class KafkaMessageListenerContainer",
+        "case_sensitive": false
+      },
+      "seconds": 0.152,
+      "result_chars": 813,
+      "hit_paths": [
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/KafkaMessageListenerContainer.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/KafkaMessageListenerContainerTests.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class AbstractMessageListenerContainer",
+        "case_sensitive": false
+      },
+      "seconds": 0.17,
+      "result_chars": 845,
+      "hit_paths": [
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/AbstractMessageListenerContainer.java",
+        "spring-jms/src/main/java/org/springframework/jms/listener/AbstractMessageListenerContainer.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class ContainerProperties",
+        "case_sensitive": false
+      },
+      "seconds": 0.17,
+      "result_chars": 388,
+      "hit_paths": [
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/ContainerProperties.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "interface MessageListenerContainer",
+        "case_sensitive": false
+      },
+      "seconds": 0.24,
+      "result_chars": 809,
+      "hit_paths": [
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/MessageListenerContainer.java",
+        "spring-jms/src/main/java/org/springframework/jms/listener/MessageListenerContainer.java"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-kafka--v3.0.9",
+        "path": "spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 14108,
+      "hit_paths": [
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-kafka--v3.0.9",
+        "path": "spring-kafka/src/main/java/org/springframework/kafka/listener/AbstractMessageListenerContainer.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 22328,
+      "hit_paths": [
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/AbstractMessageListenerContainer.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "interface SmartLifecycle",
+        "case_sensitive": false
+      },
+      "seconds": 0.252,
+      "result_chars": 710,
+      "hit_paths": [
+        "framework-docs/modules/ROOT/pages/core/beans/factory-nature.adoc",
+        "spring-context/src/main/java/org/springframework/context/SmartLifecycle.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "interface AsyncTaskExecutor",
+        "case_sensitive": false
+      },
+      "seconds": 0.209,
+      "result_chars": 373,
+      "hit_paths": [
+        "spring-core/src/main/java/org/springframework/core/task/AsyncTaskExecutor.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class SimpleAsyncTaskExecutor",
+        "case_sensitive": false
+      },
+      "seconds": 0.33,
+      "result_chars": 762,
+      "hit_paths": [
+        "spring-core/src/main/java/org/springframework/core/task/SimpleAsyncTaskExecutor.java",
+        "spring-core/src/test/java/org/springframework/core/task/SimpleAsyncTaskExecutorTests.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class ConcurrentKafkaListenerContainerFactory",
+        "case_sensitive": false
+      },
+      "seconds": 0.225,
+      "result_chars": 947,
+      "hit_paths": [
+        "spring-kafka/src/main/java/org/springframework/kafka/config/ConcurrentKafkaListenerContainerFactory.java",
+        "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/ConcurrentKafkaListenerContainerFactoryConfigurer.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class KafkaAutoConfiguration",
+        "case_sensitive": false
+      },
+      "seconds": 0.257,
+      "result_chars": 1394,
+      "hit_paths": [
+        "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfiguration.java",
+        "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfigurationIntegrationTests.java",
+        "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfigurationTests.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "setConcurrency|getConcurrency",
+        "case_sensitive": false
+      },
+      "seconds": 0.059,
+      "result_chars": 15107,
+      "hit_paths": [
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/retrytopic.adoc",
+        "spring-kafka-docs/src/main/asciidoc/retrytopic.adoc",
+        "spring-kafka/src/main/java/org/springframework/kafka/annotation/EnableKafka.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/annotation/KafkaListenerAnnotationBeanPostProcessor.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/config/AbstractKafkaListenerEndpoint.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/config/AbstractKafkaListenerEndpoint.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/config/ConcurrentKafkaListenerContainerFactory.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/config/ConcurrentKafkaListenerContainerFactory.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/config/ConcurrentKafkaListenerContainerFactory.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/config/ConcurrentKafkaListenerContainerFactory.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/config/ConcurrentKafkaListenerContainerFactory.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/config/KafkaListenerEndpoint.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/config/KafkaListenerEndpointAdapter.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainer.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/retrytopic/RetryTopicConfiguration.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/retrytopic/RetryTopicConfigurer.java",
+        "spring-kafka/src/main/java/org/springframework/kafka/retrytopic/RetryTopicConfigurer.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/annotation/ContainerFactoryTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/AsyncAckAfterHandleTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerMockTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/listener/ConcurrentMessageListenerContainerTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/retrytopic/ExistingRetryTopicIntegrationTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/retrytopic/ExistingRetryTopicIntegrationTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/retrytopic/RetryTopicConfigurationProviderTests.java",
+        "spring-kafka/src/test/java/org/springframework/kafka/retrytopic/RetryTopicExceptionRoutingIntegrationTests.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "concurrency",
+        "case_sensitive": false
+      },
+      "seconds": 0.026,
+      "result_chars": 7114,
+      "hit_paths": [
+        "spring-kafka-docs/src/main/asciidoc/changes-since-1.0.adoc",
+        "spring-kafka-docs/src/main/asciidoc/changes-since-1.0.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-boot--v3.1.2",
+        "path": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/ConcurrentKafkaListenerContainerFactoryConfigurer.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 8649,
+      "hit_paths": [
+        "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/ConcurrentKafkaListenerContainerFactoryConfigurer.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class Listener|private Integer concurrency",
+        "case_sensitive": false
+      },
+      "seconds": 0.037,
+      "result_chars": 3040,
+      "hit_paths": [
+        "samples/sample-03/src/main/java/com/example/Application.java",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/kafka.adoc",
+        "spring-kafka-docs/src/main/asciidoc/retrytopic.adoc",
+        "spring-kafka-docs/src/main/asciidoc/tips.adoc",
+        "spring-kafka-docs/src/main/java/org/springframework/kafka/jdocs/started/noboot/Listener.java",
+        "spring-kafka-docs/src/main/kotlin/org/springframework/kafka/kdocs/started/noboot/Listener.kt",
+        "spring-kafka/src/main/java/org/springframework/kafka/annotation/KafkaListenerAnnotationBeanPostProcessor.java"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-boot--v3.1.2",
+        "path": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfiguration.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 10353,
+      "hit_paths": [
+        "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfiguration.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class KafkaAnnotationDrivenConfiguration",
+        "case_sensitive": false
+      },
+      "seconds": 0.228,
+      "result_chars": 484,
+      "hit_paths": [
+        "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAnnotationDrivenConfiguration.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class KafkaProperties",
+        "case_sensitive": false
+      },
+      "seconds": 0.357,
+      "result_chars": 866,
+      "hit_paths": [
+        "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaProperties.java",
+        "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/kafka/KafkaPropertiesTests.java"
+      ]
+    }
+  ],
+  "tool_seconds": 2.906,
+  "retrieval_result_chars": 90383,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file set for the Spring Kafka listener container threading refactor across all three repos, ordered by importance:\n\n**spring-kafka (primary implementation)**\n- `AbstractMessageListenerContainer.java` \u2014 base lifecycle/threading contract (SmartLifecycle, phase, error handlers)\n- `KafkaMessageListenerContainer.java` \u2014 single-threaded container being generalized\n- `ConcurrentMessageListenerContainer.java` \u2014 the concurrency wrapper; owns `setConcurrency()`, spawns N `KafkaMessageListenerContainer` children, assigns partitions/executors\n- `MessageListenerContainer.java` \u2014 the container interface (`SmartLifecycle`, `DisposableBean`)\n- `ContainerProperties.java` \u2014 shared config carried into each child container\n- `ConcurrentKafkaListenerContainerFactory.java` / `AbstractKafkaListenerEndpoint.java` / `KafkaListenerEndpoint.java` \u2014 factory/endpoint layer that sets concurrency per `@KafkaListener`\n- `KafkaListenerAnnotationBeanPostProcessor.java` / `EnableKafka.java` \u2014 annotation-driven wiring entry point\n- Test files for both container classes \u2014 needed to update/extend alongside the refactor\n\n**spring-boot (autoconfiguration consumer)**\n- `ConcurrentKafkaListenerContainerFactoryConfigurer.java` \u2014 maps `KafkaProperties.Listener` \u2192 factory/container properties, including `concurrency`\n- `KafkaAutoConfiguration.java` / `KafkaAnnotationDrivenConfiguration.java` \u2014 autoconfig beans wiring the factory\n- `KafkaProperties.java` \u2014 `spring.kafka.listener.concurrency` property surface\n- Integration/unit test files for the autoconfiguration\n\n**spring-framework (core abstractions)**\n- `SmartLifecycle.java` \u2014 lifecycle interface all containers implement\n- `AsyncTaskExecutor.java` / `SimpleAsyncTaskExecutor.java` \u2014 threading primitives `ConcurrentMessageListenerContainer` uses per-child-consumer thread\n\nNote: spring-framework has no Kafka-specific `MessageListenerContainer` (that name only exists for JMS in `spring-jms`); the actual cross-repo dependency is these lower-level `spring-core`/`spring-context` threading and lifecycle abstractions that spring-kafka builds on.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 771947,
+  "output_tokens": 5694,
+  "input_tokens_uncached": 16,
+  "cache_creation_input_tokens": 47333,
+  "cache_read_input_tokens": 724598,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "refactor-orchestration-tri-spring-001",
+    "config_name": "condition:lexical",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.2346,
+      "10": 0.2346
+    },
+    "mrr": 0.3333,
+    "map_score": 0.1556,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.0909,
+    "n_retrieved": 22,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 5
+}

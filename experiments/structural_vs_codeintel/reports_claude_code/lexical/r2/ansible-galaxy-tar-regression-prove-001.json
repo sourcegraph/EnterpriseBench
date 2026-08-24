@@ -1,0 +1,184 @@
+{
+  "task_id": "ansible-galaxy-tar-regression-prove-001",
+  "policy": "condition:lexical",
+  "model": "claude-sonnet-5",
+  "suite": "incident_response",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/ansible--v2.16.0"
+  ],
+  "retrieved_paths": [
+    "lib/ansible/galaxy/collection/__init__.py",
+    "test/units/galaxy/test_collection.py",
+    "lib/ansible/galaxy/collection/concrete_artifact_manager.py",
+    "test/units/cli/test_galaxy.py"
+  ],
+  "required_files": [
+    "lib/ansible/galaxy/collection/__init__.py",
+    "lib/ansible/galaxy/collection/concrete_artifact_manager.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "lexical",
+  "condition_tools": [
+    "grep",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 6,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.22369779999999997,
+  "elapsed_seconds": 20.0,
+  "wall_seconds": 20.0,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "getmember",
+        "case_sensitive": false
+      },
+      "seconds": 0.496,
+      "result_chars": 4727,
+      "hit_paths": [
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/concrete_artifact_manager.py",
+        "lib/ansible/galaxy/role.py",
+        "lib/ansible/module_utils/powershell/Ansible.ModuleUtils.WebRequest.psm1",
+        "lib/ansible/module_utils/powershell/Ansible.ModuleUtils.WebRequest.psm1",
+        "packaging/release.py",
+        "test/sanity/code-smell/package-data.py",
+        "test/support/windows-integration/collections/ansible_collections/ansible/windows/plugins/module_utils/WebRequest.psm1",
+        "test/support/windows-integration/collections/ansible_collections/ansible/windows/plugins/module_utils/WebRequest.psm1",
+        "test/units/cli/test_galaxy.py",
+        "test/units/galaxy/test_collection.py",
+        "test/units/galaxy/test_collection.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "CPython.*bug|workaround.*tar|tar.*workaround",
+        "case_sensitive": false
+      },
+      "seconds": 0.167,
+      "result_chars": 389,
+      "hit_paths": [
+        "test/integration/targets/interpreter_discovery_python/aliases"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ansible--v2.16.0",
+        "path": "lib/ansible/galaxy/collection/__init__.py"
+      },
+      "seconds": 0.001,
+      "result_chars": 78192,
+      "hit_paths": [
+        "lib/ansible/galaxy/collection/__init__.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "removesuffix|normalized|_get_tar_file_member|_extract_tar_dir",
+        "case_sensitive": false
+      },
+      "seconds": 0.242,
+      "result_chars": 8669,
+      "hit_paths": [
+        "changelogs/CHANGELOG-v2.16.rst",
+        "changelogs/changelog.yaml",
+        "changelogs/fragments/first_found_fixes.yml",
+        "lib/ansible/executor/module_common.py",
+        "lib/ansible/executor/module_common.py",
+        "lib/ansible/executor/module_common.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/dependency_resolution/providers.py",
+        "lib/ansible/module_utils/distro/_distro.py",
+        "lib/ansible/module_utils/distro/_distro.py",
+        "lib/ansible/module_utils/distro/_distro.py",
+        "lib/ansible/module_utils/distro/_distro.py",
+        "lib/ansible/module_utils/distro/_distro.py",
+        "lib/ansible/module_utils/distro/_distro.py",
+        "lib/ansible/module_utils/distro/_distro.py",
+        "lib/ansible/module_utils/distro/_distro.py",
+        "lib/ansible/module_utils/distro/_distro.py",
+        "lib/ansible/module_utils/distro/_distro.py",
+        "lib/ansible/module_utils/parsing/convert_bool.py",
+        "lib/ansible/module_utils/parsing/convert_bool.py"
+      ]
+    }
+  ],
+  "tool_seconds": 0.906,
+  "retrieval_result_chars": 91977,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. The root-cause file is `lib/ansible/galaxy/collection/__init__.py`, which contains:\n\n- `install_collection()` building `collection_tar._ansible_normalized_cache = {m.name.removesuffix(os.path.sep): m for m in collection_tar.getmembers()}` \u2014 the custom normalized-name index.\n- `_extract_tar_dir(tar, dirname, b_dest)` \u2014 strips the trailing separator from `dirname` and looks it up via `tar._ansible_normalized_cache[dirname]` instead of `tar.getmember(dirname)`.\n- `_get_tar_file_member(tar, filename)` \u2014 the standard-lookup counterpart used for files, showing the asymmetry between file lookup (via `getmember`) and directory lookup (via the custom cache).\n\nIncluded `test/units/galaxy/test_collection.py` and `test/units/cli/test_galaxy.py` as existing test precedent for tar-member fixtures/patterns, and `concrete_artifact_manager.py` since it also calls `getmember()` on collection tarballs and is part of the same extraction pathway.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 358691,
+  "output_tokens": 1369,
+  "input_tokens_uncached": 10,
+  "cache_creation_input_tokens": 36382,
+  "cache_read_input_tokens": 322299,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "ansible-galaxy-tar-regression-prove-001",
+    "config_name": "condition:lexical",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.8,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.9197,
+      "5": 0.9197,
+      "10": 0.9197
+    },
+    "mrr": 1.0,
+    "map_score": 0.8333,
+    "file_recall": 1.0,
+    "context_efficiency": 0.5,
+    "n_retrieved": 4,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 5
+}

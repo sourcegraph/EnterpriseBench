@@ -1,0 +1,150 @@
+{
+  "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+  "policy": "condition:combined",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/flask--2.3.3",
+    "github.com/sg-evals/werkzeug--2.3.7"
+  ],
+  "retrieved_paths": [
+    "src/werkzeug/local.py",
+    "src/flask/globals.py",
+    "src/flask/ctx.py",
+    "docs/local.rst",
+    "docs/reqcontext.rst",
+    "CHANGES.rst",
+    "src/flask/app.py"
+  ],
+  "required_files": [
+    "flask/src/flask/globals.py",
+    "flask/src/flask/ctx.py",
+    "werkzeug/src/werkzeug/local.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "combined",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "definition",
+    "references",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax + resolved symbol identity",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 4,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.16675559999999998,
+  "elapsed_seconds": 10.6,
+  "wall_seconds": 10.6,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class LocalProxy|class Local\\b",
+        "case_sensitive": false
+      },
+      "seconds": 0.045,
+      "result_chars": 417,
+      "hit_paths": [
+        "src/werkzeug/local.py",
+        "src/werkzeug/local.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "ContextVar",
+        "case_sensitive": false
+      },
+      "seconds": 0.033,
+      "result_chars": 5683,
+      "hit_paths": [
+        "docs/reqcontext.rst",
+        "requirements/typing.in",
+        "requirements/typing.txt",
+        "src/flask/ctx.py",
+        "src/flask/ctx.py",
+        "src/flask/ctx.py",
+        "src/flask/globals.py",
+        "src/flask/globals.py",
+        "src/flask/globals.py",
+        "src/flask/globals.py",
+        "CHANGES.rst",
+        "CHANGES.rst",
+        "CHANGES.rst",
+        "docs/local.rst",
+        "docs/local.rst",
+        "docs/local.rst",
+        "docs/local.rst",
+        "docs/local.rst",
+        "docs/local.rst",
+        "requirements/typing.in",
+        "requirements/typing.txt",
+        "src/werkzeug/debug/console.py",
+        "src/werkzeug/debug/console.py",
+        "src/werkzeug/debug/console.py",
+        "src/werkzeug/local.py"
+      ]
+    }
+  ],
+  "tool_seconds": 0.078,
+  "retrieval_result_chars": 6100,
+  "denied_tools": [],
+  "cli_result_text": "Submitted.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 206742,
+  "output_tokens": 483,
+  "input_tokens_uncached": 6,
+  "cache_creation_input_tokens": 31728,
+  "cache_read_input_tokens": 175008,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "condition:combined",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.4286,
+    "n_retrieved": 7,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 4
+}

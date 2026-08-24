@@ -1,0 +1,190 @@
+{
+  "task_id": "ansible-galaxy-tar-regression-prove-001",
+  "policy": "condition:lexical",
+  "model": "claude-sonnet-5",
+  "suite": "incident_response",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/ansible--v2.16.0"
+  ],
+  "retrieved_paths": [
+    "lib/ansible/galaxy/collection/__init__.py",
+    "test/units/galaxy/test_collection.py"
+  ],
+  "required_files": [
+    "lib/ansible/galaxy/collection/__init__.py",
+    "lib/ansible/galaxy/collection/concrete_artifact_manager.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "lexical",
+  "condition_tools": [
+    "grep",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 8,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.491652,
+  "elapsed_seconds": 24.2,
+  "wall_seconds": 24.2,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "_tarfile_members|getmember|normalized.*member|CPython.*tarfile|TarFile.*bug",
+        "case_sensitive": false
+      },
+      "seconds": 0.061,
+      "result_chars": 4727,
+      "hit_paths": [
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/concrete_artifact_manager.py",
+        "lib/ansible/galaxy/role.py",
+        "lib/ansible/module_utils/powershell/Ansible.ModuleUtils.WebRequest.psm1",
+        "lib/ansible/module_utils/powershell/Ansible.ModuleUtils.WebRequest.psm1",
+        "packaging/release.py",
+        "test/sanity/code-smell/package-data.py",
+        "test/support/windows-integration/collections/ansible_collections/ansible/windows/plugins/module_utils/WebRequest.psm1",
+        "test/support/windows-integration/collections/ansible_collections/ansible/windows/plugins/module_utils/WebRequest.psm1",
+        "test/units/cli/test_galaxy.py",
+        "test/units/galaxy/test_collection.py",
+        "test/units/galaxy/test_collection.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class GalaxyCollection|def install_src|def extract_tar",
+        "case_sensitive": false
+      },
+      "seconds": 0.047,
+      "result_chars": 326,
+      "hit_paths": [
+        "lib/ansible/galaxy/collection/__init__.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ansible--v2.16.0",
+        "path": "lib/ansible/galaxy/collection/__init__.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 78192,
+      "hit_paths": [
+        "lib/ansible/galaxy/collection/__init__.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "removesuffix|_get_tar_file_member|def _extract_tar_dir|normalized_pkg_dir",
+        "case_sensitive": false
+      },
+      "seconds": 0.036,
+      "result_chars": 4053,
+      "hit_paths": [
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/galaxy/collection/__init__.py",
+        "lib/ansible/playbook/included_file.py",
+        "lib/ansible/playbook/role_include.py",
+        "lib/ansible/utils/collection_loader/_collection_finder.py",
+        "packaging/release.py",
+        "test/units/galaxy/test_collection.py",
+        "test/units/galaxy/test_collection.py",
+        "test/units/galaxy/test_collection.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ansible--v2.16.0",
+        "path": "test/units/galaxy/test_collection.py"
+      },
+      "seconds": 0.001,
+      "result_chars": 45049,
+      "hit_paths": [
+        "test/units/galaxy/test_collection.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "def _extract_tar_dir",
+        "case_sensitive": false
+      },
+      "seconds": 0.02,
+      "result_chars": 277,
+      "hit_paths": [
+        "lib/ansible/galaxy/collection/__init__.py"
+      ]
+    }
+  ],
+  "tool_seconds": 0.165,
+  "retrieval_result_chars": 132624,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the two files required for this task:\n\n1. **`lib/ansible/galaxy/collection/__init__.py`** \u2014 contains `_extract_tar_dir()`, the buggy function. It builds a private cache `{m.name.removesuffix(os.path.sep): m for m in collection_tar.getmembers()}` and looks up `dirname.removesuffix(os.path.sep)` against it, instead of calling `tar.getmember()` directly (the CPython workaround referenced in the issue).\n\n2. **`test/units/galaxy/test_collection.py`** \u2014 the existing unit test module with the `tmp_tarfile` fixture and sibling tests (`test_get_tar_file_member`, `test_extract_tar_file_*`) that establish the fixture/assertion conventions the regression test should follow.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 567222,
+  "output_tokens": 1643,
+  "input_tokens_uncached": 14,
+  "cache_creation_input_tokens": 95198,
+  "cache_read_input_tokens": 472010,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "ansible-galaxy-tar-regression-prove-001",
+    "config_name": "condition:lexical",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.5,
+    "n_retrieved": 2,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 1
+}

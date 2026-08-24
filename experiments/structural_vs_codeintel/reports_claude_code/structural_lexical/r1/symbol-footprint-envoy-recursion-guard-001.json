@@ -1,0 +1,192 @@
+{
+  "task_id": "symbol-footprint-envoy-recursion-guard-001",
+  "policy": "condition:structural_lexical",
+  "model": "claude-sonnet-5",
+  "suite": "technical_debt",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.31.2"
+  ],
+  "retrieved_paths": [
+    "source/common/common/debug_recursion_checker.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/upstream/conn_pool_map_impl.h"
+  ],
+  "required_files": [
+    "source/common/common/debug_recursion_checker.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/upstream/conn_pool_map_impl.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 9,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.3517268,
+  "elapsed_seconds": 26.8,
+  "wall_seconds": 26.8,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "AutoDebugRecursionChecker",
+        "case_sensitive": false
+      },
+      "seconds": 0.141,
+      "result_chars": 2348,
+      "hit_paths": [
+        "source/common/common/debug_recursion_checker.h",
+        "source/common/common/debug_recursion_checker.h",
+        "source/common/common/debug_recursion_checker.h",
+        "source/common/conn_pool/conn_pool_base.cc",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h",
+        "source/common/upstream/conn_pool_map_impl.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "debug_recursion_checker",
+        "case_sensitive": false
+      },
+      "seconds": 0.156,
+      "result_chars": 2086,
+      "hit_paths": [
+        "source/common/common/BUILD",
+        "source/common/common/BUILD",
+        "source/common/conn_pool/BUILD",
+        "source/common/conn_pool/conn_pool_base.cc",
+        "source/common/conn_pool/conn_pool_base.h",
+        "source/common/upstream/BUILD",
+        "source/common/upstream/BUILD",
+        "source/common/upstream/conn_pool_map.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/conn_pool/conn_pool_base.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 18126,
+      "hit_paths": [
+        "source/common/conn_pool/conn_pool_base.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/upstream/conn_pool_map.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 2741,
+      "hit_paths": [
+        "source/common/upstream/conn_pool_map.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/common/debug_recursion_checker.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 785,
+      "hit_paths": [
+        "source/common/common/debug_recursion_checker.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/upstream/conn_pool_map_impl.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 5703,
+      "hit_paths": [
+        "source/common/upstream/conn_pool_map_impl.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/envoy--v1.31.2",
+        "path": "source/common/conn_pool/conn_pool_base.cc"
+      },
+      "seconds": 0.0,
+      "result_chars": 37747,
+      "hit_paths": [
+        "source/common/conn_pool/conn_pool_base.cc"
+      ]
+    }
+  ],
+  "tool_seconds": 0.297,
+  "retrieval_result_chars": 69536,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Blast radius of removing `AutoDebugRecursionChecker`:\n\n1. **`source/common/common/debug_recursion_checker.h`** \u2014 declares the type (constructor/destructor RAII wrapper around `DebugRecursionChecker::enter()`/`exit()`); this is where the class is removed and its assertion logic would need to fold into callers.\n2. **`source/common/conn_pool/conn_pool_base.cc`** \u2014 instantiates `Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);` in `ConnPoolImplBase::closeIdleConnectionsForDrainingPool()`.\n3. **`source/common/upstream/conn_pool_map_impl.h`** \u2014 instantiates it in three `ConnPoolMap<KEY_TYPE, POOL_TYPE>` methods: `getPool()`, `erasePool()`, `clear()`, and `addIdleCallback()` (four call sites total across those methods).\n\nNote: `source/common/conn_pool/conn_pool_base.h` and `source/common/upstream/conn_pool_map.h` include the header and declare `Common::DebugRecursionChecker recursion_checker_` members, but neither names `AutoDebugRecursionChecker` itself, so they don't require edits for this specific rename/fold.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 485392,
+  "output_tokens": 2212,
+  "input_tokens_uncached": 12,
+  "cache_creation_input_tokens": 61186,
+  "cache_read_input_tokens": 424194,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "symbol-footprint-envoy-recursion-guard-001",
+    "config_name": "condition:structural_lexical",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 3,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 5
+}

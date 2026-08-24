@@ -1,0 +1,256 @@
+{
+  "task_id": "error-prov-dual-netty-spring-001",
+  "policy": "condition:structural",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/netty--netty-4.1.100.Final",
+    "github.com/sg-evals/spring-framework--v6.0.11"
+  ],
+  "retrieved_paths": [
+    "spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java",
+    "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+    "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java",
+    "spring-web/src/main/java/org/springframework/web/server/WebExceptionHandler.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorServerHttpResponse.java",
+    "transport/src/main/java/io/netty/channel/ChannelInboundHandlerAdapter.java",
+    "transport/src/main/java/io/netty/handler/ssl/SslHandler.java",
+    "transport/src/main/java/io/netty/channel/ChannelInitializer.java"
+  ],
+  "required_files": [
+    "netty/handler/src/main/java/io/netty/handler/codec/http/HttpServerCodec.java",
+    "spring-framework/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 16,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.3607632,
+  "elapsed_seconds": 58.0,
+  "wall_seconds": 58.0,
+  "tool_log": [
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "exceptionCaught($$$ARGS)",
+        "language": "java"
+      },
+      "seconds": 0.503,
+      "result_chars": 1055,
+      "hit_paths": [
+        "transport/src/main/java/io/netty/channel/ChannelInitializer.java",
+        "handler/src/main/java/io/netty/handler/ssl/ApplicationProtocolNegotiationHandler.java",
+        "handler/src/main/java/io/netty/handler/ssl/SslHandler.java"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-framework--v6.0.11"
+      },
+      "seconds": 0.007,
+      "result_chars": 176390,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/netty--netty-4.1.100.Final",
+        "path": "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 50842,
+      "hit_paths": [
+        "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class ReactorHttpHandlerAdapter",
+        "language": "java"
+      },
+      "seconds": 0.431,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class $NAME implements WebExceptionHandler",
+        "language": "java"
+      },
+      "seconds": 0.479,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-framework--v6.0.11",
+        "path": "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 2753,
+      "hit_paths": [
+        "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-framework--v6.0.11",
+        "path": "spring-webflux/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 0,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-framework--v6.0.11",
+        "path": "spring-webflux/src/main/java/org/springframework/web/server/WebExceptionHandler.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 0,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/netty--netty-4.1.100.Final",
+        "path": "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 48991,
+      "hit_paths": [
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "class HttpWebHandlerAdapter",
+        "language": "java"
+      },
+      "seconds": 0.472,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-framework--v6.0.11",
+        "path": "spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 12096,
+      "hit_paths": [
+        "spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-framework--v6.0.11",
+        "path": "spring-web/src/main/java/org/springframework/web/server/WebExceptionHandler.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 1293,
+      "hit_paths": [
+        "spring-web/src/main/java/org/springframework/web/server/WebExceptionHandler.java"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/netty--netty-4.1.100.Final",
+        "path": "transport/src/main/java/io/netty/channel/ChannelInboundHandlerAdapter.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 5147,
+      "hit_paths": [
+        "transport/src/main/java/io/netty/channel/ChannelInboundHandlerAdapter.java"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/spring-framework--v6.0.11",
+        "path": "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorServerHttpResponse.java"
+      },
+      "seconds": 0.0,
+      "result_chars": 4566,
+      "hit_paths": [
+        "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorServerHttpResponse.java"
+      ]
+    }
+  ],
+  "tool_seconds": 1.892,
+  "retrieval_result_chars": 303169,
+  "denied_tools": [],
+  "cli_result_text": "Files submitted, ordered by relevance to the exception-provenance trace:\n\n1. **`HttpWebHandlerAdapter.java`** (spring-web) \u2014 the actual point where context is lost: `handleUnresolvedError()` collapses any unhandled `Throwable` into a bare `HttpStatus.INTERNAL_SERVER_ERROR` with no body detail, logs only via `logger.error(...)`, and even special-cases disconnected-client exceptions to return `Mono.empty()` silently.\n2. **`ReactorHttpHandlerAdapter.java`** (spring-web) \u2014 the bridge that adapts reactor-netty's `HttpServerRequest/HttpServerResponse` handling function into Spring's `HttpHandler`; catches only `URISyntaxException` explicitly and otherwise just logs errors via `.doOnError(...)` without altering how the underlying exception propagates.\n3. **`AbstractChannelHandlerContext.java`** (netty) \u2014 implements `fireExceptionCaught`, propagating exceptions along the pipeline context-to-context.\n4. **`DefaultChannelPipeline.java`** (netty) \u2014 the pipeline's tail handler behavior when no handler in the chain calls `exceptionCaught`; this is where an unhandled exception in the pipeline gets logged and effectively dropped if no downstream handler acts on it.\n5. **`WebExceptionHandler.java`** (spring-web) \u2014 the WebFlux contract for exception handling (`handle(exchange, ex)`), showing what a properly wired handler *should* look like vs. the fallback path in `HttpWebHandlerAdapter`.\n6. **`ReactorServerHttpResponse.java`** (spring-web) \u2014 adapts `ServerHttpResponse` onto reactor-netty's `HttpServerResponse`; relevant to how status codes/headers actually get written (or not) once an error reaches this layer.\n7. **`ChannelInboundHandlerAdapter.java`** (netty) \u2014 shows the default `exceptionCaught` just forwards via `ctx.fireExceptionCaught(cause)`, illustrating how a handler that doesn't override this method passes the exception along unchanged (and unenriched).\n8. **`SslHandler.java`** (netty) \u2014 one of the concrete pipeline handlers that catches and re-raises exceptions (`exceptionCaught(ctx, wrapIfNeeded(cause))`), relevant to connection-reset scenarios at the TLS layer.\n9. **`ChannelInitializer.java`** (netty) \u2014 another concrete `exceptionCaught` call site, relevant to pipeline setup-time exceptions.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 548108,
+  "output_tokens": 5512,
+  "input_tokens_uncached": 14,
+  "cache_creation_input_tokens": 51578,
+  "cache_read_input_tokens": 496516,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "error-prov-dual-netty-spring-001",
+    "config_name": "condition:structural",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1111,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 5
+}

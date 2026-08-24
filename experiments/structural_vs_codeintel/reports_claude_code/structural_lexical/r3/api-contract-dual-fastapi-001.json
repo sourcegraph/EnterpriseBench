@@ -1,0 +1,225 @@
+{
+  "task_id": "api-contract-dual-fastapi-001",
+  "policy": "condition:structural_lexical",
+  "model": "claude-sonnet-5",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/fastapi--0.109.0",
+    "github.com/sg-evals/httpx--0.26.0"
+  ],
+  "retrieved_paths": [
+    "fastapi/dependencies/utils.py",
+    "fastapi/_compat.py",
+    "fastapi/routing.py",
+    "fastapi/encoders.py",
+    "fastapi/exceptions.py",
+    "fastapi/exception_handlers.py",
+    "fastapi/params.py",
+    "fastapi/applications.py",
+    "httpx/_content.py",
+    "httpx/_models.py",
+    "httpx/_client.py",
+    "httpx/_types.py",
+    "httpx/_multipart.py"
+  ],
+  "required_files": [
+    "fastapi/routing.py",
+    "httpx/_content.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 8,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.2736306,
+  "elapsed_seconds": 26.5,
+  "wall_seconds": 26.5,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/fastapi--0.109.0"
+      },
+      "seconds": 0.009,
+      "result_chars": 12238,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/httpx--0.26.0"
+      },
+      "seconds": 0.007,
+      "result_chars": 2503,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "^fastapi/(dependencies|routing|encoders|params|exception_handlers|exceptions)\\.py$",
+        "case_sensitive": false
+      },
+      "seconds": 0.06,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "request_body_to_args|is_scalar_field|get_body_field",
+        "case_sensitive": false
+      },
+      "seconds": 0.056,
+      "result_chars": 2396,
+      "hit_paths": [
+        "fastapi/_compat.py",
+        "fastapi/_compat.py",
+        "fastapi/dependencies/utils.py",
+        "fastapi/dependencies/utils.py",
+        "fastapi/dependencies/utils.py",
+        "fastapi/dependencies/utils.py",
+        "fastapi/dependencies/utils.py",
+        "fastapi/dependencies/utils.py",
+        "fastapi/routing.py",
+        "fastapi/routing.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "def encode_json|class JSONField|def encode_request|Content-Type.*application/json",
+        "case_sensitive": false
+      },
+      "seconds": 0.056,
+      "result_chars": 6746,
+      "hit_paths": [
+        "docs/em/docs/advanced/custom-response.md",
+        "docs/en/docs/advanced/custom-response.md",
+        "docs/en/docs/release-notes.md",
+        "docs/ja/docs/advanced/custom-response.md",
+        "docs/zh/docs/advanced/custom-response.md",
+        "tests/test_tutorial/test_body/test_tutorial001.py",
+        "tests/test_tutorial/test_body/test_tutorial001.py",
+        "tests/test_tutorial/test_body/test_tutorial001_py310.py",
+        "tests/test_tutorial/test_body/test_tutorial001_py310.py",
+        "tests/test_tutorial/test_custom_request_and_route/test_tutorial001.py",
+        "docs/advanced.md",
+        "docs/api.md",
+        "docs/quickstart.md",
+        "httpx/_content.py",
+        "httpx/_content.py",
+        "tests/conftest.py",
+        "tests/conftest.py",
+        "tests/models/test_requests.py",
+        "tests/models/test_requests.py",
+        "tests/models/test_requests.py",
+        "tests/models/test_requests.py",
+        "tests/models/test_responses.py",
+        "tests/models/test_responses.py",
+        "tests/models/test_responses.py",
+        "tests/models/test_responses.py"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "RequestValidationError|def request_validation_exception_handler",
+        "case_sensitive": false
+      },
+      "seconds": 0.05,
+      "result_chars": 8563,
+      "hit_paths": [
+        "docs/em/docs/how-to/custom-request-and-route.md",
+        "docs/em/docs/tutorial/handling-errors.md",
+        "docs/em/docs/tutorial/handling-errors.md",
+        "docs/em/docs/tutorial/handling-errors.md",
+        "docs/em/docs/tutorial/handling-errors.md",
+        "docs/em/docs/tutorial/handling-errors.md",
+        "docs/em/docs/tutorial/handling-errors.md",
+        "docs/en/docs/how-to/custom-request-and-route.md",
+        "docs/en/docs/release-notes.md",
+        "docs/en/docs/release-notes.md",
+        "docs/en/docs/release-notes.md",
+        "docs/en/docs/release-notes.md",
+        "docs/en/docs/tutorial/handling-errors.md",
+        "docs/en/docs/tutorial/handling-errors.md",
+        "docs/en/docs/tutorial/handling-errors.md",
+        "docs/en/docs/tutorial/handling-errors.md",
+        "docs/en/docs/tutorial/handling-errors.md",
+        "docs/en/docs/tutorial/handling-errors.md",
+        "docs/pt/docs/tutorial/handling-errors.md",
+        "docs/pt/docs/tutorial/handling-errors.md",
+        "docs/pt/docs/tutorial/handling-errors.md",
+        "docs/pt/docs/tutorial/handling-errors.md",
+        "docs/pt/docs/tutorial/handling-errors.md",
+        "docs/pt/docs/tutorial/handling-errors.md",
+        "docs/zh/docs/tutorial/handling-errors.md"
+      ]
+    }
+  ],
+  "tool_seconds": 0.238,
+  "retrieval_result_chars": 32458,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file set covering both sides of the contract:\n\n**FastAPI request validation chain:**\n- `fastapi/dependencies/utils.py` \u2014 `request_body_to_args`, `get_body_field`, core body parsing/validation dispatch\n- `fastapi/_compat.py` \u2014 Pydantic v1/v2 compatibility shims (`is_scalar_field`, model validation calls)\n- `fastapi/routing.py` \u2014 route handler wiring that invokes dependency resolution and body validation\n- `fastapi/encoders.py` \u2014 `jsonable_encoder`, used both for response serialization and comparable to what a client should produce\n- `fastapi/exceptions.py` / `fastapi/exception_handlers.py` \u2014 `RequestValidationError` and the 422 handler\n- `fastapi/params.py` \u2014 `Body`, `Query`, etc. parameter/field metadata\n- `fastapi/applications.py` \u2014 app-level wiring of exception handlers and OpenAPI content-type negotiation\n\n**httpx request encoding chain:**\n- `httpx/_content.py` \u2014 `encode_json`, `encode_request`, Content-Type header assignment\n- `httpx/_models.py` \u2014 `Request`/`Response` construction, header handling\n- `httpx/_client.py` \u2014 top-level `post`/`request` methods that route `json=` kwarg into encoding\n- `httpx/_types.py` \u2014 type aliases governing what shapes are accepted for `json=`\n- `httpx/_multipart.py` \u2014 alternate encoding path for comparison (form/multipart vs JSON)",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 389860,
+  "output_tokens": 1994,
+  "input_tokens_uncached": 10,
+  "cache_creation_input_tokens": 46237,
+  "cache_read_input_tokens": 343613,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "condition:structural_lexical",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.4911
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2778,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1538,
+    "n_retrieved": 13,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 1
+}

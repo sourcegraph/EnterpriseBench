@@ -1,0 +1,212 @@
+{
+  "task_id": "ceph-rgw-auth-secure-001",
+  "policy": "condition:codeintel",
+  "model": "claude-sonnet-5",
+  "suite": "security_operations",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/ceph--v19.2.0"
+  ],
+  "retrieved_paths": [
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_rest_s3.h",
+    "src/rgw/rgw_auth.cc",
+    "src/rgw/rgw_auth.h",
+    "src/rgw/rgw_auth_registry.h"
+  ],
+  "required_files": [
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_auth.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "codeintel",
+  "condition_tools": [
+    "definition",
+    "references",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "resolved symbol identity",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 12,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.6856164,
+  "elapsed_seconds": 56.3,
+  "wall_seconds": 56.3,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0"
+      },
+      "seconds": 0.01,
+      "result_chars": 14377,
+      "hit_paths": []
+    },
+    {
+      "tool": "definition",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth_s3.h",
+        "symbol": "RGW_Auth_S3"
+      },
+      "seconds": 0.234,
+      "result_chars": 161,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0"
+      },
+      "seconds": 0.012,
+      "result_chars": 14377,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth_s3.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 27192,
+      "hit_paths": [
+        "src/rgw/rgw_auth_s3.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 31433,
+      "hit_paths": [
+        "src/rgw/rgw_auth.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth_s3.cc"
+      },
+      "seconds": 0.001,
+      "result_chars": 57115,
+      "hit_paths": [
+        "src/rgw/rgw_auth_s3.cc"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth.cc"
+      },
+      "seconds": 0.001,
+      "result_chars": 42679,
+      "hit_paths": [
+        "src/rgw/rgw_auth.cc"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_rest_s3.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 36344,
+      "hit_paths": [
+        "src/rgw/rgw_rest_s3.h"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_rest_s3.cc"
+      },
+      "seconds": 0.001,
+      "result_chars": 205033,
+      "hit_paths": [
+        "src/rgw/rgw_rest_s3.cc"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0",
+        "path": "src/rgw/rgw_auth_registry.h"
+      },
+      "seconds": 0.0,
+      "result_chars": 3080,
+      "hit_paths": [
+        "src/rgw/rgw_auth_registry.h"
+      ]
+    }
+  ],
+  "tool_seconds": 0.259,
+  "retrieval_result_chars": 431791,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the 7 files that make up Ceph RGW's S3 authentication implementation:\n\n1. **`src/rgw/rgw_auth_s3.h`** / **`src/rgw/rgw_auth_s3.cc`** \u2014 AWS SigV2/SigV4 mechanics: canonical request/header construction, `is_time_skew_ok()` (the replay/timestamp-window check), `get_v4_signature()`/`get_v2_signature()`, chunked-upload signature verification (`AWSv4ComplMulti`/`AWSv4ComplSingle`).\n2. **`src/rgw/rgw_rest_s3.h`** / **`src/rgw/rgw_rest_s3.cc`** \u2014 the REST-layer auth engines (`LocalEngine`, `LDAPEngine`, `STSEngine`, `AWSGeneralAbstractor`) that extract credentials from the request, look up the secret key, and perform the actual signature comparison; also `RGW_Auth_S3::authorize`.\n3. **`src/rgw/rgw_auth.h`** / **`src/rgw/rgw_auth.cc`** \u2014 the generic pluggable auth framework: `Engine`, `Strategy` (engine chaining/fallback control), `IdentityApplier` hierarchy (`LocalApplier`, `RemoteApplier`, `RoleApplier`), `ImplicitTenants`.\n4. **`src/rgw/rgw_auth_registry.h`** \u2014 `StrategyRegistry`, which wires the S3 engines together and defines the V4-plain \u2192 V4-boto2 `SUFFICIENT`/`FALLBACK` ordering (the SigV2/V4 fallback chain of interest for the audit).",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 944560,
+  "output_tokens": 4462,
+  "input_tokens_uncached": 16,
+  "cache_creation_input_tokens": 118962,
+  "cache_read_input_tokens": 825582,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "ceph-rgw-auth-secure-001",
+    "config_name": "condition:codeintel",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 0.75,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.6667,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8319,
+      "10": 0.9709
+    },
+    "mrr": 1.0,
+    "map_score": 0.9167,
+    "file_recall": 1.0,
+    "context_efficiency": 0.5714,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 5
+}

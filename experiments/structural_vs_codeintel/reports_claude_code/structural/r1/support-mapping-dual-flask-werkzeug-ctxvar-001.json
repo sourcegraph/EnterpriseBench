@@ -1,0 +1,183 @@
+{
+  "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+  "policy": "condition:structural",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/flask--2.3.3",
+    "github.com/sg-evals/werkzeug--2.3.7"
+  ],
+  "retrieved_paths": [
+    "src/flask/ctx.py",
+    "src/flask/globals.py",
+    "src/werkzeug/local.py",
+    "src/flask/app.py",
+    "docs/async-await.rst",
+    "docs/reqcontext.rst"
+  ],
+  "required_files": [
+    "flask/src/flask/globals.py",
+    "flask/src/flask/ctx.py",
+    "werkzeug/src/werkzeug/local.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 10,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.3702276,
+  "elapsed_seconds": 44.1,
+  "wall_seconds": 44.1,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3"
+      },
+      "seconds": 0.005,
+      "result_chars": 5530,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/werkzeug--2.3.7"
+      },
+      "seconds": 0.005,
+      "result_chars": 5929,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/werkzeug--2.3.7",
+        "path": "src/werkzeug/local.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 22003,
+      "hit_paths": [
+        "src/werkzeug/local.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/globals.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 2945,
+      "hit_paths": [
+        "src/flask/globals.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/ctx.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 14841,
+      "hit_paths": [
+        "src/flask/ctx.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/app.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 87620,
+      "hit_paths": [
+        "src/flask/app.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/app.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 87620,
+      "hit_paths": [
+        "src/flask/app.py"
+      ]
+    }
+  ],
+  "tool_seconds": 0.01,
+  "retrieval_result_chars": 226488,
+  "denied_tools": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "grep -n \"async_to_sync\\|ensure_sync\\|asyncio\\|iscoroutinefunction\\|async def wrapper\" \"/home/ds/.claude-homes/account5/.claude/projects/-home-ds-projects-EnterpriseBench-experiments-structural-vs-codeintel/d1fe8aaf-2083-4dbb-8bbb-8c1a261c1786/tool-results/toolu_01FCifwE7AM4PGrDdPS3VMQX.json\" | head -50"
+      },
+      "condition": "structural"
+    }
+  ],
+  "cli_result_text": "Submitted. Key files, in order of relevance:\n\n1. **`src/flask/ctx.py`** (flask--2.3.3) \u2014 `RequestContext.push()`/`pop()` and `AppContext.push()`/`pop()`, which do `_cv_request.set(self)` / `_cv_app.set(self)` and store the returned `contextvars.Token` for later `.reset()`. This is where the request context actually gets bound to the current `contextvars.Context` \u2014 and it only runs in the thread/task that calls `push()`.\n\n2. **`src/flask/globals.py`** (flask--2.3.3) \u2014 defines `_cv_app`/`_cv_request` (`ContextVar` instances) and the `request`, `session`, `g`, `current_app` proxies as `werkzeug.local.LocalProxy(_cv_request, ...)`. This is the \"global `request` proxy\" the customer touches; note Flask 2.3 binds proxies directly to a `ContextVar`, not to a `LocalStack` (the old `_app_ctx_stack`/`_request_ctx_stack` are now deprecated `_FakeStack` shims delegating to the same ContextVar).\n\n3. **`src/werkzeug/local.py`** (werkzeug--2.3.7) \u2014 `Local`, `LocalStack`, and `LocalProxy` all built on `contextvars.ContextVar` (the 2.0 rewrite from threadlocal). `LocalProxy._get_current_object()` calls `ContextVar.get()` and raises `RuntimeError` (the \"Working outside of request context\" message comes from Flask's `unbound_message`) via `LookupError` when the var isn't set in the *current* context \u2014 which is exactly what happens in a task whose `contextvars.Context` didn't inherit the token set by `RequestContext.push()`.\n\n4. **`src/flask/app.py`** (flask--2.3.3) \u2014 `ensure_sync`/async view dispatch (`asgiref.sync.async_to_sync`) and `wsgi_app`, showing where/when the request context is pushed relative to where a view's coroutine runs, and why a task spawned off that call stack via `asyncio.create_task` needs `copy_context()` semantics to see the same `ContextVar` bindings.\n\n5/6. `docs/async-await.rst` and `docs/reqcontext.rst` \u2014 Flask's own documentation of the async-view caveat and the request-context contract, useful for citing intended behavior vs. the customer's observed regression.\n\n**Root cause chain**: `asyncio.create_task(coro)` implicitly calls `contextvars.copy_context()` at *task-creation time* and runs the coroutine inside that copied context \u2014 so it normally *does* inherit whatever `ContextVar` bindings (including Flask's `_cv_request`) were active in the caller at that instant. The customer's task loses context only if the task is created (a) before `RequestContext.push()` ran in that logical flow, (b) from a different OS thread's default context (thread-pool executor workers get a fresh top-level `Context`, not a copy of the request-handling thread's), or (c) via `loop.call_soon`/`ensure_future` invoked from a thread-pool worker rather than from within the coroutine that owns the pushed context \u2014 `ensure_future` still calls `copy_context()` under the hood, but it copies the context of the *thread calling it*, not the request-handling thread, so a worker-thread caller captures an empty context. Flask 2.0's threadlocal-based `LocalStack` was thread-scoped, not task-scoped, so it \"worked\" more often by accident (same OS thread \u21d2 same stack) but broke across real thread pools; werkzeug 2.0's contextvars rewrite made the boundary explicit and correct for asyncio, at the cost of surfacing this class of bug when the task is created off the wrong context.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 607981,
+  "output_tokens": 3391,
+  "input_tokens_uncached": 14,
+  "cache_creation_input_tokens": 56499,
+  "cache_read_input_tokens": 551468,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "condition:structural",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.5,
+    "n_retrieved": 6,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "repeat": 1,
+  "seed": 20260823,
+  "account": 5
+}

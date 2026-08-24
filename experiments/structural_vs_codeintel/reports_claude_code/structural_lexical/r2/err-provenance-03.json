@@ -1,0 +1,414 @@
+{
+  "task_id": "err-provenance-03",
+  "policy": "condition:structural_lexical",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/kubernetes--v1.32.0"
+  ],
+  "retrieved_paths": [
+    "pkg/registry/core/rest/storage_core.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "staging/src/k8s.io/apiserver/pkg/server/hooks.go",
+    "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go",
+    "pkg/util/async/runner.go",
+    "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go",
+    "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/generic/plugin.go",
+    "staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle/admission.go",
+    "test/e2e/apimachinery/health_handlers.go",
+    "pkg/registry/core/service/portallocator/controller/repair.go"
+  ],
+  "required_files": [
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip_test.go"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 23,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.7237203999999999,
+  "elapsed_seconds": 80.6,
+  "wall_seconds": 80.6,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "start-service-ip-repair-controllers",
+        "case_sensitive": false
+      },
+      "seconds": 0.294,
+      "result_chars": 1203,
+      "hit_paths": [
+        "pkg/registry/core/rest/storage_core.go",
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "unable to perform initial IP and Port allocation check",
+        "case_sensitive": false
+      },
+      "seconds": 0.067,
+      "result_chars": 315,
+      "hit_paths": [
+        "pkg/registry/core/rest/storage_core.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/rest/storage_core.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 22867,
+      "hit_paths": [
+        "pkg/registry/core/rest/storage_core.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "not yet ready to handle request",
+        "case_sensitive": false
+      },
+      "seconds": 0.064,
+      "result_chars": 3951,
+      "hit_paths": [
+        "plugin/pkg/admission/namespace/autoprovision/admission.go",
+        "plugin/pkg/admission/namespace/exists/admission.go",
+        "plugin/pkg/admission/podnodeselector/admission.go",
+        "plugin/pkg/admission/podnodeselector/admission.go",
+        "plugin/pkg/admission/podtolerationrestriction/admission.go",
+        "plugin/pkg/admission/podtolerationrestriction/admission.go",
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle/admission.go",
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/generic/plugin.go",
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/validating/admission_test.go",
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go",
+        "staging/src/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder/admission.go"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0"
+      },
+      "seconds": 0.009,
+      "result_chars": 9382,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "informer-sync",
+        "case_sensitive": false
+      },
+      "seconds": 0.066,
+      "result_chars": 5531,
+      "hit_paths": [
+        "CHANGELOG/CHANGELOG-1.16.md",
+        "CHANGELOG/CHANGELOG-1.17.md",
+        "CHANGELOG/CHANGELOG-1.18.md",
+        "CHANGELOG/CHANGELOG-1.19.md",
+        "CHANGELOG/CHANGELOG-1.19.md",
+        "CHANGELOG/CHANGELOG-1.19.md",
+        "CHANGELOG/CHANGELOG-1.20.md",
+        "CHANGELOG/CHANGELOG-1.20.md",
+        "staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/apiserver.go",
+        "staging/src/k8s.io/apiserver/pkg/server/config_test.go",
+        "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go",
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 9565,
+      "hit_paths": [
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/generic/plugin.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 7013,
+      "hit_paths": [
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/generic/plugin.go"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0"
+      },
+      "seconds": 0.008,
+      "result_chars": 1285,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "package controller\\n",
+        "case_sensitive": false
+      },
+      "seconds": 0.282,
+      "result_chars": 12,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 10795,
+      "hit_paths": [
+        "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/util/async/runner.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 1451,
+      "hit_paths": [
+        "pkg/util/async/runner.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "func NewRepairIPAddress",
+        "case_sensitive": false
+      },
+      "seconds": 0.062,
+      "result_chars": 321,
+      "hit_paths": [
+        "pkg/registry/core/service/ipallocator/controller/repairip.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "func NewRepair\\(",
+        "case_sensitive": false
+      },
+      "seconds": 0.286,
+      "result_chars": 1002,
+      "hit_paths": [
+        "pkg/registry/core/service/ipallocator/controller/repair.go",
+        "pkg/registry/core/service/portallocator/controller/repair.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "AddPostStartHookOrDie\\(\"start-service-ip-repair-controllers\"|start-service-ip-repair-controllers",
+        "case_sensitive": false
+      },
+      "seconds": 0.352,
+      "result_chars": 1203,
+      "hit_paths": [
+        "pkg/registry/core/rest/storage_core.go",
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go",
+        "test/e2e/apimachinery/health_handlers.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "pkg/registry/core/service/ipallocator/controller/repairip.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 22636,
+      "hit_paths": [
+        "pkg/registry/core/service/ipallocator/controller/repairip.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "func \\(s \\*GenericAPIServer\\) AddPostStartHookOrDie|func \\(s \\*GenericAPIServer\\) RunPostStartHooks|runPostStartHook",
+        "case_sensitive": false
+      },
+      "seconds": 0.322,
+      "result_chars": 2745,
+      "hit_paths": [
+        "staging/src/k8s.io/apiserver/pkg/server/config_test.go",
+        "staging/src/k8s.io/apiserver/pkg/server/genericapiserver.go",
+        "staging/src/k8s.io/apiserver/pkg/server/genericapiserver_test.go",
+        "staging/src/k8s.io/apiserver/pkg/server/genericapiserver_test.go",
+        "staging/src/k8s.io/apiserver/pkg/server/hooks.go",
+        "staging/src/k8s.io/apiserver/pkg/server/hooks.go",
+        "staging/src/k8s.io/apiserver/pkg/server/hooks.go",
+        "staging/src/k8s.io/apiserver/pkg/server/hooks.go",
+        "staging/src/k8s.io/apiserver/pkg/server/hooks.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/server/hooks.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 7871,
+      "hit_paths": [
+        "staging/src/k8s.io/apiserver/pkg/server/hooks.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "defaultservicecidr",
+        "case_sensitive": false
+      },
+      "seconds": 0.066,
+      "result_chars": 11004,
+      "hit_paths": [
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go",
+        "pkg/controller/servicecidrs/servicecidrs_controller_test.go"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "package ipaddress\\b",
+        "case_sensitive": false
+      },
+      "seconds": 0.266,
+      "result_chars": 829,
+      "hit_paths": [
+        "pkg/registry/networking/ipaddress/doc.go",
+        "pkg/registry/networking/ipaddress/strategy.go",
+        "pkg/registry/networking/ipaddress/strategy_test.go"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/kubernetes--v1.32.0",
+        "path": "staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle/admission.go"
+      },
+      "seconds": 0.0,
+      "result_chars": 8756,
+      "hit_paths": [
+        "staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle/admission.go"
+      ]
+    }
+  ],
+  "tool_seconds": 2.144,
+  "retrieval_result_chars": 129737,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Summary of the retrieval:\n\n**Error origin \u2014 `pkg/registry/core/rest/storage_core.go`**: the `\"unable to perform initial IP and Port allocation check\"` error (and the PostStartHook name `\"start-service-ip-repair-controllers\"`) live in `legacyProvider.PostStartHook()`. It launches the ClusterIP and NodePort repair controllers via `async.Runner`, waits on a `sync.WaitGroup` for both `onFirstSuccess` callbacks, and returns the error only if that doesn't happen within 1 minute.\n\n**Propagation chain**:\n1. `pkg/registry/core/service/ipallocator/controller/repairip.go` (`RepairIPAddress.RunUntil`) \u2014 waits for its own informers (Service, ServiceCIDR, IPAddress) to sync, polls for the default `ServiceCIDR` object to exist, then runs `doRunOnce()`/`syncService()`, which calls `client.NetworkingV1beta1().IPAddresses().Create(...)` to repair any missing `IPAddress` object for an existing Service's ClusterIP \u2014 this is where a create for an IP like `10.211.95.185` originates. Only after this succeeds does it call `onFirstSuccess()`.\n2. That create request goes back through the same (or peer) apiserver's admission chain. `staging/.../admission/plugin/webhook/generic/webhook.go` and `staging/.../admission/plugin/policy/generic/plugin.go` both gate `Dispatch()` on `WaitForReady()` (synced namespace informer + hook/policy source informer); if not ready they return `admission.NewForbidden(a, fmt.Errorf(\"not yet ready to handle request\"))` \u2014 this is the exact string in the ticket. (`namespace/lifecycle/admission.go` has the same string but short-circuits for non-namespaced resources like `IPAddress`, so it isn't the source here.)\n3. If the repair controller's create keeps failing/retrying past 1 minute, `wg.Done()`/`onFirstSuccess` never fires, the `select` in the PostStartHook times out, and it returns the `\"unable to perform initial IP and Port allocation check\"` error.\n4. `staging/.../server/hooks.go` (`runPostStartHook`) treats any non-nil PostStartHook error as fatal (`klog.Fatalf`) and, prior to that, leaves `entry.done` unclosed. `postStartHookHealthz.Check()` returns `errHookNotFinished` while `done` is open, which surfaces as the `poststarthook/start-service-ip-repair-controllers` readyz check failing.\n5. `staging/.../server/healthz/healthz.go`'s `informerSync` checker independently produces the `informer-sync` readyz failure, and `handleRootHealth` reports both as `[-]informer-sync ... [-]poststarthook/start-service-ip-repair-controllers ... check failed: readyz`, matching the ticket.\n\n**The race during a mixed-version rolling upgrade**: a newly-upgraded v1.33 apiserver starts its own admission plugins (webhook/policy generic plugins) and its repair controller concurrently. The repair controller's `IPAddresses().Create()` call hits the *same* apiserver's admission stack before that apiserver's own informers/webhook sources have finished their initial sync (`WaitForReady()` false) \u2014 a self-inflicted \"not ready to accept the request that its own readiness gate depends on\" cycle. Because `NewRepairIPAddress`'s repair loop also blocks on the default `ServiceCIDR` object existing (`wait.PollUntilContextCancel` against `serviceCIDRLister`) before it can even attempt the create, any delay in that CIDR informer syncing during the mixed-version window compounds the same 1-minute race. Once all nodes are upgraded and informers/caches are consistently warm cluster-wide, the create succeeds quickly, `onFirstSuccess` fires well under a minute, and the hook \u2014 and readyz \u2014 go green.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 1310828,
+  "output_tokens": 6790,
+  "input_tokens_uncached": 24,
+  "cache_creation_input_tokens": 103582,
+  "cache_read_input_tokens": 1207222,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "err-provenance-03",
+    "config_name": "condition:structural_lexical",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 5
+}

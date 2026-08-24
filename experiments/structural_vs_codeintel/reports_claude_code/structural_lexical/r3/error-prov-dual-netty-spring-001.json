@@ -1,0 +1,260 @@
+{
+  "task_id": "error-prov-dual-netty-spring-001",
+  "policy": "condition:structural_lexical",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/netty--netty-4.1.100.Final",
+    "github.com/sg-evals/spring-framework--v6.0.11"
+  ],
+  "retrieved_paths": [
+    "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+    "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/web/server/handler/ExceptionHandlingWebHandler.java",
+    "spring-web/src/main/java/org/springframework/web/server/WebExceptionHandler.java",
+    "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+    "transport/src/main/java/io/netty/channel/ChannelPipeline.java",
+    "transport/src/main/java/io/netty/channel/ChannelInboundHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorNetty2HttpHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorServerHttpRequest.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/AbstractServerHttpResponse.java",
+    "codec-http/src/main/java/io/netty/handler/codec/http/HttpContentDecoder.java",
+    "transport/src/main/java/io/netty/channel/DefaultChannelHandlerContext.java"
+  ],
+  "required_files": [
+    "netty/handler/src/main/java/io/netty/handler/codec/http/HttpServerCodec.java",
+    "spring-framework/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural_lexical",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 8,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.2480474,
+  "elapsed_seconds": 24.8,
+  "wall_seconds": 24.8,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "exceptionCaught",
+        "case_sensitive": false
+      },
+      "seconds": 0.043,
+      "result_chars": 11495,
+      "hit_paths": [
+        "codec-http/src/main/java/io/netty/handler/codec/http/HttpClientCodec.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/HttpClientUpgradeHandler.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/HttpContentDecoder.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/HttpContentEncoder.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/websocketx/Utf8FrameValidator.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/websocketx/Utf8FrameValidator.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/websocketx/WebSocketClientHandshaker.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/websocketx/WebSocketClientProtocolHandshakeHandler.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/websocketx/WebSocketProtocolHandler.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/websocketx/WebSocketProtocolHandler.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/websocketx/WebSocketServerHandshaker.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/websocketx/WebSocketServerHandshaker.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/websocketx/WebSocketServerProtocolHandler.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/websocketx/WebSocketServerProtocolHandler.java",
+        "codec-http/src/main/java/io/netty/handler/codec/http/websocketx/WebSocketServerProtocolHandshakeHandler.java",
+        "codec-http/src/main/java/io/netty/handler/codec/spdy/SpdyFrameCodec.java",
+        "codec-http/src/main/java/io/netty/handler/codec/spdy/SpdyFrameCodec.java",
+        "codec-http/src/main/java/io/netty/handler/codec/spdy/SpdyFrameCodec.java",
+        "codec-http/src/main/java/io/netty/handler/codec/spdy/SpdySessionHandler.java",
+        "codec-http/src/main/java/io/netty/handler/codec/spdy/SpdySessionHandler.java",
+        "codec-http/src/main/java/io/netty/handler/codec/spdy/SpdySessionHandler.java",
+        "codec-http/src/test/java/io/netty/handler/codec/http/HttpContentDecoderTest.java",
+        "codec-http/src/test/java/io/netty/handler/codec/http/HttpContentEncoderTest.java",
+        "codec-http2/src/main/java/io/netty/handler/codec/http2/AbstractHttp2StreamChannel.java",
+        "codec-http2/src/main/java/io/netty/handler/codec/http2/Http2ClientUpgradeCodec.java",
+        "codec-http2/src/main/java/io/netty/handler/codec/http2/Http2ConnectionHandler.java",
+        "codec-http2/src/main/java/io/netty/handler/codec/http2/Http2ConnectionHandler.java",
+        "codec-http2/src/main/java/io/netty/handler/codec/http2/Http2FrameCodec.java",
+        "codec-http2/src/main/java/io/netty/handler/codec/http2/Http2FrameCodec.java",
+        "codec-http2/src/main/java/io/netty/handler/codec/http2/Http2FrameCodec.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "ReactorHttpHandlerAdapter",
+        "case_sensitive": false
+      },
+      "seconds": 0.069,
+      "result_chars": 6936,
+      "hit_paths": [
+        "framework-docs/modules/ROOT/pages/web/webflux/reactive-spring.adoc",
+        "framework-docs/modules/ROOT/pages/web/webflux/reactive-spring.adoc",
+        "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java",
+        "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java",
+        "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java",
+        "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorNetty2HttpHandlerAdapter.java",
+        "spring-web/src/testFixtures/java/org/springframework/web/testfixture/http/server/reactive/bootstrap/ReactorHttpServer.java",
+        "spring-web/src/testFixtures/java/org/springframework/web/testfixture/http/server/reactive/bootstrap/ReactorHttpServer.java",
+        "spring-web/src/testFixtures/java/org/springframework/web/testfixture/http/server/reactive/bootstrap/ReactorHttpServer.java",
+        "spring-web/src/testFixtures/java/org/springframework/web/testfixture/http/server/reactive/bootstrap/ReactorHttpServer.java",
+        "spring-web/src/testFixtures/java/org/springframework/web/testfixture/http/server/reactive/bootstrap/ReactorHttpsServer.java",
+        "spring-web/src/testFixtures/java/org/springframework/web/testfixture/http/server/reactive/bootstrap/ReactorHttpsServer.java",
+        "spring-web/src/testFixtures/java/org/springframework/web/testfixture/http/server/reactive/bootstrap/ReactorHttpsServer.java",
+        "spring-web/src/testFixtures/java/org/springframework/web/testfixture/http/server/reactive/bootstrap/ReactorHttpsServer.java",
+        "spring-webflux/src/main/java/org/springframework/web/reactive/function/server/RouterFunctions.java",
+        "spring-webflux/src/main/java/org/springframework/web/reactive/function/server/RouterFunctions.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class DefaultChannelPipeline",
+        "case_sensitive": false
+      },
+      "seconds": 0.079,
+      "result_chars": 2279,
+      "hit_paths": [
+        "microbench/src/main/java/io/netty/microbench/channel/DefaultChannelPipelineBenchmark.java",
+        "microbench/src/main/java/io/netty/microbench/channel/DefaultChannelPipelineDuplexHandlerBenchmark.java",
+        "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java",
+        "transport/src/main/java/io/netty/channel/PendingBytesTracker.java",
+        "transport/src/test/java/io/netty/channel/DefaultChannelPipelineTailTest.java",
+        "transport/src/test/java/io/netty/channel/DefaultChannelPipelineTest.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "invokeExceptionCaught",
+        "case_sensitive": false
+      },
+      "seconds": 0.061,
+      "result_chars": 5645,
+      "hit_paths": [
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+        "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class HttpWebHandlerAdapter",
+        "case_sensitive": false
+      },
+      "seconds": 0.112,
+      "result_chars": 427,
+      "hit_paths": [
+        "spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "WebExceptionHandler",
+        "case_sensitive": false
+      },
+      "seconds": 0.074,
+      "result_chars": 7814,
+      "hit_paths": [
+        "framework-docs/modules/ROOT/pages/web/webflux/dispatcher-handler.adoc",
+        "framework-docs/modules/ROOT/pages/web/webflux/reactive-spring.adoc",
+        "framework-docs/modules/ROOT/pages/web/webflux/reactive-spring.adoc",
+        "framework-docs/modules/ROOT/pages/web/webflux/reactive-spring.adoc",
+        "framework-docs/modules/ROOT/pages/web/webflux/reactive-spring.adoc",
+        "framework-docs/modules/ROOT/pages/web/webflux/reactive-spring.adoc",
+        "spring-web/src/main/java/org/springframework/web/server/WebExceptionHandler.java",
+        "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+        "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+        "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+        "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+        "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+        "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+        "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+        "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+        "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+        "spring-web/src/main/java/org/springframework/web/server/handler/ExceptionHandlingWebHandler.java",
+        "spring-web/src/main/java/org/springframework/web/server/handler/ExceptionHandlingWebHandler.java",
+        "spring-web/src/main/java/org/springframework/web/server/handler/ExceptionHandlingWebHandler.java",
+        "spring-web/src/main/java/org/springframework/web/server/handler/ExceptionHandlingWebHandler.java"
+      ]
+    }
+  ],
+  "tool_seconds": 0.438,
+  "retrieval_result_chars": 34596,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file set covering both sides of the trace: Netty's pipeline exception propagation (`AbstractChannelHandlerContext`, `DefaultChannelPipeline`, `ChannelPipeline`, `ChannelInboundHandlerAdapter`, `HttpContentDecoder`), and Spring WebFlux's reactor-netty bridge and error-handling chain (`ReactorHttpHandlerAdapter`, `ReactorNetty2HttpHandlerAdapter`, `ReactorServerHttpRequest`, `AbstractServerHttpResponse`, `HttpWebHandlerAdapter`, `ExceptionHandlingWebHandler`, `WebExceptionHandler`, `WebHttpHandlerBuilder`) \u2014 enough to trace an exception from Netty's channel handler through the reactor-netty adapter into Spring's `WebExceptionHandler` chain and identify where context is lost.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 302426,
+  "output_tokens": 2384,
+  "input_tokens_uncached": 8,
+  "cache_creation_input_tokens": 43081,
+  "cache_read_input_tokens": 259337,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "error-prov-dual-netty-spring-001",
+    "config_name": "condition:structural_lexical",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.3066
+    },
+    "mrr": 0.3333,
+    "map_score": 0.1667,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0714,
+    "n_retrieved": 14,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 3
+}

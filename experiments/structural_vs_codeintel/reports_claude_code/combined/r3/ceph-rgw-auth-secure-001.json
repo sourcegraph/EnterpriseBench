@@ -1,0 +1,278 @@
+{
+  "task_id": "ceph-rgw-auth-secure-001",
+  "policy": "condition:combined",
+  "model": "claude-sonnet-5",
+  "suite": "security_operations",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/ceph--v19.2.0"
+  ],
+  "retrieved_paths": [
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_rest_s3.h",
+    "src/rgw/rgw_auth.h",
+    "src/rgw/rgw_auth.cc",
+    "src/rgw/rgw_auth_registry.h",
+    "src/rgw/rgw_rest.h",
+    "src/rgw/rgw_rest.cc",
+    "doc/radosgw/s3/authentication.rst",
+    "doc/dev/radosgw/s3_compliance.rst"
+  ],
+  "required_files": [
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_auth.h"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "combined",
+  "condition_tools": [
+    "grep",
+    "ast_search",
+    "definition",
+    "references",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "text + syntax + resolved symbol identity",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 9,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.1487472,
+  "elapsed_seconds": 23.1,
+  "wall_seconds": 23.1,
+  "tool_log": [
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class RGWSignatureVerifier|get_v4_signature|rgw_check_secure_mode_expiration|AWSv4|AWS4-HMAC-SHA256",
+        "case_sensitive": false
+      },
+      "seconds": 0.62,
+      "result_chars": 9154,
+      "hit_paths": [
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v10.2.3.txt",
+        "doc/changelog/v11.2.1.txt",
+        "doc/changelog/v11.2.1.txt",
+        "doc/changelog/v12.2.3.txt",
+        "doc/radosgw/rgw-cache.rst",
+        "doc/radosgw/s3/authentication.rst",
+        "doc/radosgw/s3/authentication.rst",
+        "doc/radosgw/s3/java.rst",
+        "doc/radosgw/s3/php.rst",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "qa/workunits/rgw/jcksum/src/main/java/io/ceph/jcksum/jcksum.java",
+        "src/rgw/rgw_auth.h",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.cc"
+      ]
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/ceph--v19.2.0"
+      },
+      "seconds": 0.007,
+      "result_chars": 1005,
+      "hit_paths": []
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "RGW_Auth_S3|class S3Auth|rgw_create_s3_canonical_header|check_secure_mode_expiration|clock_skew|date_range|X-Amz-Expires",
+        "case_sensitive": false
+      },
+      "seconds": 0.425,
+      "result_chars": 8690,
+      "hit_paths": [
+        "doc/changelog/v0.67.5.txt",
+        "doc/changelog/v10.2.8.txt",
+        "doc/changelog/v11.2.1.txt",
+        "doc/changelog/v11.2.1.txt",
+        "doc/dev/radosgw/s3_compliance.rst",
+        "doc/dev/radosgw/s3_compliance.rst",
+        "doc/rados/operations/health-checks.rst",
+        "doc/radosgw/s3/java.rst",
+        "doc/radosgw/s3/php.rst",
+        "monitoring/ceph-mixin/prometheus_alerts.libsonnet",
+        "monitoring/ceph-mixin/prometheus_alerts.yml",
+        "monitoring/ceph-mixin/tests_alerts/test_alerts.yml",
+        "monitoring/ceph-mixin/tests_alerts/test_alerts.yml",
+        "monitoring/ceph-mixin/tests_alerts/test_alerts.yml",
+        "monitoring/ceph-mixin/tests_alerts/test_alerts.yml",
+        "qa/suites/rados/multimon/tasks/mon_clock_no_skews.yaml",
+        "qa/suites/rados/multimon/tasks/mon_clock_no_skews.yaml",
+        "qa/suites/rados/multimon/tasks/mon_clock_with_skews.yaml",
+        "qa/suites/rados/multimon/tasks/mon_clock_with_skews.yaml",
+        "qa/tasks/mon_clock_skew_check.py",
+        "qa/tasks/mon_clock_skew_check.py",
+        "qa/tasks/mon_clock_skew_check.py",
+        "qa/tasks/mon_clock_skew_check.py",
+        "qa/tasks/mon_clock_skew_check.py",
+        "qa/tasks/mon_clock_skew_check.py",
+        "qa/tasks/mon_clock_skew_check.py",
+        "src/crimson/osd/backfill_state.cc",
+        "src/crimson/osd/backfill_state.cc",
+        "src/crimson/osd/backfill_state.cc",
+        "src/crimson/osd/backfill_state.cc"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "timing_safe|CRYPTO_memcmp|memcmp\\(.*signature|constant.time",
+        "case_sensitive": false
+      },
+      "seconds": 0.421,
+      "result_chars": 4301,
+      "hit_paths": [
+        "doc/changelog/v0.67.4.txt",
+        "doc/changelog/v12.2.2.txt",
+        "doc/changelog/v12.2.2.txt",
+        "doc/rados/operations/crush-map-edits.rst",
+        "src/blk/spdk/NVMEDevice.cc",
+        "src/common/ceph_timer.h",
+        "src/common/ceph_timer.h",
+        "src/common/cohort_lru.h",
+        "src/common/cohort_lru.h",
+        "src/crimson/common/operation.h",
+        "src/crimson/os/seastore/cache.h",
+        "src/crimson/os/seastore/cached_extent.h",
+        "src/crimson/os/seastore/cached_extent.h",
+        "src/include/cpp-btree/btree.h",
+        "src/include/cpp-btree/btree.h",
+        "src/librbd/migration/QCOW.h",
+        "src/os/bluestore/AvlAllocator.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "class LocalEngine|class EngineMap|class StrategyRegistry|get_system_secret|rgw_get_s3_header_digest",
+        "case_sensitive": false
+      },
+      "seconds": 0.431,
+      "result_chars": 1279,
+      "hit_paths": [
+        "src/rgw/rgw_auth.h",
+        "src/rgw/rgw_auth_registry.h",
+        "src/rgw/rgw_op.h",
+        "src/rgw/rgw_process_env.h",
+        "src/rgw/rgw_rest.h",
+        "src/rgw/rgw_rest_s3.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "get_v2_signature|class S3AnonymousEngine|class ExternalAuthStrategy|class AWSAuthStrategy|class LDAPEngine|class KeystoneEngine",
+        "case_sensitive": false
+      },
+      "seconds": 0.399,
+      "result_chars": 2331,
+      "hit_paths": [
+        "src/rgw/rgw_auth_s3.cc",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_auth_s3.h",
+        "src/rgw/rgw_loadgen.cc",
+        "src/rgw/rgw_rest_client.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.cc",
+        "src/rgw/rgw_rest_s3.h",
+        "src/rgw/rgw_rest_s3.h"
+      ]
+    },
+    {
+      "tool": "grep",
+      "arguments": {
+        "pattern": "rgw_auth_s3\\.h|rgw_rest_s3\\.cc",
+        "case_sensitive": false
+      },
+      "seconds": 0.496,
+      "result_chars": 1087,
+      "hit_paths": [
+        "doc/changelog/v0.56.7.txt",
+        "doc/changelog/v0.61.8.txt",
+        "doc/changelog/v0.67.10.txt",
+        "doc/changelog/v0.67.5.txt",
+        "doc/changelog/v0.80.10.txt"
+      ]
+    }
+  ],
+  "tool_seconds": 2.799,
+  "retrieval_result_chars": 27847,
+  "denied_tools": [],
+  "cli_result_text": "Submitted the file set for the S3 auth security audit.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 385082,
+  "output_tokens": 1925,
+  "input_tokens_uncached": 10,
+  "cache_creation_input_tokens": 13806,
+  "cache_read_input_tokens": 371266,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "ceph-rgw-auth-secure-001",
+    "config_name": "condition:combined",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.8889,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.9829,
+      "10": 0.9829
+    },
+    "mrr": 1.0,
+    "map_score": 0.95,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3636,
+    "n_retrieved": 11,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "repeat": 3,
+  "seed": 20260823,
+  "account": 1
+}

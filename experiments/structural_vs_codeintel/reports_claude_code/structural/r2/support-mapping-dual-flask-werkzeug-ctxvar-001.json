@@ -1,0 +1,193 @@
+{
+  "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+  "policy": "condition:structural",
+  "model": "claude-sonnet-5",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/flask--2.3.3",
+    "github.com/sg-evals/werkzeug--2.3.7"
+  ],
+  "retrieved_paths": [
+    "src/werkzeug/local.py",
+    "src/flask/ctx.py",
+    "src/flask/globals.py",
+    "src/flask/app.py",
+    "src/flask/wrappers.py",
+    "src/flask/helpers.py",
+    "src/flask/testing.py",
+    "docs/async-await.rst",
+    "docs/reqcontext.rst",
+    "docs/local.rst"
+  ],
+  "required_files": [
+    "flask/src/flask/globals.py",
+    "flask/src/flask/ctx.py",
+    "werkzeug/src/werkzeug/local.py"
+  ],
+  "scoring": "aligned_suffix_v1",
+  "condition": "structural",
+  "condition_tools": [
+    "ast_search",
+    "read_file",
+    "list_files",
+    "submit_files"
+  ],
+  "condition_knows": "syntax",
+  "generation_seam": "claude_code_cli",
+  "generation_seam_note": "Claude Code CLI over OAuth. Sampling is not settable, the agent loop is the CLI's, and roughly 28k tokens of CLI scaffolding are charged to every run. Do not compare token or cost fields against the openrouter seam.",
+  "sampling": "cli_default_not_settable",
+  "rounds_executed": 10,
+  "rounds_unit": "cli_turns",
+  "max_turns": 40,
+  "token_counting": "cli_reported",
+  "scaffold_overhead_tokens": "~28600 fixed CLI scaffolding per run",
+  "cost_usd": 0.3540504,
+  "elapsed_seconds": 49.3,
+  "wall_seconds": 49.3,
+  "tool_log": [
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3"
+      },
+      "seconds": 0.004,
+      "result_chars": 5530,
+      "hit_paths": []
+    },
+    {
+      "tool": "list_files",
+      "arguments": {
+        "repo": "github.com/sg-evals/werkzeug--2.3.7"
+      },
+      "seconds": 0.004,
+      "result_chars": 5929,
+      "hit_paths": []
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/globals.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 2945,
+      "hit_paths": [
+        "src/flask/globals.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/werkzeug--2.3.7",
+        "path": "src/werkzeug/local.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 22003,
+      "hit_paths": [
+        "src/werkzeug/local.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/ctx.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 14841,
+      "hit_paths": [
+        "src/flask/ctx.py"
+      ]
+    },
+    {
+      "tool": "read_file",
+      "arguments": {
+        "repo": "github.com/sg-evals/flask--2.3.3",
+        "path": "src/flask/app.py"
+      },
+      "seconds": 0.0,
+      "result_chars": 87620,
+      "hit_paths": [
+        "src/flask/app.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "def ensure_sync($$$ARGS)",
+        "language": "python"
+      },
+      "seconds": 0.028,
+      "result_chars": 488,
+      "hit_paths": [
+        "src/flask/app.py"
+      ]
+    },
+    {
+      "tool": "ast_search",
+      "arguments": {
+        "pattern": "async_to_sync",
+        "language": "python"
+      },
+      "seconds": 0.035,
+      "result_chars": 633,
+      "hit_paths": [
+        "src/flask/app.py",
+        "src/flask/app.py",
+        "src/flask/app.py"
+      ]
+    }
+  ],
+  "tool_seconds": 0.071,
+  "retrieval_result_chars": 139989,
+  "denied_tools": [],
+  "cli_result_text": "Submitted. Summary of the trace for the customer-facing writeup:\n\n**1. Where `request` binds to the ContextVar-backed proxy**\n`src/flask/globals.py` defines `_cv_request: ContextVar[RequestContext] = ContextVar(\"flask.request_ctx\")` and `request = LocalProxy(_cv_request, \"request\", unbound_message=_no_req_msg)`. Every attribute access on `flask.request` goes through `LocalProxy.__getattr__` \u2192 `_get_current_object()` \u2192 `_cv_request.get()`.\n\n**2. Where Werkzeug's `Local`/`LocalProxy` moved off threadlocals**\n`src/werkzeug/local.py`, `Local.__init__` and `LocalStack.__init__` \u2014 docstring \"`.. versionchanged:: 2.0` Uses `ContextVar` instead of a custom storage implementation.\" `LocalProxy.__init__`'s `ContextVar` branch is what Flask's `request`/`g`/`session`/`current_app` actually use (Flask proxies the ContextVar directly, not a `LocalStack` \u2014 the `LocalStack` class still exists in werkzeug but Flask 2.2+ bypasses it). The critical mechanic: a `ContextVar` is not global mutable state, it's resolved against whatever `contextvars.Context` is active on the executing task/thread, which is exactly why child tasks can lose it.\n\n**3. The break chain, file:function**\n- `flask/app.py` `Flask.wsgi_app` \u2192 `RequestContext.push()` in `flask/ctx.py` \u2192 `self._cv_tokens.append((_cv_request.set(self), app_ctx))`. `ContextVar.set()` mutates only the `Context` object currently executing (the request-handling coroutine/thread's context).\n- When the view does `asyncio.create_task(coro)`, CPython's `asyncio.tasks.Task.__init__` calls `contextvars.copy_context()` and runs the task inside that **copied snapshot**. A copy still contains the `_cv_request` binding at the moment of copy, so `create_task` from *inside* the view normally still sees `request` \u2014 copies fork the parent context, they don't sever it.\n- The customer's actual failure mode (per the report) happens when the coroutine is spawned in a way that does **not** copy the request-bearing context \u2014 e.g., handed off across a thread-pool worker (`loop.run_in_executor`) or scheduled via a bare `asyncio.ensure_future(coro)` invoked from a callback/thread whose current `contextvars.Context` was never derived from the request's context in the first place. Threads each start with their own fresh context; `Context.run`/`copy_context()` only propagates within the same OS thread's call chain. Once the task's `Context` doesn't contain the `_cv_request` token that `RequestContext.push()` set, `_cv_request.get()` inside `LocalProxy._get_current_object` raises `LookupError`, which `flask/globals.py`'s `ContextVar` branch converts to `RuntimeError(_no_req_msg)` \u2014 literally \"Working outside of request context.\"\n- `flask/ctx.py`'s `RequestContext.pop()` also matters for timing bugs: it calls `_cv_request.reset(token)` at the end of the syncronous view/`ensure_sync` wrapper, so even a task that *did* copy the context correctly will find the context reset (its captured `RequestContext` object still exists, but subsequent pushes/pops on other requests reuse the same `ContextVar` slot in new contexts) once the parent request context has already unwound \u2014 a race if the spawned task outlives the request.\n\n**4. Why `create_task` \"usually works\" but a thread-pool `ensure_future` doesn't**\n`asyncio.create_task` is documented to snapshot the *caller's* current context via `contextvars.copy_context()` at creation time, so it inherits `_cv_request`'s binding as long as it's called synchronously from within the view coroutine's own context. A callable submitted to a `ThreadPoolExecutor` (or any code path where `ensure_future`/`create_task` fires from a different OS thread, e.g. inside `loop.run_in_executor`'s callback re-entering the loop) is running in that thread's own default context, which was never `contextvars.Context.run()`-derived from the request's context \u2014 so `copy_context()` there copies a context that never had `_cv_request` set. The consequence at the Flask/Werkzeug boundary is exactly the reported symptom: `LocalProxy._get_current_object` sees `ContextVar.get()` raise `LookupError`, Flask's `globals.py` wrapper turns that into `RuntimeError: Working outside of request context.`, even though a request is very much in flight on the main thread. This is a known asyncio/contextvars propagation boundary, not a Flask/Werkzeug regression versus 2.0 \u2014 2.0's threadlocal-based `Local` had the analogous failure mode across OS threads, and contextvars simply moved the same boundary from \"thread\" to \"context,\" which don't automatically follow work across `run_in_executor`/thread hops either.",
+  "cli_is_error": false,
+  "cli_subtype": "success",
+  "cli_stop_reason": "end_turn",
+  "input_tokens": 512015,
+  "output_tokens": 3753,
+  "input_tokens_uncached": 12,
+  "cache_creation_input_tokens": 56341,
+  "cache_read_input_tokens": 455662,
+  "status": "scored",
+  "ir_scores": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "condition:structural",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "repeat": 2,
+  "seed": 20260823,
+  "account": 3
+}
