@@ -30,6 +30,7 @@ blocker (`.github/workflows/ci.yml` → "Scoring-integrity corpus").
 | infra milestone averaged into `chain_result.json` total | both | chc2z | `test_chain_result_json_total_score_is_null_and_exit_is_nonzero` |
 | failed session → final checkpoints score an unworked workspace → free 1.0 | over-credit | 6c9wp | `test_failed_first_session_scores_nothing_and_never_runs_the_checkpoints` |
 | chain aborted mid-way → total computed from the earlier sessions' milestones | over-credit | 6c9wp | `test_mid_chain_failure_does_not_score_from_the_earlier_milestones` |
+| errored session reports `success=True` → passes 6c9wp's completion gate | over-credit | 46rq8 | `test_a_session_that_commits_no_branch_state_reports_failure`, `test_success_is_derived_so_it_cannot_be_set_beside_an_error`, `test_the_chain_completion_gate_does_not_count_an_errored_session` |
 
 A failed session is **not** a verifier failure, so it routes through a sibling
 channel, `session_failure`, rather than being laundered through
@@ -43,6 +44,7 @@ reported when both fire.
 |---|---|
 | real all-fail 0.0 (verifier ran, agent failed) | `test_genuine_all_fail_zero_passes_through` |
 | healthy chain, every session completed → scores normally | `test_every_session_completing_scores_the_final_checkpoints` |
+| session that committed branch state → reports success | `test_a_session_that_commits_branch_state_reports_success` |
 | valid partial score | `test_valid_scores_pass_through` |
 | `ImportError` in an error-provenance **task subject** | `test_import_error_in_task_subject_is_not_flagged` |
 | genuinely clean repo (no changes) | `test_clean_repo_no_changes_is_not_infra` |
