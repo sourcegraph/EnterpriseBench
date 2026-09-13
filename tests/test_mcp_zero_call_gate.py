@@ -276,13 +276,22 @@ class TestStatusIsPersisted:
         assert results["status"] == ""
 
 
-class TestMcpCallCountingAcrossOutputFormats:
-    """mcp_tool_calls must be counted whatever --output-format the agent used.
+def _tool_use(name: str) -> dict:
+    """One stream-json assistant record carrying a single tool_use block."""
+    return {
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t1", "name": name}]},
+    }
 
-    The count used to sit *after* the single-JSON early return, so a run using
-    --output-format json always reported 0 MCP calls. Harmless while the value
-    was unread; now it feeds a hard invalidation gate, so a json-format run
-    would be invalidated no matter how much MCP it actually used.
+
+class TestMcpToolCallCounting:
+    """mcp_tool_calls counts real tool-use records, never prose.
+
+    The count used to be ``content.count("mcp__sourcegraph__")`` over the raw
+    log. Now that it feeds a hard invalidation gate, any text that merely
+    *mentions* the token — the agent narrating its plan, an error message, a
+    tool_result echo — would make a genuinely-zero-MCP mcp_only run look
+    non-zero and slip past the gate into the mcp_only mean.
     """
 
     @staticmethod
@@ -290,38 +299,162 @@ class TestMcpCallCountingAcrossOutputFormats:
         (tmp_path / "agent_stdout.log").write_text(stdout)
         return run_task._extract_tool_usage(tmp_path)
 
-    def test_counts_calls_in_single_json_output(self, tmp_path: Path) -> None:
+    def _count(self, tmp_path: Path, stdout: str) -> int:
+        return self._usage(tmp_path, stdout)["mcp_tool_calls"]
+
+    def test_prose_in_assistant_text_block_is_not_a_call(self, tmp_path: Path) -> None:
+        record = {
+            "type": "assistant",
+            "message": {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "I would use mcp__sourcegraph__search_code here.",
+                    }
+                ]
+            },
+        }
+
+        assert self._count(tmp_path, json.dumps(record)) == 0
+
+    def test_prose_in_result_string_is_not_a_call(self, tmp_path: Path) -> None:
+        record = {"type": "result", "result": "mcp__sourcegraph__search_code failed"}
+
+        assert self._count(tmp_path, json.dumps(record)) == 0
+
+    def test_tool_result_echo_is_not_a_call(self, tmp_path: Path) -> None:
+        record = {
+            "type": "user",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "t1",
+                        "content": "error: mcp__sourcegraph__read_file not found",
+                    }
+                ]
+            },
+        }
+
+        assert self._count(tmp_path, json.dumps(record)) == 0
+
+    def test_nested_tool_use_block_is_counted(self, tmp_path: Path) -> None:
+        stream = json.dumps(_tool_use("mcp__sourcegraph__search_code"))
+
+        assert self._count(tmp_path, stream) == 1
+
+    def test_multiple_blocks_in_one_message_are_each_counted(
+        self, tmp_path: Path
+    ) -> None:
+        record = {
+            "type": "assistant",
+            "message": {
+                "content": [
+                    {"type": "text", "text": "searching"},
+                    {"type": "tool_use", "name": "mcp__sourcegraph__search_code"},
+                    {"type": "tool_use", "name": "mcp__sourcegraph__read_file"},
+                    {"type": "tool_use", "name": "Read"},
+                ]
+            },
+        }
+
+        assert self._count(tmp_path, json.dumps(record)) == 2
+
+    def test_flat_tool_use_record_is_counted(self, tmp_path: Path) -> None:
+        record = {"type": "tool_use", "tool_name": "mcp__sourcegraph__search_code"}
+
+        assert self._count(tmp_path, json.dumps(record)) == 1
+
+    def test_newly_added_sourcegraph_tool_is_counted(self, tmp_path: Path) -> None:
+        """Prefix match, not an allow-list: the gate invalidates on zero, so an
+        unfamiliar sourcegraph tool must not read as no-MCP."""
+        stream = json.dumps(_tool_use("mcp__sourcegraph_public__find_symbol"))
+
+        assert self._count(tmp_path, stream) == 1
+
+    def test_non_sourcegraph_mcp_tool_is_not_counted(self, tmp_path: Path) -> None:
+        stream = json.dumps(_tool_use("mcp__other__search"))
+
+        assert self._count(tmp_path, stream) == 0
+
+
+class TestToolUsageParsingAcrossOutputFormats:
+    """modelUsage/turn parsing must survive whatever --output-format was used."""
+
+    @staticmethod
+    def _usage(tmp_path: Path, stdout: str) -> dict:
+        (tmp_path / "agent_stdout.log").write_text(stdout)
+        return run_task._extract_tool_usage(tmp_path)
+
+    def test_single_json_object_output(self, tmp_path: Path) -> None:
         payload = json.dumps(
             {
-                "modelUsage": {"claude": {"inputTokens": 10, "outputTokens": 5}},
+                "modelUsage": {
+                    "claude": {"inputTokens": 10, "outputTokens": 5, "costUSD": 0.25}
+                },
                 "numTurns": 3,
-                "result": (
-                    "used mcp__sourcegraph__search_code then "
-                    "mcp__sourcegraph__read_file"
-                ),
+                "result": "done, no tool_use records in this format",
             }
         )
 
         usage = self._usage(tmp_path, payload)
 
-        assert usage["mcp_tool_calls"] == 2
-        assert usage["num_turns"] == 3  # the json branch still parses normally
+        assert usage["total_input_tokens"] == 10
+        assert usage["total_output_tokens"] == 5
+        assert usage["cost_usd"] == 0.25
+        assert usage["num_turns"] == 3
+        # --output-format json carries no tool_use records, so there is nothing
+        # to count — and the runner defaults to stream-json.
+        assert usage["mcp_tool_calls"] == 0
 
-    def test_counts_calls_in_stream_json_output(self, tmp_path: Path) -> None:
+    def test_stream_json_output(self, tmp_path: Path) -> None:
         stream = (
-            '{"type":"assistant","text":"calling mcp__sourcegraph__search_code"}\n'
-            '{"modelUsage":{"claude":{"inputTokens":1,"outputTokens":1}},'
-            '"num_turns":2}\n'
+            json.dumps(_tool_use("mcp__sourcegraph__search_code"))
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "result",
+                    "modelUsage": {
+                        "claude": {"inputTokens": 1, "outputTokens": 1, "costUSD": 0.5}
+                    },
+                    "num_turns": 2,
+                }
+            )
+            + "\n"
         )
 
         usage = self._usage(tmp_path, stream)
 
         assert usage["mcp_tool_calls"] == 1
+        assert usage["total_input_tokens"] == 1
+        assert usage["total_output_tokens"] == 1
+        assert usage["cost_usd"] == 0.5
         assert usage["num_turns"] == 2
 
-    def test_json_output_with_no_mcp_calls_still_reports_zero(
-        self, tmp_path: Path
-    ) -> None:
-        payload = json.dumps({"modelUsage": {}, "numTurns": 1, "result": "no mcp here"})
+    def test_json_array_output(self, tmp_path: Path) -> None:
+        payload = json.dumps(
+            [
+                _tool_use("mcp__sourcegraph__search_code"),
+                {"type": "result", "numTurns": 4},
+            ]
+        )
 
-        assert self._usage(tmp_path, payload)["mcp_tool_calls"] == 0
+        usage = self._usage(tmp_path, payload)
+
+        assert usage["mcp_tool_calls"] == 1
+        assert usage["num_turns"] == 4
+
+    def test_non_json_noise_lines_are_skipped(self, tmp_path: Path) -> None:
+        stream = (
+            "warning: mcp__sourcegraph__search_code is deprecated\n"
+            + json.dumps(_tool_use("mcp__sourcegraph__read_file"))
+            + "\n"
+        )
+
+        assert self._usage(tmp_path, stream)["mcp_tool_calls"] == 1
+
+    def test_missing_log_reports_zeroes(self, tmp_path: Path) -> None:
+        usage = run_task._extract_tool_usage(tmp_path)
+
+        assert usage["mcp_tool_calls"] == 0
+        assert usage["num_turns"] == 0
