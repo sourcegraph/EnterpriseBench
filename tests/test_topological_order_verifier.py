@@ -13,6 +13,8 @@ Covers:
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from eb_verify.plugins.topological_order import (
@@ -196,3 +198,30 @@ class TestTopologicalOrderValidatorPlugin:
     def test_artifact_type(self) -> None:
         validator = TopologicalOrderValidator()
         assert validator.artifact_type == "topological_order"
+
+    def test_single_ordering_in_subdir_graded(self, tmp_path) -> None:
+        sub = tmp_path / "plan"
+        sub.mkdir()
+        (sub / "ordering.json").write_text(json.dumps({
+            "proposed_order": ["A", "B"],
+            "dependency_graph": {"B": ["A"], "A": []},
+        }))
+        result = TopologicalOrderValidator().validate(tmp_path)
+        assert result.valid is True
+
+    def test_root_decoy_shadowing_is_ambiguous(self, tmp_path) -> None:
+        # Root decoy + real ordering in a subdir -> ambiguous, not a silent
+        # candidates[0] grade of the anchor-first decoy.
+        (tmp_path / "ordering.json").write_text(json.dumps({
+            "proposed_order": ["B", "A"],  # decoy: violates the dependency
+            "dependency_graph": {"B": ["A"], "A": []},
+        }))
+        sub = tmp_path / "plan"
+        sub.mkdir()
+        (sub / "ordering.json").write_text(json.dumps({
+            "proposed_order": ["A", "B"],
+            "dependency_graph": {"B": ["A"], "A": []},
+        }))
+        result = TopologicalOrderValidator().validate(tmp_path)
+        assert result.valid is False
+        assert "ambiguous" in result.detail.lower()

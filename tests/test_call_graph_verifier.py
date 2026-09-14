@@ -252,6 +252,30 @@ class TestCallGraphValidatorPlugin:
         assert result.valid is False
         assert "No dead_code_report.json" in result.detail
 
+    def test_root_decoy_shadowing_pinned_report_is_ambiguous(self, tmp_path: Path) -> None:
+        # A workspace-root decoy alongside the real report in a repo subdir must
+        # NOT be silently graded as candidates[0]; reject as ambiguous. The
+        # sealed ground_truth/ reads stay direct and are unaffected.
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        gt_dir = workspace / "ground_truth"
+        gt_dir.mkdir()
+        (gt_dir / "dead_code.json").write_text(json.dumps([
+            _sym("src/utils.py", "unused_helper"),
+        ]))
+        (gt_dir / "live_code.json").write_text(json.dumps([
+            _sym("src/core.py", "main", reachability="direct"),
+        ]))
+        (workspace / "dead_code_report.json").write_text(json.dumps([]))  # decoy
+        repo = workspace / "react"
+        repo.mkdir()
+        (repo / "dead_code_report.json").write_text(json.dumps([
+            _sym("src/utils.py", "unused_helper"),
+        ]))
+        result = CallGraphValidator().validate(workspace)
+        assert result.valid is False
+        assert "ambiguous" in result.detail.lower()
+
     def test_invalid_json_report(self, tmp_path: Path) -> None:
         workspace = tmp_path / "workspace"
         workspace.mkdir()

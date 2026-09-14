@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from eb_verify.groundedness import check_groundedness, parse_citations
-from eb_verify.artifact_io import safe_read
+from eb_verify.artifact_io import safe_read, select_unique
 from eb_verify.plugins import ValidationResult
 
 REQUIRED_FIELDS = ["vulnerabilities", "severity_summary", "recommendations"]
@@ -80,16 +80,19 @@ class SecurityAssessmentValidator:
         evidence_spans appear verbatim in the cited workspace files (see
         module docstring); failures report per-finding, per-citation reasons.
         """
-        candidates = list(workspace.glob("**/security_assessment.json")) + \
-                     list(workspace.glob("**/security-assessment.json"))
-
-        if not candidates:
+        # Decoy-shadow-safe selection: reject >1 candidate as ambiguous.
+        path, sel_err = select_unique(
+            workspace, ["security_assessment.json", "security-assessment.json"]
+        )
+        if sel_err is not None:
+            return ValidationResult(valid=False, detail=sel_err)
+        if path is None:
             return ValidationResult(
                 valid=False, detail="No security assessment file found"
             )
 
         try:
-            data = json.loads(safe_read(candidates[0], workspace))
+            data = json.loads(safe_read(path, workspace))
         except (json.JSONDecodeError, ValueError) as e:
             return ValidationResult(valid=False, detail=f"Invalid JSON: {e}")
 

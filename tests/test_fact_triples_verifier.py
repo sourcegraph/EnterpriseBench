@@ -370,6 +370,33 @@ def test_validate_missing_facts_json(tmp_path: Path):
     assert "facts.json" in result.detail
 
 
+def test_validate_root_decoy_shadowing_pinned_facts_is_ambiguous(tmp_path: Path):
+    # Decoy-shadow class: a workspace-root facts.json alongside the real one in
+    # a subdir must not be silently graded (sorted(glob)[0] took the root
+    # decoy). Reject as ambiguous instead.
+    ws = make_workspace(tmp_path)
+    (ws / "facts.json").write_text(json.dumps({"facts": []}))  # root decoy
+    out = ws / "agent_output"
+    out.mkdir()
+    (out / "facts.json").write_text(json.dumps({"facts": perfect_facts()}))
+    result = FactTriplesValidator().validate(ws)
+    assert not result.valid
+    assert "ambiguous" in result.detail.lower()
+
+
+def test_validate_ignores_ground_truth_facts_json(tmp_path: Path):
+    # A facts.json planted inside ground_truth/ must not be conflated with the
+    # agent artifact; the lone agent file under agent_output/ is graded.
+    ws = make_workspace(tmp_path)
+    (ws / "ground_truth" / "facts.json").write_text(json.dumps({"facts": []}))
+    out = ws / "agent_output"
+    out.mkdir()
+    (out / "facts.json").write_text(json.dumps({"facts": perfect_facts()}))
+    result = FactTriplesValidator().validate(ws)
+    assert result.valid
+    assert "score=1.000" in result.detail
+
+
 def test_validate_missing_ground_truth(tmp_path: Path):
     ws = make_workspace(tmp_path)
     (ws / "ground_truth" / "expected_facts.json").unlink()

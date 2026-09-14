@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from eb_verify.groundedness import CitationParseError, ground_citations
-from eb_verify.artifact_io import safe_read
+from eb_verify.artifact_io import safe_read, select_unique
 from eb_verify.plugins import ValidationResult
 
 
@@ -150,19 +150,21 @@ class IncidentReportValidator:
            citation's evidence_span must appear verbatim in the cited workspace
            file; missing/malformed citations or any ungrounded span fail validation
         """
-        candidates = list(workspace.glob("**/incident_report.json")) + \
-                     list(workspace.glob("**/incident-report.json")) + \
-                     list(workspace.glob("**/output/incident_report.json")) + \
-                     list(workspace.glob("**/artifacts/incident_report.json"))
-
-        if not candidates:
+        # Decoy-shadow-safe selection: prefer nothing, but reject >1 candidate
+        # as ambiguous instead of grading a workspace-root decoy. The former
+        # ``**/output/...`` and ``**/artifacts/...`` globs were strict subsets
+        # of ``**/incident_report.json`` and only added self-collisions.
+        report_path, sel_err = select_unique(
+            workspace, ["incident_report.json", "incident-report.json"]
+        )
+        if sel_err is not None:
+            return ValidationResult(valid=False, detail=sel_err)
+        if report_path is None:
             return ValidationResult(
                 valid=False,
                 detail="No incident report file found (expected incident_report.json)",
             )
 
-        # Validate the first found
-        report_path = candidates[0]
         try:
             data = json.loads(safe_read(report_path, workspace))
         except (json.JSONDecodeError, ValueError) as e:
