@@ -150,7 +150,12 @@ mix exceeds that floor:
 
 The calibration stratum is a deliberate single-repo, small-codebase set
 designed so that MCP-equipped agents should have minimal advantage. We use it
-to detect benchmark bias (Section 4).
+to detect benchmark bias (§6.5); §3.1 situates this calibration check
+alongside the information-parity precondition a prior CodeScaleBench audit
+motivates.
+
+This stratification is structural, keyed to repo count; §3.2 develops a
+second, behavioral axis, localization difficulty.
 
 ### 2.5 Cross-Repo Necessity Test (CRNT)
 
@@ -159,7 +164,8 @@ required to solve them. We enforce this with the **Cross-Repo Necessity
 Test** (`scripts/validation/crnt_validator.py`): a task is rejected as
 multi-repo if the ground-truth answer can be assembled by inspecting only one
 of its repos. CRNT validation runs as a pre-flight gate before tasks enter
-the benchmark.
+the benchmark. CRNT is a structural check on repo necessity; §3.3 develops a
+complementary axis, instruction leakage.
 
 ### 2.6 Ground truth (layered)
 
@@ -176,9 +182,272 @@ three-tier ground-truth pipeline:
 The curator never has access to Sourcegraph or any other tool that is being
 evaluated, ensuring tool-independent ground truth.
 
-## 3. Evaluation Framework
+## 3. Methodology
 
-### 3.1 Tool-access modes
+This section states the analytical design used to interpret cost and outcome
+differences between EnterpriseBench's tool-access modes, building on prior
+measurement from CodeScaleBench, EnterpriseBench's direct predecessor (§8). A
+retrieval effect read off the whole corpus at once is not interpretable,
+because the underlying task mix determines the aggregate on its own; the
+design therefore commits to reporting every effect within a difficulty
+stratum. The design rests on
+seven commitments: an information-parity precondition on the baseline, a
+localization-difficulty stratification distinct from the repo-count strata of
+§2.4, a corpus leakage audit, a subagent-inclusive cost decomposition, a
+retrieval-quality axis scored separately from reward, a tiered screening
+protocol, and an arm-by-regime comparison over EnterpriseBench's three
+tool-access modes.
+
+The results in §6 predate all seven. They report a single flat pass over the
+corpus (§5.4) under three arms, without a parity census, localization strata,
+leakage buckets, a subagent-inclusive cost basis, retrieval-quality metrics,
+or regimes. This section is therefore the design EnterpriseBench is moving to,
+not the design its current numbers were produced under, and the aggregate
+per-mode deltas in §6 should be read with the task-mix confound above in mind.
+Each subsection below states which part is already instrumented and which is
+pending; §7.3 tracks the pending work.
+
+### 3.1 The baseline receives the same information as the retrieval arm
+
+A retrieval effect is only interpretable when both configurations see the same
+code. CodeScaleBench's corpus violated this. A parity audit of a frozen
+CodeScaleBench snapshot classified 288 tasks as a paired checkout, 48 as an
+empty baseline workspace, 10 as partial, and 21 as unknown. Those 48
+empty-baseline tasks carried the entire apparent retrieval lift, a delta of
++0.091 reward; across the 288 correctly paired tasks the difference was
+statistically null.[^csb-parity]
+
+EnterpriseBench's sandbox generator describes an analogous asymmetry, but the
+system as run does not implement it, and the distinction matters for how §6
+can be read. `scripts/sandbox/dockerfile_generator.py` emits three images per
+task: `Dockerfile` (baseline) performs a standard local clone of every required
+repository; `Dockerfile.sg_only` ships an empty workspace with Sourcegraph MCP
+mandatory; `Dockerfile.hybrid` clones locally and also exposes MCP. Only the
+first is ever built. `scripts/orchestration/run_task.py` resolves the generated
+Dockerfile at a single call site that is hardcoded to the standard variant; the
+string `sg_only` does not occur anywhere in the runner. The empty-workspace
+image is written to disk on every run and then discarded.
+
+What actually varies across arms is the instruction and the tool endpoint. An
+`mcp_only` or `hybrid` run has the Sourcegraph MCP server configured and a
+retrieval preamble prepended to the task instruction; a `baseline` run has
+neither. Nothing gates the filesystem. An `mcp_only` agent keeps its ordinary
+file-reading and search tools over a fully populated `/workspace`, and the
+`mcp_only` preamble's assertion that local source files are not present in
+`/workspace` is false as run. Mode is therefore enforced by prompt conditioning
+alone, and the instruction-fidelity defect is tracked as a release blocker.
+
+The consequence is that the information-parity argument is a property of the
+design, not of the numbers in §6. The intended reading, in which baseline holds
+strictly more local information than `mcp_only` by construction and hybrid is
+the parity-matched arm, holds only once the runner builds the image the
+generator already produces. Until then an `mcp_only`-vs-baseline delta is not
+an information ablation but a prompt-conditioning contrast, and §7.2's note on
+mode comparability should be read with that substitution in mind.
+EnterpriseBench also does not yet run an outcome-blind census of baseline
+workspace completeness comparable to CodeScaleBench's `parity_audit.py`; adding
+one is the natural extension of the calibration check already in place (§6.5).
+
+### 3.2 Localization difficulty is the stratifying variable
+
+The repo-count strata of §2.4 (calibration, large single-repo, dual, tri,
+multi, monorepo) capture how many repositories a task touches, not how hard
+the relevant code is to find within them. CodeScaleBench's stratifying
+variable for that second, orthogonal axis is baseline grep-breadth: the number
+of distinct search-and-scan operations the local-grep baseline issues before
+it localizes an answer, read directly from the baseline transcript.
+Grep-breadth is observable without an oracle and defined on the baseline arm
+alone, so it does not depend on which retrieval configuration is under test.
+It orders tasks from well-localized, where a named symbol resolves in one
+grep, to navigation-hard, where the answer is spread across files the baseline
+must scan broadly to assemble.
+
+The variable earns its place because the cost effect of retrieval tracks it.
+On CodeScaleBench's 113-task paired substitution run, the per-task cost delta
+between retrieval and baseline correlated r = −0.57 with baseline
+grep-breadth: retrieval's cost penalty over baseline closes and then reverses
+as the baseline's own search broadens.[^csb-grepbreadth] EnterpriseBench
+inherits the same prediction, that `mcp_only` and `hybrid` should look worst,
+cost-wise, on the well-localized end of the distribution and best on the
+navigation-hard end, and the three-mode design (§4.1) already produces the
+paired per-task deltas needed to test it. Cutting EnterpriseBench's own
+grep-breadth strata and reporting per-stratum task counts is pending the
+arm×regime run described in §3.7.
+
+<!-- TODO(jn73.11): grep-breadth cut points + per-stratum task counts for
+     EnterpriseBench's own task corpus, from the arm x regime runs. -->
+
+### 3.3 Corpus leakage audit
+
+An instruction that names the answer's location turns a retrieval task into a
+lookup, and a corpus dense with such instructions caps any aggregate retrieval
+effect near zero regardless of tool quality. CodeScaleBench's audit is a
+census over its 275 maintained tasks that classifies each instruction by what
+it hands the agent: an exact file path leaked verbatim, a symbol or directory
+name leaked, a behavioral description whose terms map directly to a greppable
+string, or grep-hard, where localization needs navigation that no instruction
+term shortcuts. That census found the corpus heavily lookup-shaped: 38% of
+instructions leak an exact path, symbol, or directory outright, a further 59%
+are behavioral-only, and enough of the behavioral-only remainder maps to
+greppable strings that 74% of the corpus is grep-trivial by construction. Its
+`feature` and `test` categories, which have no direct counterpart in
+EnterpriseBench's ten task types (§2.1), score 0% enterprise-complex: they
+measure authoring rather than retrieval.[^csb-leakage] Retrieval-win rate then
+rose as leakage fell, measured on the 113-task paired subset of that census:
+
+Table 1: CodeScaleBench, 113-task paired analysis. A retrieval win is a task on
+which the retrieval arm's cost is at most the baseline's. The rate is a cost
+comparison, not an outcome comparison.
+
+| Leakage bucket                 | Retrieval-win rate, cost basis (CodeScaleBench) |
+| ------------------------------ | ----------------------------------------------: |
+| (a) exact path leaked          |                                              0% |
+| (b) symbol / directory leaked  |                                              4% |
+| (c) behavioral, greppable      |                                             28% |
+| grep-hard                      |                                             32% |
+
+The retrieval arm wins more often exactly as the instruction gives away less,
+evidence that leakage rather than tool capability drove that corpus's
+aggregate, and the reason a leakage bucket belongs alongside every stratified
+effect. The top two buckets are separated by four points, so the ordering
+across them is weak; the (a)-to-(c) span is what carries the claim.
+
+Leakage answers a different question than the Cross-Repo Necessity Test of
+§2.5. CRNT rejects a task if its ground truth can be assembled from one repo;
+leakage classifies whether the instruction text gives away where in the code
+the answer sits, repo count aside. A single-repo task can be leakage-clean and
+a five-repo task can leak an exact path. EnterpriseBench has not yet run an
+equivalent census over its own corpus; doing so would sit alongside CRNT as a
+pre-flight gate (§2.5) and would let every reported effect carry a leakage
+bucket next to its repo-count stratum (§7.3).
+
+### 3.4 Cost is decomposed on a subagent-inclusive basis
+
+CodeScaleBench's cost unit sums `total_cost_usd` over the main agent and every
+subagent it spawns, priced by token type at the model's published
+per-million-token rates for uncached input, cache-creation, cache-read, and
+output. The basis matters because a main-agent-only count omits delegated
+subagent work and overstates the retrieval penalty. On the subagent-inclusive
+basis CodeScaleBench's retrieval arm showed a cost gap over baseline of +24%,
+not the +42–48% a main-only count reported. Cache-creation dominated that gap
+(roughly two-thirds of the delta), followed by cache-read and output; uncached
+input contributed almost nothing.[^csb-cost] The mechanism CodeScaleBench
+identified is accumulated-reasoning re-creation, not retrieved-payload size:
+retrieval concentrates comparable total work into fewer, heavier turns, and
+each heavy turn rewrites more of the prompt cache.
+
+EnterpriseBench's cost accounting already uses the same token-class scheme
+(§5.3). It is not yet subagent-inclusive: `cost_tracker.py` sums usage from a
+single `agent_trace.jsonl` per result directory
+(`root_dir.rglob("agent_trace.jsonl")`), and whether a delegated subagent's
+turns land in that same trace file or need a separate walk is unresolved. Until
+it is, EnterpriseBench's own cost figures (§6.6) carry the same main-only bias
+this subsection describes, and they are not a fair-basis delta (§7.1).
+
+<!-- TODO(jn73.11): per-regime cost split and cache-creation / cache-read /
+     output attribution from EnterpriseBench's own arm x regime runs. -->
+
+### 3.5 Retrieval quality is measured on its own axis
+
+Outcome reward says whether an agent succeeded, not whether its retrieval was
+precise, and a configuration can raise reward by over-fetching.
+EnterpriseBench already carries the machinery to separate the two:
+`lib/eb_metrics/ir_metrics.py` ports the retrieval-quality core of
+CodeScaleBench's `scripts/csb_metrics/ir_metrics.py`, providing precision@k,
+recall@k, F1@k, mean reciprocal rank, nDCG@k, mean average precision,
+file-level recall, and a context-efficiency ratio over normalized,
+repo-relative file paths. These are standard code information-retrieval
+measures (Li et al., 2025; Li et al., 2026), and reporting them beside reward,
+rather than folding them into it, separates a genuine precision gain from an
+over-injection effect an outcome-only benchmark cannot see (Wang et al.,
+2025). The port deliberately excludes CodeScaleBench's dollar-cost and
+time-to-first-relevant-file fields, since those belong to §3.4's cost lever,
+not this retrieval-quality axis. EnterpriseBench's layered ground truth (§2.6)
+and checkpoint scoring (§4.4) already produce the required-file and
+sufficient-file oracle sets these metrics score against. The instrumentation
+therefore exists, but it has not been applied to the current run set: §6
+reports no retrieval-quality metrics, and doing so is pending (§7.3).
+
+### 3.6 A tiered screening protocol precedes the representative comparison
+
+Screening a candidate tool configuration and estimating its representative
+effect are different jobs, and conflating them wastes trials. CodeScaleBench's
+protocol runs three tiers: a smoke tier of three tasks chosen for maximum
+signal rather than representativeness, giving a first directional read and
+catching breakage; a confirm tier of nine cost-biased tasks at three trials
+each, testing whether an effect that survives smoke holds under paired
+per-task deltas; and a stratum tier, drawn from the leakage-audited,
+grep-breadth-stratified frame of §3.2–§3.3, that estimates the representative
+per-regime effect and is reached only by configurations that survive confirm.
+Cost and reward verdicts require confirm or higher: CodeScaleBench observed
+the smoke tier repeatedly over-reward turn reduction, because its tasks are
+exactly where retrieval loops dominate, so a smoke-tier cost verdict inverted
+or shrank once retested at confirm.[^csb-protocol] Under the protocol the unit
+of analysis is the paired per-task delta: a cost delta without a matching
+call-count delta is noise, and arm means are not compared directly.
+
+EnterpriseBench's current run set (§5.4) is a single flat pass rather than a
+tiered one, and §6.1 and §6.2 report unpaired arm means, which the protocol
+above would not admit as a verdict. Adopting the smoke → confirm → stratum
+sequence would matter most the next time a new MCP client version, or a new arm
+such as a batched-search or CLI variant (§3.7), needs screening before it runs
+across the full corpus.
+
+### 3.7 Arms and regimes
+
+CodeScaleBench's comparison crosses retrieval arms with localization regimes,
+holding the retrieval backend and index fixed while varying only the
+interface: a local-grep baseline, a stock retrieval-tool configuration over
+the remote index (Anthropic, 2024; Sourcegraph, 2023), a batched-search
+variant issuing several queries per call, and a shell-composable command-line
+form over the same endpoint, following the observation that the
+agent-computer interface itself changes agent behavior (Yang et al., 2024).
+EnterpriseBench's own three tool-access modes, baseline, `mcp_only`, and
+hybrid (§4.1), are its arms. They are not an exact match to CodeScaleBench's
+taxonomy: `mcp_only` withholds local search tools entirely rather than offering
+an alternative interface over the same index (§3.1). The regimes are the
+localization-difficulty strata of §3.2, once cut for EnterpriseBench's own
+corpus.
+
+The design does not seek a single best arm. Its deliverable is a routing rule
+keyed on localization difficulty: which mode minimizes cost at reward parity
+within each regime, and where the crossover between modes falls. That routing
+rule is not reported in this paper. EnterpriseBench has not yet run the
+arm-by-regime experiment, so the cost and reward matrix, the per-regime paired
+statistics, and the crossover remain pending (§7.3); §6 reports arms without
+regimes.
+
+<!-- TODO(jn73.11): arm x regime cost/reward matrix, per-regime paired
+     statistics and win counts, and the routing crossover, from
+     EnterpriseBench's own arm x regime runs. -->
+
+[^csb-parity]: Figures from CodeScaleBench's internal parity audit of a frozen
+    snapshot (`parity_audit.py`): census OK 288 / EMPTY 48 / PARTIAL 10 /
+    UNKNOWN 21. The empty-workspace split is an information-parity artifact in
+    that corpus, not evidence about retrieval; it complements the
+    contamination controls that pin an index to the exact revision under test
+    (Weng et al., 2026; Riddell et al., 2024).
+
+[^csb-grepbreadth]: CodeScaleBench: 113-task substitution run, Sonnet-class
+    agent, both arms, main+subagent cost basis (§3.4). Reported as a point
+    correlation; no confidence interval is available.
+
+[^csb-leakage]: CodeScaleBench internal 275-task census. Bucket
+    classification is a per-instruction structural check, distinct from the
+    parity gate of §3.1.
+
+[^csb-cost]: CodeScaleBench, main+subagent basis, confirm-tier decomposition:
+    retrieval $0.627 vs. baseline $0.506 per trial. The correction is an
+    accounting-basis change; it does not by itself change arm rankings, since
+    the same basis applies to every arm.
+
+[^csb-protocol]: Observed repeatedly across CodeScaleBench's tool-design
+    campaign: reward and payload verdicts needed the confirm tier to be
+    trustworthy.
+
+## 4. Evaluation Framework
+
+### 4.1 Tool-access modes
 
 Every task is runnable in three controlled tool-access modes:
 
@@ -219,7 +488,7 @@ eligibility-matched subset is tracked as separate work. The mode-suffixed image
 tags (`eb-task-mcp_only`, etc.) prevent build collisions during parallel runs and
 do not themselves encode the mode.
 
-### 3.2 Session types
+### 4.2 Session types
 
 | Type           | Container lifecycle             | State mechanism                    |
 | -------------- | ------------------------------- | ---------------------------------- |
@@ -228,7 +497,7 @@ do not themselves encode the mode.
 | `event_replay` | One container, event stream     | `events.jsonl` → `actions.jsonl`   |
 | `resume`       | One container, pre-populated    | Git branch + progress doc          |
 
-### 3.3 Verification
+### 4.3 Verification
 
 A single library, `eb_verify`, ships in every sandbox container — there are
 no per-task verifier copies. Nine artifact-aware plugins validate the diverse
@@ -246,7 +515,7 @@ outputs that EnterpriseBench tasks elicit:
 | `topological_order`   | Dependency ordering correctness                      |
 | `call_graph`          | Function call graph accuracy                         |
 
-### 3.4 Checkpoint-based scoring
+### 4.4 Checkpoint-based scoring
 
 Each task defines 2–5 graduated checkpoints. Partial credit is awarded for
 intermediate progress, so even high-difficulty tasks produce signal rather
@@ -259,15 +528,15 @@ than collapsing to a single pass/fail bit. The scoring layers are:
 | Chunk-level      | Line ranges within files             | Block-level precision/recall                 |
 | Checkpoints      | 2–5 graduated per task               | Partial credit for intermediate progress     |
 
-## 4. Experimental Setup
+## 5. Experimental Setup
 
-### 4.1 Agent configurations
+### 5.1 Agent configurations
 
 The runs reported here used a single agent driver (`scripts/orchestration/run_task.py`)
 against Anthropic models (Claude Opus / Sonnet, model recorded in each
 `run_log.json`). Token costs and tool calls are captured per run.
 
-### 4.2 Sandbox
+### 5.2 Sandbox
 
 Each task runs in a Docker container with all required repositories pre-
 cloned to `/workspace/{repo-name}/` at the SHAs pinned in
@@ -275,16 +544,22 @@ cloned to `/workspace/{repo-name}/` at the SHAs pinned in
 `eb-task-mcp_only`, `eb-task-hybrid`) are used so that mode variants can be
 built and run in parallel without collision.
 
-### 4.3 Cost tracking
+### 5.3 Cost tracking
 
-Per-run cost is computed from token counts using current Anthropic pricing
-(input/output rates). The 60/40 input/output split observed in early sample
-runs is used as the default token-mix assumption when provider-side counts
-are not directly available; provider counts are preferred when present.
+Per-run cost is computed from observed token counts using current Anthropic
+pricing. `scripts/cost_tracker.py` reads each per-task `agent_trace.jsonl` and
+breaks actual usage out into four token classes, input, output, cache-write and
+cache-read, per model. No token mix is assumed or imputed. The tracker walks
+only those result directories that contain a trace, so a task whose run produced
+no trace is omitted from the cost totals rather than estimated. Cost coverage is
+therefore a subset of outcome coverage, and a per-arm cost mean is taken over
+whichever tasks yielded traces in that arm rather than over the full run set.
+This accounting is also not subagent-inclusive; §3.4 establishes why that biases
+the cost figures reported in §6.6.
 
-### 4.4 Run set used in this paper
+### 5.4 Run set used in this paper
 
-The results in Section 5 use the most recent end-to-end run set produced by
+The results in Section 6 use the most recent end-to-end run set produced by
 the Phase 7 analysis pipeline:
 
 - 326 task results across three modes
@@ -293,7 +568,7 @@ the Phase 7 analysis pipeline:
   in absolute count, with smaller suites (security_operations, platform_engineering)
   underrepresented as a known limitation
 
-## 5. Results
+## 6. Results
 
 > All numbers in this section are produced from
 > `results/analysis/score_analysis.json` via the pipeline in
@@ -301,13 +576,13 @@ the Phase 7 analysis pipeline:
 > `scripts/generate_report.py`. Re-running `make paper-figures` regenerates
 > every figure and table from the underlying data.
 
-### 5.1 Headline numbers
+### 6.1 Headline numbers
 
 - **Tasks scored across modes:** 326
 - **Tasks present in all three modes:** 108
 - **Baseline pass rate (score ≥ 0.7):** 51.8%
 
-### 5.2 Distribution by mode
+### 6.2 Distribution by mode
 
 | Mode       |   N | Mean   | Median | Std    | Pass rate |
 | ---------- | --: | ------ | ------ | ------ | --------- |
@@ -317,7 +592,7 @@ the Phase 7 analysis pipeline:
 
 ![Score distribution by mode](figures/score_by_mode.png)
 
-### 5.3 Distribution by suite
+### 6.3 Distribution by suite
 
 ![Score heatmap by suite × mode](figures/score_heatmap.png)
 
@@ -327,7 +602,7 @@ Suite-level means span a wide range, from `dependency_management` (baseline
 doing most of the work because the 0.7 pass threshold is not crossed in any
 mode).
 
-### 5.4 MCP impact analysis
+### 6.4 MCP impact analysis
 
 Paired comparisons on the 108 tasks with all three modes:
 
@@ -346,14 +621,14 @@ Paired comparisons on the 108 tasks with all three modes:
 ![MCP delta vs baseline](figures/mcp_delta.png)
 
 These deltas are *negative* in the current run set. We interpret this with
-care: (a) the calibration check (Section 5.5) shows the benchmark itself is
+care: (a) the calibration check (Section 6.5) shows the benchmark itself is
 not biased toward baseline, (b) sample size is small, particularly in
 several suites, and (c) the agent-side MCP integration has known coverage
 gaps in this run that we expect to close in subsequent runs. The headline is
 that MCP delta is *measurable and signed*, not that MCP is empirically
-unhelpful — see Section 6 for limitations.
+unhelpful; see Section 7 for limitations.
 
-### 5.5 Calibration bias check
+### 6.5 Calibration bias check
 
 The 35-task calibration stratum is small, single-repo, and designed so that
 no mode should have a meaningful advantage. The observed maximum mode delta
@@ -368,14 +643,18 @@ particular tool-access mode on easy tasks.
 
 ![Calibration check](figures/calibration_check.png)
 
-### 5.6 Cost per task
+### 6.6 Cost per task
 
 Per-task cost ranges from $0.05 (Sonnet, dead-code) to $0.32 (Opus,
 api_contract baseline). MCP modes consistently use 23–33% fewer tokens than
 baseline at the same task. The full benchmark in 3-mode config runs at an
 estimated $42–$61 in token + compute (see `results/analysis/cost_model.md`).
 
-### 5.7 Reproducibility
+These figures are computed on a main-agent-only basis, which §3.4 shows
+overstates the retrieval arm's cost penalty; they are not a fair-basis
+comparison and should not be read as one (§7.1).
+
+### 6.7 Reproducibility
 
 A 3× repeat-run reproducibility report on a 25-task stratified subset is
 **not yet generated**; the harness (`scripts/reproducibility_check.py`) is in
@@ -384,27 +663,34 @@ This section will report mean, std, and ICC per stratum once those runs are
 available; the placeholder is enforced by `make paper-figures` so the paper
 cannot be packaged with a stale reproducibility number.
 
-## 6. Discussion
+## 7. Discussion
 
-### 6.1 Limitations
+### 7.1 Limitations
 
 - **Sample size.** Several suites (security_operations, platform_engineering)
   have small absolute task counts; per-suite deltas should be read as
   directional, not conclusive.
 - **Reproducibility.** Multi-run variance is not yet quantified; this is
-  acknowledged in §5.7 and gated on the upcoming 3× run.
+  acknowledged in §6.7 and gated on the upcoming 3× run.
 - **Ecosystem skew.** The current multi-repo task mix skews Go (46.2%),
   exceeding the PRD ceiling of 40% per ecosystem. Closing this gap is on the
-  active task list and shifts results in §5.3 only marginally because suite
+  active task list and shifts results in §6.3 only marginally because suite
   means are weighted across ecosystems.
-- **Single agent driver.** Results in §5 use a single driver against
+- **Single agent driver.** Results in §6 use a single driver against
   Anthropic models. The benchmark is agent-agnostic at the contract level
   (task TOML + sandbox + `eb_verify`) and is intended to be run against
   additional drivers (OpenHands, etc.) before publication.
 - **MCP coverage.** Some MCP modes were run with a partially-instrumented
   client; planned closures are tracked in the active backlog.
+- **Cost basis.** Cost is tracked on a main-agent-only basis (§5.3), which
+  §3.4 shows overstates the retrieval arm's penalty. The §6.6 cost and token
+  figures are therefore not a fair-basis comparison across arms.
+- **Design not yet applied to results.** The methodology of §3 states the
+  design EnterpriseBench is moving to. The results in §6 predate all seven of
+  its commitments and report a single flat pass over the corpus, so they carry
+  the task-mix confound §3 is built to remove.
 
-### 6.2 Threats to validity
+### 7.2 Threats to validity
 
 - **Curator leakage.** The LLM curator could over-weight code its training
   set has memorized; cross-backend agreement and solve-verification mitigate
@@ -416,16 +702,31 @@ cannot be packaged with a stale reproducibility number.
 - **Mode comparability.** Hybrid is intended to be a strict superset of
   baseline + mcp_only in capability terms, so a *negative* hybrid delta is a
   signal worth investigating: either the agent is making bad tool-routing
-  decisions or one of the underlying tools is degrading the other.
+  decisions or one of the underlying tools is degrading the other. §3.1
+  formalizes this as an information-parity argument, using a prior
+  CodeScaleBench audit as evidence for why the precondition matters.
 
-### 6.3 Future work
+### 7.3 Future work
 
 - Reproducibility 3× run on a 25-task stratified subset
 - Additional agent drivers (OpenHands, others)
 - Ecosystem rebalancing to bring Go below the 40% ceiling
 - Expansion of security_operations and platform_engineering suites
+- Baseline-workspace parity census (§3.1), CodeScaleBench-style, run against
+  EnterpriseBench's own mode-suffixed sandbox builds
+- Localization-difficulty strata (§3.2) cut for EnterpriseBench's own corpus,
+  with per-stratum task counts, so effects can be reported within a regime
+- Corpus leakage audit (§3.3) over the active corpus, alongside CRNT
+- Subagent-inclusive cost basis (§3.4), resolving whether delegated subagent
+  turns land in the per-task trace, so §6.6 can report a fair-basis delta
+- Retrieval-quality metrics (§3.5) applied to the run set and reported beside
+  reward, using the existing `ir_metrics.py` instrumentation
+- Tiered smoke → confirm → stratum screening (§3.6) adopted for future arm
+  additions such as a batched-search or CLI-form MCP variant
+- Arm-by-regime cost and reward matrix with per-regime paired statistics
+  (§3.7), yielding the routing rule keyed on localization difficulty
 
-## 7. Related Work
+## 8. Related Work
 
 - **SWE-bench / SWE-bench-Verified.** Single-repo PR resolution; complementary
   to EnterpriseBench but does not exercise cross-repo reasoning.
@@ -437,9 +738,13 @@ cannot be packaged with a stale reproducibility number.
 - **CodeScaleBench (CSB, internal).** EnterpriseBench's direct predecessor;
   275 single-repo, single-session tasks. EnterpriseBench inherits CSB's
   metadata pipeline, retires its duplicated verifiers, and adds true
-  multi-repo coverage and artifact diversity.
+  multi-repo coverage and artifact diversity. The stratification,
+  leakage-audit, cost-decomposition, and tiered-protocol methodology in §3 is
+  ported from an unpublished internal CSB draft
+  (`paper/retrieval-effectiveness/`) rather than duplicated as a separate
+  paper.
 
-## 8. Conclusion
+## 9. Conclusion
 
 EnterpriseBench targets a capability that prior coding benchmarks largely do
 not: finding and comprehending the right code across distributed
@@ -451,6 +756,33 @@ picture of agent performance under the conditions in which enterprise
 developers actually work. The results presented here are an early read on a
 single agent driver; the design is set up for more agents, more runs, and a
 quantified reproducibility envelope before broad release.
+
+## References
+
+- Anthropic. 2024. *Model Context Protocol.* https://modelcontextprotocol.io
+- Jiménez, C. E., Yang, J., Wettig, A., Yao, S., Pei, K., Press, O., &
+  Narasimhan, K. 2024. *SWE-bench: Can Language Models Resolve Real-World
+  GitHub Issues?* ICLR. arXiv:2310.06770.
+- Li, X., Dong, K., Lee, Y. Q., Xia, W., Zhang, H., Dai, X., Wang, Y., & Tang,
+  R. 2025. *CoIR: A Comprehensive Benchmark for Code Information Retrieval
+  Models.* ACL 2025. arXiv:2407.02883.
+- Li, H., Zhu, L., Zhang, B., Feng, R., Wang, J., Pan, Y., Barr, E. T., Sarro,
+  F., Chu, Z., & Ye, H. 2026. *ContextBench: A Benchmark for Context
+  Retrieval in Coding Agents.* arXiv:2602.05892.
+- Riddell, M., Ni, A., & Cohan, A. 2024. *Quantifying Contamination in
+  Evaluating Code Generation Capabilities of Language Models.* ACL 2024.
+  arXiv:2403.04811.
+- Sourcegraph. 2023. *SCIP: A Code Intelligence Protocol.*
+  https://sourcegraph.com/blog/announcing-scip
+- Wang, Z. Z., Asai, A., Yu, X. V., Xu, F. F., Xie, Y., Neubig, G., & Fried,
+  D. 2025. *CodeRAG-Bench: Can Retrieval Augment Code Generation?* Findings
+  of ACL: NAACL 2025. arXiv:2406.14497.
+- Weng, H., Yang, Q., Fu, H., Pan, H., & Lv, X. 2026. *When Retrieval Hurts
+  Code Completion: A Diagnostic Study of Stale Repository Context.*
+  arXiv:2605.14478.
+- Yang, J., Jiménez, C. E., Wettig, A., Lieret, K., Yao, S., Narasimhan, K.,
+  & Press, O. 2024. *SWE-agent: Agent-Computer Interfaces Enable Automated
+  Software Engineering.* NeurIPS 2024. arXiv:2405.15793.
 
 ## Appendix A — Reproducibility
 
