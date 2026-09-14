@@ -1,15 +1,159 @@
 """
 Weighted score computation and reward.txt generation.
+
+Also home of :func:`score_file_set` / :class:`FileSetScore`, the benchmark-wide
+scoring primitive for file-discovery checkpoints (bead EnterpriseBench-vdeyx).
 """
 
 from __future__ import annotations
 
+import operator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional, Sequence
 
 from eb_verify.score_contract import weighted_mean
 from eb_verify.scorer_guard import InfraError
+
+# Default bar for `passed`, inclusive. Only a default: checkpoints set their own
+# bar (the blobs today span 0.3/0.4/0.5/0.6), so a caller with one compares f1
+# itself. At this bar, full recall passes iff |answer| <= 3|GT|.
+FILE_SET_PASS_THRESHOLD = 0.5
+
+
+@dataclass(frozen=True)
+class FileSetScore:
+    """Set-F1 verdict over a file-discovery answer.
+
+    Every file-discovery checkpoint scores through this one primitive so the 28
+    checkpoints stay comparable; it replaces recall-only scoring, which charged
+    nothing for over-listing. Rationale and options considered:
+    docs/file_discovery_scoring_decision.md.
+
+    Three counts; precision/recall/F1 are derived. ``n_matched`` is one
+    true-positive count shared by both sides, never two independently-counted
+    totals — that is what stops either half of the answer from lying.
+
+    Counts, not paths, because not every matcher is a pairwise predicate —
+    file_extraction.py's refinement rule credits per answer, so that call site
+    constructs from counts while blob-style call sites go through
+    :func:`score_file_set`. Count-constructing callers owe the contract
+    :func:`score_file_set` enforces for them: counts are over DISTINCT files,
+    and ``n_matched`` is a 1-to-1 pairing (an ambiguous guess is listed, but
+    credits nothing).
+    """
+
+    n_required: int  # distinct ground-truth files; >= 1
+    n_listed: int  # distinct files the agent listed
+    n_matched: int  # required files credited, under a 1-to-1 pairing
+
+    def __post_init__(self) -> None:
+        if self.n_required < 1:
+            # A checkpoint with nothing to find is a task-authoring bug. Scoring
+            # it vacuously perfect would hand every agent a free pass, so refuse
+            # to produce a number at all and let the caller raise an infra error.
+            raise ValueError(f"no required files to score against in {self}")
+        if not 0 <= self.n_matched <= min(self.n_required, self.n_listed):
+            # No real pairing lands here: you cannot credit more files than
+            # either side holds, or fewer than none. Catches miscounts at the
+            # counts-based call site, which would otherwise fabricate a score.
+            raise ValueError(
+                f"matched {self.n_matched} outside [0, min(required "
+                f"{self.n_required}, listed {self.n_listed})] in {self}"
+            )
+
+    @property
+    def recall(self) -> float:
+        """Share of required files found."""
+        return self.n_matched / self.n_required
+
+    @property
+    def precision(self) -> float:
+        """Share of listed files that earned credit. Vacuously 1.0 when nothing
+        was listed — harmless, since an empty answer has recall 0 and so F1 0."""
+        if self.n_listed == 0:
+            return 1.0
+        return self.n_matched / self.n_listed
+
+    @property
+    def f1(self) -> float:
+        """Harmonic mean of precision and recall; 0.0 when both are 0."""
+        p, r = self.precision, self.recall
+        if p + r == 0:
+            return 0.0
+        return 2 * p * r / (p + r)
+
+    @property
+    def passed(self) -> bool:
+        return self.f1 >= FILE_SET_PASS_THRESHOLD
+
+    def detail(self) -> str:
+        """Human-readable verdict."""
+        return (
+            f"{self.n_matched}/{self.n_required} required files found, "
+            f"{self.n_listed} listed; "
+            f"P={self.precision:.2f} R={self.recall:.2f} F1={self.f1:.2f}"
+        )
+
+
+def _max_pairing(
+    listed: Sequence[str],
+    required: Sequence[str],
+    match: Callable[[str, str], bool],
+) -> int:
+    """Size of a maximum 1-to-1 pairing between listed and required files.
+
+    The true-positive count. 1-to-1 is what denies a lenient matcher extra
+    credit; MAXIMUM (rather than greedy first-match) is what makes the count
+    independent of the order ``required_files`` happens to be written in, and
+    stops a specific guess being wasted on a file a vaguer one also covers.
+    Kuhn's augmenting-path algorithm — required sets are a handful of files
+    (<= 6 across the suite today), so the quadratic is free.
+    """
+    credited_by = [-1] * len(required)  # required index -> listed index, or -1
+
+    def assign(li: int, seen: List[bool]) -> bool:
+        for ri, gt in enumerate(required):
+            if seen[ri] or not match(listed[li], gt):
+                continue
+            seen[ri] = True
+            # Take it if free, else make its current holder step aside.
+            if credited_by[ri] == -1 or assign(credited_by[ri], seen):
+                credited_by[ri] = li
+                return True
+        return False
+
+    return sum(1 for li in range(len(listed)) if assign(li, [False] * len(required)))
+
+
+def score_file_set(
+    agent_files: Sequence[str],
+    required_files: Sequence[str],
+    match: Callable[[str, str], bool] = operator.eq,
+) -> FileSetScore:
+    """Score a file-discovery answer against required files with set-F1.
+
+    ``match(agent_path, required_path)`` decides whether one listed file names
+    one required file; default is exact string equality. The matcher owns all
+    path semantics — normalization, suffix policy, component boundaries — and
+    this function owns the scoring math. Credit is awarded through a 1-to-1
+    pairing (:func:`_max_pairing`), so a matcher can decide WHICH files are
+    credited but never HOW MANY: no matcher, however lenient, can make
+    over-listing free. That independence is the whole point of one primitive.
+
+    Both lists are deduplicated by exact string first, so repeating an entry
+    neither helps nor hurts. Near-duplicate spellings survive dedup, but the
+    pairing denies them a second credit, so they only cost precision.
+
+    Raises ValueError on empty ``required_files``.
+    """
+    required = list(dict.fromkeys(required_files))
+    listed = list(dict.fromkeys(agent_files))
+    return FileSetScore(
+        n_required=len(required),
+        n_listed=len(listed),
+        n_matched=_max_pairing(listed, required, match),
+    )
 
 
 @dataclass
