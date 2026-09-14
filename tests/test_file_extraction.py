@@ -703,6 +703,106 @@ def test_a_gt_path_holding_the_mount_component_zeroes_the_mandated_shape(tmp_pat
     assert "ambiguous" in payload["detail"]
 
 
+# --- the LIVE over-credit half of d900w, pinned on shipped ground truth -------
+#
+# The two pins below assert the WRONG behaviour on purpose. Both are live today on
+# real, shipped ground truth (the tasks above only ever exercised correct answers,
+# which is why the leak survived them). They exist so the fix, whichever fork the
+# owner picks, has an executable target: the bead describes these repros in prose,
+# and prose does not fail a test run.
+#
+# Both sides of the match carry a `repo` and neither side uses it. ground_truth_files
+# mandates that `repo` be present, run_task.py mandates '/workspace/<repo>/...'
+# answers, and _matches_parts then flattens both to component lists and compares
+# them repo-blind. The field is validated and then ignored.
+#
+# NOT fixed here. Both forks the bead offers are corpus migrations, and both move a
+# PUBLISHED cross-arm number in opposite directions: lib/eb_metrics/retrieval_extraction
+# reads required_files[].path as repo-relative, so changing the stored path length moves
+# recall for exactly the arm whose reads are repo-relative. The fork comparison and its
+# measurements live in the bead. Picking one is an owner call about published numbers,
+# not a scorer cleanup, so d900w stays needs-human and these stay pinned.
+
+
+def test_a_wrong_repo_answer_over_credits_a_bare_tail(tmp_path):
+    """LIVE over-credit, pinned. babel's real ground truth (NESTED_GT), verbatim.
+
+    '/workspace/babel/package.json' is the babel repo's ROOT manifest. It is not a
+    required file of this task at all — babel's required manifest is the deeper
+    'packages/babel-parser/package.json'. The answer names one wrong file and nothing
+    else, and is credited a third of the task:
+
+        components('/workspace/babel/package.json') = [workspace, babel, package.json]
+
+    whose trailing slice [package.json] equals webpack's required bare 'package.json'.
+    So WEBPACK's required file is credited to a file in the BABEL repo, off a
+    basename collision between two different repos' manifests. The `repo` field that
+    would refuse the match ('babel' vs 'webpack') is carried by both sides and read
+    by neither.
+
+    Flip this to 0.0 when d900w's fork lands.
+    """
+    gt = nested_gt_file(tmp_path)
+    answer = write_json(tmp_path / "answer.json",
+                        {"source_files": ["/workspace/babel/package.json"]})
+    proc = run_cli(answer, gt)
+    payload = json.loads(proc.stdout)
+    assert INFRA_SENTINEL not in payload["detail"], payload["detail"]
+    assert payload["score"] == 0.3333, payload["detail"]
+    missed = payload["detail"].split("missed: ")[1].rstrip(")").split(", ")
+    assert "package.json" not in missed, (
+        "webpack's bare 'package.json' is the wrongly-credited entry, so it is the one "
+        "NOT reported as missed: " + payload["detail"]
+    )
+
+
+def test_a_wrong_file_in_the_right_repo_over_credits_via_the_mount_prefix(tmp_path):
+    """LIVE over-credit, the other direction: right repo, wrong file. The real ground
+    truth of technical_debt/refactor-orchestration-tri-tokio-001, verbatim.
+
+    tokio's required 'tokio/Cargo.toml' means the tokio SUBCRATE manifest, which lives
+    at /workspace/tokio/tokio/Cargo.toml — the repo root's Cargo.toml is a virtual
+    workspace manifest ([workspace], no [package]) and is not a required file. The
+    answer names that root manifest and is still credited:
+
+        components('/workspace/tokio/Cargo.toml') = [workspace, tokio, Cargo.toml]
+
+    trailing-slices to [tokio, Cargo.toml], which equals the required path exactly.
+    The mandated '/workspace/' prefix supplies a phantom 'tokio' component, and the
+    required path's own leading 'tokio' — a repo-relative subdirectory — silently
+    plays the part of the repo qualifier.
+
+    This entry is why the bead's CAUTION holds: 'tokio/Cargo.toml' with repo 'tokio'
+    is undecidable between already-prefixed and the tokio/ subcrate by inspection
+    alone, because BOTH readings name a file that really exists at tokio-1.29.1. It is
+    resolved here from intent, not layout: hyper's sibling entry is the bare
+    'Cargo.toml' precisely because hyper@v1.0.0-rc.4 is single-crate and its root IS
+    its [package] manifest, so all three entries consistently mean 'the manifest of
+    the crate being changed'.
+
+    Flip this to 0.0 when d900w's fork lands.
+    """
+    gt = write_json(tmp_path / "ground_truth.json", {"required_files": [
+        {"path": "tokio/Cargo.toml", "repo": "tokio"},
+        {"path": "Cargo.toml", "repo": "hyper"},
+        {"path": "axum/Cargo.toml", "repo": "axum"},
+    ]})
+    answer = write_json(tmp_path / "answer.json",
+                        {"source_files": ["/workspace/tokio/Cargo.toml"]})
+    proc = run_cli(answer, gt)
+    payload = json.loads(proc.stdout)
+    # Guard the flip, not just the score: this GT is spelled inline, so a fork that
+    # enforces components(path)[0] == repo rejects the hyper entry as malformed and
+    # emits an INFRA 0.0. Without this line, flipping the assert below to 0.0 would go
+    # green on that infra error and stop testing the matcher entirely.
+    assert INFRA_SENTINEL not in payload["detail"], payload["detail"]
+    assert payload["score"] == 0.3333, payload["detail"]
+    assert "tokio/Cargo.toml" not in payload["detail"], (
+        "the wrongly-credited entry should be the one NOT reported as missed: "
+        + payload["detail"]
+    )
+
+
 # --- ground truth is OUR artifact: strict, and never silently shrunk ---------
 
 def test_duplicate_gt_spellings_do_not_distort_the_denominator(tmp_path):
