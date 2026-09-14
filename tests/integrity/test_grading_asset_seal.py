@@ -79,6 +79,27 @@ def _fail(stderr: str = "boom", returncode: int = 1) -> subprocess.CompletedProc
     )
 
 
+@pytest.fixture
+def captured_git_argv(monkeypatch, tmp_path) -> tuple[list[list[str]], Path]:
+    """``(argv seen, an empty repo)`` for asserting on patch_evidence's git calls.
+
+    The argv is the only place these properties are visible: the module builds
+    ``git -C <repo> diff ...``, which no grep of the source text would match.
+    """
+    from eb_verify.plugins import patch_evidence
+
+    seen: list[list[str]] = []
+
+    def _fake_run(argv, **kwargs):
+        seen.append(argv)
+        return _ok()
+
+    monkeypatch.setattr(patch_evidence.subprocess, "run", _fake_run)
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    return seen, repo
+
+
 def _reap_is(cmd: list) -> bool:
     """True if this exec is the pre-scoring agent-process reap."""
     return bool(cmd) and cmd[0] == "bash" and "kill -9" in cmd[-1] and "id -u agent" in cmd[-1]
@@ -650,6 +671,109 @@ class TestAgentCodeExecutionDuringScoring:
         assert not offenders, (
             f"these checks git-diff an agent-controlled repo without disabling "
             f"the textconv/external-diff hooks: {offenders}"
+        )
+
+    def test_patch_evidence_diffs_disable_textconv(self, captured_git_argv) -> None:
+        """The same rule, enforced where the check script no longer shows it.
+
+        The test above greps checks/*.sh for the literal "git diff". The
+        enterprise-hard patch checks call ``patch_evidence`` instead, so that
+        grep stopped covering them while still passing — and patch_evidence
+        shipped without the flags, letting a .gitattributes textconv driver
+        forge a fix the agent never wrote (bead jn73.2.7).
+
+        Asserted on the argv actually handed to subprocess, not on the source
+        text: the module builds ``git -C <repo> diff ...``, which no grep for
+        ``["git", "diff"`` would ever match.
+        """
+        from eb_verify.plugins import patch_evidence
+
+        seen, repo = captured_git_argv
+
+        patch_evidence._diff(repo, ["lib/rack/utils.rb"])
+        patch_evidence._changed_files(repo)
+
+        assert seen, "no git invocation was captured"
+        for argv in seen:
+            assert "diff" in argv, argv
+            assert "--no-textconv" in argv, (
+                f"patch_evidence ran a diff without --no-textconv: {argv} — an "
+                "agent-configured textconv driver can forge this diff's content"
+            )
+            assert "--no-ext-diff" in argv, (
+                f"patch_evidence ran a diff without --no-ext-diff: {argv} — "
+                "diff.external is the same forgery via another config key"
+            )
+
+    def test_patch_evidence_diffs_request_whole_file_context(self, captured_git_argv) -> None:
+        """Context width is scoring policy, not a tuning knob.
+
+        patch_diff decides "comment or code" by scanning from the top of the
+        file, so the opener of a block the agent edited *inside* has to be in the
+        diff. At any bounded width, a docstring opening further up than that is
+        invisible, the scanner starts with no state, and prose inside it reads as
+        code — the agent types the fix's exact text into a docstring the file
+        already had and collects 60-65% of task weight on all 14 tasks (bead
+        jn73.2.7, defect A).
+
+        Pinned on the argv, and on a width no real source file reaches, because
+        the integrity suites cannot see this: they seed a small file, so every
+        width past their opener distance passes. -U20 keeps the whole suite green
+        while defect A reopens on markupsafe's real 34-line class docstring. The
+        pressure to shrink it is real — _code_changed_elsewhere runs one diff per
+        changed file — so the guard has to sit where that pressure lands.
+        """
+        import re as _re
+
+        from eb_verify.plugins import patch_evidence
+
+        seen, repo = captured_git_argv
+
+        patch_evidence._diff(repo, ["src/urllib3/response.py"])
+
+        assert seen, "no git invocation was captured"
+        widths = [
+            int(m.group(1))
+            for argv in seen
+            for arg in argv
+            if (m := _re.fullmatch(r"-U(\d+)", arg))
+        ]
+        assert widths, (
+            f"patch_evidence._diff ran a diff at git's DEFAULT context: {seen[0]} — "
+            "a comment opening more than three lines above the agent's edit is then "
+            "outside the hunk, and the prose inside it scores as code"
+        )
+        assert min(widths) >= 100_000, (
+            f"patch_evidence._diff asks for only {min(widths)} lines of context — "
+            "a docstring or license header opening further above the edit than that "
+            "is invisible to the scanner, and fix-shaped prose inside it scores full "
+            "credit. This width is scoring policy; it is not free to tune down."
+        )
+
+    def test_no_module_builds_a_git_diff_argv_outside_agent_git(self) -> None:
+        """agent_git is the one place the flags are attached; keep it that way.
+
+        A tripwire for the *next* module rather than a check on the current two:
+        the rule failed before not because someone disabled it but because a new
+        diff call site was written somewhere the rule was not looking.
+        """
+        sanctioned = {"agent_git.py"}
+        offenders = []
+        for py in (REPO_ROOT / "lib" / "eb_verify").rglob("*.py"):
+            if py.name in sanctioned:
+                continue
+            for i, line in enumerate(py.read_text().splitlines(), 1):
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                if '"diff"' not in stripped and "'diff'" not in stripped:
+                    continue
+                if '"git"' in stripped or "'git'" in stripped:
+                    offenders.append(f"{py.relative_to(REPO_ROOT)}:{i}: {stripped}")
+        assert not offenders, (
+            "these build a git-diff argv outside eb_verify.agent_git, so they "
+            f"can silently miss the no-execute flags: {offenders} — use "
+            "agent_git.git_diff_argv()"
         )
 
     def test_a_planted_conftest_cannot_reach_the_grader(self) -> None:

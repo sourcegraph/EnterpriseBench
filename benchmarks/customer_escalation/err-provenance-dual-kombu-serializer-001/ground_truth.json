@@ -1,0 +1,38 @@
+{
+  "task_id": "err-provenance-dual-kombu-serializer-001",
+  "repo": "celery/celery",
+  "repo_rev": "v5.0.5",
+  "difficulty": "hard",
+  "rationale": "The operator restricts Celery's accepted-content-types and every worker crashes at startup with a bare KeyError naming a serializer short-name (e.g. 'msgpack'). Celery does not raise it: celery/app/amqp.py builds the task consumer and forwards the configured accept_content list, and the worker consumer bootstrap (celery/worker/consumer/consumer.py) starts the consumer, which crosses the repo boundary into kombu's Consumer. kombu's Consumer.__init__ (kombu/messaging.py) calls prepare_accept_content(accept), and at tag v5.0.2 that helper in kombu/serialization.py does `{n if '/' in n else name_to_type[n] for n in content_types}` -- an unguarded subscript of the name-to-type registry. An unregistered short-name raises a raw KeyError that escapes uncaught, instead of the SerializerNotInstalled error the rest of the module raises for a missing serializer. The real upstream fix is kombu commit 4cf1a2171202f821d93c30b9f635dbefa532ac9a (#1343, released in 5.1.0): prepare_accept_content wraps the comprehension in try/except KeyError and re-raises SerializerNotInstalled. The Celery-side files are the traversal that leads an investigator across the repo boundary.",
+  "required_files": [
+    {
+      "path": "kombu/serialization.py",
+      "repo": "kombu",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site. At v5.0.2 `prepare_accept_content` does an unguarded `name_to_type[n]` subscript, so an unregistered serializer short-name escapes as a bare KeyError. Real upstream fix (commit 4cf1a2171202) wraps it in try/except KeyError and raises SerializerNotInstalled."
+    },
+    {
+      "path": "kombu/messaging.py",
+      "repo": "kombu",
+      "confidence": 0.80,
+      "source": "curator",
+      "rationale": "Consumer.__init__ calls `self.accept = prepare_accept_content(accept)`; the call site inside the messaging library that propagates the configured accept list into the throwing helper."
+    },
+    {
+      "path": "celery/app/amqp.py",
+      "repo": "celery",
+      "confidence": 0.90,
+      "source": "deterministic",
+      "rationale": "TaskConsumer builds the kombu Consumer and passes the app's accept_content configuration across the repo boundary into kombu."
+    },
+    {
+      "path": "celery/worker/consumer/consumer.py",
+      "repo": "celery",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "The worker consumer bootstrap that starts the message consumer at worker startup; the user-facing surface where the KeyError crash appears."
+    }
+  ],
+  "sufficient_files": []
+}

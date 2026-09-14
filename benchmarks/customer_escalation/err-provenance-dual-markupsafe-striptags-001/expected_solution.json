@@ -1,0 +1,30 @@
+{
+  "task_id": "err-provenance-dual-markupsafe-striptags-001",
+  "checkpoints": {
+    "localization": {
+      "expected_solution": "The surviving multi-line tag originates in markupsafe (the escaping library), NOT in jinja2 (whose striptags filter the app calls). At tag 2.1.1, markupsafe's striptags in src/markupsafe/__init__.py strips using two module-level regexes, `_strip_comments_re = re.compile(r\"<!--.*?-->\")` and `_strip_tags_re = re.compile(r\"<.*?>\")`, neither with re.DOTALL; because `.` does not match a newline by default, a tag whose markup spans multiple lines is not matched and is left in the output. The failure path is: jinja2 do_striptags (src/jinja2/filters.py), registered via FILTERS/DEFAULT_FILTERS (src/jinja2/defaults.py), calls Markup(str(value)).striptags() -> markupsafe striptags -> the newline-blind regexes. The agent must attribute the defect to markupsafe's strip regexes and explain that jinja2 only delegates to them.",
+      "evaluation_criteria": [
+        "Attributes the surviving tag to markupsafe (the escaping library / dependency), NOT to jinja2",
+        "Names markupsafe's tag/comment strip regexes (in the escaping library's main module) as the site, and that they lack re.DOTALL / cannot cross a newline",
+        "Explains that `.` does not match newlines by default, so multi-line tags are not removed",
+        "Describes the cross-repo traversal: jinja2 striptags filter (do_striptags, wired via the filter registry) -> Markup.striptags in markupsafe"
+      ]
+    },
+    "patch_at_fix_site": {
+      "expected_solution": "The agent leaves an uncommitted diff in /workspace/markupsafe that modifies src/markupsafe/__init__.py at the real fix site: the tag-strip (and comment-strip) regex compilation(s), adding re.DOTALL (or an equivalent newline-inclusive pattern), matching upstream commit e49d257126d0. A diff that only touches jinja2, or that pre-processes the body in the app, is not the correct site.",
+      "evaluation_criteria": [
+        "git diff in the markupsafe workspace repo shows a modification to src/markupsafe/__init__.py",
+        "The change is in markupsafe, not jinja2",
+        "The change targets the tag/comment strip regex compilation, not an unrelated spot"
+      ]
+    },
+    "patch_semantics": {
+      "expected_solution": "The patch makes the strip regexes match across newlines: it adds re.DOTALL to the `re.compile(...)` call for the tag regex (and ideally the comment regex), or switches the pattern to a newline-inclusive form like `[\\s\\S]`, exactly as the upstream fix does, so a multi-line tag is stripped like a single-line one.",
+      "evaluation_criteria": [
+        "The diff adds re.DOTALL (or an equivalent newline-inclusive pattern such as [\\s\\S]) to the tag-strip regex compilation",
+        "The fix makes `.` (or the pattern) cross a newline so multi-line tags are matched",
+        "The fix is scoped to the strip regexes, not a broad rewrite of the escaping logic"
+      ]
+    }
+  }
+}

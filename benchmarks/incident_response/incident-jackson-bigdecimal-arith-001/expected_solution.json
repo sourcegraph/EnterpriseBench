@@ -1,0 +1,30 @@
+{
+  "task_id": "incident-jackson-bigdecimal-arith-001",
+  "checkpoints": {
+    "root_cause_identified": {
+      "expected_solution": "The uncaught java.lang.ArithmeticException does not originate in jackson-databind (whose ObjectMapper.readValue frame is the only Jackson frame the customer sees). It escapes in jackson-core's BigDecimalParser.parse (src/main/java/com/fasterxml/jackson/core/io/BigDecimalParser.java). At tag jackson-core-2.13.4 that method wraps the recursive big-decimal construction in a `catch (NumberFormatException e)` only; extreme-exponent numeric text (e.g. 7.65E+2147483647) makes the underlying java.math.BigDecimal operations throw ArithmeticException, which is not caught and propagates through NumberInput.parseBigDecimal, back through the databind scalar deserializer, up to readValue. The agent must name jackson-core's BigDecimalParser as the throwing site and explain that the databind deserializer merely delegates to it via JsonParser.getDecimalValue().",
+      "evaluation_criteria": [
+        "Attributes the throw to jackson-core (the upstream/transitive repo), NOT jackson-databind",
+        "Names the big-decimal text parser in jackson-core's io package as the file where the exception escapes",
+        "Explains that the catch clause there only handles NumberFormatException, so ArithmeticException from BigDecimal construction is unhandled",
+        "Explains the traversal: databind scalar decimal deserializer -> JsonParser.getDecimalValue() -> jackson-core number-input helper -> recursive big-decimal parser"
+      ]
+    },
+    "patch_lands_at_fix_site": {
+      "expected_solution": "The agent leaves an uncommitted diff in /workspace/jackson-core that modifies src/main/java/com/fasterxml/jackson/core/io/BigDecimalParser.java. The change must be at the real fix site (the parse routine's exception handling), matching the upstream fix (jackson-core commit a9e3fddad0). A diff that only touches jackson-databind, or that only adds a catch-all at the ingestion layer, is not the correct site.",
+      "evaluation_criteria": [
+        "git diff in the jackson-core workspace repo shows a modification to BigDecimalParser.java",
+        "The change is in jackson-core, not jackson-databind",
+        "No new files; an in-place edit of the existing parser"
+      ]
+    },
+    "patch_handles_arithmetic": {
+      "expected_solution": "The patch widens the exception handling in BigDecimalParser.parse so that ArithmeticException thrown during big-decimal construction is caught and re-reported as a NumberFormatException (a normal invalid-number parse error), exactly as the upstream fix does with `catch (ArithmeticException | NumberFormatException e)`. Equivalent handling that converts the arithmetic overflow into the same normal number-format failure the deserializer already surfaces is acceptable.",
+      "evaluation_criteria": [
+        "The diff references ArithmeticException",
+        "The overflow is converted into a normal number-format parse error rather than left to propagate",
+        "The fix is scoped to the parse path, not a broad swallow of all exceptions"
+      ]
+    }
+  }
+}

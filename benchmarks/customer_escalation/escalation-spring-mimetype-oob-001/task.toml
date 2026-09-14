@@ -1,0 +1,90 @@
+# Customer escalation: a Spring Boot web app returns HTTP 500 for certain clients
+# whose Accept header is unusual but legal. The framework's autoconfigured welcome-
+# page handler parses the Accept header and expects a checked "invalid media type"
+# error; a recently introduced off-by-one in the core mime-type text parser throws
+# an unchecked index exception instead, two dependency levels below the handler.
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "spring-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "structural_match"]
+
+[task]
+id = "escalation-spring-mimetype-oob-001"
+suite = "customer_escalation"
+task_type = "error_provenance"
+difficulty = "hard"
+estimated_duration_minutes = 40
+session_type = "single"
+description = "Trace an unexpected HTTP 500 on a Spring Boot app's home page for requests with a quoted Accept header from the autoconfigured welcome-page handler down through the framework's media-type parsing into the core mime-type text parser, and patch the off-by-one bounds bug so malformed media types surface as the checked invalid-media-type error the handler already tolerates."
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/spring-projects/spring-boot"
+rev = "v4.0.7"
+path = "spring-boot"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/spring-projects/spring-framework"
+rev = "v7.0.8"
+path = "spring-framework"
+role = "upstream"
+
+[metadata]
+languages = ["java"]
+total_loc = 500_000
+dependency_depth = 2
+frameworks = ["spring-boot", "spring-framework", "spring-web"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "root_cause_identified"
+weight = 0.40
+verifier = "checks/check_root_cause.sh"
+description = "Agent's answer.json names the source files on the failure path across spring-framework and spring-boot — including the true fix site (spring-core/src/main/java/org/springframework/util/MimeTypeUtils.java) — scored as recall over ground_truth.json required_files, which the prompt never names"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_lands_at_fix_site"
+weight = 0.40
+verifier = "checks/check_patch_site.sh"
+description = "Agent's uncommitted diff modifies the framework's core mime-type text parser where the quote scan reads one character before the start of the string"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_guards_bounds"
+weight = 0.20
+verifier = "checks/check_patch_semantics.sh"
+description = "The patch guards the index before the backtracking character read so the parser raises the checked invalid-media-type error instead of an unchecked index exception"
+timeout_seconds = 60
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The app author writes no parsing code and no error handling for this path. The autoconfigured welcome-page handler mapping reads the request's Accept header and asks the framework to parse it into media types, catching only the checked invalid-media-type exception. A recently introduced off-by-one in the core mime-type text parser reads the character before index zero for a value that opens with a quote and has no delimiter, raising an unchecked StringIndexOutOfBoundsException that the handler's catch does not cover, so it escapes as a 500. The throwing frame is two modules and one repository below the handler, reached through a static parse call the handler never names, and is invisible from the '500 on the home page' symptom."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "spring-core/src/main/java/org/springframework/util/MimeTypeUtils.java"
+repo = "spring-framework"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "spring-web/src/main/java/org/springframework/http/MediaType.java"
+repo = "spring-framework"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "module/spring-boot-webmvc/src/main/java/org/springframework/boot/webmvc/autoconfigure/WelcomePageHandlerMapping.java"
+repo = "spring-boot"
+confidence = 0.80
+source = "curator"

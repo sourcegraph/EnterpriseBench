@@ -1,0 +1,31 @@
+{
+  "task_id": "incident-rack-range-redos-001",
+  "repo": "sinatra/sinatra",
+  "repo_rev": "v4.0.0",
+  "difficulty": "hard",
+  "rationale": "The Sinatra app only calls send_file; there is no exception, just a worker pinned at 100% CPU. The ReDoS originates one repository down, in Rack. At tag v3.0.3, Rack::Utils.get_byte_ranges (lib/rack/utils.rb) parses each comma-separated range segment with `return nil unless range_spec =~ /(\\d*)-(\\d*)/`; a Range header of many `0-,` segments drives this nested-quantifier match into catastrophic backtracking, so the request thread spins forever with no exception. The real upstream fix (rack commit 7a9d76a7850455a5ef9403203ea757ed110e7806, CVE-2022-44570) replaces the regex with a linear split-based parse (`range_spec.include?('-')` then `range_spec.split('-')`). The path: Sinatra's send_file (lib/sinatra/base.rb) delegates to Rack::Files.new(...).serving; Rack::Files#serving (lib/rack/files.rb) reads the HTTP_RANGE header and calls Rack::Utils.get_byte_ranges on it. The vulnerable regex lives in Rack, not Sinatra, which is why an app-level search never surfaces it.",
+  "required_files": [
+    {
+      "path": "lib/rack/utils.rb",
+      "repo": "rack",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site: get_byte_ranges parses each range segment with a nested-quantifier regex `/(\\d*)-(\\d*)/` at v3.0.3, which backtracks catastrophically on crafted multi-segment Range input. Real upstream fix (commit 7a9d76a7, CVE-2022-44570) replaces it with a split-based linear parse."
+    },
+    {
+      "path": "lib/rack/files.rb",
+      "repo": "rack",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "Rack::Files#serving reads the incoming HTTP_RANGE header and calls Rack::Utils.get_byte_ranges on it; the hop inside Rack that carries the attacker header into the vulnerable utility."
+    },
+    {
+      "path": "lib/sinatra/base.rb",
+      "repo": "sinatra",
+      "confidence": 0.80,
+      "source": "curator",
+      "rationale": "send_file constructs a Rack::Files server and calls serving(request, path), delegating range handling to Rack; the cross-repo boundary the investigator must cross from the app's only call."
+    }
+  ],
+  "sufficient_files": []
+}

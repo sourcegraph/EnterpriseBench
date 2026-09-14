@@ -1,0 +1,90 @@
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "aiohttp-yarl-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "err-provenance-dual-aiohttp-zoneid-001"
+suite = "customer_escalation"
+task_type = "error_provenance"
+difficulty = "hard"
+estimated_duration_minutes = 40
+session_type = "single"
+description = "Trace an async client's failure to reach IPv6 link-local peers (RFC 6874 zone id) from the client request path into the URL library's host-encoding, and patch the root cause"
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/aio-libs/aiohttp"
+rev = "v3.11.11"
+path = "aiohttp"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/aio-libs/yarl"
+rev = "v1.24.2"
+path = "yarl"
+role = "dependency"
+
+[metadata]
+languages = ["python"]
+total_loc = 90_000
+dependency_depth = 2
+frameworks = ["aiohttp", "yarl", "asyncio"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "localization"
+weight = 0.35
+verifier = "checks/check_localization.sh"
+description = "Agent's answer.json names the source files on the failure path across yarl and aiohttp — including the true fix site (yarl/_url.py) — scored as recall over ground_truth.json required_files, which the prompt never names"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_at_fix_site"
+weight = 0.40
+verifier = "checks/check_patch_site.sh"
+description = "The submitted patch lands in the URL library's IPv6 zone-id / host-encoding code, not in the client shim"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_applies"
+weight = 0.25
+verifier = "checks/check_patch_applies.sh"
+description = "A code patch exists under the workspace and applies cleanly"
+timeout_seconds = 120
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The symptom surfaces in the async client while the defect lives one dependency down in the URL library's host encoder. The client only ever passes an opaque host string across the repo boundary, so the zone-id mishandling is invisible to single-repo search and only cross-repo reference resolution connects the failing request to the encoder."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "yarl/_url.py"
+repo = "yarl"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "yarl/_parse.py"
+repo = "yarl"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "aiohttp/client_reqrep.py"
+repo = "aiohttp"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "aiohttp/connector.py"
+repo = "aiohttp"
+confidence = 0.85
+source = "deterministic"

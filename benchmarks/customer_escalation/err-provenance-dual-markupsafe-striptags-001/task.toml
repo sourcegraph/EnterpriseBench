@@ -1,0 +1,95 @@
+# Escalation: a template's built-in tag-stripping filter leaves multi-line HTML
+# tags in the "plain-text" preview. Root cause is one dependency below the
+# templating library, in the escaping library's tag-strip regexes, which do not
+# match across newlines.
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "jinja-markupsafe-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "err-provenance-dual-markupsafe-striptags-001"
+suite = "customer_escalation"
+task_type = "error_provenance"
+difficulty = "hard"
+estimated_duration_minutes = 40
+session_type = "single"
+description = "Trace why a templating library's built-in tag-stripping filter fails to remove HTML tags whose markup spans multiple lines, from the template filter down into the escaping library's strip regexes, and patch the regexes so tags are matched across newlines."
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/pallets/jinja"
+rev = "3.1.2"
+path = "jinja"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/pallets/markupsafe"
+rev = "2.1.1"
+path = "markupsafe"
+role = "dependency"
+
+[metadata]
+languages = ["python"]
+total_loc = 30_000
+dependency_depth = 2
+frameworks = ["jinja2", "markupsafe"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "localization"
+weight = 0.35
+verifier = "checks/check_localization.sh"
+description = "Agent's answer.json names the source files on the failure path across markupsafe and jinja — including the true fix site (src/markupsafe/__init__.py) — scored as recall over ground_truth.json required_files, which the prompt never names"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_at_fix_site"
+weight = 0.35
+verifier = "checks/check_patch_site.sh"
+description = "The submitted patch lands in the escaping library's module where the tag-strip regexes are compiled, not in the template filter"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_semantics"
+weight = 0.30
+verifier = "checks/check_patch_semantics.sh"
+description = "The patch makes the tag-strip regexes match across newlines (re.DOTALL or an equivalent newline-inclusive pattern)"
+timeout_seconds = 60
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The customer only sees a templating filter that is supposed to strip tags; the actual removal is delegated one repository down to the escaping library's Markup.striptags, whose two module-level regexes decide what counts as a tag. The template filter passes an opaque string across the repo boundary, so the missing DOTALL flag on those regexes is invisible to single-repo search of the templating library; only cross-repo reference resolution connects the leaking preview to the regex compilation."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "src/markupsafe/__init__.py"
+repo = "markupsafe"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/markupsafe/_native.py"
+repo = "markupsafe"
+confidence = 0.75
+source = "curator"
+
+[[ground_truth.required_files]]
+path = "src/jinja2/filters.py"
+repo = "jinja"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/jinja2/defaults.py"
+repo = "jinja"
+confidence = 0.80
+source = "deterministic"

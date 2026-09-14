@@ -1,0 +1,31 @@
+{
+  "task_id": "secops-qs-proto-pollution-tri-001",
+  "repo": "expressjs/express",
+  "repo_rev": "4.17.2",
+  "difficulty": "hard",
+  "rationale": "The Express app only registers express.urlencoded({extended:true}) and calls Object.assign(prefs, req.body). The prototype-pollution sink is three repositories away, in the transitive query-string library qs. At tag v6.9.6, qs's recursive key-expansion routine (parseObject in lib/parse.js) rebuilds a bracket-nested object bottom-up and, in its final branch, assigns obj[cleanRoot] = leaf with no exclusion of the special prototype key, so a key segment of __proto__ writes onto Object.prototype. The real upstream fix (qs commit 8b4cc14cda94a5c89341b77e5fe435ec6c41be2d, released in 6.9.7) guards that assignment with `else if (cleanRoot !== '__proto__')`. Two independent code paths feed attacker input into that sink: (1) body-parser's extended urlencoded parser (lib/types/urlencoded.js) resolves its nested expander through a dynamic switch-guarded require('qs') that plain import-following cannot resolve; (2) Express's own built-in request-query layer (lib/middleware/query.js) calls qs.parse directly. The JSON body path uses a different parser and never reaches parseObject, which is why only the form-urlencoded path pollutes.",
+  "required_files": [
+    {
+      "path": "lib/parse.js",
+      "repo": "qs",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site: parseObject rebuilds the nested object and its final else-branch assigns obj[cleanRoot] = leaf with no prototype-key guard at v6.9.6, so a __proto__ key segment pollutes Object.prototype. Real upstream fix (commit 8b4cc14cda94) adds `else if (cleanRoot !== '__proto__')`."
+    },
+    {
+      "path": "lib/types/urlencoded.js",
+      "repo": "body-parser",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "The extended urlencoded parser builds its nested query expander via a dynamic switch-guarded require('qs'), invisible to static import-following; this is the middleware hop that carries the attacker's form body into qs.parse -> parseObject."
+    },
+    {
+      "path": "lib/middleware/query.js",
+      "repo": "express",
+      "confidence": 0.80,
+      "source": "curator",
+      "rationale": "Express's own request-query layer calls qs.parse directly, the second independent path into the same sink; part of the cross-repo traversal an investigator must reconcile."
+    }
+  ],
+  "sufficient_files": []
+}

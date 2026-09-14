@@ -1,0 +1,30 @@
+{
+  "task_id": "incident-h2-continuation-flood-001",
+  "checkpoints": {
+    "root_cause_identified": {
+      "expected_solution": "The meltdown does not originate in hyper. hyper's src/proto/h2/server.rs builds an h2::server::Builder and drives its handshake/Connection future; the frame decoding happens in the h2 crate. The defect is in h2's frame reader in src/codec/framed_read.rs (repo h2, tag v0.4.3): it reassembles a header block that spans CONTINUATION frames into a Partial buffer and appends each CONTINUATION payload with no cap on the number of CONTINUATION frames a single header block may span. A client that sends a HEADERS frame without END_HEADERS followed by an endless stream of CONTINUATION frames keeps the server buffering fragments and doing hpack work indefinitely -- unbounded CPU and memory on one connection (the HTTP/2 CONTINUATION flood). The agent must name h2's frame reader as the vulnerable reassembly site and explain that hyper merely drives h2's handshake and that the server-level limits it configured (max concurrent streams, max header list size) do not bound the CONTINUATION count.",
+      "evaluation_criteria": [
+        "Attributes the resource exhaustion to h2 (the transitive/upstream repo), NOT hyper",
+        "Names h2's HTTP/2 frame reader / header-block reassembly as the vulnerable site",
+        "Explains that CONTINUATION frames are appended to a partial header block with no per-request cap, so a stream that never sets END_HEADERS consumes unbounded CPU/memory",
+        "Explains the traversal: hyper HTTP/2 server wiring -> h2 handshake/Connection -> h2 frame reader -> header-block reassembly"
+      ]
+    },
+    "patch_lands_at_fix_site": {
+      "expected_solution": "The agent leaves an uncommitted diff in /workspace/h2 that modifies src/codec/framed_read.rs at the header-block reassembly (the Partial buffer / CONTINUATION handling), matching the upstream fix (h2 commit e76bd7403347). A diff that only touches hyper, or that drops the connection from application code, is not the correct site.",
+      "evaluation_criteria": [
+        "git diff in the h2 workspace repo shows a modification to the HTTP/2 frame reader (framed_read.rs)",
+        "The change is in h2, not hyper",
+        "No new files; an in-place edit of the existing frame reader"
+      ]
+    },
+    "patch_bounds_continuation": {
+      "expected_solution": "The patch introduces a per-header-block count of CONTINUATION frames and a maximum bound, and once the count exceeds the bound it fails the connection with a protocol error / GOAWAY instead of continuing to append frames -- exactly as the upstream fix does with its max_continuation_frames budget and continuation_frames_count field. Simply lowering an existing setting or timing the connection out is not acceptable; the reassembly itself must count CONTINUATION frames and reject the overflow.",
+      "evaluation_criteria": [
+        "The diff adds a counter for CONTINUATION frames within a single header block and a maximum limit",
+        "Exceeding the limit yields a connection error / GOAWAY (protocol error), not continued buffering",
+        "The bound is applied in the frame reader's reassembly path, not in application code"
+      ]
+    }
+  }
+}

@@ -1,0 +1,94 @@
+# Security: a form-urlencoded request body silently mutates Object.prototype across the
+# whole Node process; the sink is three dependency levels below the Express app, in the
+# recursive query-string key expander that assigns bracket-nested keys without a guard.
+
+difficulty_stratum = "tri_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "express-body-parser-qs-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "structural_match"]
+
+[task]
+id = "secops-qs-proto-pollution-tri-001"
+suite = "security_operations"
+task_type = "error_provenance"
+difficulty = "hard"
+estimated_duration_minutes = 45
+session_type = "single"
+description = "Trace a prototype-pollution vulnerability triggered by an ordinary form-urlencoded POST body from the Express request-handling layer, through the body-parsing middleware and the framework's own query layer, down into the transitive query-string library whose recursive key expander assigns nested keys without excluding the prototype key, and patch the real sink."
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/expressjs/express"
+rev = "4.17.2"
+path = "express"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/expressjs/body-parser"
+rev = "1.19.1"
+path = "body-parser"
+role = "upstream"
+
+[[repos]]
+url = "https://github.com/ljharb/qs"
+rev = "v6.9.6"
+path = "qs"
+role = "upstream"
+
+[metadata]
+languages = ["javascript"]
+total_loc = 40_000
+dependency_depth = 3
+frameworks = ["express", "body-parser", "qs"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "root_cause_identified"
+weight = 0.40
+verifier = "checks/check_root_cause.sh"
+description = "Agent's answer.json names the source files on the failure path across qs, body-parser and express — including the true fix site (lib/parse.js) — scored as recall over ground_truth.json required_files, which the prompt never names"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_lands_at_fix_site"
+weight = 0.40
+verifier = "checks/check_patch_site.sh"
+description = "Agent's uncommitted diff modifies the query-string library's recursive parse module where the nested key is assigned onto the freshly built object"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_excludes_prototype_key"
+weight = 0.20
+verifier = "checks/check_patch_semantics.sh"
+description = "The patch prevents the special prototype key from being assigned during key expansion, matching the upstream fix, rather than papering over it at the app or middleware layer"
+timeout_seconds = 60
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The vulnerable assignment is invisible from the Express app: the only thing the developer wrote is app.use(bodyParser.urlencoded({extended: true})) and a route handler. The attacker-controlled key travels through three repositories. The framework's built-in query layer and the extended body parser each independently construct the same transitive parser via a dynamic, switch-guarded require that static import-following cannot resolve, and the actual sink is a recursive routine that rebuilds a nested object bottom-up and assigns the decoded key onto it with no exclusion of the prototype key. Every hop is a cross-repo boundary and the dangerous line names nothing security-related."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "lib/parse.js"
+repo = "qs"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/types/urlencoded.js"
+repo = "body-parser"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/middleware/query.js"
+repo = "express"
+confidence = 0.80
+source = "curator"

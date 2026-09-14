@@ -1,0 +1,90 @@
+# Escalation: an HTTP client service intermittently returns truncated or
+# cross-contaminated response bodies when streaming large downloads from one
+# upstream. The root cause is two dependency levels below the client API, in the
+# low-level HTTP/1 chunked transfer-size accumulator, where a very long hex
+# chunk-size line overflows a u64 silently and the framing desynchronizes.
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "rust-http-client-stack"
+org_scale = true
+verification_modes = ["deterministic", "structural_match"]
+
+[task]
+id = "error-prov-dual-reqwest-hyper-chunk-001"
+suite = "customer_escalation"
+task_type = "error_provenance"
+difficulty = "hard"
+estimated_duration_minutes = 45
+session_type = "single"
+description = "Trace intermittently corrupted streamed response bodies from the high-level HTTP client's body stream, through the transitive HTTP library's body abstraction, down into the HTTP/1 chunked transfer-size accumulator where an oversized hex chunk-size line overflows a u64 unchecked, and patch the real fix site so an overflowing chunk size becomes a normal framing error."
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/seanmonstar/reqwest"
+rev = "v0.11.4"
+path = "reqwest"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/hyperium/hyper"
+rev = "v0.14.9"
+path = "hyper"
+role = "upstream"
+
+[metadata]
+languages = ["rust"]
+total_loc = 90_000
+dependency_depth = 2
+frameworks = ["reqwest", "hyper"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "root_cause_identified"
+weight = 0.40
+verifier = "checks/check_root_cause.sh"
+description = "Agent's answer.json names the source files on the failure path across hyper and reqwest — including the true fix site (src/proto/h1/decode.rs) — scored as recall over ground_truth.json required_files, which the prompt never names"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_lands_at_fix_site"
+weight = 0.40
+verifier = "checks/check_patch_site.sh"
+description = "Agent's uncommitted diff modifies the HTTP/1 chunk-size decoding routine in the transitive HTTP library where the accumulator overflows"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_guards_overflow"
+weight = 0.20
+verifier = "checks/check_patch_semantics.sh"
+description = "The patch replaces the unchecked multiply/add of the chunk-size accumulator with checked arithmetic that surfaces an overflowing size as a normal invalid-chunk framing error"
+timeout_seconds = 60
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The customer only sees the high-level client API returning a bad body stream; the client crate merely wraps the transitive HTTP library's body behind a boxed HttpBody trait object, so the corrupting frame is one crate away and reached only through dynamic dispatch. The chunked transfer-size accumulator that actually overflows is another layer below that, inside the HTTP/1 read state machine, invisible to single-repo search and named nowhere in the client's public surface."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "src/proto/h1/decode.rs"
+repo = "hyper"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/body/body.rs"
+repo = "hyper"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/async_impl/decoder.rs"
+repo = "reqwest"
+confidence = 0.85
+source = "deterministic"

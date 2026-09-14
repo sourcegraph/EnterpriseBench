@@ -8,6 +8,11 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
+# _git_diff_argv is the one sanctioned git-diff argv builder; the no-execute
+# flags and why they are mandatory live in eb_verify.agent_git, shared with
+# patch_evidence. A private copy here is exactly how the second call site came
+# to omit them (bead jn73.2.7); the seal test enforces no other hand-built argv.
+from eb_verify.agent_git import git_diff_argv as _git_diff_argv
 from eb_verify.plugins import ValidationResult
 from eb_verify.scorer_guard import INFRA_SENTINEL, DiffProbeError
 
@@ -15,26 +20,6 @@ from eb_verify.scorer_guard import INFRA_SENTINEL, DiffProbeError
 # Diff size thresholds (in lines of diff output)
 DEFAULT_MAX_DIFF_LINES = 10_000
 DEFAULT_MIN_DIFF_LINES = 1
-
-
-# Every repo this module diffs is the agent's, and a git repo configures its own
-# code execution: .gitattributes picks a diff driver per path, and that driver's
-# textconv / command then names a program git runs while producing the diff. The
-# driver name is the attacker's to choose, so there is no fixed config key the
-# caller could pin to neutralize it — the execution has to be refused at the call
-# site. Scoring is unprivileged (run_task.SCORING_USER), so this is depth rather
-# than the only wall, but it keeps agent code out of the grader's process
-# entirely. --no-ext-diff covers the same trick via diff.external.
-_GIT_NO_EXEC_FLAGS = ("--no-textconv", "--no-ext-diff")
-
-
-def _git_diff_argv(*args: str) -> list[str]:
-    """argv for a ``git diff`` against an agent-controlled repo.
-
-    The one place the no-execute flags are attached, so a new diff call site
-    cannot forget them.
-    """
-    return ["git", "diff", *_GIT_NO_EXEC_FLAGS, *args]
 
 
 def _run_git_diff(args: list[str], repo_path: Path) -> str:

@@ -1,0 +1,94 @@
+# Incident: report-ingestion worker crashes with an uncaught java.lang.ArithmeticException
+# while deserializing a vendor JSON payload; root cause is two dependency levels
+# below the ObjectMapper call, in the low-level number-text parser.
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "fasterxml-jackson-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "structural_match"]
+
+[task]
+id = "incident-jackson-bigdecimal-arith-001"
+suite = "incident_response"
+task_type = "error_provenance"
+difficulty = "hard"
+estimated_duration_minutes = 40
+session_type = "single"
+description = "Trace an uncaught ArithmeticException raised while deserializing a decimal JSON field from the databind deserializer down into the core number-text parser, and patch the real fix site so malformed numeric input surfaces as a normal parse error."
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/FasterXML/jackson-databind"
+rev = "jackson-databind-2.13.4"
+path = "jackson-databind"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/FasterXML/jackson-core"
+rev = "jackson-core-2.13.4"
+path = "jackson-core"
+role = "upstream"
+
+[metadata]
+languages = ["java"]
+total_loc = 120_000
+dependency_depth = 2
+frameworks = ["jackson-databind", "jackson-core"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "root_cause_identified"
+weight = 0.40
+verifier = "checks/check_root_cause.sh"
+description = "Agent's answer.json names the source files on the failure path across jackson-core and jackson-databind — including the true fix site (src/main/java/com/fasterxml/jackson/core/io/BigDecimalParser.java) — scored as recall over ground_truth.json required_files, which the prompt never names"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_lands_at_fix_site"
+weight = 0.40
+verifier = "checks/check_patch_site.sh"
+description = "Agent's uncommitted diff modifies the core big-decimal text parser file where the exception escapes"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_handles_arithmetic"
+weight = 0.20
+verifier = "checks/check_patch_semantics.sh"
+description = "The patch actually catches/handles the arithmetic overflow so malformed numeric input becomes a normal number-format parse error"
+timeout_seconds = 60
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The stack the customer sees ends at ObjectMapper.readValue, but the throwing frame is two repos away: databind's scalar deserializer calls JsonParser.getDecimalValue(), the core parser routes the raw characters through its number-input helper into the recursive big-decimal text parser, and that helper only guards one exception family. Every hop is a cross-repo boundary invisible to single-repo search, and the deserializer name in the stack trace points at the wrong repository."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/fasterxml/jackson/core/io/BigDecimalParser.java"
+repo = "jackson-core"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/fasterxml/jackson/core/io/NumberInput.java"
+repo = "jackson-core"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/fasterxml/jackson/databind/deser/std/NumberDeserializers.java"
+repo = "jackson-databind"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/fasterxml/jackson/databind/deser/std/StdDeserializer.java"
+repo = "jackson-databind"
+confidence = 0.80
+source = "curator"

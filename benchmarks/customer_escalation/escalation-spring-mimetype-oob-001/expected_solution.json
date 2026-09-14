@@ -1,0 +1,30 @@
+{
+  "task_id": "escalation-spring-mimetype-oob-001",
+  "checkpoints": {
+    "root_cause_identified": {
+      "expected_solution": "The 500 does not originate in spring-boot's WelcomePageHandlerMapping (which only reads the Accept header and delegates). It escapes in spring-core's mime-type text parser. At tag v7.0.8, MimeTypeUtils.parseMimeTypeInternal scans the input and, when it hits a double-quote, evaluates `mimeType.charAt(nextIndex - 1) != '\\'` to decide whether the quote is escaped. For an Accept value that begins with a quote and has no ';' section (e.g. \"text/html\"), the scan reaches that quote while nextIndex == 0 and calls charAt(-1), throwing an unchecked java.lang.StringIndexOutOfBoundsException. WelcomePageHandlerMapping.getAcceptedMediaTypes() calls MediaType.parseMediaTypes(acceptHeader) inside a try that catches only the checked InvalidMediaTypeException, so the unchecked index error is not caught and propagates to a 500. The agent must attribute the throw to spring-core's mime-type parser (the lower-level module/repo), identify it as an off-by-one that reads before index 0, explain the unchecked-vs-checked exception mismatch, and describe the traversal Accept header -> parseMediaTypes -> parseMediaType -> MimeTypeUtils.parseMimeType.",
+      "evaluation_criteria": [
+        "Attributes the throw to spring-framework's spring-core mime-type text parser, NOT spring-boot's welcome-page handler",
+        "Identifies the off-by-one: for a value beginning with a quote, the quote-escape check reads charAt(nextIndex - 1) with nextIndex == 0, i.e. charAt(-1)",
+        "Explains the exception mismatch: an unchecked StringIndexOutOfBoundsException escapes, whereas the handler catches only the checked InvalidMediaTypeException / InvalidMimeTypeException",
+        "Describes the traversal: welcome-page handler reads the Accept header -> MediaType.parseMediaTypes/parseMediaType -> core MimeTypeUtils parse"
+      ]
+    },
+    "patch_lands_at_fix_site": {
+      "expected_solution": "The agent leaves an uncommitted diff in /workspace/spring-framework that modifies spring-core/src/main/java/org/springframework/util/MimeTypeUtils.java at the quote-scanning branch (the `charAt(nextIndex - 1)` read). A diff that only touches spring-web's MediaType, or the spring-boot handler, or that adds a broad catch, is not the correct site.",
+      "evaluation_criteria": [
+        "git diff in the spring-framework workspace repo shows a modification to MimeTypeUtils.java",
+        "The change is in spring-framework (spring-core), not spring-boot",
+        "No new files; an in-place edit of the existing parser"
+      ]
+    },
+    "patch_guards_bounds": {
+      "expected_solution": "The patch guards the index before the backtracking read so a leading quote no longer calls charAt(-1), matching the upstream fix `(nextIndex == 0 || mimeType.charAt(nextIndex - 1) != '\\')`. With the guard, a value that begins with a quote is handled without the out-of-bounds read and fails as the normal checked invalid-media-type error. Equivalent bounds-guarding (e.g. `nextIndex > 0 && ...`) that avoids the negative index while preserving the escape check is acceptable.",
+      "evaluation_criteria": [
+        "The diff guards nextIndex before charAt(nextIndex - 1) (e.g. `nextIndex == 0 ||` or `nextIndex > 0 &&`)",
+        "The out-of-bounds read on a leading quote is eliminated so the parse yields the checked invalid-media-type error, not an unchecked index exception",
+        "The fix is scoped to the quote-scan bounds check, not a broad swallow of exceptions"
+      ]
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "task_id": "error-prov-dual-reqwest-hyper-chunk-001",
+  "repo": "seanmonstar/reqwest",
+  "repo_rev": "v0.11.4",
+  "difficulty": "hard",
+  "rationale": "The customer only sees reqwest's Response::chunk() stream returning a truncated or cross-contaminated body. reqwest does not parse HTTP/1 framing itself: its async_impl/decoder.rs wraps the connection body as a boxed hyper HttpBody and simply polls it (src/async_impl/decoder.rs -> hyper::body::Body in src/body/body.rs). The actual framing happens two layers down, in hyper's HTTP/1 chunked read state machine. At tag v0.14.9, hyper's ChunkedState::read_size in src/proto/h1/decode.rs accumulates each hex digit into a u64 with plain `*size *= radix; *size += digit` and never checks for overflow. A chunk-size line with 16+ hex digits wraps the accumulator, so the decoder reads the wrong number of body bytes: the stream ends early (truncation) or the parser resynchronizes onto following bytes (foreign response data). The real upstream fix is hyper commit 1068b994df1aec2a0a562224965a80ddced50e60 (\"fix(http1): protect against overflow in chunked decoder\", GHSA-5h46-h7hh-c6x9, released in 0.14.10), which replaces the multiply/add with checked_mul/checked_add and returns an InvalidData io::Error (\"invalid chunk size: overflow\") on overflow. The reqwest-side file is the traversal that carries an investigator across the crate boundary into hyper's body, and hyper's Body is the bridge from that boxed body into the HTTP/1 dispatcher and chunk decoder.",
+  "required_files": [
+    {
+      "path": "src/proto/h1/decode.rs",
+      "repo": "hyper",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site: ChunkedState::read_size accumulates the hex chunk size into a u64 with unchecked `*size *= radix; *size += ...` at v0.14.9; a long size line overflows silently and desynchronizes framing. Real upstream fix (commit 1068b994df1a) switches to checked_mul/checked_add and returns an overflow error here."
+    },
+    {
+      "path": "src/body/body.rs",
+      "repo": "hyper",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "hyper's Body is the streaming-body value that reqwest wraps and polls; it drives the HTTP/1 dispatcher that runs the chunked read state machine, the bridge from the boxed HttpBody into the throwing code."
+    },
+    {
+      "path": "src/async_impl/decoder.rs",
+      "repo": "reqwest",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "reqwest's response body stream wraps the connection body as a boxed hyper HttpBody and yields chunks to Response::chunk(); the client-side entry into the cross-crate failure path and the only layer the customer's code touches."
+    }
+  ],
+  "sufficient_files": []
+}

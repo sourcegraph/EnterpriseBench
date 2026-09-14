@@ -1,0 +1,31 @@
+{
+  "task_id": "incident-h2-continuation-flood-001",
+  "repo": "hyperium/hyper",
+  "repo_rev": "v1.2.0",
+  "difficulty": "hard",
+  "rationale": "The operator only sees hyper's HTTP/2 server API pegging a core and leaking memory. hyper does not decode HTTP/2 frames itself: src/proto/h2/server.rs builds an h2::server::Builder and drives its handshake/Connection future, then pulls decoded requests off it. The abusive frame handling happens one crate down, in h2. At tag v0.4.3, h2's frame reader in src/codec/framed_read.rs reassembles a header block that spans CONTINUATION frames (Partial { frame, buf }) and appends each CONTINUATION payload to the partial buffer with no cap on how many CONTINUATION frames a single header block may span. frame::Headers / the header-block machinery in src/frame/headers.rs is what is accumulated. A client that sends a HEADERS frame without END_HEADERS followed by an unbounded stream of CONTINUATION frames keeps the server doing hpack work and buffering forever -- the HTTP/2 CONTINUATION flood (RUSTSEC-2024-0332 / resource-exhaustion DoS). The real upstream fix is h2 commit e76bd740334795a1ebb32dd38756bbedfda09b9f (\"fix: limit number of CONTINUATION frames allowed\", released in 0.4.4 and backported to 0.3.26), which adds a max_continuation_frames budget and a per-block continuation_frames_count in framed_read.rs and returns a GOAWAY once the budget is exceeded. The hyper-side file is the traversal that carries an investigator across the crate boundary into h2's reader.",
+  "required_files": [
+    {
+      "path": "src/codec/framed_read.rs",
+      "repo": "h2",
+      "confidence": 0.95,
+      "source": "deterministic",
+      "rationale": "Fix site: the frame reader reassembles a header block from CONTINUATION frames into a Partial buffer with no bound on the number of CONTINUATION frames per block at v0.4.3. Real upstream fix (commit e76bd7403347) adds a max_continuation_frames budget and per-block count here and errors with GOAWAY when exceeded."
+    },
+    {
+      "path": "src/frame/headers.rs",
+      "repo": "h2",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "Defines the HEADERS/CONTINUATION header-block frame and its hpack load path; the partial header block accumulated by the frame reader across CONTINUATION frames, part of the reassembly traversal."
+    },
+    {
+      "path": "src/proto/h2/server.rs",
+      "repo": "hyper",
+      "confidence": 0.85,
+      "source": "deterministic",
+      "rationale": "hyper's HTTP/2 server wiring builds h2::server::Builder and drives its handshake/Connection future; the server-side entry into the cross-crate failure path and the only layer whose limits the operator configured."
+    }
+  ],
+  "sufficient_files": []
+}

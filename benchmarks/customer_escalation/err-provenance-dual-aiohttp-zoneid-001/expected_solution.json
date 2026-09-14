@@ -1,0 +1,29 @@
+{
+  "task_id": "err-provenance-dual-aiohttp-zoneid-001",
+  "checkpoints": {
+    "localization": {
+      "expected_solution": "The zone identifier is mangled in yarl (the URL library), NOT in aiohttp (the async client whose ClientConnectorError the customer sees). At tag v1.24.2, yarl's `host` accessor in yarl/_url.py returns the raw IP-literal unchanged for anything that looks like an IP address, so the RFC 6874 encoded zone `%25eth0` is never decoded back to `%eth0`; and `_encode_host` in the same file does `raw_ip, sep, zone = host.partition(\"%\")`, which splits `fe80::1%25eth0` into zone `25eth0`. aiohttp's connector then reads `req.url.raw_host` and hands `fe80::1%25eth0` to `getaddrinfo`, which fails with 'Name or service not known' because the OS zone is `eth0`, not `25eth0`. The failure path is: aiohttp connector `_create_direct_connection`/`_resolve_host` (aiohttp/connector.py) reads raw_host -> which came from ClientRequest.update_host (aiohttp/client_reqrep.py) -> off the yarl URL parsed by split_url (yarl/_parse.py) -> whose host/_encode_host (yarl/_url.py) never decoded %25. The agent must attribute the defect to yarl and name yarl/_url.py's host/_encode_host as the origin.",
+      "evaluation_criteria": [
+        "Attributes the mangled zone to yarl (the URL library / dependency), NOT to aiohttp",
+        "Names yarl/_url.py (the host accessor and/or _encode_host) as the file where %25 should be decoded and is not",
+        "Explains that the encoded zone separator %25 is left as-is, so the resolver receives a zone beginning with '25'",
+        "Describes the cross-repo traversal: aiohttp connector reads raw_host and calls the resolver -> raw_host comes from the yarl URL parsed from the bracketed IPv6 authority"
+      ]
+    },
+    "patch_at_fix_site": {
+      "expected_solution": "The agent leaves an uncommitted diff in /workspace/yarl that modifies yarl/_url.py at the real fix site: the `host` accessor decodes `%25` -> `%` for IP-literal hosts, and/or `_encode_host` partitions on `%25` (falling back to `%`) and reuses the matched separator when reconstructing the host, matching upstream commit ddc827ba1e. A diff that only touches aiohttp, or that string-rewrites the host in the client before resolution, is not the correct site.",
+      "evaluation_criteria": [
+        "git diff in the yarl workspace repo shows a modification to yarl/_url.py",
+        "The change is in yarl, not aiohttp",
+        "The change handles the %25 zone separator (decode to %, or partition on %25), not a broad rewrite elsewhere"
+      ]
+    },
+    "patch_applies": {
+      "expected_solution": "A code patch exists under the workspace (an uncommitted, non-empty diff in one of the cloned repos) and applies cleanly to the pinned tree.",
+      "evaluation_criteria": [
+        "At least one /workspace repo has an uncommitted diff",
+        "The diff applies cleanly (git apply --check succeeds against the pinned tree)"
+      ]
+    }
+  }
+}

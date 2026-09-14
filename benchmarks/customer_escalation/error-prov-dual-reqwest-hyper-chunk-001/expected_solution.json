@@ -1,0 +1,30 @@
+{
+  "task_id": "error-prov-dual-reqwest-hyper-chunk-001",
+  "checkpoints": {
+    "root_cause_identified": {
+      "expected_solution": "The corrupted body does not originate in reqwest. reqwest's async_impl/decoder.rs wraps the connection body as a boxed hyper HttpBody and only polls it; the HTTP/1 framing happens in hyper. The defect is in hyper's ChunkedState::read_size in src/proto/h1/decode.rs (repo hyper, tag v0.14.9). That routine accumulates each hex digit of the chunk-size line into a u64 with plain `*size *= radix; *size += digit` and never checks for overflow. A chunk-size line of 16+ hex digits overflows the u64 and wraps to a small or attacker-chosen value, so the decoder consumes the wrong number of body bytes: the stream terminates early (truncation) or the state machine resynchronizes onto trailing bytes belonging to a following response. The agent must name hyper's HTTP/1 chunk-size decoder as the mis-framing site and explain that reqwest merely delegates to hyper's Body (src/body/body.rs), which drives the HTTP/1 dispatcher into the chunked read state machine.",
+      "evaluation_criteria": [
+        "Attributes the mis-framing to hyper (the transitive/upstream repo), NOT reqwest",
+        "Names hyper's HTTP/1 chunked size decoder (proto/h1 chunk-size reader) as the file/routine where the overflow occurs",
+        "Explains that the hex chunk size is accumulated into a u64 with unchecked multiply/add, so a long size line overflows and desynchronizes framing",
+        "Explains the traversal: reqwest response body stream -> boxed hyper HttpBody / hyper Body -> HTTP/1 dispatcher -> chunked read state machine"
+      ]
+    },
+    "patch_lands_at_fix_site": {
+      "expected_solution": "The agent leaves an uncommitted diff in /workspace/hyper that modifies src/proto/h1/decode.rs at the chunk-size accumulation (ChunkedState::read_size), matching the upstream fix (hyper commit 1068b994df1a). A diff that only touches reqwest, or that adds a length guard in the streaming loop, is not the correct site.",
+      "evaluation_criteria": [
+        "git diff in the hyper workspace repo shows a modification to the HTTP/1 chunked decoder (decode.rs)",
+        "The change is in hyper, not reqwest",
+        "No new files; an in-place edit of the existing chunk-size reader"
+      ]
+    },
+    "patch_guards_overflow": {
+      "expected_solution": "The patch replaces the unchecked `*size *= radix; *size += digit` accumulation with checked arithmetic (checked_mul / checked_add, or an equivalent explicit overflow test) and, on overflow, returns the same kind of invalid-chunk framing error the reader already produces for malformed size lines (an io::Error with ErrorKind::InvalidData / InvalidInput), exactly as the upstream fix does with its `or_overflow!` macro that emits \"invalid chunk size: overflow\". Silently saturating the value is not acceptable; the overflowing size must become an error.",
+      "evaluation_criteria": [
+        "The diff references checked_mul/checked_add or an explicit overflow check on the size accumulator",
+        "An overflowing chunk size is converted into a normal invalid-chunk io::Error rather than allowed to wrap",
+        "The fix is scoped to the chunk-size reader, not a broad change elsewhere"
+      ]
+    }
+  }
+}

@@ -10,7 +10,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.tasks import find_task_dirs
 
-BENCHMARKS = Path("/home/ds/EnterpriseBench/benchmarks")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+BENCHMARKS = PROJECT_ROOT / "benchmarks"
 
 
 def find_task_tomls() -> list[Path]:
@@ -133,7 +134,8 @@ def main():
             missing.append({"url": url, "rev": rev, "detail": detail, "tasks": tasks})
 
     # Write report
-    out = Path("/home/ds/EnterpriseBench/results/analysis/tag_verification.md")
+    out = PROJECT_ROOT / "results/analysis/tag_verification.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w") as f:
         f.write("# Tag/Revision Verification Report\n\n")
         f.write(f"**Date**: 2026-03-29\n")

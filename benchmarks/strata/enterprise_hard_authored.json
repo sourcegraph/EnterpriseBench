@@ -1,0 +1,1501 @@
+{
+  "schema_version": "1",
+  "stratum": "enterprise_hard_authored",
+  "bead": "EnterpriseBench-jn73.2.7",
+  "description": "Tasks AUTHORED into the tier-1 hard-to-localize class because the existing corpus could not reach >=50 enterprise-win-regime tasks by selection (36 candidates; 46/58 measured tasks are trivially localizable). Gates A/B/D are computed here. Gate C is a MEASUREMENT and is pending for every task -- designed-tier-1 is not measured-tier-1.",
+  "gate_vocabulary": {
+    "computable": [
+      "A",
+      "B",
+      "D"
+    ],
+    "measurement": [
+      "C",
+      "E",
+      "F"
+    ],
+    "source": "scripts/validation/stratum_selector.py (jn73.2, unmerged)"
+  },
+  "counts": {
+    "authored": 14,
+    "passing_computable_gates": 14,
+    "requiring_code_patch": 14
+  },
+  "tasks": [
+    {
+      "task_id": "err-provenance-dual-aiohttp-zoneid-001",
+      "suite": "customer_escalation",
+      "task_type": "error_provenance",
+      "difficulty": "hard",
+      "difficulty_stratum": "dual_repo",
+      "path": "benchmarks/customer_escalation/err-provenance-dual-aiohttp-zoneid-001",
+      "repos": [
+        {
+          "url": "https://github.com/aio-libs/aiohttp",
+          "rev": "v3.11.11",
+          "path": "aiohttp"
+        },
+        {
+          "url": "https://github.com/aio-libs/yarl",
+          "rev": "v1.24.2",
+          "path": "yarl"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 4,
+      "n_oracle_files": 4,
+      "required_files": [
+        {
+          "path": "yarl/_url.py",
+          "repo": "yarl"
+        },
+        {
+          "path": "yarl/_parse.py",
+          "repo": "yarl"
+        },
+        {
+          "path": "aiohttp/client_reqrep.py",
+          "repo": "aiohttp"
+        },
+        {
+          "path": "aiohttp/connector.py",
+          "repo": "aiohttp"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "aiohttp",
+              "yarl"
+            ],
+            "oracle_repos": [
+              "aiohttp",
+              "yarl"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "err-provenance-dual-aiohttp-zoneid-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 2,
+            "crnt_positive": true,
+            "n_oracle_files": 4,
+            "n_modules": 2,
+            "modules": [
+              "aiohttp",
+              "yarl"
+            ],
+            "difficulty_stratum": "dual_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    },
+    {
+      "task_id": "err-provenance-dual-kombu-serializer-001",
+      "suite": "customer_escalation",
+      "task_type": "error_provenance",
+      "difficulty": "hard",
+      "difficulty_stratum": "dual_repo",
+      "path": "benchmarks/customer_escalation/err-provenance-dual-kombu-serializer-001",
+      "repos": [
+        {
+          "url": "https://github.com/celery/celery",
+          "rev": "v5.0.5",
+          "path": "celery"
+        },
+        {
+          "url": "https://github.com/celery/kombu",
+          "rev": "v5.0.2",
+          "path": "kombu"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 4,
+      "n_oracle_files": 4,
+      "required_files": [
+        {
+          "path": "kombu/serialization.py",
+          "repo": "kombu"
+        },
+        {
+          "path": "kombu/messaging.py",
+          "repo": "kombu"
+        },
+        {
+          "path": "celery/app/amqp.py",
+          "repo": "celery"
+        },
+        {
+          "path": "celery/worker/consumer/consumer.py",
+          "repo": "celery"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "celery",
+              "kombu"
+            ],
+            "oracle_repos": [
+              "celery",
+              "kombu"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "err-provenance-dual-kombu-serializer-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 2,
+            "crnt_positive": true,
+            "n_oracle_files": 4,
+            "n_modules": 3,
+            "modules": [
+              "celery/app",
+              "celery/worker/consumer",
+              "kombu"
+            ],
+            "difficulty_stratum": "dual_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    },
+    {
+      "task_id": "err-provenance-dual-markupsafe-striptags-001",
+      "suite": "customer_escalation",
+      "task_type": "error_provenance",
+      "difficulty": "hard",
+      "difficulty_stratum": "dual_repo",
+      "path": "benchmarks/customer_escalation/err-provenance-dual-markupsafe-striptags-001",
+      "repos": [
+        {
+          "url": "https://github.com/pallets/jinja",
+          "rev": "3.1.2",
+          "path": "jinja"
+        },
+        {
+          "url": "https://github.com/pallets/markupsafe",
+          "rev": "2.1.1",
+          "path": "markupsafe"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 4,
+      "n_oracle_files": 4,
+      "required_files": [
+        {
+          "path": "src/markupsafe/__init__.py",
+          "repo": "markupsafe"
+        },
+        {
+          "path": "src/markupsafe/_native.py",
+          "repo": "markupsafe"
+        },
+        {
+          "path": "src/jinja2/filters.py",
+          "repo": "jinja"
+        },
+        {
+          "path": "src/jinja2/defaults.py",
+          "repo": "jinja"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "jinja",
+              "markupsafe"
+            ],
+            "oracle_repos": [
+              "jinja",
+              "markupsafe"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "err-provenance-dual-markupsafe-striptags-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 2,
+            "crnt_positive": true,
+            "n_oracle_files": 4,
+            "n_modules": 2,
+            "modules": [
+              "src/jinja2",
+              "src/markupsafe"
+            ],
+            "difficulty_stratum": "dual_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    },
+    {
+      "task_id": "err-provenance-dual-urllib3-xgzip-001",
+      "suite": "customer_escalation",
+      "task_type": "error_provenance",
+      "difficulty": "hard",
+      "difficulty_stratum": "dual_repo",
+      "path": "benchmarks/customer_escalation/err-provenance-dual-urllib3-xgzip-001",
+      "repos": [
+        {
+          "url": "https://github.com/psf/requests",
+          "rev": "v2.31.0",
+          "path": "requests"
+        },
+        {
+          "url": "https://github.com/urllib3/urllib3",
+          "rev": "2.0.7",
+          "path": "urllib3"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 4,
+      "n_oracle_files": 4,
+      "required_files": [
+        {
+          "path": "src/urllib3/response.py",
+          "repo": "urllib3"
+        },
+        {
+          "path": "src/urllib3/connectionpool.py",
+          "repo": "urllib3"
+        },
+        {
+          "path": "requests/adapters.py",
+          "repo": "requests"
+        },
+        {
+          "path": "requests/models.py",
+          "repo": "requests"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "requests",
+              "urllib3"
+            ],
+            "oracle_repos": [
+              "requests",
+              "urllib3"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "err-provenance-dual-urllib3-xgzip-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 2,
+            "crnt_positive": true,
+            "n_oracle_files": 4,
+            "n_modules": 2,
+            "modules": [
+              "requests",
+              "src/urllib3"
+            ],
+            "difficulty_stratum": "dual_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    },
+    {
+      "task_id": "error-prov-dual-reqwest-hyper-chunk-001",
+      "suite": "customer_escalation",
+      "task_type": "error_provenance",
+      "difficulty": "hard",
+      "difficulty_stratum": "dual_repo",
+      "path": "benchmarks/customer_escalation/error-prov-dual-reqwest-hyper-chunk-001",
+      "repos": [
+        {
+          "url": "https://github.com/seanmonstar/reqwest",
+          "rev": "v0.11.4",
+          "path": "reqwest"
+        },
+        {
+          "url": "https://github.com/hyperium/hyper",
+          "rev": "v0.14.9",
+          "path": "hyper"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 3,
+      "n_oracle_files": 3,
+      "required_files": [
+        {
+          "path": "src/proto/h1/decode.rs",
+          "repo": "hyper"
+        },
+        {
+          "path": "src/body/body.rs",
+          "repo": "hyper"
+        },
+        {
+          "path": "src/async_impl/decoder.rs",
+          "repo": "reqwest"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "hyper",
+              "reqwest"
+            ],
+            "oracle_repos": [
+              "hyper",
+              "reqwest"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "error-prov-dual-reqwest-hyper-chunk-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 2,
+            "crnt_positive": true,
+            "n_oracle_files": 3,
+            "n_modules": 3,
+            "modules": [
+              "src/async_impl",
+              "src/body",
+              "src/proto/h1"
+            ],
+            "difficulty_stratum": "dual_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    },
+    {
+      "task_id": "escalation-netty-gzip-fextra-001",
+      "suite": "customer_escalation",
+      "task_type": "incident_investigation",
+      "difficulty": "hard",
+      "difficulty_stratum": "dual_repo",
+      "path": "benchmarks/customer_escalation/escalation-netty-gzip-fextra-001",
+      "repos": [
+        {
+          "url": "https://github.com/reactor/reactor-netty",
+          "rev": "v1.2.18",
+          "path": "reactor-netty"
+        },
+        {
+          "url": "https://github.com/netty/netty",
+          "rev": "netty-4.1.135.Final",
+          "path": "netty"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 3,
+      "n_oracle_files": 3,
+      "required_files": [
+        {
+          "path": "codec/src/main/java/io/netty/handler/codec/compression/JdkZlibDecoder.java",
+          "repo": "netty"
+        },
+        {
+          "path": "reactor-netty-http/src/main/java/reactor/netty/http/client/HttpClientConfig.java",
+          "repo": "reactor-netty"
+        },
+        {
+          "path": "reactor-netty-http/src/main/java/reactor/netty/http/client/HttpClientOperations.java",
+          "repo": "reactor-netty"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "netty",
+              "reactor-netty"
+            ],
+            "oracle_repos": [
+              "netty",
+              "reactor-netty"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "escalation-netty-gzip-fextra-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 2,
+            "crnt_positive": true,
+            "n_oracle_files": 3,
+            "n_modules": 2,
+            "modules": [
+              "codec/src/main/java/io/netty/handler/codec/compression",
+              "reactor-netty-http/src/main/java/reactor/netty/http/client"
+            ],
+            "difficulty_stratum": "dual_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    },
+    {
+      "task_id": "escalation-spring-mimetype-oob-001",
+      "suite": "customer_escalation",
+      "task_type": "error_provenance",
+      "difficulty": "hard",
+      "difficulty_stratum": "dual_repo",
+      "path": "benchmarks/customer_escalation/escalation-spring-mimetype-oob-001",
+      "repos": [
+        {
+          "url": "https://github.com/spring-projects/spring-boot",
+          "rev": "v4.0.7",
+          "path": "spring-boot"
+        },
+        {
+          "url": "https://github.com/spring-projects/spring-framework",
+          "rev": "v7.0.8",
+          "path": "spring-framework"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 3,
+      "n_oracle_files": 3,
+      "required_files": [
+        {
+          "path": "spring-core/src/main/java/org/springframework/util/MimeTypeUtils.java",
+          "repo": "spring-framework"
+        },
+        {
+          "path": "spring-web/src/main/java/org/springframework/http/MediaType.java",
+          "repo": "spring-framework"
+        },
+        {
+          "path": "module/spring-boot-webmvc/src/main/java/org/springframework/boot/webmvc/autoconfigure/WelcomePageHandlerMapping.java",
+          "repo": "spring-boot"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "spring-boot",
+              "spring-framework"
+            ],
+            "oracle_repos": [
+              "spring-boot",
+              "spring-framework"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "escalation-spring-mimetype-oob-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 2,
+            "crnt_positive": true,
+            "n_oracle_files": 3,
+            "n_modules": 3,
+            "modules": [
+              "module/spring-boot-webmvc/src/main/java/org/springframework/boot/webmvc/autoconfigure",
+              "spring-core/src/main/java/org/springframework/util",
+              "spring-web/src/main/java/org/springframework/http"
+            ],
+            "difficulty_stratum": "dual_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    },
+    {
+      "task_id": "incident-h2-continuation-flood-001",
+      "suite": "incident_response",
+      "task_type": "incident_investigation",
+      "difficulty": "hard",
+      "difficulty_stratum": "dual_repo",
+      "path": "benchmarks/incident_response/incident-h2-continuation-flood-001",
+      "repos": [
+        {
+          "url": "https://github.com/hyperium/hyper",
+          "rev": "v1.2.0",
+          "path": "hyper"
+        },
+        {
+          "url": "https://github.com/hyperium/h2",
+          "rev": "v0.4.3",
+          "path": "h2"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 3,
+      "n_oracle_files": 3,
+      "required_files": [
+        {
+          "path": "src/codec/framed_read.rs",
+          "repo": "h2"
+        },
+        {
+          "path": "src/frame/headers.rs",
+          "repo": "h2"
+        },
+        {
+          "path": "src/proto/h2/server.rs",
+          "repo": "hyper"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "h2",
+              "hyper"
+            ],
+            "oracle_repos": [
+              "h2",
+              "hyper"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "incident-h2-continuation-flood-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 2,
+            "crnt_positive": true,
+            "n_oracle_files": 3,
+            "n_modules": 3,
+            "modules": [
+              "src/codec",
+              "src/frame",
+              "src/proto/h2"
+            ],
+            "difficulty_stratum": "dual_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    },
+    {
+      "task_id": "incident-httpclient5-poolleak-timeout-001",
+      "suite": "incident_response",
+      "task_type": "incident_investigation",
+      "difficulty": "hard",
+      "difficulty_stratum": "dual_repo",
+      "path": "benchmarks/incident_response/incident-httpclient5-poolleak-timeout-001",
+      "repos": [
+        {
+          "url": "https://github.com/apache/httpcomponents-client",
+          "rev": "rel/v5.6.1",
+          "path": "httpcomponents-client"
+        },
+        {
+          "url": "https://github.com/apache/httpcomponents-core",
+          "rev": "rel/v5.4.2",
+          "path": "httpcomponents-core"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 3,
+      "n_oracle_files": 3,
+      "required_files": [
+        {
+          "path": "httpcore5/src/main/java/org/apache/hc/core5/pool/StrictConnPool.java",
+          "repo": "httpcomponents-core"
+        },
+        {
+          "path": "httpcore5/src/main/java/org/apache/hc/core5/pool/LaxConnPool.java",
+          "repo": "httpcomponents-core"
+        },
+        {
+          "path": "httpclient5/src/main/java/org/apache/hc/client5/http/impl/io/PoolingHttpClientConnectionManager.java",
+          "repo": "httpcomponents-client"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "httpcomponents-client",
+              "httpcomponents-core"
+            ],
+            "oracle_repos": [
+              "httpcomponents-client",
+              "httpcomponents-core"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "incident-httpclient5-poolleak-timeout-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 2,
+            "crnt_positive": true,
+            "n_oracle_files": 3,
+            "n_modules": 2,
+            "modules": [
+              "httpclient5/src/main/java/org/apache/hc/client5/http/impl/io",
+              "httpcore5/src/main/java/org/apache/hc/core5/pool"
+            ],
+            "difficulty_stratum": "dual_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    },
+    {
+      "task_id": "incident-jackson-bigdecimal-arith-001",
+      "suite": "incident_response",
+      "task_type": "error_provenance",
+      "difficulty": "hard",
+      "difficulty_stratum": "dual_repo",
+      "path": "benchmarks/incident_response/incident-jackson-bigdecimal-arith-001",
+      "repos": [
+        {
+          "url": "https://github.com/FasterXML/jackson-databind",
+          "rev": "jackson-databind-2.13.4",
+          "path": "jackson-databind"
+        },
+        {
+          "url": "https://github.com/FasterXML/jackson-core",
+          "rev": "jackson-core-2.13.4",
+          "path": "jackson-core"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 4,
+      "n_oracle_files": 4,
+      "required_files": [
+        {
+          "path": "src/main/java/com/fasterxml/jackson/core/io/BigDecimalParser.java",
+          "repo": "jackson-core"
+        },
+        {
+          "path": "src/main/java/com/fasterxml/jackson/core/io/NumberInput.java",
+          "repo": "jackson-core"
+        },
+        {
+          "path": "src/main/java/com/fasterxml/jackson/databind/deser/std/NumberDeserializers.java",
+          "repo": "jackson-databind"
+        },
+        {
+          "path": "src/main/java/com/fasterxml/jackson/databind/deser/std/StdDeserializer.java",
+          "repo": "jackson-databind"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "jackson-core",
+              "jackson-databind"
+            ],
+            "oracle_repos": [
+              "jackson-core",
+              "jackson-databind"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "incident-jackson-bigdecimal-arith-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 2,
+            "crnt_positive": true,
+            "n_oracle_files": 4,
+            "n_modules": 2,
+            "modules": [
+              "src/main/java/com/fasterxml/jackson/core/io",
+              "src/main/java/com/fasterxml/jackson/databind/deser/std"
+            ],
+            "difficulty_stratum": "dual_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    },
+    {
+      "task_id": "incident-rack-range-redos-001",
+      "suite": "incident_response",
+      "task_type": "error_provenance",
+      "difficulty": "hard",
+      "difficulty_stratum": "dual_repo",
+      "path": "benchmarks/incident_response/incident-rack-range-redos-001",
+      "repos": [
+        {
+          "url": "https://github.com/sinatra/sinatra",
+          "rev": "v4.0.0",
+          "path": "sinatra"
+        },
+        {
+          "url": "https://github.com/rack/rack",
+          "rev": "v3.0.3",
+          "path": "rack"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 3,
+      "n_oracle_files": 3,
+      "required_files": [
+        {
+          "path": "lib/rack/utils.rb",
+          "repo": "rack"
+        },
+        {
+          "path": "lib/rack/files.rb",
+          "repo": "rack"
+        },
+        {
+          "path": "lib/sinatra/base.rb",
+          "repo": "sinatra"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "rack",
+              "sinatra"
+            ],
+            "oracle_repos": [
+              "rack",
+              "sinatra"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "incident-rack-range-redos-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 2,
+            "crnt_positive": true,
+            "n_oracle_files": 3,
+            "n_modules": 2,
+            "modules": [
+              "lib/rack",
+              "lib/sinatra"
+            ],
+            "difficulty_stratum": "dual_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    },
+    {
+      "task_id": "incident-rustls-completeio-hang-001",
+      "suite": "incident_response",
+      "task_type": "incident_investigation",
+      "difficulty": "hard",
+      "difficulty_stratum": "dual_repo",
+      "path": "benchmarks/incident_response/incident-rustls-completeio-hang-001",
+      "repos": [
+        {
+          "url": "https://github.com/algesten/ureq",
+          "rev": "2.9.1",
+          "path": "ureq"
+        },
+        {
+          "url": "https://github.com/rustls/rustls",
+          "rev": "v/0.21.10",
+          "path": "rustls"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 3,
+      "n_oracle_files": 3,
+      "required_files": [
+        {
+          "path": "rustls/src/conn.rs",
+          "repo": "rustls"
+        },
+        {
+          "path": "rustls/src/stream.rs",
+          "repo": "rustls"
+        },
+        {
+          "path": "src/rtls.rs",
+          "repo": "ureq"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "rustls",
+              "ureq"
+            ],
+            "oracle_repos": [
+              "rustls",
+              "ureq"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "incident-rustls-completeio-hang-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 2,
+            "crnt_positive": true,
+            "n_oracle_files": 3,
+            "n_modules": 2,
+            "modules": [
+              "rustls/src",
+              "src"
+            ],
+            "difficulty_stratum": "dual_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    },
+    {
+      "task_id": "secops-axios-proxyauth-leak-001",
+      "suite": "security_operations",
+      "task_type": "error_provenance",
+      "difficulty": "hard",
+      "difficulty_stratum": "dual_repo",
+      "path": "benchmarks/security_operations/secops-axios-proxyauth-leak-001",
+      "repos": [
+        {
+          "url": "https://github.com/axios/axios",
+          "rev": "v1.6.7",
+          "path": "axios"
+        },
+        {
+          "url": "https://github.com/follow-redirects/follow-redirects",
+          "rev": "v1.15.4",
+          "path": "follow-redirects"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 3,
+      "n_oracle_files": 3,
+      "required_files": [
+        {
+          "path": "index.js",
+          "repo": "follow-redirects"
+        },
+        {
+          "path": "lib/adapters/http.js",
+          "repo": "axios"
+        },
+        {
+          "path": "lib/core/dispatchRequest.js",
+          "repo": "axios"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "axios",
+              "follow-redirects"
+            ],
+            "oracle_repos": [
+              "axios",
+              "follow-redirects"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "secops-axios-proxyauth-leak-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 2,
+            "crnt_positive": true,
+            "n_oracle_files": 3,
+            "n_modules": 3,
+            "modules": [
+              ".",
+              "lib/adapters",
+              "lib/core"
+            ],
+            "difficulty_stratum": "dual_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    },
+    {
+      "task_id": "secops-qs-proto-pollution-tri-001",
+      "suite": "security_operations",
+      "task_type": "error_provenance",
+      "difficulty": "hard",
+      "difficulty_stratum": "tri_repo",
+      "path": "benchmarks/security_operations/secops-qs-proto-pollution-tri-001",
+      "repos": [
+        {
+          "url": "https://github.com/expressjs/express",
+          "rev": "4.17.2",
+          "path": "express"
+        },
+        {
+          "url": "https://github.com/expressjs/body-parser",
+          "rev": "1.19.1",
+          "path": "body-parser"
+        },
+        {
+          "url": "https://github.com/ljharb/qs",
+          "rev": "v6.9.6",
+          "path": "qs"
+        }
+      ],
+      "artifacts_required": [
+        "code_patch",
+        "answer"
+      ],
+      "requires_code_patch": true,
+      "require_grounded_citations": false,
+      "grounding_artifact_conflict": false,
+      "crnt_positive": true,
+      "n_required_files": 3,
+      "n_oracle_files": 3,
+      "required_files": [
+        {
+          "path": "lib/parse.js",
+          "repo": "qs"
+        },
+        {
+          "path": "lib/types/urlencoded.js",
+          "repo": "body-parser"
+        },
+        {
+          "path": "lib/middleware/query.js",
+          "repo": "express"
+        }
+      ],
+      "gates": {
+        "A": {
+          "gate": "A",
+          "status": "pass",
+          "reason": "baseline clones every repo the oracle files live in",
+          "evidence": {
+            "declared_repos": [
+              "body-parser",
+              "express",
+              "qs"
+            ],
+            "oracle_repos": [
+              "body-parser",
+              "express",
+              "qs"
+            ]
+          }
+        },
+        "B": {
+          "gate": "B",
+          "status": "pass",
+          "reason": "no locational leak; bucket=grep_hard",
+          "evidence": {
+            "bucket": "grep_hard",
+            "token": "",
+            "scorer": "authoring_subset"
+          }
+        },
+        "C": {
+          "gate": "C",
+          "status": "pending_measurement",
+          "reason": "hard-to-localize is measured from baseline traces; no baseline run exists for this task yet",
+          "evidence": {
+            "designed_for": "tier_1",
+            "tier1_min_turns": 20,
+            "input_contract": {
+              "needs": "baseline-arm agent_trace.jsonl for this task_id",
+              "scorer": "compute_ttfr (jn73.1) over the baseline arm",
+              "admits_if": "turns_to_first_relevant >= 20"
+            },
+            "task_id": "secops-qs-proto-pollution-tri-001"
+          }
+        },
+        "D": {
+          "gate": "D",
+          "status": "pass",
+          "reason": "CRNT-positive with a dispersed oracle",
+          "evidence": {
+            "n_repos": 3,
+            "crnt_positive": true,
+            "n_oracle_files": 3,
+            "n_modules": 3,
+            "modules": [
+              "lib",
+              "lib/middleware",
+              "lib/types"
+            ],
+            "difficulty_stratum": "tri_repo",
+            "module_granularity": "parent_dir"
+          }
+        }
+      }
+    }
+  ]
+}

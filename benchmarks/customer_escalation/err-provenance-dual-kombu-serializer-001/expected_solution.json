@@ -1,0 +1,30 @@
+{
+  "task_id": "err-provenance-dual-kombu-serializer-001",
+  "checkpoints": {
+    "localization": {
+      "expected_solution": "The uncaught KeyError originates in kombu (the messaging library), NOT in Celery. At tag v5.0.2, kombu's prepare_accept_content in kombu/serialization.py normalizes the accept list with `{n if '/' in n else name_to_type[n] for n in content_types}`; the bare `name_to_type[n]` subscript raises a raw KeyError for a short-name that is not in the registry (an uninstalled serializer). It is called from kombu's Consumer.__init__ (kombu/messaging.py) as `self.accept = prepare_accept_content(accept)`. Celery merely forwards the configured accept_content: celery/app/amqp.py's TaskConsumer builds the kombu Consumer, and celery/worker/consumer/consumer.py boots that consumer at worker startup, where the crash surfaces. The agent must attribute the throw to kombu's prepare_accept_content and explain that Celery only passes the config through.",
+      "evaluation_criteria": [
+        "Attributes the KeyError to kombu (the messaging library / dependency), NOT to Celery",
+        "Names kombu's accept-content preparation helper (prepare_accept_content in the serialization module) as the throw site with the unguarded registry subscript",
+        "Explains that an unregistered serializer short-name should raise SerializerNotInstalled but instead escapes as a bare KeyError",
+        "Describes the cross-repo traversal: Celery app/worker consumer wiring passes accept_content -> kombu Consumer.__init__ -> prepare_accept_content"
+      ]
+    },
+    "patch_at_fix_site": {
+      "expected_solution": "The agent leaves an uncommitted diff in /workspace/kombu that modifies kombu/serialization.py at the real fix site: prepare_accept_content guards the registry lookup and raises SerializerNotInstalled for an unregistered name, matching upstream commit 4cf1a2171202. A diff that only touches Celery, or that catches the KeyError in the worker bootstrap, is not the correct site.",
+      "evaluation_criteria": [
+        "git diff in the kombu workspace repo shows a modification to kombu/serialization.py",
+        "The change is in kombu, not celery",
+        "The change is at prepare_accept_content (the accept-content normalization), not elsewhere"
+      ]
+    },
+    "patch_semantics": {
+      "expected_solution": "The patch wraps the name-to-type lookup in prepare_accept_content so a missing serializer short-name is caught and re-raised as SerializerNotInstalled (the library's normal not-installed error) rather than propagating a bare KeyError, exactly as the upstream fix does with `except KeyError` -> `raise SerializerNotInstalled(...)`.",
+      "evaluation_criteria": [
+        "The diff references SerializerNotInstalled",
+        "The KeyError from the registry subscript is caught (try/except KeyError) rather than left to propagate",
+        "The fix is scoped to the accept-content preparation, not a broad swallow of all exceptions"
+      ]
+    }
+  }
+}

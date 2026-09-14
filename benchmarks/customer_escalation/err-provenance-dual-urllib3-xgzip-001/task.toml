@@ -1,0 +1,95 @@
+# Escalation: one vendor's HTTP responses come back as undecoded compressed bytes.
+# The client reads resp.text/resp.json() and gets binary garbage; root cause is one
+# dependency below the HTTP adapter, in the low-level response decoder registry that
+# does not recognize the vendor's content-encoding label.
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "requests-urllib3-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "err-provenance-dual-urllib3-xgzip-001"
+suite = "customer_escalation"
+task_type = "error_provenance"
+difficulty = "hard"
+estimated_duration_minutes = 40
+session_type = "single"
+description = "Trace why one vendor's compressed HTTP responses are returned undecoded through the requests client down into the transport library's content-decoder registry, and patch the registry so the vendor's content-encoding label is decoded like standard gzip."
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/psf/requests"
+rev = "v2.31.0"
+path = "requests"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/urllib3/urllib3"
+rev = "2.0.7"
+path = "urllib3"
+role = "dependency"
+
+[metadata]
+languages = ["python"]
+total_loc = 55_000
+dependency_depth = 2
+frameworks = ["requests", "urllib3"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "localization"
+weight = 0.35
+verifier = "checks/check_localization.sh"
+description = "Agent's answer.json names the source files on the failure path across urllib3 and requests — including the true fix site (src/urllib3/response.py) — scored as recall over ground_truth.json required_files, which the prompt never names"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_at_fix_site"
+weight = 0.35
+verifier = "checks/check_patch_site.sh"
+description = "The submitted patch lands in the transport library's response-decoder module, not in the requests adapter or model"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_semantics"
+weight = 0.30
+verifier = "checks/check_patch_semantics.sh"
+description = "The patch makes the vendor's content-encoding label route through the gzip decoder path and be listed as a decodable encoding"
+timeout_seconds = 60
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The customer only sees requests' public surface (resp.text / resp.json()); the byte-for-byte body they get back is produced two hops away in the transport library, where a small hardcoded decoder registry decides whether a Content-Encoding value is decompressed at all. The requests adapter passes the response object across the repo boundary opaquely, so the missing encoding alias is invisible to single-repo search and only cross-repo reference resolution connects the wrong body to the decoder table."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "src/urllib3/response.py"
+repo = "urllib3"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/urllib3/connectionpool.py"
+repo = "urllib3"
+confidence = 0.80
+source = "curator"
+
+[[ground_truth.required_files]]
+path = "requests/adapters.py"
+repo = "requests"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "requests/models.py"
+repo = "requests"
+confidence = 0.85
+source = "deterministic"

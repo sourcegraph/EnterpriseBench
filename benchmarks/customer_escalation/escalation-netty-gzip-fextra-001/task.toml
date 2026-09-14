@@ -1,0 +1,89 @@
+# Customer escalation: a Spring WebFlux service fails to decompress valid gzip
+# responses from one upstream/CDN. The reactive HTTP client wires the response
+# through a transitive dependency's gzip inflater, whose header-parsing bug
+# mishandles the optional "extra field". Root cause is two repos below the app.
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "reactor-netty-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "structural_match"]
+
+[task]
+id = "escalation-netty-gzip-fextra-001"
+suite = "customer_escalation"
+task_type = "incident_investigation"
+difficulty = "hard"
+estimated_duration_minutes = 45
+session_type = "single"
+description = "Trace a reactive HTTP client 'decompression failure' on valid gzip responses through the client's automatic decompression wiring into the transitive dependency's gzip header parser, and patch the byte-parsing bug at its real origin."
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/reactor/reactor-netty"
+rev = "v1.2.18"
+path = "reactor-netty"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/netty/netty"
+rev = "netty-4.1.135.Final"
+path = "netty"
+role = "upstream"
+
+[metadata]
+languages = ["java"]
+total_loc = 350_000
+dependency_depth = 2
+frameworks = ["reactor-netty", "netty", "project-reactor"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "root_cause_identified"
+weight = 0.40
+verifier = "checks/check_root_cause.sh"
+description = "Agent's answer.json names the source files on the failure path across netty and reactor-netty — including the true fix site (codec/src/main/java/io/netty/handler/codec/compression/JdkZlibDecoder.java) — scored as recall over ground_truth.json required_files, which the prompt never names"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_lands_at_fix_site"
+weight = 0.40
+verifier = "checks/check_patch_site.sh"
+description = "Agent's uncommitted diff modifies the gzip inflater/decoder in the transitive dependency where the extra-field length is parsed"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "patch_fixes_extra_field"
+weight = 0.20
+verifier = "checks/check_patch_semantics.sh"
+description = "The patch corrects the extra-field length handling (assign instead of OR into the sentinel, and little-endian byte order)"
+timeout_seconds = 60
+
+[artifacts]
+required = ["code_patch", "answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The app author only writes the reactive HTTP client call; automatic response decompression inserts a content-decompression handler into the Netty channel pipeline, which constructs the transitive dependency's gzip inflater. The failing byte arithmetic lives in that inflater's gzip-header state machine, several handlers removed from any code the app or even reactor-netty author writes. The boundary is a config-driven pipeline insertion, invisible to single-repo search and un-greppable from the 'decompression failure' symptom."
+
+[ground_truth]
+tiers = ["deterministic", "curator"]
+
+[[ground_truth.required_files]]
+path = "codec/src/main/java/io/netty/handler/codec/compression/JdkZlibDecoder.java"
+repo = "netty"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "reactor-netty-http/src/main/java/reactor/netty/http/client/HttpClientConfig.java"
+repo = "reactor-netty"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "reactor-netty-http/src/main/java/reactor/netty/http/client/HttpClientOperations.java"
+repo = "reactor-netty"
+confidence = 0.80
+source = "curator"

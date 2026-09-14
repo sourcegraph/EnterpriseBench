@@ -1,0 +1,30 @@
+{
+  "task_id": "incident-rustls-completeio-hang-001",
+  "checkpoints": {
+    "root_cause_identified": {
+      "expected_solution": "The busy loop does not originate in ureq. ureq's src/rtls.rs wraps the socket as rustls::StreamOwned and delegates read to it; rustls's blocking Stream adapter (rustls/src/stream.rs, Stream::read) calls self.conn.complete_io(self.sock) in a loop. The defect is in rustls's complete_io in rustls/src/conn.rs (repo rustls, tag v/0.21.10). Its loop keeps iterating until it is sure the exchange is finished, but there is a state where the connection wants neither to write pending TLS data nor to read more, and is not cleanly closed: the loop then does no IO and falls through its terminal match without returning, so it spins at 100% CPU forever. A peer that stalls mid-exchange without closing triggers exactly this. The agent must name rustls's complete_io as the spinning site and explain that ureq merely delegates through the boxed read-write object into rustls's blocking stream and completion loop, and that the client's read timeout never fires because the thread never returns to client code.",
+      "evaluation_criteria": [
+        "Attributes the spin to rustls (the transitive/upstream repo), NOT ureq",
+        "Names rustls's blocking IO-completion routine (complete_io) as the loop that fails to terminate",
+        "Explains the no-progress state: the connection wants neither write nor read and is not cleanly closed, so the loop does no IO yet iterates again",
+        "Explains the traversal: ureq TLS stream wrapper -> rustls StreamOwned/Stream::read -> complete_io loop"
+      ]
+    },
+    "patch_lands_at_fix_site": {
+      "expected_solution": "The agent leaves an uncommitted diff in /workspace/rustls that modifies rustls/src/conn.rs at the complete_io loop, matching the upstream fix (rustls commit ebcb4782f23b on the 0.21 line). A diff that only touches ureq, or that adds a wall-clock timeout in the client, is not the correct site.",
+      "evaluation_criteria": [
+        "git diff in the rustls workspace repo shows a modification to the blocking IO-completion routine (conn.rs / complete_io)",
+        "The change is in rustls, not ureq",
+        "No new files; an in-place edit of the existing completion loop"
+      ]
+    },
+    "patch_bails_on_no_progress": {
+      "expected_solution": "The patch makes the completion loop return when neither a write nor a read is wanted, exactly as the upstream fix does with `if !self.wants_write() && !self.wants_read() { return Ok((rdlen, wrlen)); }` at the top of the loop. An equivalent no-progress guard that returns instead of looping again is acceptable. A wall-clock timeout, a sleep, or a bounded retry counter is not the correct fix.",
+      "evaluation_criteria": [
+        "The diff adds a guard on wants_write and wants_read (no-progress detection) inside the completion loop",
+        "In the no-progress state the loop returns instead of iterating again",
+        "The fix is scoped to the completion loop, not a timeout bolted on elsewhere"
+      ]
+    }
+  }
+}
