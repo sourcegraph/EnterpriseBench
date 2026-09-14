@@ -1201,6 +1201,15 @@ _UNBILLABLE_PAYLOADS = [
         '{"inputTokens": Infinity, "costUSD": 2.0}}, "total_cost_usd": 2.0}',
         id="infinite_token_count",
     ),
+    # A deeply-nested whole-file payload makes json.loads raise RecursionError (a
+    # RuntimeError, NOT a ValueError subclass) at both _result_object boundaries
+    # (whole-file parse and the per-line block scan). Uncaught it aborts the whole
+    # batch cost report — the exact mode parse_model_usage exists to prevent. This
+    # is the sibling of the trace-line RecursionError fix (t2dl4/agux1).
+    pytest.param(
+        '{"modelUsage": ' + "[" * 10_000 + "]" * 10_000 + "}",
+        id="deeply_nested_recursionerror",
+    ),
     # Last-wins picks the trailing partial stream block; the checksum catches it.
     pytest.param(
         "\n".join(

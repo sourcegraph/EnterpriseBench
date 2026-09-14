@@ -175,7 +175,12 @@ def retrieved_files_from_trace(trace_path: Path) -> list[str]:
         if isinstance(tool_input, str):
             try:
                 tool_input = json.loads(tool_input)
-            except json.JSONDecodeError:
+            except (ValueError, RecursionError):
+                # JSONDecodeError is a ValueError subclass. A 4300-digit int
+                # literal raises a bare ValueError (CPython int-str guard) and a
+                # deeply-nested payload raises RecursionError; this parse runs
+                # outside the per-line try/except, so an uncaught error here
+                # aborts the whole trace scan. Treat both as malformed input.
                 tool_input = {}
         if not isinstance(tool_input, dict):
             return
