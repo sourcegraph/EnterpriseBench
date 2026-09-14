@@ -22,20 +22,33 @@ class JudgeBackendError(Exception):
         self.status_code = status_code
 
 
+def _require_dict(parsed: object, text: str) -> dict:
+    """Ensure parsed JSON is a dict, raising with the source text on mismatch."""
+    if not isinstance(parsed, dict):
+        raise JudgeBackendError(
+            f"Expected JSON object, got {type(parsed).__name__}: {text[:200]}...",
+        )
+    return parsed
+
+
+def _try_parse_json(candidate: str) -> dict | None:
+    """Parse candidate as JSON, returning None (not raising) on malformed JSON."""
+    try:
+        parsed = json.loads(candidate)
+    except json.JSONDecodeError:
+        return None
+    return _require_dict(parsed, candidate)
+
+
 def _parse_json(raw: str) -> dict:
     """Extract and parse JSON from the model's text response."""
     text = raw.strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
+    if (parsed := _try_parse_json(text)) is not None:
+        return parsed
 
     m = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
-    if m:
-        try:
-            return json.loads(m.group(1).strip())
-        except json.JSONDecodeError:
-            pass
+    if m and (parsed := _try_parse_json(m.group(1).strip())) is not None:
+        return parsed
 
     raise JudgeBackendError(
         f"Failed to parse JSON from response: {text[:200]}...",
