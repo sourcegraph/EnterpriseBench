@@ -207,6 +207,43 @@ def _validate_semantic_layer(
                 ))
             seen_names.add(name)
 
+    # Rule 8: require_grounded_citations is only honored where the gate can run.
+    # The gate is Phase 5c of run_task.py's scoring path, and it grades exactly
+    # one file: agent_output/answer.json. Both bounds below are authoring-time
+    # guards for a flag that no runtime check can defend, each failing a
+    # different way if omitted.
+    if ground_truth.get("require_grounded_citations"):
+        # (a) Wrong session type: chain scores via chain_runner._compute_total_score
+        # and event_replay via action_scorer. Neither reaches the gate, so the flag
+        # would shape the prompt and then never be checked — silently inert, the
+        # exact failure the flag exists to prevent.
+        if session_type not in (None, "single"):
+            errors.append(ValidationError(
+                field="ground_truth.require_grounded_citations",
+                message=(
+                    "require_grounded_citations is only enforced for session_type "
+                    f"'single' (got '{session_type}'); that scoring path never runs "
+                    "the gate, so the flag would be silently inert"
+                ),
+                severity="error",
+            ))
+        # (b) No answer artifact: the gate reads agent_output/answer.json, so a
+        # task requiring only (say) incident_report has nothing there to grade.
+        # The gate would fail the artifact and force 0.0 on an honest run — a
+        # false zero, which corrupts the measurement far worse than no gate.
+        required_artifacts = data.get("artifacts", {}).get("required", [])
+        if "answer" not in required_artifacts:
+            errors.append(ValidationError(
+                field="ground_truth.require_grounded_citations",
+                message=(
+                    "require_grounded_citations requires 'answer' in "
+                    f"artifacts.required (got {sorted(required_artifacts)}); the "
+                    "gate grades agent_output/answer.json, so without it an "
+                    "honest run would be forced to 0.0"
+                ),
+                severity="error",
+            ))
+
     return errors, warnings
 
 

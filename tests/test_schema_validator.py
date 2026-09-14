@@ -164,6 +164,76 @@ class TestSemanticSessionType:
         assert len(rs_errors) == 1
 
 
+class TestSemanticGroundedCitations:
+    """Rule 8: the flag is only enforced on the session type that runs the gate.
+
+    The gate lives in run_task.py's scoring path (single). chain and
+    event_replay score elsewhere and never reach it, so the flag there shapes
+    the prompt and is then silently never checked — an authoring mistake worth
+    failing loudly at lint time, since nothing at runtime would.
+    """
+
+    def _data(self, session_type: str, required: list[str] | None = None) -> dict:
+        return {
+            "task": {"session_type": session_type},
+            "ground_truth": {"require_grounded_citations": True},
+            "artifacts": {"required": ["answer"] if required is None else required},
+            "checkpoints": [{"name": "a", "weight": 1.0}],
+        }
+
+    @pytest.mark.parametrize("required", [["incident_report"], ["security_assessment"], []])
+    def test_flag_without_an_answer_artifact_fails(self, required):
+        """The gate grades agent_output/answer.json and nothing else.
+
+        A task demanding grounded citations while requiring some other artifact
+        has no answer.json for the gate to read, so Phase 5c would force 0.0 on
+        a perfectly honest run. 14 tasks in benchmarks/ already require only
+        incident_report or security_assessment, so this is one edit away.
+        """
+        errors, _ = _validate_semantic_layer(self._data("single", required=required))
+        gate_errors = [
+            e for e in errors if e.field == "ground_truth.require_grounded_citations"
+        ]
+        assert len(gate_errors) == 1
+        assert "answer" in gate_errors[0].message
+
+    def test_flag_with_answer_among_several_artifacts_is_fine(self):
+        """The gate can read answer.json; co-required artifacts are its own concern."""
+        errors, _ = _validate_semantic_layer(
+            self._data("single", required=["answer", "topological_order"])
+        )
+        assert not [
+            e for e in errors if e.field == "ground_truth.require_grounded_citations"
+        ]
+
+    @pytest.mark.parametrize("session_type", ["chain", "event_replay", "resume"])
+    def test_flag_on_non_single_session_fails(self, session_type):
+        errors, _ = _validate_semantic_layer(self._data(session_type))
+        gate_errors = [
+            e for e in errors if e.field == "ground_truth.require_grounded_citations"
+        ]
+        assert len(gate_errors) == 1
+        assert gate_errors[0].severity == "error"
+
+    def test_flag_on_single_session_is_fine(self):
+        errors, _ = _validate_semantic_layer(self._data("single"))
+        assert not [
+            e for e in errors if e.field == "ground_truth.require_grounded_citations"
+        ]
+
+    def test_flag_absent_is_fine_on_any_session_type(self):
+        data = {
+            "task": {"session_type": "chain", "session_count": 2},
+            "ground_truth": {},
+            "artifacts": {"required": ["incident_report"]},
+            "checkpoints": [{"name": "a", "weight": 1.0}],
+        }
+        errors, _ = _validate_semantic_layer(data)
+        assert not [
+            e for e in errors if e.field == "ground_truth.require_grounded_citations"
+        ]
+
+
 class TestSemanticDuplicateCheckpoints:
     def test_duplicate_name_caught(self):
         data = {

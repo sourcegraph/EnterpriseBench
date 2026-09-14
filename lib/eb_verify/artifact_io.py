@@ -11,12 +11,21 @@ Stdlib only, by design. Anything imported here is paid by every validator.
 from __future__ import annotations
 
 import os
+import stat
 from pathlib import Path
 from typing import Optional, Sequence
 
 
 class FileTooLargeError(ValueError):
     """Raised by safe_read when a file exceeds the caller's max_bytes cap."""
+
+
+class NotRegularFileError(ValueError):
+    """Raised by safe_read when the target is not a regular file.
+
+    A FIFO, socket, or device is never a verifiable artifact, and reading one
+    can block forever — see safe_read for why that matters.
+    """
 
 
 def select_unique(
@@ -104,14 +113,28 @@ def safe_read(
     than re-resolving/re-opening the path at each step). This closes the
     TOCTOU window a path-based resolve-then-reopen sequence would leave
     between the containment check and the read.
+
+    Only regular files are read. The open is non-blocking because the target
+    can be a file type the agent chose: opening a FIFO for reading otherwise
+    blocks until a writer appears, and no writer ever does. Containment does
+    not help here — an agent needs no privilege to mkfifo *inside* its own
+    workspace. Every caller reads under a scoring timeout, so a blocking open
+    turns a failed artifact into an infra error, and an infra error earns a
+    re-run: the agent that plants the pipe trades a certain zero for a fresh
+    attempt. O_NONBLOCK is a no-op on the regular files that survive the check.
     """
     workspace_resolved = workspace.resolve()
-    fd = os.open(str(path), os.O_RDONLY)
+    fd = os.open(str(path), os.O_RDONLY | os.O_NONBLOCK)
     with os.fdopen(fd) as handle:
         real_path = Path(os.path.realpath(f"/proc/self/fd/{fd}"))
         if not str(real_path).startswith(str(workspace_resolved) + "/") and real_path != workspace_resolved:
             raise ValueError(
                 f"Path escapes workspace: {path} -> {real_path}"
+            )
+        mode = os.fstat(fd).st_mode
+        if not stat.S_ISREG(mode):
+            raise NotRegularFileError(
+                f"Not a regular file: {path} (mode {stat.filemode(mode)})"
             )
         if max_bytes is not None:
             size = os.fstat(fd).st_size

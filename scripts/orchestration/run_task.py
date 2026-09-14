@@ -281,6 +281,11 @@ _GRADING_PATHS_SH = " ".join(shlex.quote(p) for p in GRADING_PATHS)
 AGENT_INSTRUCTION = f"{WORKSPACE_DIR}/instruction.md"
 AGENT_OUTPUT_DIR = f"{WORKSPACE_DIR}/agent_output"
 
+# Canonical answer-artifact location appended to every task instruction by
+# _build_instruction_text(); always a candidate for the LLM judge, and the one
+# file the grounded-citations gate grades.
+ANSWER_ARTIFACT_PATH = f"{AGENT_OUTPUT_DIR}/answer.json"
+
 # Phases whose scores cannot be trusted. The judge is skipped for these (there
 # is nothing trustworthy left to put a ceiling on), and none of them may be
 # overwritten with phase="complete", success=True at save time. agent_infra_error
@@ -288,6 +293,12 @@ AGENT_OUTPUT_DIR = f"{WORKSPACE_DIR}/agent_output"
 # judge — hence two sets rather than one.
 UNTRUSTED_SCORE_PHASES = frozenset({"verifier_infra_error", "integrity_violation"})
 NON_COMPLETE_PHASES = UNTRUSTED_SCORE_PHASES | {"agent_infra_error"}
+
+# Where _run_scoring parks the grounded-citations verdict for Phase 5c.
+GROUNDING_GATE_KEY = "grounding_gate"
+
+# The gate reads one small JSON file and greps a handful of workspace files.
+GROUNDING_GATE_TIMEOUT = 120
 
 # The grader's identity. Scoring must not run as the agent (it would own the
 # grader) and must not run as root either: several checks execute code the agent
@@ -2432,6 +2443,26 @@ def _agent_output_infra(detail: str) -> dict:
     }
 
 
+def _grounding_required(task_data: dict) -> bool:
+    """True when the task's ground truth demands grounded citations."""
+    return bool((task_data.get("ground_truth") or {}).get("require_grounded_citations"))
+
+
+def _gate_infra_error(reason: str, detail: str) -> dict:
+    """A gate verdict standing for "could not reach a verdict".
+
+    Built through InfraError so the payload carries the same reason/stage/
+    detail/cause shape every other verifier_infra_error producer writes;
+    chain_runner indexes ["cause"] directly, so a hand-rolled dict would be a
+    KeyError waiting for its first reader.
+    """
+    return {
+        "infra_error": InfraError(
+            reason=reason, stage="grounding_gate", detail=detail
+        ).as_verifier_error()
+    }
+
+
 def _other_readable_grading_assets(container_id: str) -> subprocess.CompletedProcess:
     """Every path under the sealed grading assets that is other-readable.
 
@@ -2692,11 +2723,110 @@ def _open_agent_output_for_scoring(container_id: str) -> dict | None:
     return _assert_answer_readable_by_scorer(container_id)
 
 
-def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
+def _decide_grounding_gate(container_id: str) -> dict:
+    """Run the grounded-citations gate and return its verdict dict.
+
+    Must be called inside the closed scoring window: the gate reads the one
+    artifact whose authenticity is the entire point, so it has to see it under
+    the same seal the checks do, not through a reopened world-writable
+    workspace.
+
+    Returns the module's ``{passed, detail}`` verdict, or an ``infra_error``
+    dict when the gate could not reach one. A gate that could not run is not
+    evidence the agent cheated — folding that into a 0.0 is exactly the
+    conflation the scorer trust boundary exists to prevent.
+    """
+    try:
+        proc = _docker_exec(
+            container_id,
+            [
+                "bash",
+                "-c",
+                f"export PYTHONPATH={shlex.quote(EB_VERIFY_DIR)}:${{PYTHONPATH:-}} "
+                f"PYTHONSAFEPATH=1 PYTHONDONTWRITEBYTECODE=1; "
+                f"python3 -m eb_verify.artifact_gate "
+                f"--workspace {shlex.quote(WORKSPACE_DIR)} "
+                f"--answer {shlex.quote(ANSWER_ARTIFACT_PATH)}",
+            ],
+            timeout=GROUNDING_GATE_TIMEOUT,
+            workdir=SCORING_WORKDIR,
+            user=SCORING_USER,
+        )
+    except (subprocess.SubprocessError, OSError, UnicodeDecodeError) as e:
+        # Never propagate: an escaped exception lands in the caller's catch-all
+        # as phase="error" and discards a measurement already taken. text=True
+        # decodes both streams strictly, so UnicodeDecodeError belongs here —
+        # it is a ValueError, not an OSError, and would otherwise slip past.
+        return _gate_infra_error("grounding_gate_failed", f"{type(e).__name__}: {e}")
+
+    if proc.returncode != 0:
+        # Exit status is the gate's "did I run" channel; nonzero means it
+        # never reached a verdict.
+        return _gate_infra_error(
+            "grounding_gate_failed",
+            f"exit {proc.returncode}: {proc.stderr.strip()[:500]}",
+        )
+
+    try:
+        verdict = json.loads(proc.stdout)
+    except ValueError:  # JSONDecodeError subclasses ValueError
+        verdict = None
+    if not isinstance(verdict, dict) or "passed" not in verdict:
+        return _gate_infra_error(
+            "grounding_gate_unreadable",
+            f"unparseable gate output: {proc.stdout.strip()[:500]}",
+        )
+    return verdict
+
+
+def _apply_grounding_gate(result: "TaskRunResult", scores: dict) -> None:
+    """Force the score to zero when the grounded-citations gate failed.
+
+    Phase 5c: must run AFTER the LLM judge. _apply_llm_judge rewrites
+    task_score as the weighted sum of the checkpoints, so a gate applied any
+    earlier is silently erased and the run banks a full score on fabricated
+    citations.
+
+    No-ops for tasks that never set the flag, and on an untrusted phase, where
+    there is no score for a gate to force down.
+    """
+    gate = scores.get(GROUNDING_GATE_KEY)
+    if not gate or result.phase in UNTRUSTED_SCORE_PHASES:
+        return
+
+    infra_error = gate.get("infra_error")
+    if infra_error:
+        scores["verifier_infra_error"] = infra_error
+        _route_verifier_infra_error(result, scores)
+        return
+
+    if gate.get("passed"):
+        return
+
+    gate_msg = (
+        "require_grounded_citations: answer artifact failed the grounded-"
+        f"citations gate ({gate.get('detail', 'no detail')}); task_score "
+        "forced to 0.0"
+    )
+    scores["task_score"] = 0.0
+    # Zeroing task_score alone yields a results.json that contradicts itself:
+    # solve_verify reads both fields and would report a pass at score zero.
+    scores["all_passed"] = False
+    scores.setdefault("score_gates", []).append(gate_msg)
+    logger.warning("SCORE GATE: %s", gate_msg)
+
+
+def _run_scoring(
+    container_id: str, verifier_timeout: int = 600, require_grounded: bool = False
+) -> dict:
     """Run /workspace/test.sh and capture the JSON results.
 
     Refuses to run at all if the grading-asset seal is broken: a verifier the
     agent could have rewritten produces a number, not a measurement.
+
+    When *require_grounded* is set, the grounded-citations gate is decided in
+    the same closed window, and its verdict is attached under
+    GROUNDING_GATE_KEY for _apply_grounding_gate to act on after the judge.
     """
     sealed, seal_err = _assert_grading_assets_sealed(container_id)
     if not sealed:
@@ -2748,6 +2878,9 @@ def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
             workdir=SCORING_WORKDIR,
             user=SCORING_USER,
         )
+        # Inside the seal by contract (see _decide_grounding_gate); applied
+        # later, in Phase 5c.
+        gate_verdict = _decide_grounding_gate(container_id) if require_grounded else None
     finally:
         _reopen_workspace_for_agent(container_id)
 
@@ -2762,11 +2895,15 @@ def _run_scoring(container_id: str, verifier_timeout: int = 600) -> dict:
     # legitimate all-checkpoint-fail (beads s58f, hktt/pt0n, apfp #2).
     guarded = guard_verifier_output(result.stdout, result.returncode)
     if isinstance(guarded, InfraError):
+        # No verifier verdict means no score for the gate to force down, so
+        # its verdict is dropped rather than recorded against an invalid run.
         return {
             "task_score": 0.0,
             "all_passed": False,
             "verifier_infra_error": guarded.as_verifier_error(),
         }
+    if gate_verdict is not None:
+        guarded[GROUNDING_GATE_KEY] = gate_verdict
     return guarded
 
 
@@ -5326,7 +5463,11 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
 
         # --- Phase 5: Score (Tier 1 — deterministic) ---
         t0 = time.monotonic()
-        scores = _run_scoring(container_id, config.verifier_timeout)
+        scores = _run_scoring(
+            container_id,
+            config.verifier_timeout,
+            require_grounded=_grounding_required(task_data),
+        )
         timings["scoring"] = time.monotonic() - t0
         _route_verifier_infra_error(result, scores)
         _route_integrity_violation(result, scores)
@@ -5346,6 +5487,11 @@ def run_task(config: TaskRunConfig) -> TaskRunResult:
                 judge_account=config.judge_account,
             )
             _route_verifier_infra_error(result, scores)
+
+        # --- Phase 5c: Gate (grounded citations) ---
+        # Unconditional and last, after the judge's recompute (see
+        # _apply_grounding_gate).
+        _apply_grounding_gate(result, scores)
 
         result.scores = scores
 

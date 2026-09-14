@@ -14,6 +14,7 @@ import pytest
 from eb_verify.artifact_io import (
     FileTooLargeError,
     MAX_ARTIFACT_BYTES,
+    NotRegularFileError,
     safe_read,
     select_unique,
 )
@@ -1572,6 +1573,43 @@ class TestIncidentReportSemantics:
 # ---------------------------------------------------------------------------
 # safe_read max_bytes guard
 # ---------------------------------------------------------------------------
+
+
+class TestSafeReadRejectsNonRegularFiles:
+    """safe_read must never block on a file type the agent can plant.
+
+    Opening a FIFO for reading blocks until a writer appears — one never does.
+    The agent creates one with a plain mkfifo (no privilege needed) inside the
+    workspace, so containment does not stop it. Every safe_read caller sits on
+    a scoring timeout, so a blocking open converts a would-be 0.0 into an
+    infra error, and an infra error earns a re-run. That hands an agent that
+    cannot ground its citations a mulligan instead of a zero.
+    """
+
+    def test_fifo_is_rejected_not_blocked_on(self, tmp_path):
+        fifo = tmp_path / "evidence.pipe"
+        os.mkfifo(fifo)
+        # Must raise rather than hang. pytest-timeout is not installed, so a
+        # regression shows up as a hung suite; the reason string is asserted
+        # below to pin the behaviour precisely.
+        with pytest.raises(NotRegularFileError):
+            safe_read(fifo, tmp_path)
+
+    def test_directory_is_rejected(self, tmp_path):
+        d = tmp_path / "subdir"
+        d.mkdir()
+        with pytest.raises((NotRegularFileError, IsADirectoryError)):
+            safe_read(d, tmp_path)
+
+    def test_not_regular_file_error_is_a_value_error(self):
+        # Callers that already catch ValueError (the containment failure)
+        # keep failing closed rather than letting a new exception escape.
+        assert issubclass(NotRegularFileError, ValueError)
+
+    def test_regular_file_still_reads(self, tmp_path):
+        f = tmp_path / "ok.txt"
+        f.write_text("still fine")
+        assert safe_read(f, tmp_path) == "still fine"
 
 
 class TestSafeReadMaxBytes:

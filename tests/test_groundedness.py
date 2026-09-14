@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -238,6 +239,22 @@ def test_oversized_file_in_workspace_is_too_large_not_read(ws: Path):
     res = check_groundedness([c], ws)
     assert one(res).grounded is False
     assert one(res).reason == "too_large"
+
+
+def test_cited_fifo_is_rejected_and_never_blocks(ws: Path):
+    """A citation naming a FIFO must resolve to a reason, not hang the verifier.
+
+    mkfifo needs no privilege and the pipe sits inside the workspace, so
+    containment does not stop it. Reading it blocks until a writer appears —
+    none ever does — which would stall scoring until its timeout and convert a
+    certain 0.0 into a re-runnable infra error. The span deliberately never has
+    to match: the open is what hangs.
+    """
+    os.mkfifo(ws / "evidence.pipe")
+    c = Citation(repo="", file="evidence.pipe", evidence_span=SPAN)
+    res = check_groundedness([c], ws)
+    assert one(res).grounded is False
+    assert one(res).reason == "not_a_regular_file"
 
 
 def test_oversized_file_outside_workspace_is_path_escape(ws: Path, tmp_path: Path):
