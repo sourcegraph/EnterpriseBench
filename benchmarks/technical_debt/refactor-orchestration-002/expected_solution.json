@@ -1,0 +1,29 @@
+{
+  "task_id": "refactor-orch-002",
+  "checkpoints": {
+    "identify_repos": {
+      "expected_solution": "Two repos appear in the cascade: spf13/cobra (upstream — releases v1.10.2 with improved command suggestion logic) and kubernetes/kubernetes (consumer — bumps cobra to v1.10.2 across kubectl and all control-plane binaries via PR kubernetes/kubernetes#137843). Both names must appear in REFACTOR_PLAN.md so check_repo_set.sh's 'cobra' and 'kubernetes' greps succeed (the actual grep is for 'cobra' OR 'kubernetes' in this task — note the verifier file shipped with the task).",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must mention both 'cobra' and 'kubernetes' so check_repo_set.sh's pair of greps both fire",
+        "Plan must clarify role-of-each: spf13/cobra ships the new release; kubernetes/kubernetes consumes it across kubectl, kube-controller-manager, kubelet, kube-apiserver, kube-scheduler, kube-proxy",
+        "Plan should reference the relevant go.mod files (spf13/cobra@v1.10.2 module declaration and kubernetes/kubernetes@v1.33.0 top-level go.mod's spf13/cobra require) to anchor the version-bump claim"
+      ]
+    },
+    "topological_order": {
+      "expected_solution": "Strict linear cascade: (1) spf13/cobra v1.10.2 ships first, then (2) kubernetes/kubernetes#137843 (merged 2026-03-18) bumps the require directive. Use a numbered markdown list with canonical org/repo identifiers so check_topo_order.sh can extract them. dependency_graph: spf13/cobra: [], kubernetes/kubernetes: [spf13/cobra].",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must contain a numbered list ('1. spf13/cobra' / '2. kubernetes/kubernetes') so the verifier's regex extracts the order",
+        "Order must respect dependency_graph: spf13/cobra (no deps) before kubernetes/kubernetes (depends on spf13/cobra)",
+        "Each step's narrative must explain why it precedes the next — cobra v1.10.2 must be tagged before kubernetes can pin to it",
+        "Repo identifiers in the numbered list must use canonical org/repo form ('spf13/cobra', 'kubernetes/kubernetes') so the verifier's token matching works"
+      ]
+    },
+    "parallelism": {
+      "expected_solution": "No parallelizable steps — the cascade is a strict chain (cobra → kubernetes). The plan should explicitly state 'no parallelizable steps' under a Parallelization heading. Claiming parallelism between cobra and kubernetes would register as a dependency violation in check_parallelism.sh.",
+      "evaluation_criteria": [
+        "Plan must explicitly note that no steps are parallelizable (ground truth's parallelizable_steps is empty)",
+        "Must NOT claim that spf13/cobra and kubernetes/kubernetes can be updated in parallel — the dependency edge cobra → kubernetes means parallel claims would penalise the score"
+      ]
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "task_id": "incident-inv-dual-cortex-thanos-001",
+  "checkpoints": {
+    "cortex_ring": {
+      "expected_solution": "Agent must identify Cortex's ingester ring management in pkg/ring/ring.go (and pkg/ingester/ingester.go for the ingester-side use of the ring). The ring is a hash ring keyed by ingester token; the bug arises because token hashes can collide under specific topology changes (scale-up/down) leaving two ingesters claiming the same token range, so writes for that range are duplicated and reads against the ring return inconsistent ownership.",
+      "evaluation_criteria": [
+        "Names pkg/ring/ring.go (cortex) as the ring management file",
+        "Mentions ingester tokens / hash ring as the data structure being inspected",
+        "Identifies token collision (or overlapping token ranges) as the structural problem"
+      ]
+    },
+    "thanos_store": {
+      "expected_solution": "Agent must identify Thanos's StoreAPI proxy/discovery in pkg/store/proxy.go (and pkg/query/querier.go for the query-side fan-out). Thanos discovers Cortex StoreAPI endpoints (one per ingester) and fans queries out across them. When Cortex's ring has a token collision, the Thanos StoreAPI proxy still talks to both colliding ingesters, deduplication runs across inconsistent inputs, and queries can return partial or duplicated series depending on which ingester answers first.",
+      "evaluation_criteria": [
+        "Names pkg/store/proxy.go (thanos) as the StoreAPI discovery / fan-out point",
+        "Mentions StoreAPI (gRPC) discovery of Cortex ingesters",
+        "Connects the inconsistent ingester ownership to inconsistent / duplicated series in query responses"
+      ]
+    },
+    "race_condition": {
+      "expected_solution": "Agent must identify the race: a Cortex topology change (ingester join/leave or token-claim refresh) interleaves with an in-flight Thanos query fan-out. The ring write that resolves the collision is not yet visible to all StoreAPI clients when the query runs, so different replicas see different ring snapshots. The result is a window where Thanos sends overlapping queries to two ingesters that both claim the same token range, producing duplicated samples or 'no data' depending on dedup.",
+      "evaluation_criteria": [
+        "Identifies a race between Cortex ring updates and Thanos StoreAPI queries",
+        "Mentions the inconsistent ring snapshot observed by different StoreAPI clients during the window",
+        "Connects the race to the user-visible symptom (duplicated samples, gaps, or query failures)"
+      ]
+    }
+  }
+}

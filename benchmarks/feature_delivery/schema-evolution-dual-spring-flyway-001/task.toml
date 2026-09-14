@@ -1,0 +1,125 @@
+# DB Schema Evolution: Spring Boot Flyway migration ordering conflict with JPA entity changes
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "spring-flyway-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "schema-evolution-dual-spring-flyway-001"
+suite = "feature_delivery"
+task_type = "db_schema_evolution"
+difficulty = "hard"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Trace Spring Boot Flyway migration execution order conflict with Hibernate schema validation during startup"
+prompt = """
+A team reports that their Spring Boot application fails to start after adding
+a new Flyway migration. The error is:
+
+    org.hibernate.tool.schema.spi.SchemaManagementException: Schema-validation:
+    missing column [user_preferences] in table [users]
+
+The migration V42__add_user_preferences.sql adds the column, and running it
+manually against the database works. The issue is that Hibernate's schema
+validation runs BEFORE Flyway migrations in certain auto-configuration orderings.
+
+Your task:
+1. Find where Spring Boot orders Flyway migration execution relative to
+   EntityManagerFactory initialization — trace from FlywayAutoConfiguration
+   through the bean dependency chain to identify the @DependsOn and
+   BeanFactoryPostProcessor ordering.
+2. Find where Spring Boot configures Hibernate schema validation mode — trace
+   from HibernateJpaAutoConfiguration through the JPA properties to identify
+   how spring.jpa.hibernate.ddl-auto=validate interacts with Flyway timing.
+3. Trace the startup sequence: Spring context loads -> Flyway should migrate ->
+   Hibernate should validate. Identify the conditions under which this ordering
+   breaks (e.g., eager EntityManagerFactory initialization, @PostConstruct
+   triggering early JPA access).
+4. Document the race condition and the correct configuration to guarantee
+   Flyway runs before Hibernate validation.
+
+Document in your answer (use these JSON fields):
+{
+  "execution_order": [
+    {"step": "<step description>", "file": "<source file>", "class": "<class>"}
+  ],
+  "race_condition": "<description of ordering bug>",
+  "fix": "<correct configuration approach>"
+}
+"""
+
+[[repos]]
+url = "https://github.com/spring-projects/spring-boot"
+rev = "v3.1.2"
+path = "spring-boot"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/spring-projects/spring-framework"
+rev = "v6.0.11"
+path = "spring-framework"
+role = "upstream"
+
+[metadata]
+languages = ["java"]
+total_loc = 2_000_000
+dependency_depth = 2
+frameworks = ["spring-boot", "spring-framework", "hibernate"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "execution_order"
+weight = 0.40
+verifier = "checks/check_execution_order.sh"
+description = "Agent identifies the correct Flyway/Hibernate startup ordering"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "race_condition"
+weight = 0.35
+verifier = "checks/check_race_condition.sh"
+description = "Agent identifies the race condition between Flyway and Hibernate"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "fix_identification"
+weight = 0.25
+verifier = "checks/check_fix.sh"
+description = "Agent identifies the correct configuration fix"
+timeout_seconds = 60
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Tracing bean initialization ordering across Spring Boot auto-configuration and Spring Framework context lifecycle requires cross-repo search through DependsOn annotations and BeanFactoryPostProcessor chains"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/flyway/FlywayAutoConfiguration.java"
+repo = "spring-boot"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaAutoConfiguration.java"
+repo = "spring-boot"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "spring-context/src/main/java/org/springframework/context/support/AbstractApplicationContext.java"
+repo = "spring-framework"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateProperties.java"
+repo = "spring-boot"
+confidence = 0.85

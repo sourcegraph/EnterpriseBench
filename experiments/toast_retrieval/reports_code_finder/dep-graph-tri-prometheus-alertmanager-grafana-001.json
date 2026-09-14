@@ -1,0 +1,214 @@
+{
+  "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/prometheus--v2.47.0",
+    "github.com/sg-evals/alertmanager--v0.26.0",
+    "github.com/sg-evals/grafana--v10.2.0"
+  ],
+  "retrieved_paths": [
+    "rules/alerting.go",
+    "rules/manager.go",
+    "notifier/notifier.go",
+    "config/config.go",
+    "cmd/prometheus/main.go",
+    "api/v2/compat.go",
+    "api/v2/api.go",
+    "dispatch/dispatch.go",
+    "dispatch/route.go",
+    "api/v2/openapi.yaml",
+    "public/app/features/alerting/unified/api/prometheus.ts",
+    "pkg/services/ngalert/api/generated_base_api_prometheus.go",
+    "pkg/services/ngalert/api/api_prometheus.go",
+    "public/app/features/alerting/unified/api/alertmanagerApi.ts",
+    "public/app/plugins/datasource/alertmanager/types.ts",
+    "pkg/services/ngalert/state/compat.go"
+  ],
+  "retrieved_paths_union": [
+    "rules/alerting.go",
+    "rules/manager.go",
+    "notifier/notifier.go",
+    "config/config.go",
+    "cmd/prometheus/main.go",
+    "api/v2/compat.go",
+    "api/v2/api.go",
+    "dispatch/dispatch.go",
+    "dispatch/route.go",
+    "api/v2/openapi.yaml",
+    "public/app/features/alerting/unified/api/prometheus.ts",
+    "pkg/services/ngalert/api/generated_base_api_prometheus.go",
+    "pkg/services/ngalert/api/api_prometheus.go",
+    "public/app/features/alerting/unified/api/alertmanagerApi.ts",
+    "public/app/plugins/datasource/alertmanager/types.ts",
+    "pkg/services/ngalert/state/compat.go"
+  ],
+  "required_files": [
+    "prometheus/rules/alerting.go",
+    "alertmanager/api/v2/restapi/operations/alert/post_alerts.go",
+    "grafana/pkg/services/ngalert/api/api_prometheus.go"
+  ],
+  "ir_scores": {
+    "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3846,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.125,
+    "n_retrieved": 16,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3846,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.125,
+    "n_retrieved": 16,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 32.2,
+  "response_chars": 6078,
+  "raw_response": "I\u2019m unable to write `/workspace/analysis/IMPACT_REPORT.md` because the available tools only support repository search/read operations, not filesystem writes. Findings so far:\n\n- **Prometheus rule evaluation and alert format**\n  - `rules/alerting.go:39-92` \u2014 `AlertState`, `Alert`, and `AlertingRule`; states are `inactive`, `pending`, and `firing`, with labels, annotations, value, and lifecycle timestamps.\n  - `rules/manager.go:642-687` \u2014 `Group.Eval`; evaluates rules, records health/evaluation metadata, and invokes `AlertingRule.sendAlerts`.\n  - `notifier/notifier.go:57-70` \u2014 outbound alert contract: `labels`, `annotations`, `startsAt`, `endsAt`, and `generatorURL`.\n  - `notifier/notifier.go:480-565` \u2014 selects Alertmanager API v1/v2 and converts alerts to OpenAPI `PostableAlert`; v2 is serialized with `alertsToOpenAPIAlerts`.\n  - `config/config.go:780-813` \u2014 supported Alertmanager API versions (`v1`, `v2`).\n  - `cmd/prometheus/main.go:659-662` \u2014 wires rule evaluation to `rules.SendAlerts`.\n  - `go.mod:45-50` \u2014 Prometheus v2.47.0 depends on Alertmanager `v0.25.0`, while the target Alertmanager repository is v0.26.0: compatibility should be explicitly tested.\n\n- **Alertmanager ingestion and processing**\n  - `api/v2/compat.go:161-178` \u2014 `OpenAPIAlertsToAlerts`; maps v2 payloads into internal `types.Alert`, preserving labels, annotations, start/end times, and generator URL.\n  - `api/v2/api.go:308-367` \u2014 `postAlertsHandler`; applies timestamps and resolve timeout, validates labels, tracks firing/resolved/invalid metrics, and inserts valid alerts.\n  - `api/v2/api.go:250-305` \u2014 GET `/api/v2/alerts`; filters by matchers, silenced/inhibited/active state, resolves receivers, and returns OpenAPI alerts.\n  - `dispatch/dispatch.go:303-310` \u2014 `processAlert`; computes grouping labels and fingerprints.\n  - `dispatch/dispatch.go:217-220` \u2014 `Groups`; exposes grouped internal state.\n  - `dispatch/route.go:191-208` \u2014 `RouteOpts`; defines receiver, grouping, wait/interval, and repeat behavior.\n  - `api/v2/openapi.yaml:1-8`, `README.md:188-201` \u2014 v2 is the generated/OpenAPI contract under `/api/v2`.\n  - `go.mod:31-36` \u2014 Alertmanager v0.26.0 uses `github.com/prometheus/common v0.44.0`, matching Prometheus\u2019s common dependency.\n\n- **Grafana querying Prometheus and Alertmanager**\n  - `public/app/features/alerting/unified/api/prometheus.ts:22-45` \u2014 builds Prometheus-compatible `/api/v1/rules` requests, including `file`, `rule_group`, state, matcher, and alert limits.\n  - `pkg/services/ngalert/api/generated_base_api_prometheus.go:53-56,83-92` \u2014 exposes Grafana-backed Prometheus-compatible `/api/v1/alerts` and `/api/v1/rules`.\n  - `pkg/services/ngalert/api/api_prometheus.go:37-72` \u2014 `RouteGetAlertStatuses`; returns Grafana alert state with labels, annotations, state, active time, and value.\n  - `public/app/features/alerting/unified/api/alertmanagerApi.ts:39-79` \u2014 queries external Alertmanager `/api/v2/alerts`, supporting matcher and active/silenced/inhibited/unprocessed filters.\n  - `public/app/features/alerting/unified/api/alertmanagerApi.ts:81-85` \u2014 queries `/api/v2/alerts/groups`.\n  - `public/app/plugins/datasource/alertmanager/types.ts:213-237` \u2014 frontend `AlertmanagerAlert` and group shapes.\n  - `pkg/services/ngalert/state/compat.go:92-109` \u2014 Grafana-generated no-data alerts use Alertmanager v2 `PostableAlert`, including labels, annotations, `StartsAt`, and `EndsAt`.\n  - `go.mod:23-26,90-95,501-504` \u2014 Grafana pins Prometheus to v0.43.0 semantics and uses a forked Alertmanager v0.25.1 snapshot, creating a significant dependency/API cascade risk.\n\n**Three-way contract and cascade points**\n\n1. Prometheus evaluates PromQL alert rules and tracks pending/firing/resolved lifecycle state.\n2. Prometheus sends JSON alert objects to Alertmanager. The stable identity is the label set; annotations are non-identifying metadata. `StartsAt`, `EndsAt`, and `GeneratorURL` are lifecycle/provenance fields.\n3. Alertmanager v2 accepts `PostableAlerts`, validates and normalizes timestamps, applies resolve timeout when `EndsAt` is absent, stores alerts, fingerprints/group them, routes them, and exposes enriched state through `/api/v2/alerts`.\n4. Grafana consumes Prometheus-compatible `/api/v1/rules` and `/api/v1/alerts`, and Alertmanager `/api/v2/alerts` and `/api/v2/alerts/groups`. It therefore depends on both response schemas and state vocabulary.\n5. Main cascade risks are:\n   - changing Prometheus alert labels or timestamp semantics, which changes Alertmanager fingerprints, grouping, deduplication, and Grafana display;\n   - changing v2 `PostableAlert` fields or required validation, breaking Prometheus notification delivery and Grafana-generated alerts;\n   - changing Prometheus `/api/v1/rules` or `/api/v1/alerts` response fields/state strings, breaking Grafana\u2019s rule/state parsing;\n   - changing Alertmanager `/api/v2/alerts` filters or response models, breaking Grafana\u2019s external Alertmanager datasource;\n   - dependency skew: Prometheus v2.47.0\u2019s Alertmanager dependency is v0.25.0, Alertmanager target is v0.26.0, and Grafana uses a forked v0.25.1 snapshot.\n\n**Migration recommendations**\n\n- Keep Alertmanager API v2 enabled and test `PostableAlert` serialization/deserialization across all three repositories.\n- Treat labels as a compatibility-critical identity schema; do not rename/remove labels without coordinated migration.\n- Preserve `startsAt`, `endsAt`, and `generatorURL` semantics, especially resolved-alert delivery and missing-`EndsAt` timeout behavior.\n- Add contract tests for Prometheus \u2192 Alertmanager POST payloads, Alertmanager validation/grouping, and Grafana queries against `/api/v1/rules`, `/api/v1/alerts`, `/api/v2/alerts`, and `/api/v2/alerts/groups`.\n- Align or explicitly pin the Alertmanager versions/forks used by Prometheus and Grafana before upgrading; verify generated OpenAPI models and state/filter parameters.\n- Update Grafana adapters if Prometheus changes alert state names, response nesting, value formatting, or rule filtering parameters.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3846,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.125,
+    "n_retrieved": 16,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "prometheus/rules/alerting.go",
+    "rules/manager.go",
+    "notifier/notifier.go",
+    "config/config.go",
+    "cmd/prometheus/main.go",
+    "api/v2/compat.go",
+    "api/v2/api.go",
+    "dispatch/dispatch.go",
+    "dispatch/route.go",
+    "api/v2/openapi.yaml",
+    "public/app/features/alerting/unified/api/prometheus.ts",
+    "pkg/services/ngalert/api/generated_base_api_prometheus.go",
+    "grafana/pkg/services/ngalert/api/api_prometheus.go",
+    "public/app/features/alerting/unified/api/alertmanagerApi.ts",
+    "public/app/plugins/datasource/alertmanager/types.ts",
+    "pkg/services/ngalert/state/compat.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3846,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.125,
+    "n_retrieved": 16,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

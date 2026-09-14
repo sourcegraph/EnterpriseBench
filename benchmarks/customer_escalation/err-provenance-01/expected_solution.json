@@ -1,0 +1,33 @@
+{
+  "task_id": "error-trace-k8s-job-starttime-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "Primary error source: pkg/apis/batch/validation/validation.go \u2014 Contains the validation logic that generates the misleading 'startTime cannot be removed' error message. The format string is directly in this file.. Supporting: pkg/apis/batch/validation/validation_test.go \u2014 Test file modified in the fix PR. Contains test cases that exercise the validation error path.. Surface error: Job.batch \"job-c4nbt\" is invalid: status.startTime: Required value: startTime cannot be removed for unsuspended job.",
+      "evaluation_criteria": [
+        "Must identify pkg/apis/batch/validation/validation.go as part of the error source",
+        "Must identify pkg/apis/batch/validation/validation_test.go as part of the error source",
+        "Must reference the surface error message ('Job.batch \"job-c4nbt\" is invalid: status.startTime: Required value: startTime ca') or its origin",
+        "Must reference a specific function, type, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Error propagation chain: (1) User submits Job status update via kubectl/API \u2192 (2) pkg/registry/batch/job/strategy.go validates the update \u2192 (3) pkg/apis/batch/validation/validation.go checks startTime field \u2192 (4) Validation returns field.Required error with misleading message.",
+      "evaluation_criteria": [
+        "Must describe the step: 'User submits Job status update via kubectl/API'",
+        "Must describe the propagation: 'Validation returns field.Required error with misleading message'",
+        "Must include all intermediate steps in the correct order",
+        "Must reference the chain in causal order (source \u2192 surface)",
+        "Must cite at least one file from the propagation path (e.g. pkg/apis/batch/validation/validation.go)"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Job has session_type=single and is not suspended; (2) User or controller modifies status.startTime (not just removes it); (3) The validation incorrectly treats any change as removal.",
+      "evaluation_criteria": [
+        "Must identify the condition: 'Job has session_type=single and is not suspended'",
+        "Must identify the condition: 'User or controller modifies status.startTime (not just removes it)'",
+        "Must identify the condition: 'The validation incorrectly treats any change as removal'",
+        "Must explain the combined conditions necessary to reproduce the error"
+      ]
+    }
+  }
+}

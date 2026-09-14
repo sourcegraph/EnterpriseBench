@@ -1,0 +1,190 @@
+{
+  "task_id": "refactor-orchestration-tri-tokio-001",
+  "policy": "deepsearch",
+  "suite": "technical_debt",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/tokio--tokio-1.29.1",
+    "github.com/sg-evals/hyper--v1.0.0-rc.4",
+    "github.com/sg-evals/axum--axum-v0.6.19"
+  ],
+  "retrieved_paths": [
+    "Cargo.toml",
+    "axum/Cargo.toml",
+    "axum-core/Cargo.toml",
+    "tokio/Cargo.toml",
+    "github.com/sg-evals/tokio--tokio-1.29.1",
+    "github.com/sg-evals/hyper--v1.0.0-rc.4",
+    "github.com/sg-evals/axum--axum-v0.6.19",
+    "hyper/Cargo.toml"
+  ],
+  "retrieved_paths_union": [
+    "Cargo.toml",
+    "axum/Cargo.toml",
+    "axum-core/Cargo.toml",
+    "tokio/Cargo.toml",
+    "github.com/sg-evals/tokio--tokio-1.29.1",
+    "github.com/sg-evals/hyper--v1.0.0-rc.4",
+    "github.com/sg-evals/axum--axum-v0.6.19",
+    "hyper/Cargo.toml"
+  ],
+  "required_files": [
+    "tokio/Cargo.toml",
+    "Cargo.toml",
+    "axum/Cargo.toml"
+  ],
+  "ir_scores": {
+    "task_id": "refactor-orchestration-tri-tokio-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.9675,
+      "10": 0.9675
+    },
+    "mrr": 1.0,
+    "map_score": 0.9167,
+    "file_recall": 1.0,
+    "context_efficiency": 0.375,
+    "n_retrieved": 8,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "refactor-orchestration-tri-tokio-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.9675,
+      "10": 0.9675
+    },
+    "mrr": 1.0,
+    "map_score": 0.9167,
+    "file_recall": 1.0,
+    "context_efficiency": 0.375,
+    "n_retrieved": 8,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 112.8,
+  "response_chars": 10330,
+  "raw_response": "---\ntitle: Topologically sort and plan tokio runtime refactor across tokio, hyper, and axum\nshare_url: https://demo.sourcegraph.com/deepsearch/20b4094b-0b77-465c-ad16-46e7604ceb37\nurl: https://demo.sourcegraph.com/deepsearch/2249\ncreated: 2026-08-18T02:21:42Z\nupdated: 2026-08-18T02:22:52Z\n---\n\n# # Refactor Orchestration: Async HTTP Stack (tokio/hyper/axum)\n\n## Context\n\ntokio is refactoring its runtime builder API to support configurable task\nschedulers: `Runtime::new()` is gaining a required scheduler configuration\nparameter. This is a breaking change for any crate that builds a tokio runtime\nor spawns onto one.\n\nWe vendor three repos and need a rollout plan across them. Do not assume how\nthey relate to each other. Derive every dependency edge from the manifests as\nthey are checked out in this workspace, and cite the version requirement that\nestablishes each one.\n\n## Repos in Workspace\n\n- `/workspace/tokio/`\n- `/workspace/hyper/`\n- `/workspace/axum/`\n\n## Task\n\nProduce a topologically sorted execution plan for propagating the tokio runtime\nbuilder refactoring across these repos.\n\n## Expected Output\n\nWrite `/workspace/REFACTOR_PLAN.md` containing:\n\n1. A numbered list of repos in the order they should be updated\n2. Dependency graph: which repo depends on which, and for each edge the manifest\n   and the version requirement that establishes it. If a dependency you expected\n   is not present at these revisions, say so and show what the manifest actually\n   requires instead.\n3. Parallelization annotations: which repos can be updated at the same time, and why\n4. Breaking vs. compatible change annotations per step\n5. Risk assessment for each change\n\n\nSearch only these repositories: github.com/sg-evals/tokio--tokio-1.29.1, github.com/sg-evals/hyper--v1.0.0-rc.4, github.com/sg-evals/axum--axum-v0.6.19\n\nHere is the complete refactor plan, derived entirely from the checked-out manifests.\n\n---\n\n## Refactor Plan: Async HTTP Stack \u2014 tokio Runtime Builder API\n\n---\n\n### 1. Execution Order (Topologically Sorted)\n\n1. **tokio** \u2014 [`github.com/sg-evals/tokio--tokio-1.29.1`](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.29.1)\n2. **hyper** \u2014 [`github.com/sg-evals/hyper--v1.0.0-rc.4`](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.0.0-rc.4)\n3. **axum** \u2014 [`github.com/sg-evals/axum--axum-v0.6.19`](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.6.19)\n\n---\n\n### 2. Dependency Graph\n\nAll edges derived from manifests only. No assumptions made.\n\n#### Edge: hyper \u2192 tokio\n\n| Manifest | Dep type | Version requirement |\n|---|---|---|\n| [`hyper/Cargo.toml` L35](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.0.0-rc.4/-/blob/Cargo.toml?L35) | production | `\"1\"` + features `[\"sync\"]` |\n| [`hyper/Cargo.toml` L51\u201362](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.0.0-rc.4/-/blob/Cargo.toml?L51-L62) | dev | `\"1\"` + features `[\"fs\",\"macros\",\"net\",\"io-std\",\"io-util\",\"rt\",\"rt-multi-thread\",\"sync\",\"time\",\"test-util\"]` |\n\nNote: `tokio-util = { version = \"0.7\", features = [\"codec\"] }` at [L64](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.0.0-rc.4/-/blob/Cargo.toml?L64) is a transitive tokio consumer, not a direct edge.\n\n#### Edge: axum \u2192 tokio\n\n| Manifest | Dep type | Version requirement |\n|---|---|---|\n| [`axum/Cargo.toml` L63](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.6.19/-/blob/axum/Cargo.toml?L63) | optional production (behind `tokio` feature) | `\"1.25.0\"` + features `[\"time\"]` |\n| [`axum/Cargo.toml` L115](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.6.19/-/blob/axum/Cargo.toml?L115) | dev | `\"1.25.0\"` + features `[\"macros\",\"rt\",\"rt-multi-thread\",\"net\",\"test-util\"]` |\n| [`axum-core/Cargo.toml` L41](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.6.19/-/blob/axum-core/Cargo.toml?L41) | dev only (axum-core has no production tokio dep) | `\"1.25.0\"` + features `[\"macros\"]` |\n\n#### Edge: axum \u2192 hyper\n\n| Manifest | Dep type | Version requirement |\n|---|---|---|\n| [`axum/Cargo.toml` L41](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.6.19/-/blob/axum/Cargo.toml?L41) | production | `\"0.14.24\"` + features `[\"stream\"]` |\n| [`axum-core/Cargo.toml` L40](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.6.19/-/blob/axum-core/Cargo.toml?L40) | dev | `\"0.14.24\"` |\n\n**Critical mismatch:** axum requires `hyper = \"0.14.24\"` (the stable 0.14 series), but the workspace's hyper is `v1.0.0-rc.4` (hyper 1.x pre-release). These are **incompatible under Cargo's resolver**. The axum \u2192 hyper edge as checked out cannot be satisfied without a breaking manifest change to axum.\n\n#### No edges present\n\n- `hyper \u2192 axum`: not present in any hyper manifest.\n- `tokio \u2192 hyper` or `tokio \u2192 axum`: not present; [`tokio/Cargo.toml`](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.29.1/-/blob/tokio/Cargo.toml) has no HTTP dependencies.\n\n#### Graph\n\n```\ntokio  \u25c4\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 hyper  \u25c4\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 axum\n       (v\"1\")              (v\"0.14.24\"*)\ntokio  \u25c4\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500  axum\n       (v\"1.25.0\")\n\n* version mismatch: axum requires 0.14.x; workspace hyper is 1.0.0-rc.4\n```\n\n---\n\n### 3. Parallelization Annotations\n\n| Phase | Repo | Parallel with others? | Reason |\n|---|---|---|---|\n| 1 | tokio | No | DAG root; no upstream deps. Hyper and axum cannot start until the new tokio API is finalized and vendored. |\n| 2 | hyper | No | Direct tokio consumer; blocked on Phase 1. |\n| 3 | axum | No | Depends on both tokio (direct) and hyper (direct); blocked on Phases 1 and 2. |\n\nThe three repos form a strict linear chain. No cross-repo parallelism is possible. Parallelism is only achievable *within* a repo (e.g., updating tokio's internal workspace members `tokio-test`, `tokio-util`, `tokio-stream` in parallel sub-PRs), but that is intra-repo scheduling.\n\n---\n\n### 4. Breaking vs. Compatible Change Annotations\n\n**Step 1 \u2014 tokio: BREAKING**\nAdding a required parameter to `Runtime::new()` is a breaking public API change. Callers that use `Runtime::new()` or the current `Builder` API will fail to compile. Requires a semver-appropriate version bump (minor `1.30.0` minimum; `2.0.0` if treated as a true breaking change by tokio's policy).\n\n**Step 2 \u2014 hyper: BREAKING (internal) / Compatible (published surface)**\nhyper's production tokio dep only enables `[\"sync\"]` \u2014 it does not construct runtimes in production code. The breakage is confined to `tests/`, `benches/`, and `examples/`, which use `rt` and `rt-multi-thread`. After fixing those call sites, no change to hyper's published API is required, so a **patch or minor** release of hyper suffices.\n\n**Step 3 \u2014 axum: DOUBLE BREAKING**\nTwo simultaneous breaking changes must be resolved:\n1. tokio scheduler API change (resolved once tokio and hyper are updated)\n2. hyper 0.14 \u2192 1.x major version migration (the workspace already reflects this future state, but axum's manifest still pins `\"0.14.24\"`)\n\nThese should be handled as separate, sequenced PRs: hyper 1.x migration first, then the tokio scheduler change.\n\n---\n\n### 5. Risk Assessment\n\n**tokio \u2014 HIGH RISK**\n- Blast radius: every crate in the async Rust ecosystem; hyper and axum are both downstream in this workspace.\n- Internal workspace members (`tokio-test`, `tokio-util`, `tokio-stream`) must be updated in the same release. `tokio-test = \"0.4\"` is also referenced by hyper's dev-dependencies ([`hyper/Cargo.toml` L63](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.0.0-rc.4/-/blob/Cargo.toml?L63)), so a tokio-test API change cascades into hyper's test suite independently.\n- Mitigation: provide a compat shim or feature flag for the old `Runtime::new()` signature; do not remove it until all downstream repos are updated.\n\n**hyper \u2014 MEDIUM RISK**\n- hyper `v1.0.0-rc.4` is a pre-release with weaker stability guarantees.\n- Production code only requires `tokio/sync`; no runtime construction in the published binary. Risk is confined to dev/test artifacts.\n- `tokio = \"1\"` requirement accepts any `1.x`, so a minor tokio bump resolves with no manifest change. Risk is low if tokio chooses a minor bump.\n- Mitigation: audit `Runtime::new()` call sites in `tests/`, `benches/`, `examples/` and update before cutting a hyper release.\n\n**axum \u2014 HIGH RISK**\n- The `hyper = \"0.14.24\"` vs workspace hyper `1.0.0-rc.4` mismatch means axum is simultaneously facing two independent breaking changes. Conflating them in one PR significantly increases review and rollback complexity.\n- axum's `tokio` feature is **default-on** ([`axum/Cargo.toml` L15](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.6.19/-/blob/axum/Cargo.toml?L15)), meaning virtually all axum users are in the impact zone.\n- Mitigation:\n  1. Land the hyper 0.14 \u2192 1.x migration for axum as its own PR with its own release, decoupled from the tokio change.\n  2. Pin the new tokio minimum explicitly (e.g., `version = \"1.30.0\"`) rather than relying on `\"1.25.0\"` to avoid silent resolution to an incompatible version.\n  3. Publish a new axum major/minor version with updated MSRV and dependency floor documentation.\n\n## Sources\n\n- [github.com/sg-evals/tokio--tokio-1.29.1/Cargo.toml@12ef01e](/github.com/sg-evals/tokio--tokio-1.29.1@12ef01e54ee382312e26e3a3462b440fca59fe8c/-/blob/Cargo.toml)\n- [github.com/sg-evals/hyper--v1.0.0-rc.4/Cargo.toml@fe60213](/github.com/sg-evals/hyper--v1.0.0-rc.4@fe60213f267276c244fb5c25d20f84c6c4400530/-/blob/Cargo.toml)\n- [github.com/sg-evals/axum--axum-v0.6.19/Cargo.toml@e8e84e2](/github.com/sg-evals/axum--axum-v0.6.19@e8e84e25b08f5ab8e7723dda5eb85e62a2e3f84f/-/blob/Cargo.toml)\n- [github.com/sg-evals/tokio--tokio-1.29.1/tokio/Cargo.toml@12ef01e](/github.com/sg-evals/tokio--tokio-1.29.1@12ef01e54ee382312e26e3a3462b440fca59fe8c/-/blob/tokio/Cargo.toml)\n- [github.com/sg-evals/axum--axum-v0.6.19/axum/Cargo.toml@e8e84e2](/github.com/sg-evals/axum--axum-v0.6.19@e8e84e25b08f5ab8e7723dda5eb85e62a2e3f84f/-/blob/axum/Cargo.toml)\n- [github.com/sg-evals/axum--axum-v0.6.19/axum-core/Cargo.toml@e8e84e2](/github.com/sg-evals/axum--axum-v0.6.19@e8e84e25b08f5ab8e7723dda5eb85e62a2e3f84f/-/blob/axum-core/Cargo.toml)\n\n\nGenerated files:\n- files/REFACTOR_PLAN_content.json: /.api/agent-files/v1/deep-search/20b4094b-0b77-465c-ad16-46e7604ceb37/files/REFACTOR_PLAN_content.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "refactor-orchestration-tri-tokio-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.9675,
+      "10": 0.9675
+    },
+    "mrr": 1.0,
+    "map_score": 0.9167,
+    "file_recall": 1.0,
+    "context_efficiency": 0.375,
+    "n_retrieved": 8,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "Cargo.toml",
+    "axum/Cargo.toml",
+    "axum-core/Cargo.toml",
+    "tokio/Cargo.toml",
+    "github.com/sg-evals/tokio--tokio-1.29.1",
+    "github.com/sg-evals/hyper--v1.0.0-rc.4",
+    "github.com/sg-evals/axum--axum-v0.6.19",
+    "hyper/Cargo.toml"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "refactor-orchestration-tri-tokio-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.9675,
+      "10": 0.9675
+    },
+    "mrr": 1.0,
+    "map_score": 0.9167,
+    "file_recall": 1.0,
+    "context_efficiency": 0.375,
+    "n_retrieved": 8,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

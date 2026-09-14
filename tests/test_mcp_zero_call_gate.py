@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -29,6 +30,7 @@ sys.path.insert(
 )
 
 import run_task
+from agents.harnesses import registry
 from run_task import (
     RUN_STATUS_INVALID,
     TaskRunConfig,
@@ -39,12 +41,114 @@ from run_task import (
 )
 
 
-def _result(mcp_calls: int) -> TaskRunResult:
+def _result(mcp_calls: int, mcp_errors: int = 0) -> TaskRunResult:
     return TaskRunResult(
         task_id="incident-investigation-002",
         phase="",
-        tool_usage={"mcp_tool_calls": mcp_calls},
+        tool_usage={"mcp_tool_calls": mcp_calls, "mcp_tool_errors": mcp_errors},
     )
+
+
+class TestAllMcpCallsErrored:
+    """Calls the server refused retrieved nothing, so they cannot clear the gate.
+
+    A depleted-credit or expired-token backend returns 403 to every call while
+    the agent keeps emitting tool_use blocks. Counting attempts would let a
+    total retrieval outage score as a measured agent failure.
+    """
+
+    def test_every_call_errored_is_invalid(self) -> None:
+        result = _result(5, mcp_errors=5)
+
+        _route_zero_mcp_run(result, "mcp_only")
+
+        assert result.status == RUN_STATUS_INVALID
+        assert result.success is False
+        assert result.failure_class == "infra_mcp_backend_error"
+        assert result.tool_usage["mcp_used"] is False
+        assert "never live" in result.error
+
+    def test_reason_is_distinct_from_the_unused_gate(self) -> None:
+        errored = _result(5, mcp_errors=5)
+        unused = _result(0)
+
+        _route_zero_mcp_run(errored, "mcp_only")
+        _route_zero_mcp_run(unused, "mcp_only")
+
+        assert errored.failure_class == "infra_mcp_backend_error"
+        assert unused.failure_class == "infra_mcp_unused"
+
+    def test_one_served_call_still_clears_the_gate(self) -> None:
+        result = _result(5, mcp_errors=4)
+
+        _route_zero_mcp_run(result, "mcp_only")
+
+        assert result.status != RUN_STATUS_INVALID
+        assert result.failure_class is None
+        assert result.tool_usage["mcp_used"] is True
+
+    def test_a_more_specific_root_cause_is_not_relabelled(self) -> None:
+        result = _result(3, mcp_errors=3)
+        result.failure_class = "timeout"
+
+        _route_zero_mcp_run(result, "mcp_only")
+
+        assert result.status == RUN_STATUS_INVALID
+        assert result.failure_class == "timeout"
+
+
+class TestMcpErrorAccounting:
+    """mcp_tool_errors joins errored results back to the MCP calls that made them."""
+
+    def test_errored_mcp_result_is_counted(self, tmp_path: Path) -> None:
+        stream = _assistant(_tool_use("mcp__toast__toast_search")) + "\n" + _record(
+            "user",
+            {
+                "type": "tool_result",
+                "tool_use_id": "toolu_01ABC",
+                "is_error": True,
+                "content": "PermissionDeniedError: Error code: 403",
+            },
+        )
+
+        usage = _usage(tmp_path, stream)
+
+        assert usage["mcp_tool_calls"] == 1
+        assert usage["mcp_tool_errors"] == 1
+
+    def test_a_failing_non_mcp_tool_is_not_charged_to_mcp(
+        self, tmp_path: Path
+    ) -> None:
+        stream = _assistant(
+            {"type": "tool_use", "id": "toolu_01BASH", "name": "Bash", "input": {}}
+        ) + "\n" + _record(
+            "user",
+            {
+                "type": "tool_result",
+                "tool_use_id": "toolu_01BASH",
+                "is_error": True,
+                "content": "Permission denied",
+            },
+        )
+
+        usage = _usage(tmp_path, stream)
+
+        assert usage["mcp_tool_errors"] == 0
+
+    def test_a_served_mcp_call_records_no_error(self, tmp_path: Path) -> None:
+        stream = _assistant(_tool_use("mcp__toast__toast_search")) + "\n" + _record(
+            "user",
+            {
+                "type": "tool_result",
+                "tool_use_id": "toolu_01ABC",
+                "content": "src/lib.rs:1",
+            },
+        )
+
+        usage = _usage(tmp_path, stream)
+
+        assert usage["mcp_tool_calls"] == 1
+        assert usage["mcp_tool_errors"] == 0
 
 
 class TestZeroMcpGateMcpOnly:
@@ -366,6 +470,33 @@ class TestMcpToolCallCounting:
 
         assert _usage(tmp_path, stream)["mcp_tool_calls"] == 2
 
+    def test_tool_breakdown_records_code_finder_by_name(self, tmp_path: Path) -> None:
+        usage = _usage(
+            tmp_path,
+            _assistant(
+                _tool_use("mcp__sourcegraph__code_finder"),
+                _tool_use("mcp__sourcegraph__read_file"),
+            ),
+        )
+
+        assert usage["mcp_tool_breakdown"] == {
+            "code_finder": 1,
+            "read_file": 1,
+        }
+
+    def test_direct_mcp_arm_rejects_code_finder_contamination(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        result = _result(1)
+        result.tool_usage["mcp_tool_breakdown"] = {"code_finder": 1}
+
+        run_task._route_code_finder_run(result, "mcp_only")
+
+        assert result.status == RUN_STATUS_INVALID
+        assert result.failure_class == "invalid_arm_contamination"
+        assert "mcp_only" in result.error
+
 
 class TestUsageParsingAcrossOutputFormats:
     """Token/turn accounting must survive whatever --output-format was used."""
@@ -432,3 +563,248 @@ class TestUsageParsingAcrossOutputFormats:
         assert usage["mcp_tool_calls"] == 0
         assert usage["num_turns"] == 0
         assert usage["cost_usd"] == 0.0
+
+
+class TestMcpToastArm:
+    """The mcp_toast arm registers a different MCP server, `toast`.
+
+    Its tool names carry the `mcp__toast__` prefix, so the call counter has to
+    recognize them; otherwise every toast run counts 0 MCP calls and the gate
+    above invalidates the whole arm.
+    """
+
+    def test_toast_tool_use_counts_as_an_mcp_call(self) -> None:
+        record = {
+            "message": {
+                "content": [
+                    {"type": "tool_use", "name": "mcp__toast__toast_search"},
+                ]
+            }
+        }
+
+        assert run_task._count_mcp_tool_calls(record) == 1
+        assert run_task._mcp_tool_names(record) == ["toast_search"]
+
+    def test_toast_mcp_tool_call_item_counts(self) -> None:
+        record = {
+            "type": "item.completed",
+            "item": {
+                "type": "mcp_tool_call",
+                "server": "toast",
+                "tool": "toast_search",
+            },
+        }
+
+        assert run_task._count_mcp_tool_calls(record) == 1
+
+    def test_unregistered_server_is_not_counted(self) -> None:
+        record = {
+            "message": {
+                "content": [{"type": "tool_use", "name": "mcp__github__search_code"}]
+            }
+        }
+
+        assert run_task._count_mcp_tool_calls(record) == 0
+
+    def test_zero_toast_calls_is_invalid(self) -> None:
+        """Toast is this arm's only path to code, exactly as MCP is for mcp_only."""
+        result = _result(0)
+
+        _route_zero_mcp_run(result, "mcp_toast")
+
+        assert result.status == RUN_STATUS_INVALID
+        assert result.failure_class == "infra_mcp_unused"
+
+    def test_toast_calls_present_is_untouched(self) -> None:
+        result = _result(3)
+
+        _route_zero_mcp_run(result, "mcp_toast")
+
+        assert result.status != RUN_STATUS_INVALID
+        assert result.tool_usage["mcp_used"] is True
+
+
+class TestTelemetryProxyStaging:
+    """The Finder arms' capture proxy must install as root, not as the agent.
+
+    /usr/local/lib is root-owned on some base images (node) and agent-owned on
+    others (python), so an unprivileged mkdir made mcp_code_finder runnable or
+    not according to which language a task's repos happened to need --
+    refactor-orchestration-tri-babel-001 failed MCP pre-flight for exactly this
+    reason while the python-repo tasks in the same sweep passed.
+    """
+
+    def test_install_dir_is_created_as_root(self) -> None:
+        calls: list[dict] = []
+
+        def fake_exec(container_id, argv, user=None, **kwargs):
+            calls.append({"argv": argv, "user": user})
+            return SimpleNamespace(returncode=1, stdout="", stderr="denied")
+
+        with patch.object(run_task, "_docker_exec", side_effect=fake_exec):
+            assert run_task._start_mcp_telemetry_proxy("c1") is False
+
+        mkdirs = [c for c in calls if c["argv"][0] == "mkdir"]
+        assert mkdirs, "proxy staging never created its install directory"
+        assert mkdirs[0]["user"] == "root"
+
+
+class TestMcpAuthHeaderStaging:
+    """The staged auth header must be readable by the user curl runs as.
+
+    docker cp preserves the host tempfile's 0600 mode and maps it to the host
+    uid (1000). `agent` is uid 1000 on the python base images but 1001 on the
+    node ones, where the copy lands owned by `node` and curl silently sends no
+    Authorization header -- surfacing as a 401 that reads as an expired token.
+    refactor-orchestration-tri-babel-001 failed MCP pre-flight this way while
+    python-repo tasks in the same sweep passed.
+    """
+
+    def test_header_file_is_chowned_to_the_exec_user_as_root(self) -> None:
+        calls: list[dict] = []
+
+        def fake_exec(container_id, argv, user=None, **kwargs):
+            calls.append({"argv": argv, "user": user})
+            if argv[:2] == ["id", "-u"]:
+                return SimpleNamespace(returncode=0, stdout="1001\n", stderr="")
+            if argv[:2] == ["id", "-g"]:
+                return SimpleNamespace(returncode=0, stdout="1001\n", stderr="")
+            return SimpleNamespace(returncode=0, stdout="200", stderr="")
+
+        with (
+            patch.object(run_task, "_docker_exec", side_effect=fake_exec),
+            patch.object(run_task, "_docker_cp"),
+        ):
+            assert run_task._verify_mcp_endpoint("c1", "tok") is True
+
+        chowns = [c for c in calls if c["argv"][0] == "chown"]
+        assert chowns, "auth header was never handed to the exec user"
+        assert chowns[0]["argv"][1] == "1001:1001"
+        assert chowns[0]["user"] == "root"
+
+        chmods = [c for c in calls if c["argv"][0] == "chmod"]
+        assert chmods and chmods[0]["argv"][1] == "600", "header must stay 0600"
+        assert chmods[0]["user"] == "root"
+
+
+class TestTreatmentOverlayStaging:
+    """The overlay module must reach the container, and be switched on there.
+
+    The proxy imports it by name from its own directory. Staged without the
+    env flag it would be inert; the flag set without the file would abort the
+    proxy at startup. Either way the arm would stop measuring the server
+    change, so both halves are asserted.
+    """
+
+    @staticmethod
+    def _run(mode: str) -> tuple[list[tuple[str, str]], dict]:
+        copies: list[tuple[str, str]] = []
+        env: dict = {}
+
+        def fake_exec(container_id, argv, user=None, **kwargs):
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        def fake_detached(container_id, argv, env=None, **kwargs):
+            env_seen.update(env or {})
+            return SimpleNamespace(returncode=1, stdout="", stderr="stopped here")
+
+        env_seen = env
+        with (
+            patch.object(run_task, "_docker_exec", side_effect=fake_exec),
+            patch.object(
+                run_task,
+                "_docker_cp",
+                side_effect=lambda src, dst: copies.append((src, dst)),
+            ),
+            patch.object(run_task, "_docker_exec_detached", side_effect=fake_detached),
+        ):
+            run_task._start_mcp_telemetry_proxy("c1", mode)
+        return copies, env
+
+    def test_treatment_mode_stages_the_overlay_and_enables_it(self) -> None:
+        copies, env = self._run("mcp_treatment")
+
+        assert any(
+            destination.endswith("sourcegraph_server_treatment.py")
+            for _source, destination in copies
+        )
+        assert env["MCP_PROXY_TREATMENT"] == "1"
+
+    def test_finder_modes_stage_no_overlay_and_leave_it_off(self) -> None:
+        copies, env = self._run("mcp_code_finder")
+
+        assert not any(
+            destination.endswith("sourcegraph_server_treatment.py")
+            for _source, destination in copies
+        )
+        assert env["MCP_PROXY_TREATMENT"] == "0"
+
+
+class TestDeferredToolSchemaGate:
+    """An MCP arm must not be scored when the agent never saw the tool text.
+
+    Claude Code defers MCP tool schemas by default: the model gets names and
+    loads descriptions on request. Every run in the first retrieval sweep did
+    exactly that and none selected code_finder, so "the agent never chose Code
+    Finder" was measured against a toolset whose descriptions were absent from
+    its context. The env in full_tool_schema_env prevents it; this gate proves
+    the prevention held rather than assuming it.
+    """
+
+    @staticmethod
+    def _trace(tmp_path: Path, tool_name: str) -> Path:
+        line = json.dumps(
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {"type": "tool_use", "name": tool_name, "input": {}},
+                    ]
+                },
+            }
+        )
+        (tmp_path / "agent_trace.jsonl").write_text(line + "\n")
+        return tmp_path
+
+    def test_a_deferred_schema_run_is_invalid(self, tmp_path) -> None:
+        result = _result(5)
+        run_task._route_deferred_tool_run(
+            result, "mcp_default", "claude", self._trace(tmp_path, "ToolSearch")
+        )
+
+        assert result.status == RUN_STATUS_INVALID
+        assert result.failure_class == "invalid_deferred_tool_schemas"
+        assert result.success is False
+
+    def test_an_undeferred_run_is_untouched(self, tmp_path) -> None:
+        result = _result(5)
+        run_task._route_deferred_tool_run(
+            result, "mcp_default", "claude", self._trace(tmp_path, "Bash")
+        )
+
+        assert result.status != RUN_STATUS_INVALID
+        assert result.failure_class is None
+
+    def test_baseline_is_not_gated(self, tmp_path) -> None:
+        result = _result(5)
+        run_task._route_deferred_tool_run(
+            result, "baseline", "claude", self._trace(tmp_path, "ToolSearch")
+        )
+
+        assert result.status != RUN_STATUS_INVALID
+
+    def test_a_harness_without_deferral_passes_without_a_trace(self, tmp_path) -> None:
+        result = _result(5)
+        run_task._route_deferred_tool_run(result, "mcp_default", "codex", tmp_path)
+
+        assert result.status != RUN_STATUS_INVALID
+
+    def test_every_harness_declares_both_halves_of_the_contract(self) -> None:
+        for harness in registry.HARNESS_NAMES:
+            registry.full_tool_schema_env(harness)
+            registry.deferred_tool_markers(harness)
+
+    def test_claude_runs_are_launched_with_deferral_off(self) -> None:
+        assert registry.full_tool_schema_env("claude") == {
+            "ENABLE_TOOL_SEARCH": "false"
+        }

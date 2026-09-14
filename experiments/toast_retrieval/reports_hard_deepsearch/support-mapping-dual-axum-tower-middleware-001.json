@@ -1,0 +1,184 @@
+{
+  "task_id": "support-mapping-dual-axum-tower-middleware-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/axum--axum-v0.7.5",
+    "github.com/sg-evals/tower--tower-0.4.13"
+  ],
+  "retrieved_paths": [
+    "axum/src/routing/mod.rs",
+    "axum/src/routing/path_router.rs",
+    "axum/src/routing/route.rs",
+    "tower/src/builder/mod.rs",
+    "tower-layer/src/stack.rs",
+    "axum/src/docs/routing/route_layer.md"
+  ],
+  "retrieved_paths_union": [
+    "axum/src/routing/mod.rs",
+    "axum/src/routing/path_router.rs",
+    "axum/src/routing/route.rs",
+    "tower/src/builder/mod.rs",
+    "tower-layer/src/stack.rs",
+    "axum/src/docs/routing/route_layer.md"
+  ],
+  "required_files": [
+    "axum/axum/src/routing/mod.rs",
+    "axum/axum/src/routing/path_router.rs",
+    "tower/tower/src/builder/mod.rs",
+    "tower/tower/src/layer/layer_fn.rs"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-axum-tower-middleware-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.75,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.6667,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.8048,
+      "10": 0.8048
+    },
+    "mrr": 1.0,
+    "map_score": 0.6875,
+    "file_recall": 0.75,
+    "context_efficiency": 0.5,
+    "n_retrieved": 6,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-axum-tower-middleware-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.75,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.6667,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.8048,
+      "10": 0.8048
+    },
+    "mrr": 1.0,
+    "map_score": 0.6875,
+    "file_recall": 0.75,
+    "context_efficiency": 0.5,
+    "n_retrieved": 6,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 110.3,
+  "response_chars": 9811,
+  "raw_response": "---\ntitle: Investigating axum route_layer vs layer order causing auth middleware bypass with tracing\nshare_url: https://demo.sourcegraph.com/deepsearch/0c846de1-5c89-44cd-a7b2-8fb8343c4240\nurl: https://demo.sourcegraph.com/deepsearch/2209\ncreated: 2026-08-18T01:53:06Z\nupdated: 2026-08-18T01:54:17Z\n---\n\n# # Map customer axum auth middleware bypassed for tracing-instrumented routes to the Router / tower ServiceBuilder layer-order boundary\n\nA customer reports that their axum service has an auth middleware\nthat runs on most routes but is silently bypassed for routes nested\nunder a Router that wraps a tracing layer. Requests to those routes\nsucceed without the Authorization header; the auth layer never\nproduces a span.\n\nYour task:\n1. Find where axum's Router applies layers and how nested Routers\n   compose with tower::ServiceBuilder layers.\n2. Find where tower::ServiceBuilder enforces layer order and how\n   .layer() differs from .route_layer() in axum.\n3. Trace the cross-repo path: axum::Router::route_layer vs\n   axum::Router::layer -> Router::merge -> tower::ServiceBuilder ->\n   tower::Layer::layer composition. Cite each file and the function\n   responsible.\n4. Identify why route_layer() applied to a parent Router does NOT\n   wrap routes added via Router::merge from a sub-router, leaving\n   the auth layer skipped for nested routes.\n\n\nSearch only these repositories: github.com/sg-evals/axum--axum-v0.7.5, github.com/sg-evals/tower--tower-0.4.13\n\nHere is the complete trace of the bug.\n\n---\n\n## 1. How `Router::layer` vs `Router::route_layer` work\n\nBoth are defined in [axum/src/routing/mod.rs](./r/github.com/sg-evals/axum--axum-v0.7.5/-/blob/axum/src/routing/mod.rs?L274-L307).\n\n**`Router::layer`** ([L274-L289](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.7.5/-/blob/axum/src/routing/mod.rs?L274-L289)) wraps *everything*: the `path_router`, the `fallback_router`, and the `catch_all_fallback`:\n\n```rust\npub fn layer<L>(self, layer: L) -> Router<S> {\n    self.map_inner(|this| RouterInner {\n        path_router: this.path_router.layer(layer.clone()),\n        fallback_router: this.fallback_router.layer(layer.clone()),\n        default_fallback: this.default_fallback,\n        catch_all_fallback: this.catch_all_fallback.map(|route| route.layer(layer)),\n    })\n}\n```\n\n**`Router::route_layer`** ([L291-L307](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.7.5/-/blob/axum/src/routing/mod.rs?L291-L307)) wraps *only* the `path_router`. The `fallback_router` and `catch_all_fallback` are passed through untouched:\n\n```rust\npub fn route_layer<L>(self, layer: L) -> Self {\n    self.map_inner(|this| RouterInner {\n        path_router: this.path_router.route_layer(layer),\n        fallback_router: this.fallback_router,          // unchanged\n        default_fallback: this.default_fallback,\n        catch_all_fallback: this.catch_all_fallback,    // unchanged\n    })\n}\n```\n\nThe intent is that `route_layer` prevents a 404 from being converted to a 401 by skipping the fallback. But both share the same critical constraint: **the layer is applied only to routes that are already registered at the moment of the call.**\n\n---\n\n## 2. `PathRouter::route_layer` \u2014 the snapshot-at-call-time mechanic\n\n[`PathRouter::route_layer`](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.7.5/-/blob/axum/src/routing/path_router.rs?L264-L294) iterates `self.routes` \u2014 a `HashMap<RouteId, Endpoint>` \u2014 and calls `endpoint.layer(layer.clone())` for each entry currently present:\n\n```rust\npub(super) fn route_layer<L>(self, layer: L) -> Self {\n    if self.routes.is_empty() {\n        panic!(\"Adding a route_layer before any routes is a no-op. ...\");\n    }\n\n    let routes = self\n        .routes\n        .into_iter()\n        .map(|(id, endpoint)| {\n            let route = endpoint.layer(layer.clone());   // wraps each existing Route\n            (id, route)\n        })\n        .collect();\n\n    PathRouter { routes, node: self.node, prev_route_id: self.prev_route_id }\n}\n```\n\nThe returned `PathRouter` contains a new `routes` map where each `Route` has the layer baked in. **This is a one-time transformation, not a registry that wraps future insertions.** Equally, `PathRouter::layer` at [L240-L262](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.7.5/-/blob/axum/src/routing/path_router.rs?L240-L262) works the same way.\n\n---\n\n## 3. `Route::layer` \u2014 how layers are actually composed per-route\n\nEach `Route` is a `BoxCloneService` stored in a `Mutex` ([route.rs L31](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.7.5/-/blob/axum/src/routing/route.rs?L31)). `Route::layer` ([L52-L69](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.7.5/-/blob/axum/src/routing/route.rs?L52-L69)) constructs a new `Route` by composing the given layer with the existing service:\n\n```rust\npub(crate) fn layer<L, NewError>(self, layer: L) -> Route<NewError> {\n    let layer = (\n        MapRequestLayer::new(...),\n        MapErrLayer::new(Into::into),\n        MapResponseLayer::new(IntoResponse::into_response),\n        layer,         // <-- the actual auth/tracing layer\n    );\n    Route::new(layer.layer(self))   // produces a new BoxCloneService\n}\n```\n\nThis delegates to tower's `Stack` composition.\n\n---\n\n## 4. tower `ServiceBuilder::layer` and `Stack` composition\n\n[`ServiceBuilder::layer`](https://demo.sourcegraph.com/r/github.com/sg-evals/tower--tower-0.4.13/-/blob/tower/src/builder/mod.rs?L132-L136) prepends each new layer onto a `Stack`:\n\n```rust\npub fn layer<T>(self, layer: T) -> ServiceBuilder<Stack<T, L>> {\n    ServiceBuilder { layer: Stack::new(layer, self.layer) }\n}\n```\n\n[`Stack::layer`](https://demo.sourcegraph.com/r/github.com/sg-evals/tower--tower-0.4.13/-/blob/tower-layer/src/stack.rs?L25-L29) applies inner first, then outer:\n\n```rust\nfn layer(&self, service: S) -> Self::Service {\n    let inner = self.inner.layer(service);  // inner layer wraps service\n    self.outer.layer(inner)                 // outer layer wraps that\n}\n```\n\nThis means layers added *first* to a `ServiceBuilder` end up *outermost* in the call stack. Axum uses this same `Layer::layer` protocol in `Route::layer`, so the `auth_layer` passed to `route_layer` is permanently composed into the `BoxCloneService` at the time of the call.\n\n---\n\n## 5. `Router::merge` \u2014 why it bypasses the already-applied layer\n\n[`Router::merge`](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.7.5/-/blob/axum/src/routing/mod.rs?L224-L272) calls `this.path_router.merge(path_router)`. [`PathRouter::merge`](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.7.5/-/blob/axum/src/routing/path_router.rs?L123-L161) iterates the *other* router's endpoints and calls `self.route(path, method_router)` or `self.route_service(path, route)` for each:\n\n```rust\nfor (id, route) in routes {\n    // ...\n    match route {\n        Endpoint::MethodRouter(method_router) => self.route(path, method_router)?,\n        Endpoint::Route(route) => self.route_service(path, route)?,\n    }\n}\n```\n\nThese are bare insertions into `self.routes`. **No layer is applied during merge.** The merged routes land in the `HashMap` as raw `Endpoint` values, identical to how they were stored in the sub-router \u2014 with no knowledge of any layer that was previously applied to the parent router's `PathRouter`.\n\n---\n\n## Root cause summary\n\nThe bug arises from this ordering dependency:\n\n```\nparent = Router::new()\n    .route(\"/parent-route\", get(handler))\n    .route_layer(auth_layer)     // snapshot: wraps only /parent-route's Route\n    .merge(sub_router);          // sub_router's routes inserted AFTER snapshot\n                                 // -> no auth_layer baked into them\n```\n\n`route_layer` (and `layer`) apply by **iterating and transforming the current `routes` HashMap** at call time \u2014 they do not install a registry or interceptor that wraps future insertions. When `merge` later inserts the sub-router's routes, it calls `self.route(...)` directly with the sub-router's unwrapped `Endpoint`s. There is no mechanism to retroactively apply the parent's layer.\n\nThe fix is to call `.route_layer(auth_layer)` **after** `.merge(sub_router)`:\n\n```rust\nlet app = Router::new()\n    .route(\"/parent-route\", get(handler))\n    .merge(sub_router)           // all routes present first\n    .route_layer(auth_layer);    // now wraps ALL of them\n```\n\nOr apply the auth layer on the sub-router itself before merging, so its routes already carry the layer when they are inserted into the parent's `PathRouter`.\n\n## Sources\n\n- [github.com/sg-evals/axum--axum-v0.7.5/axum/src/routing/mod.rs@042dac7?L222-320](/github.com/sg-evals/axum--axum-v0.7.5@042dac77871ae8edb63a673b00476c5a99609d38/-/blob/axum/src/routing/mod.rs?L222-320)\n- [github.com/sg-evals/axum--axum-v0.7.5/axum/src/routing/path_router.rs@042dac7?L123-300](/github.com/sg-evals/axum--axum-v0.7.5@042dac77871ae8edb63a673b00476c5a99609d38/-/blob/axum/src/routing/path_router.rs?L123-300)\n- [github.com/sg-evals/tower--tower-0.4.13/tower-layer/src/stack.rs@2b06e5c](/github.com/sg-evals/tower--tower-0.4.13@2b06e5caf42ceba7feff497933f12fe6183b08e8/-/blob/tower-layer/src/stack.rs)\n- [github.com/sg-evals/axum--axum-v0.7.5/axum/src/routing/route.rs@042dac7?L1-80](/github.com/sg-evals/axum--axum-v0.7.5@042dac77871ae8edb63a673b00476c5a99609d38/-/blob/axum/src/routing/route.rs?L1-80)\n- [github.com/sg-evals/tower--tower-0.4.13/tower/src/builder/mod.rs@2b06e5c?L115-145](/github.com/sg-evals/tower--tower-0.4.13@2b06e5caf42ceba7feff497933f12fe6183b08e8/-/blob/tower/src/builder/mod.rs?L115-145)\n- [github.com/sg-evals/axum--axum-v0.7.5/axum/src/docs/routing/route_layer.md@042dac7](/github.com/sg-evals/axum--axum-v0.7.5@042dac77871ae8edb63a673b00476c5a99609d38/-/blob/axum/src/docs/routing/route_layer.md)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-axum-tower-middleware-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 6,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "axum/axum/src/routing/mod.rs",
+    "axum/axum/src/routing/path_router.rs",
+    "axum/src/routing/route.rs",
+    "tower/tower/src/builder/mod.rs",
+    "tower-layer/src/stack.rs",
+    "axum/src/docs/routing/route_layer.md"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-axum-tower-middleware-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 6,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

@@ -1,0 +1,227 @@
+{
+  "task_id": "api-contract-dual-envoy-istio-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.28.0",
+    "github.com/sg-evals/istio--1.20.0"
+  ],
+  "retrieved_paths": [
+    "api/envoy/service/cluster/v3/cds.proto",
+    "api/envoy/service/listener/v3/lds.proto",
+    "api/envoy/service/route/v3/rds.proto",
+    "api/envoy/service/discovery/v3/discovery.proto",
+    "pilot/pkg/xds/discovery.go",
+    "pilot/pkg/networking/core/configgen.go",
+    "pilot/pkg/xds/v3/model.go",
+    "go.mod",
+    "pilot/pkg/networking/core/v1alpha3/cluster_tls.go",
+    "pilot/pkg/networking/core/v1alpha3/cluster_builder.go",
+    "api/envoy/config/listener/v3/listener_components.proto",
+    "api/envoy/config/cluster/v3/cluster.proto",
+    "pilot/pkg/xds/cds.go",
+    "pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/rds.go",
+    "pilot/pkg/xds/v3",
+    "api/envoy/config/listener/v3/listener.proto",
+    "api/envoy/config/route/v3/route.proto",
+    "pilot/pkg/networking/core/v1alpha3/cluster.go",
+    "pilot/pkg/networking/core/v1alpha3/listener_builder.go",
+    "pilot/pkg/networking/core/v1alpha3/httproute.go"
+  ],
+  "retrieved_paths_union": [
+    "api/envoy/service/cluster/v3/cds.proto",
+    "api/envoy/service/listener/v3/lds.proto",
+    "api/envoy/service/route/v3/rds.proto",
+    "api/envoy/service/discovery/v3/discovery.proto",
+    "pilot/pkg/xds/discovery.go",
+    "pilot/pkg/networking/core/configgen.go",
+    "pilot/pkg/xds/v3/model.go",
+    "go.mod",
+    "pilot/pkg/networking/core/v1alpha3/cluster_tls.go",
+    "pilot/pkg/networking/core/v1alpha3/cluster_builder.go",
+    "api/envoy/config/listener/v3/listener_components.proto",
+    "api/envoy/config/cluster/v3/cluster.proto",
+    "pilot/pkg/xds/cds.go",
+    "pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/rds.go",
+    "pilot/pkg/xds/v3",
+    "api/envoy/config/listener/v3/listener.proto",
+    "api/envoy/config/route/v3/route.proto",
+    "pilot/pkg/networking/core/v1alpha3/cluster.go",
+    "pilot/pkg/networking/core/v1alpha3/listener_builder.go",
+    "pilot/pkg/networking/core/v1alpha3/httproute.go"
+  ],
+  "required_files": [
+    "envoy/api/envoy/config/cluster/v3/cluster.proto",
+    "istio/pilot/pkg/xds/ads.go"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-envoy-istio-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0833,
+    "map_score": 0.0417,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0476,
+    "n_retrieved": 21,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-envoy-istio-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0833,
+    "map_score": 0.0417,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0476,
+    "n_retrieved": 21,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 551.0,
+  "response_chars": 13683,
+  "raw_response": "---\ntitle: Analyze Envoy xDS v2 to v3 changes and Istio generator contract points\nshare_url: https://demo.sourcegraph.com/deepsearch/d2d3c160-528c-489b-befb-451c4c9c639c\nurl: https://demo.sourcegraph.com/deepsearch/2133\ncreated: 2026-08-17T21:12:46Z\nupdated: 2026-08-17T21:21:06Z\n---\n\n#         # api-contract-dual-envoy-istio-001\n\n        **Suite:** dependency_management | **Type:** api_contract | **Difficulty:** expert\n        **Repos:** envoy + istio\n\n        ## Context\n\n        Envoy's xDS (discovery service) API evolved from v2 to v3, changing\nresource type names and proto message structures. Istio's control\nplane (istiod) generates xDS configuration for Envoy sidecars.\n\nYour task:\n1. Find where Envoy defines xDS v3 API proto messages\n2. Find where Istio generates xDS configuration for Envoy\n3. Identify v2 \u2192 v3 API changes in cluster, listener, and route configs\n4. Document the contract points between Istio's xDS generator and\n   Envoy's xDS consumer\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/envoy--v1.28.0, github.com/sg-evals/istio--1.20.0\n\nThe report has been written. Here is the full analysis:\n\n---\n\n## IMPACT_REPORT.md \u2014 xDS v2 \u2192 v3 Contract Analysis\n\nThe report content is available for download at the link above. Here is a summary of findings:\n\n---\n\n### 1. Envoy v3 API Proto Definitions\n\n**Service files** (`api/envoy/service/*/v3/`):\n\n| Service | Proto | Resource Type URL |\n|---|---|---|\n| CDS | [`cds.proto`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.28.0/-/blob/api/envoy/service/cluster/v3/cds.proto?L22-37) | `envoy.config.cluster.v3.Cluster` |\n| LDS | [`lds.proto`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.28.0/-/blob/api/envoy/service/listener/v3/lds.proto?L26-41) | `envoy.config.listener.v3.Listener` |\n| RDS | [`rds.proto`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.28.0/-/blob/api/envoy/service/route/v3/rds.proto?L26-59) | `envoy.config.route.v3.RouteConfiguration` |\n| VHDS | [`rds.proto`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.28.0/-/blob/api/envoy/service/route/v3/rds.proto?L53-58) | `envoy.config.route.v3.VirtualHost` (new, no v2 equiv) |\n| ADS envelope | [`discovery.proto`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.28.0/-/blob/api/envoy/service/discovery/v3/discovery.proto) | mux |\n\nEvery resource message carries `(udpa.annotations.versioning).previous_message_type` tracing back to its `envoy.api.v2.*` predecessor.\n\n---\n\n### 2. Istio xDS Generation Pipeline\n\n**Generator registration** ([`discovery.go:530-564`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.20.0/-/blob/pilot/pkg/xds/discovery.go?L530-564)):\n```go\ns.Generators[v3.ClusterType]  = &CdsGenerator{Server: s}\ns.Generators[v3.ListenerType] = &LdsGenerator{Server: s}\ns.Generators[v3.RouteType]    = &RdsGenerator{Server: s}\n```\n\n**`ConfigGenerator` interface** ([`configgen.go:29-55`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.20.0/-/blob/pilot/pkg/networking/core/configgen.go?L29-55)) defines:\n- `BuildListeners` \u2192 `[]*listener.Listener` (v3)\n- `BuildClusters` / `BuildDeltaClusters` \u2192 `[]*discovery.Resource`\n- `BuildHTTPRoutes` \u2192 `[]*discovery.Resource`\n\n**Type URL constants** ([`v3/model.go:23-45`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.20.0/-/blob/pilot/pkg/xds/v3/model.go?L23-45)) alias `go-control-plane/pkg/resource/v3`.\n\n**Dependency pin** ([`go.mod:32`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.20.0/-/blob/go.mod?L32)): `github.com/envoyproxy/go-control-plane v0.11.2-0.20231019082134-6e4589f570e1`\n\n---\n\n### 3. Key v2 \u2192 v3 Breaking Changes\n\n| Change | Nature | Files |\n|---|---|---|\n| Package `envoy.api.v2` \u2192 `envoy.config.*.v3` | **Rename** | All proto files; type URLs in `Any.type_url` must be v3 |\n| `Cluster.tls_context` removed | **Removal** | Use `transport_socket` + `TypedExtensionConfig` ([`cluster_tls.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.20.0/-/blob/pilot/pkg/networking/core/v1alpha3/cluster_tls.go)) |\n| `Cluster.http2_protocol_options` removed | **Removal** | Use `typed_extension_protocol_options` map ([`cluster_builder.go:51`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.20.0/-/blob/pilot/pkg/networking/core/v1alpha3/cluster_builder.go?L51-61)) |\n| `Filter.config` (Struct) \u2192 `typed_config` (Any) | **Structural** | All filter configs must be typed protos ([`listener_components.proto`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.28.0/-/blob/api/envoy/config/listener/v3/listener_components.proto?L29-31)) |\n| `ORIGINAL_DST_LB` LbPolicy value removed | **Removal** | Use `DiscoveryType = ORIGINAL_DST` ([`cluster.proto:82-84`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.28.0/-/blob/api/envoy/config/cluster/v3/cluster.proto?L82-84)) |\n| VHDS added | **New service** | `rds.proto:53-58`; Istio does not currently use VHDS |\n| `Resource.ttl`, `control_plane`, `metadata` | **New fields** | `discovery.proto:140,381,389`; Istio does not populate these |\n| Delta xDS formalized (`initial_resource_versions`, `removed_resources`) | **Behavioral** | [`discovery.proto:176-284`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.28.0/-/blob/api/envoy/service/discovery/v3/discovery.proto?L176-284); Istio's `GenerateDeltas` returns `removedClusters []string` |\n\n---\n\n### 4. Contract Points Summary\n\n**CDS**: Istio produces `cluster.Cluster_EDS` / `_STATIC` / `_ORIGINAL_DST` typed clusters wrapped as `discovery.Resource{Name, Resource: protoconv.MessageToAny(c)}` at type URL `envoy.config.cluster.v3.Cluster`. Delta support returns `removedClusters` strings matching `DeltaDiscoveryResponse.removed_resources`.\n\n**LDS**: Produces `envoy.config.listener.v3.Listener` with filter chains using `typed_config` (never `config`). Virtual sidecar listeners at `:15006`/`:15001`. HCM filter config carries `Rds.route_config_name` linking to RDS.\n\n**RDS**: Produces `envoy.config.route.v3.RouteConfiguration` named by port string, with `validate_clusters: false`. VirtualHost domains derived from service hostnames. Cluster references must match CDS-emitted names.\n\n**ADS ordering**: CDS \u2192 EDS \u2192 LDS \u2192 RDS is the required push order; Istio enforces this via `pushQueue`.\n\n---\n\n### 5. Migration Recommendations\n\n1. Use only v3 type URLs \u2014 reject `envoy.api.v2.*` type URLs entirely\n2. Replace `Filter.config` (Struct) with `Filter.typed_config` (Any) for all filters\n3. Replace `Cluster.tls_context` with `transport_socket` using typed `UpstreamTlsContext`\n4. Replace `Cluster.http2_protocol_options` with `typed_extension_protocol_options` map\n5. Replace `lb_policy = ORIGINAL_DST_LB` with `type = ORIGINAL_DST`\n6. Implement Delta xDS `initial_resource_versions` on reconnect; handle `removed_resources`\n7. Maintain CDS \u2192 EDS \u2192 LDS \u2192 RDS push ordering over ADS\n8. Pin to `go-control-plane v0.11.2-0.20231019082134-6e4589f570e1` for Go clients\n\n## Sources\n\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/service/cluster/v3/cds.proto@3e8b0ef](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/service/cluster/v3/cds.proto)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/service/listener/v3/lds.proto@3e8b0ef](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/service/listener/v3/lds.proto)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/service/route/v3/rds.proto@3e8b0ef](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/service/route/v3/rds.proto)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/configgen.go@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/configgen.go)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/discovery.go@88e571c?L1-120](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/discovery.go?L1-120)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/discovery.go@88e571c?L500-580](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/discovery.go?L500-580)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/cds.go@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/cds.go)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/lds.go@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/lds.go)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/rds.go@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/rds.go)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/v3@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/v3)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/cluster/v3/cluster.proto@3e8b0ef?L1-100](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/cluster/v3/cluster.proto?L1-100)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/listener/v3/listener.proto@3e8b0ef?L1-100](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/listener/v3/listener.proto?L1-100)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/route/v3/route.proto@3e8b0ef?L1-80](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/route/v3/route.proto?L1-80)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/v3/model.go@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/v3/model.go)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/cluster/v3/cluster.proto@3e8b0ef?L100-250](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/cluster/v3/cluster.proto?L100-250)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/cluster.go@88e571c?L1-80](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/cluster.go?L1-80)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/cluster.go@88e571c?L190-350](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/cluster.go?L190-350)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/listener_builder.go@88e571c?L1-80](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/listener_builder.go?L1-80)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/service/discovery/v3/discovery.proto@3e8b0ef](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/service/discovery/v3/discovery.proto)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/cluster_builder.go@88e571c?L1-80](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/cluster_builder.go?L1-80)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/httproute.go@88e571c?L1-90](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/httproute.go?L1-90)\n- [repo:^github.com/sg-evals/istio--1.20.0$ go-control-plane envoy/config/cluster](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fistio--1.20.0$%20go-control-plane%20envoy%2Fconfig%2Fcluster)\n- [github.com/sg-evals/istio--1.20.0/go.mod@88e571c?L1-60](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/go.mod?L1-60)\n- [repo:^github.com/sg-evals/envoy--v1.28.0$ previous_message_type envoy.api.v2](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fenvoy--v1.28.0$%20previous_message_type%20envoy.api.v2)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/cluster_builder.go@88e571c?L80-200](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/cluster_builder.go?L80-200)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/cluster/v3/cluster.proto@3e8b0ef?L350-500](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/cluster/v3/cluster.proto?L350-500)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/cluster/v3/cluster.proto@3e8b0ef?L500-650](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/cluster/v3/cluster.proto?L500-650)\n\n\nGenerated files:\n- files/IMPACT_REPORT.json: /.api/agent-files/v1/deep-search/d2d3c160-528c-489b-befb-451c4c9c639c/files/IMPACT_REPORT.json\n- files/IMPACT_REPORT.csv: /.api/agent-files/v1/deep-search/d2d3c160-528c-489b-befb-451c4c9c639c/files/IMPACT_REPORT.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-envoy-istio-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0833,
+    "map_score": 0.0417,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0476,
+    "n_retrieved": 21,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "api/envoy/service/cluster/v3/cds.proto",
+    "api/envoy/service/listener/v3/lds.proto",
+    "api/envoy/service/route/v3/rds.proto",
+    "api/envoy/service/discovery/v3/discovery.proto",
+    "pilot/pkg/xds/discovery.go",
+    "pilot/pkg/networking/core/configgen.go",
+    "pilot/pkg/xds/v3/model.go",
+    "go.mod",
+    "pilot/pkg/networking/core/v1alpha3/cluster_tls.go",
+    "pilot/pkg/networking/core/v1alpha3/cluster_builder.go",
+    "api/envoy/config/listener/v3/listener_components.proto",
+    "envoy/api/envoy/config/cluster/v3/cluster.proto",
+    "pilot/pkg/xds/cds.go",
+    "pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/rds.go",
+    "pilot/pkg/xds/v3",
+    "api/envoy/config/listener/v3/listener.proto",
+    "api/envoy/config/route/v3/route.proto",
+    "pilot/pkg/networking/core/v1alpha3/cluster.go",
+    "pilot/pkg/networking/core/v1alpha3/listener_builder.go",
+    "pilot/pkg/networking/core/v1alpha3/httproute.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-envoy-istio-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0833,
+    "map_score": 0.0417,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0476,
+    "n_retrieved": 21,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

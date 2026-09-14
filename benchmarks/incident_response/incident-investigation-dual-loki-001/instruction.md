@@ -54,4 +54,4 @@ ring theory.
 
 ## Output
 
-Write your incident report to `/workspace/loki/INCIDENT_REPORT.md`.
+Write your incident report to `/workspace/INCIDENT_REPORT.md`.

@@ -1,0 +1,70 @@
+{
+  "task_id": "support-mapping-dual-tonic-tokio-streamcancel-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/hyperium/tonic",
+      "rev": "v0.11.0",
+      "path": "tonic"
+    },
+    {
+      "url": "https://github.com/tokio-rs/tokio",
+      "rev": "tokio-1.36.0",
+      "path": "tokio"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "tonic/tonic/src/codec/decode.rs",
+      "repo": "tonic",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "tonic/tonic/src/transport/channel/mod.rs",
+      "repo": "tonic",
+      "confidence": 0.8,
+      "source": "deterministic"
+    },
+    {
+      "path": "tokio/tokio/src/sync/mpsc/chan.rs",
+      "repo": "tokio",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "tokio/tokio/src/sync/mpsc/bounded.rs",
+      "repo": "tokio",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "tonic/tonic/src/client/grpc.rs",
+      "repo": "tonic",
+      "confidence": 0.75
+    },
+    {
+      "path": "tokio/tokio/src/sync/mpsc/list.rs",
+      "repo": "tokio",
+      "confidence": 0.7
+    }
+  ],
+  "error_chain": [
+    "Server emits Status::cancelled which becomes an HTTP/2 RST_STREAM or trailers frame; tonic's decode.rs translates trailers into either Ok(None) or Err(Status)",
+    "tonic's transport channel feeds decoded frames into a tokio mpsc::channel where the client's Streaming receiver awaits",
+    "tokio's mpsc channel in chan.rs only signals receiver close when ALL senders are dropped; if a clone of the sender lives in the h2 task, the receiver continues blocking",
+    "When the RST_STREAM arrives, tonic's transport task may not drop all sender clones synchronously, leaving Streaming::poll_next parked on the mpsc despite the wire cancel"
+  ],
+  "trigger_conditions": [
+    "Server emits Status::cancelled mid-stream and the wire RST_STREAM races with tonic's transport task dropping its mpsc sender",
+    "tokio's mpsc only closes when sender refcount hits zero; an outstanding clone (in a tracing span, a retry layer, etc.) keeps it alive",
+    "tonic's Streaming::poll_next maps an open mpsc to Pending, even though the gRPC stream is logically cancelled"
+  ],
+  "expected_answer": {
+    "error_origin": "tonic's transport task holds a clone of the mpsc sender that outlives the RST_STREAM, so tokio's mpsc Receiver never sees channel-closed",
+    "bypass_reason": "tokio's mpsc close is sender-refcount-driven; tonic's RST handling does not synchronously drop all clones",
+    "correct_config": "Wrap the client stream in tokio::time::timeout, or upgrade tonic to a release that drops the transport task's sender promptly on RST_STREAM, or use a separate cancellation channel that the client polls alongside the stream"
+  }
+}

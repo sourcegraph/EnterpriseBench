@@ -1,0 +1,33 @@
+{
+  "task_id": "cal-err-requests-proxy-003",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "Primary error source: src/requests/utils.py \u2014 Contains rewind_body and header-stripping logic for proxy connections. Supporting: src/requests/models.py \u2014 PreparedRequest.prepare method and header handling during request preparation. Surface error: Proxy-Authorization header is stripped from requests.",
+      "evaluation_criteria": [
+        "Must identify src/requests/utils.py as part of the error source",
+        "Must identify src/requests/models.py as part of the error source",
+        "Must reference the surface error message ('Proxy-Authorization header is stripped from requests') or its origin",
+        "Must reference a specific function, type, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Error propagation chain: (1) User sets Proxy-Authorization in headers dict \u2192 (2) Session.request() creates PreparedRequest \u2192 (3) During redirect or proxy negotiation, headers are rebuilt \u2192 (4) Proxy-Authorization is stripped from non-proxy destinations in utils.py.",
+      "evaluation_criteria": [
+        "Must describe the step: 'User sets Proxy-Authorization in headers dict'",
+        "Must describe the propagation: 'Proxy-Authorization is stripped from non-proxy destinations in utils.py'",
+        "Must include all intermediate steps in the correct order",
+        "Must reference the chain in causal order (source \u2192 surface)",
+        "Must cite at least one file from the propagation path (e.g. src/requests/utils.py)"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Proxy-Authorization header is manually set; (2) Request goes through HTTPS proxy (CONNECT tunnel); (3) Header stripping logic in utils treats it as sensitive header to remove on redirect.",
+      "evaluation_criteria": [
+        "Must identify the condition: 'Proxy-Authorization header is manually set'",
+        "Must identify the condition: 'Request goes through HTTPS proxy (CONNECT tunnel)'",
+        "Must identify the condition: 'Header stripping logic in utils treats it as sensitive header to remove on redir'",
+        "Must explain the combined conditions necessary to reproduce the error"
+      ]
+    }
+  }
+}

@@ -1,0 +1,130 @@
+# Imported from CodeScaleBench CCX-compliance-286 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-compliance-286"
+suite = "security_operations"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "TiDB SQL Privilege Check and RBAC Enforcement Audit"
+
+[[repos]]
+url = "https://github.com/pingcap/tidb"
+rev = "v8.5.0"
+path = "tidb"
+role = "primary"
+
+[metadata]
+languages = ["go"]
+csb_mirror = "sg-evals/tidb--v8.5.0"
+csb_commit = "v8.5.0"
+csb_family = "csb_org_compliance"
+csb_category = "compliance-audit"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "pkg/privilege/privilege.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/privilege/privileges/privileges.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/privilege/privileges/cache.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/privilege/privileges/errors.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/privilege/conn/conn.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/planner/core/optimizer.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/planner/optimize.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/planner/core/planbuilder.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/planner/core/logical_plan_builder.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/planner/core/preprocess.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/planner/core/point_get_plan.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/planner/core/expression_codec_fn.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/planner/core/plan_cache.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/planner/core/plan_cache_utils.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/planner/core/expression_rewriter.go"
+repo = "tidb"
+confidence = 0.9
+source = "deterministic"

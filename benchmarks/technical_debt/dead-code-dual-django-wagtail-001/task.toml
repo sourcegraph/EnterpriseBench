@@ -1,0 +1,121 @@
+# Dead Code Necropsy: Deprecated Django StreamField API usage in Wagtail
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "django-wagtail-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "dead-code-dual-django-wagtail-001"
+suite = "technical_debt"
+task_type = "dead_code_necropsy"
+difficulty = "hard"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Identify dead code paths in Wagtail's StreamField that reference deprecated Django JSONField internals"
+prompt = """
+Wagtail's StreamField is a complex rich content field that stores structured
+data as JSON in a Django JSONField. When Django 3.1 moved JSONField from
+django.contrib.postgres to django.db.models, Wagtail maintained backward
+compatibility shims. Now on Django 5.0, these compatibility paths are dead code.
+
+Your task:
+1. Find all Wagtail code paths that reference the old django.contrib.postgres.fields.JSONField
+   import or its associated form field, widget, and lookup classes. These are dead
+   code on Django 5.0+.
+2. Trace the StreamField initialization chain in Wagtail — from field declaration
+   through form widget rendering to identify which intermediate layers still contain
+   compatibility branches for the old JSONField location.
+3. Find all Django 5.0 deprecation removals related to JSONField — identify which
+   django.contrib.postgres paths were removed and what Wagtail code would break if
+   the compatibility shims were removed without updating.
+4. Document each dead code location with: file path, function/class, the dead branch
+   condition, and whether removing it would require a Wagtail migration.
+
+Document in your answer (use these JSON fields):
+{
+  "dead_code_locations": [
+    {
+      "file": "<file path>",
+      "class_or_function": "<name>",
+      "dead_branch_condition": "<condition that is always true/false on Django 5.0>",
+      "removal_requires_migration": true/false,
+      "explanation": "<why this is dead code>"
+    }
+  ]
+}
+"""
+
+[[repos]]
+url = "https://github.com/wagtail/wagtail"
+rev = "v5.2"
+path = "wagtail"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/django/django"
+rev = "5.0"
+path = "django"
+role = "upstream"
+
+[metadata]
+languages = ["python"]
+total_loc = 650_000
+dependency_depth = 2
+frameworks = ["django", "wagtail"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "dead_code_locations"
+weight = 0.45
+verifier = "checks/check_dead_code_locations.sh"
+description = "Agent identifies dead JSONField compatibility paths in Wagtail"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "dependency_trace"
+weight = 0.30
+verifier = "checks/check_dependency_trace.sh"
+description = "Agent traces StreamField through Django JSONField dependency chain"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "removal_impact"
+weight = 0.25
+verifier = "checks/check_removal_impact.sh"
+description = "Agent correctly assesses migration requirements for dead code removal"
+timeout_seconds = 60
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Finding deprecated JSONField references across Wagtail's StreamField and comparing against Django 5.0 removal points requires cross-repo search for import paths and compatibility shims"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "wagtail/fields.py"
+repo = "wagtail"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "django/db/models/fields/json.py"
+repo = "django"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "wagtail/blocks/stream_block.py"
+repo = "wagtail"
+confidence = 0.85
+
+[[ground_truth.sufficient_files]]
+path = "wagtail/blocks/field_block.py"
+repo = "wagtail"
+confidence = 0.80

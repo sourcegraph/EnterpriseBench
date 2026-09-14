@@ -1,0 +1,130 @@
+# Imported from CodeScaleBench CCX-domain-157 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-domain-157"
+suite = "platform_engineering"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Grafana Datasource Plugin Query Architecture"
+
+[[repos]]
+url = "https://github.com/grafana/grafana"
+rev = "26d36ec"
+path = "grafana"
+role = "primary"
+
+[metadata]
+languages = ["go"]
+csb_mirror = "sg-evals/grafana--26d36ec"
+csb_commit = "26d36ec"
+csb_family = "csb_org_domain"
+csb_category = "domain-lineage"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "pkg/api/ds_query.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/query/query.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/plugins/manager/client/client.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/plugins/plugins.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/plugins/ifaces.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/plugins/backendplugin/coreplugin/core_plugin.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/plugins/backendplugin/grpcplugin/grpc_plugin.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/plugins/backendplugin/grpcplugin/client_v2.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/expr/service.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/expr/transform.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/expr/nodes.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/expr/query_convert.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/pluginsintegration/pluginsintegration.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/aggregator/apiserver/plugin/query.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/registry/apis/datasource/queryconvert.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"

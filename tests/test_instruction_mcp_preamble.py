@@ -11,7 +11,6 @@ Verifies:
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -25,7 +24,7 @@ sys.path.insert(
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "infra"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
 
-from run_task import _build_instruction_text
+from run_task import _build_instruction_text, _derive_graded_artifact_path
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -101,6 +100,137 @@ class TestBaselineMode:
         result = _build_instruction_text(task_dir, "baseline")
         assert result is not None
         assert "## Output Requirements" in result
+
+    def test_checker_path_supersedes_stale_instruction_path(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "instruction.md").write_text(
+            "Write a detailed report to /workspace/LEGACY_REPORT.md."
+        )
+        checks = tmp_path / "checks"
+        checks.mkdir()
+        (checks / "check_answer.sh").write_text(
+            'export ANSWER_FILE="$WORKSPACE/agent_output/answer.json"\n'
+        )
+
+        result = _build_instruction_text(tmp_path, "baseline")
+
+        assert result is not None
+        assert (
+            "The grader reads only `/workspace/agent_output/answer.json`"
+        ) in result
+        assert (
+            "supersedes any other output path mentioned earlier"
+        ) in result
+        assert "Do not create secondary or legacy deliverables" in result
+
+    def test_bespoke_markdown_checker_path_gets_markdown_appendix(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "instruction.md").write_text("Investigate the incident.")
+        checks = tmp_path / "checks"
+        checks.mkdir()
+        (checks / "check_report.sh").write_text(
+            'REPORT="${WORKSPACE:-/workspace}/moby/INCIDENT_REPORT.md"\n'
+        )
+
+        result = _build_instruction_text(tmp_path, "baseline")
+
+        assert result is not None
+        assert "The grader reads only `/workspace/moby/INCIDENT_REPORT.md`" in result
+        assert "Write the complete report as Markdown" in result
+        assert "/workspace/agent_output/answer.json" not in result
+        assert "```json" not in result
+
+    def test_bespoke_json_checker_path_does_not_impose_answer_schema(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "instruction.md").write_text(
+            "Write the requested drift report using the documented schema."
+        )
+        checks = tmp_path / "checks"
+        checks.mkdir()
+        (checks / "check_drift.sh").write_text(
+            'export REPORT="${WORKSPACE:-/workspace}/DRIFT_REPORT.json"\n'
+        )
+
+        result = _build_instruction_text(tmp_path, "baseline")
+
+        assert result is not None
+        assert "The grader reads only `/workspace/DRIFT_REPORT.json`" in result
+        assert "Follow the task's requested JSON schema exactly" in result
+        assert "/workspace/agent_output/answer.json" not in result
+        assert '"source_files"' not in result
+
+    def test_conflicting_checker_paths_fail_closed(self, tmp_path: Path) -> None:
+        (tmp_path / "instruction.md").write_text("Do the task.")
+        checks = tmp_path / "checks"
+        checks.mkdir()
+        (checks / "check_a.sh").write_text(
+            'REPORT="$WORKSPACE/FIRST_REPORT.md"\n'
+        )
+        (checks / "check_b.sh").write_text(
+            'REPORT="$WORKSPACE/SECOND_REPORT.md"\n'
+        )
+
+        with pytest.raises(ValueError, match="multiple graded artifact paths"):
+            _build_instruction_text(tmp_path, "baseline")
+
+    def test_graded_artifact_path_ignores_non_artifact_workspace_values(
+        self, tmp_path: Path
+    ) -> None:
+        checks = tmp_path / "checks"
+        checks.mkdir()
+        (checks / "check_report.sh").write_text(
+            'WORKSPACE="${WORKSPACE:-/workspace}"\n'
+            'MAX_REPORT_BYTES=200000\n'
+            'REPORT="$WORKSPACE/analysis/IMPACT_REPORT.md"\n'
+            'GT_FILE="$WORKSPACE/.task/ground_truth.json"\n'
+        )
+
+        assert (
+            _derive_graded_artifact_path(tmp_path)
+            == "/workspace/analysis/IMPACT_REPORT.md"
+        )
+
+    def test_graded_artifact_path_rejects_parent_traversal(
+        self, tmp_path: Path
+    ) -> None:
+        checks = tmp_path / "checks"
+        checks.mkdir()
+        (checks / "check_report.sh").write_text(
+            'REPORT="$WORKSPACE/../escaped/REPORT.md"\n'
+        )
+
+        with pytest.raises(ValueError, match="outside /workspace"):
+            _derive_graded_artifact_path(tmp_path)
+
+    def test_graded_artifact_path_supports_event_replay_jsonl(
+        self, tmp_path: Path
+    ) -> None:
+        checks = tmp_path / "checks"
+        checks.mkdir()
+        (checks / "check_actions.sh").write_text(
+            'ACTIONS="$WORKSPACE/actions.jsonl"\n'
+        )
+
+        assert _derive_graded_artifact_path(tmp_path) == "/workspace/actions.jsonl"
+        (tmp_path / "instruction.md").write_text("Write one action per line.")
+        instruction = _build_instruction_text(tmp_path, "baseline")
+        assert instruction is not None
+        assert "Write the complete report as JSON Lines" in instruction
+
+    def test_unrecognized_checker_artifact_contract_fails_closed(
+        self, tmp_path: Path
+    ) -> None:
+        checks = tmp_path / "checks"
+        checks.mkdir()
+        (checks / "check_report.sh").write_text(
+            'RESULT_PATH="$WORKSPACE/report.md"\n'
+        )
+
+        with pytest.raises(ValueError, match="cannot determine graded artifact"):
+            _derive_graded_artifact_path(tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -357,8 +487,13 @@ def task_dir_with_checks(task_dir: Path) -> Path:
     """Task directory with a checks/ dir holding two check scripts."""
     checks = task_dir / "checks"
     checks.mkdir()
-    (checks / "check_api_migration.sh").write_text("#!/usr/bin/env bash\nexit 0\n")
-    (checks / "check_tests.sh").write_text("#!/usr/bin/env bash\nexit 0\n")
+    check_body = (
+        "#!/usr/bin/env bash\n"
+        'ANSWER_FILE="$WORKSPACE/agent_output/answer.json"\n'
+        "exit 0\n"
+    )
+    (checks / "check_api_migration.sh").write_text(check_body)
+    (checks / "check_tests.sh").write_text(check_body)
     return task_dir
 
 

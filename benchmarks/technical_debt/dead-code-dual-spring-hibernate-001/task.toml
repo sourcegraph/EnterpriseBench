@@ -1,0 +1,122 @@
+# Dead Code Necropsy: Spring Boot 3.x Hibernate 6 compatibility shims
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "spring-hibernate-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "dead-code-dual-spring-hibernate-001"
+suite = "technical_debt"
+task_type = "dead_code_necropsy"
+difficulty = "hard"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Identify dead Hibernate 5 compatibility code paths in Spring Boot 3.x JPA auto-configuration"
+prompt = """
+Spring Boot 3.x requires Hibernate 6.x (Jakarta EE namespace). However, Spring
+Boot's JPA auto-configuration still contains compatibility branches and property
+mappings that were needed for Hibernate 5.x support. These are dead code on
+Spring Boot 3.x since Hibernate 5 is no longer a supported runtime.
+
+Your task:
+1. Find all Spring Boot auto-configuration code that branches on Hibernate version
+   detection — look for version checks, class existence probes (e.g.,
+   ClassUtils.isPresent for Hibernate 5-specific classes), and conditional
+   bean registration that only activates for Hibernate 5.
+2. Find the Hibernate 6 classes that replaced Hibernate 5 equivalents — identify
+   which Spring Boot compatibility bridges reference classes that no longer exist
+   in Hibernate 6 (e.g., org.hibernate.dialect.* changes, criteria API changes).
+3. Trace the Spring Boot JPA auto-configuration chain from
+   HibernateJpaAutoConfiguration through EntityManagerFactory creation to identify
+   dead property mappings that reference removed Hibernate 5 configuration keys.
+4. Document each dead code location with: file, class/method, the version check
+   condition, and what Hibernate 6 replacement exists.
+
+Document in your answer (use these JSON fields):
+{
+  "dead_code_locations": [
+    {
+      "file": "<file path>",
+      "class_or_function": "<name>",
+      "dead_branch_condition": "<Hibernate 5 version check that always fails>",
+      "hibernate6_replacement": "<what replaced it in Hibernate 6>",
+      "explanation": "<why this is dead on Spring Boot 3.x>"
+    }
+  ]
+}
+"""
+
+[[repos]]
+url = "https://github.com/spring-projects/spring-boot"
+rev = "v3.1.2"
+path = "spring-boot"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/spring-projects/spring-framework"
+rev = "v6.0.11"
+path = "spring-framework"
+role = "upstream"
+
+[metadata]
+languages = ["java"]
+total_loc = 2_000_000
+dependency_depth = 2
+frameworks = ["spring-boot", "spring-framework", "hibernate"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "dead_code_locations"
+weight = 0.45
+verifier = "checks/check_dead_code_locations.sh"
+description = "Agent identifies Hibernate 5 compatibility dead code in Spring Boot"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "dependency_trace"
+weight = 0.30
+verifier = "checks/check_dependency_trace.sh"
+description = "Agent traces JPA auto-configuration through Hibernate version detection"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "removal_impact"
+weight = 0.25
+verifier = "checks/check_removal_impact.sh"
+description = "Agent documents Hibernate 6 replacements for dead code"
+timeout_seconds = 60
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Finding Hibernate 5 compatibility branches across Spring Boot auto-configuration and cross-referencing with Spring Framework ORM module requires searching version-conditional code across both repos"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaAutoConfiguration.java"
+repo = "spring-boot"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "spring-orm/src/main/java/org/springframework/orm/jpa/vendor/HibernateJpaVendorAdapter.java"
+repo = "spring-framework"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateProperties.java"
+repo = "spring-boot"
+confidence = 0.85
+
+[[ground_truth.sufficient_files]]
+path = "spring-orm/src/main/java/org/springframework/orm/hibernate5/HibernateTransactionManager.java"
+repo = "spring-framework"
+confidence = 0.80

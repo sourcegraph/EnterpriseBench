@@ -1,0 +1,163 @@
+# Incident Investigation: Cilium endpoint regen race produces torn BPF map definitions
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "cilium-ebpf-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "incident-investigation-dual-cilium-001"
+suite = "incident_response"
+task_type = "incident_investigation"
+difficulty = "expert"
+estimated_duration_minutes = 50
+session_type = "single"
+description = "Trace a data race between concurrent Cilium endpoint regenerations that corrupts shared MapSpec readers in the cilium/ebpf library, producing torn map definitions and BPF verifier failures"
+prompt = """
+Your platform team operates a Cilium 1.16-managed Kubernetes cluster. After a
+deployment that triples concurrent pod churn, kernel logs and the Cilium agent
+report intermittent BPF program load failures:
+
+  level=error msg="Failed to load policy program" error="program too large"
+  level=error msg="failed to attach lxc_egress" error="map create: invalid argument"
+  fatal: panic: BPF map definition corrupt: max_entries=2147483647
+
+The errors only occur during high-churn periods (multiple endpoint
+regenerations within the same second). When the agent is idle, BPF programs
+load cleanly. Restarting the agent clears the failure transiently. The Go
+race detector, when enabled in a debug build, prints a `DATA RACE` between
+two `pkg/bpf.LoadCollectionSpec` callers.
+
+Investigation notes from the platform engineer:
+- Each pod start triggers `pkg/endpoint/bpf.go::regenerateBPF`, which calls
+  into the datapath loader.
+- The loader (`pkg/datapath/loader/netlink.go::loadDatapath`) uses
+  `pkg/bpf/collection.go::LoadCollectionSpec` to parse a templated BPF ELF.
+- `LoadCollectionSpec` wraps `cilium/ebpf` (v0.16.0) which constructs a
+  `MapSpec` from the ELF and ultimately calls
+  `cilium/ebpf::MapSpec.createMap` to issue the bpf() syscall.
+- `MapSpec` is mutable; it carries internal cursors and template references.
+  The Cilium-side caller passes a single shared `bytes.Reader` for the
+  templated ELF to multiple goroutines, expecting `cilium/ebpf` to copy it.
+- It does not copy the underlying reader's cursor on a fast path; concurrent
+  iteration mutates the shared cursor, producing torn struct values when
+  read by the kernel verifier.
+
+Repos and revisions:
+- /workspace/cilium/ — `cilium/cilium` at v1.16.4
+- /workspace/ebpf/ — `cilium/ebpf` at v0.16.0
+
+Both are Go projects.
+
+Your task:
+1. Find Cilium's regeneration entry point and the loader function that
+   prepares BPF objects per endpoint (`regenerateBPF`, `loadDatapath`).
+2. Identify the cilium-side wrapper that calls `cilium/ebpf` to load a
+   `CollectionSpec` and where the shared reader is constructed.
+3. In `cilium/ebpf`, find `MapSpec.createMap` and the surrounding code path
+   that consumes the reader without copying.
+4. Trace the race: two endpoint regenerations call `LoadCollectionSpec` with
+   the same template -> shared `bytes.Reader` -> `MapSpec.createMap` reads
+   cursor concurrently -> torn map definition -> kernel verifier rejects ->
+   error surfaces in agent logs.
+
+Write your incident report to `/workspace/cilium/INCIDENT_REPORT.md` with:
+- Root cause (file and function in each repo)
+- Full race trace
+- Affected components
+- Remediation: serialize regenerations OR deep-copy the MapSpec on each call
+  OR fix the cilium/ebpf side to not assume reader exclusivity
+"""
+
+[[repos]]
+url = "https://github.com/cilium/cilium"
+rev = "v1.16.4"
+path = "cilium"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/cilium/ebpf"
+rev = "v0.16.0"
+path = "ebpf"
+role = "dependency"
+
+[metadata]
+languages = ["go"]
+total_loc = 700_000
+dependency_depth = 2
+frameworks = ["cilium", "cilium-ebpf"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "root_cause_identification"
+weight = 0.35
+verifier = "checks/check_root_cause.sh"
+description = "Agent identifies the cilium-side LoadCollectionSpec wrapper and cilium/ebpf MapSpec.createMap as race participants"
+timeout_seconds = 60
+
+[[checkpoints]]
+name = "error_chain_trace"
+weight = 0.30
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces concurrent regenerateBPF -> loadDatapath -> shared reader -> torn MapSpec -> kernel verifier failure"
+timeout_seconds = 60
+
+[[checkpoints]]
+name = "affected_components"
+weight = 0.15
+verifier = "checks/check_affected_components.sh"
+description = "Agent names the Cilium endpoint manager, datapath loader, and the cilium/ebpf library"
+timeout_seconds = 60
+
+[[checkpoints]]
+name = "remediation_proposal"
+weight = 0.20
+verifier = "checks/check_remediation.sh"
+description = "Agent proposes serialization, deep-copying the reader/MapSpec, or upstream cilium/ebpf fix"
+timeout_seconds = 60
+
+[artifacts]
+required = ["incident_report"]
+optional = ["code_patch"]
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The race spans two Go modules with a shared mutable type (MapSpec) and an internal io.Reader contract; tracing it requires cross-repo navigation from Cilium's datapath loader into cilium/ebpf's map creation path, which lives in a less-famous library that LLMs are unlikely to memorize from training data."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "pkg/datapath/loader/netlink.go"
+repo = "cilium"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/bpf/collection.go"
+repo = "cilium"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "map.go"
+repo = "ebpf"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "collection.go"
+repo = "ebpf"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "pkg/endpoint/bpf.go"
+repo = "cilium"
+confidence = 0.80
+
+[[ground_truth.sufficient_files]]
+path = "elf_reader.go"
+repo = "ebpf"
+confidence = 0.70

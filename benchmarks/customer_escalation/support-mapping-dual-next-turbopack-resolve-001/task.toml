@@ -1,0 +1,122 @@
+# support_code_mapping: Map customer Next.js Turbopack monorepo workspace resolution divergence from Webpack to the next-config / Turbopack resolver boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "vercel-build-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-next-turbopack-resolve-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 35
+session_type = "single"
+description = "Map customer Next.js Turbopack monorepo workspace resolution divergence from Webpack to the next-config / Turbopack resolver boundary"
+prompt = """
+A customer reports that their Next.js 14 monorepo build works under
+webpack (next dev) but fails under Turbopack (next dev --turbo) with
+'Module not found: Cannot resolve @internal/ui' for a workspace package
+they consume via pnpm. Their next.config.js sets transpilePackages and
+the webpack alias keeps working, but Turbopack's resolver does not see
+the package.
+
+Your task:
+1. Find where Next.js's webpack-config.ts adds the workspace package to
+   the module resolution path and applies transpilePackages.
+2. Find where Turbopack's resolver implementation handles workspace
+   roots and how it interprets pnpm's nested node_modules layout.
+3. Trace the cross-repo path: next next-server/dev start ->
+   loadConfig -> turbopack resolve plugin -> turbo-tasks-fs read ->
+   package.json walk. Cite each file and the function or attribute
+   responsible.
+4. Identify why pnpm's symlinked workspace layout (with .pnpm/ store)
+   resolves under webpack's enhanced-resolve but not under
+   Turbopack's default resolver, and what config option closes the gap.
+"""
+
+[[repos]]
+url = "https://github.com/vercel/next.js"
+rev = "v14.1.4"
+path = "next.js"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/vercel/turbo"
+rev = "v1.13.2"
+path = "turbo"
+role = "upstream"
+
+[metadata]
+languages = ["typescript", "javascript", "rust"]
+total_loc = 900000
+dependency_depth = 2
+frameworks = ["next.js", "turbopack", "pnpm"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Module resolution semantics differ between Next.js's webpack config (transpilePackages alias) and Turbopack's Rust resolver. Tracing the divergence requires cross-repo reading of both pipelines."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "next.js/packages/next/src/build/webpack-config.ts"
+repo = "next.js"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "next.js/packages/next/src/server/lib/turbopack-warning.ts"
+repo = "next.js"
+confidence = 0.75
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "turbo/crates/turbopack-ecmascript/src/references/esm/mod.rs"
+repo = "turbo"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "turbo/crates/turbopack-resolve/src/resolve.rs"
+repo = "turbo"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "next.js/packages/next/src/build/load-jsconfig.ts"
+repo = "next.js"
+confidence = 0.7
+
+[[ground_truth.sufficient_files]]
+path = "turbo/crates/turbopack-resolve/src/resolve_options_context.rs"
+repo = "turbo"
+confidence = 0.7

@@ -1,0 +1,70 @@
+{
+  "task_id": "support-mapping-dual-tokio-hyper-graceful-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/hyperium/hyper",
+      "rev": "v1.2.0",
+      "path": "hyper"
+    },
+    {
+      "url": "https://github.com/tokio-rs/tokio",
+      "rev": "tokio-1.36.0",
+      "path": "tokio"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "hyper/src/server/conn/http1.rs",
+      "repo": "hyper",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "hyper/src/proto/h1/conn.rs",
+      "repo": "hyper",
+      "confidence": 0.85,
+      "source": "deterministic"
+    },
+    {
+      "path": "tokio/tokio/src/runtime/runtime.rs",
+      "repo": "tokio",
+      "confidence": 0.85,
+      "source": "deterministic"
+    },
+    {
+      "path": "tokio/tokio/src/task/join_set.rs",
+      "repo": "tokio",
+      "confidence": 0.8,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "hyper/src/proto/h1/dispatch.rs",
+      "repo": "hyper",
+      "confidence": 0.75
+    },
+    {
+      "path": "tokio/tokio/src/signal/unix.rs",
+      "repo": "tokio",
+      "confidence": 0.7
+    }
+  ],
+  "error_chain": [
+    "Customer wires Server::with_graceful_shutdown to a tokio::signal future; SIGTERM resolves the future, hyper stops accepting new connections",
+    "hyper's Connection::poll for HTTP/1 in proto/h1/conn.rs continues draining the body of in-flight requests because graceful shutdown only declines new requests, not active ones",
+    "The long-poll request is parked on tokio's reactor inside a tokio task; hyper's graceful path awaits Connection::shutdown which only completes when the response body finishes",
+    "tokio's runtime on shutdown_timeout drops still-running tasks but the long-poll task is not in a JoinSet hyper can cancel; the container terminationGracePeriod kicks in and SIGKILLs the process"
+  ],
+  "trigger_conditions": [
+    "Server::with_graceful_shutdown is wired to a tokio::signal future and the request handler holds a long-running future without an explicit cancellation token",
+    "hyper's HTTP/1 graceful shutdown only declines new connections; active connections must complete naturally",
+    "tokio's runtime cannot force-cancel a parked task without dropping the runtime, so the long-poll task survives the shutdown signal"
+  ],
+  "expected_answer": {
+    "error_origin": "hyper's HTTP/1 graceful path waits for Connection::shutdown completion; the long-poll task remains parked on tokio's reactor and tokio cannot force-cancel it",
+    "bypass_reason": "hyper's graceful_shutdown only stops accepting new connections, not in-flight ones; tokio's task cancellation is cooperative",
+    "correct_config": "Pass an explicit cancellation token (tokio_util::CancellationToken) into the request handler so it can short-circuit on shutdown, or use Runtime::shutdown_timeout with a forced drop after graceful_shutdown completes"
+  }
+}

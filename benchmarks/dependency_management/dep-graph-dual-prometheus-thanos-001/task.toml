@@ -1,0 +1,102 @@
+# dependency_graph: Trace Prometheus TSDB storage API changes affecting Thanos s
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "cncf-observability-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "dep-graph-dual-prometheus-thanos-001"
+suite = "dependency_management"
+task_type = "dependency_graph"
+difficulty = "hard"
+estimated_duration_minutes = 35
+session_type = "single"
+description = "Trace Prometheus TSDB storage API changes affecting Thanos sidecar integration"
+prompt = """
+Prometheus changed its TSDB storage engine API for block compaction
+and chunk encoding. Thanos extends Prometheus as a sidecar for
+long-term storage and depends on these internal APIs.
+
+Your task:
+1. Find where Prometheus defines TSDB storage and compaction APIs
+2. Find where Thanos implements its Prometheus sidecar integration
+3. Identify TSDB API changes that break Thanos' block uploading
+4. Document the dependency chain and affected Thanos components
+
+Write your analysis to /workspace/analysis/IMPACT_REPORT.md
+"""
+
+[[repos]]
+url = "https://github.com/prometheus/prometheus"
+rev = "v2.47.0"
+path = "prometheus"
+role = "dependency"
+
+[[repos]]
+url = "https://github.com/thanos-io/thanos"
+rev = "v0.32.0"
+path = "thanos"
+role = "primary"
+
+[metadata]
+languages = ["go"]
+total_loc = 200_000
+dependency_depth = 2
+frameworks = ["prometheus", "thanos"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "prometheus_tsdb"
+weight = 0.30
+verifier = "checks/check_prometheus_tsdb.sh"
+description = "Agent identifies Prometheus TSDB API"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "thanos_sidecar"
+weight = 0.40
+verifier = "checks/check_thanos_sidecar.sh"
+description = "Agent finds Thanos sidecar integration"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "api_impact"
+weight = 0.30
+verifier = "checks/check_api_impact.sh"
+description = "Agent documents TSDB API changes affecting Thanos"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = ["migration_guide"]
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Internal TSDB API tracing across large Go repos benefits from code search"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "prometheus/tsdb/db.go"
+repo = "prometheus"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "thanos/pkg/shipper/shipper.go"
+repo = "thanos"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "prometheus/tsdb/compact.go"
+repo = "prometheus"
+confidence = 0.85
+
+[[ground_truth.sufficient_files]]
+path = "thanos/pkg/store/prometheus.go"
+repo = "thanos"
+confidence = 0.8

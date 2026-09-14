@@ -1,0 +1,203 @@
+{
+  "task_id": "dep-graph-dual-prometheus-thanos-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/prometheus--v2.47.0",
+    "github.com/sg-evals/thanos--v0.32.0"
+  ],
+  "retrieved_paths": [
+    "go.mod",
+    "tsdb/compact.go",
+    "tsdb/block.go",
+    "tsdb/chunkenc/chunk.go",
+    "pkg/compact/compact.go",
+    "cmd/thanos/compact.go",
+    "pkg/block/metadata/meta.go",
+    "pkg/shipper/shipper.go",
+    "pkg/store/bucket.go",
+    "pkg/store/storepb/types.pb.go",
+    "pkg/query/iter.go",
+    "pkg/receive/multitsdb.go",
+    "cmd/thanos/receive.go"
+  ],
+  "retrieved_paths_union": [
+    "go.mod",
+    "tsdb/compact.go",
+    "tsdb/block.go",
+    "tsdb/chunkenc/chunk.go",
+    "pkg/compact/compact.go",
+    "cmd/thanos/compact.go",
+    "pkg/block/metadata/meta.go",
+    "pkg/shipper/shipper.go",
+    "pkg/store/bucket.go",
+    "pkg/store/storepb/types.pb.go",
+    "pkg/query/iter.go",
+    "pkg/receive/multitsdb.go",
+    "cmd/thanos/receive.go"
+  ],
+  "required_files": [
+    "prometheus/tsdb/db.go",
+    "thanos/pkg/shipper/shipper.go"
+  ],
+  "ir_scores": {
+    "task_id": "dep-graph-dual-prometheus-thanos-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1934
+    },
+    "mrr": 0.125,
+    "map_score": 0.0625,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0769,
+    "n_retrieved": 13,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "dep-graph-dual-prometheus-thanos-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1934
+    },
+    "mrr": 0.125,
+    "map_score": 0.0625,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0769,
+    "n_retrieved": 13,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 220.4,
+  "response_chars": 18703,
+  "raw_response": "---\ntitle: Identify Prometheus TSDB API changes breaking Thanos block uploads\nshare_url: https://demo.sourcegraph.com/deepsearch/2139569e-7f00-48c9-800a-e82eb816db2b\nurl: https://demo.sourcegraph.com/deepsearch/2225\ncreated: 2026-08-18T02:00:59Z\nupdated: 2026-08-18T02:04:27Z\n---\n\n#         # dep-graph-dual-prometheus-thanos-001\n\n        **Suite:** dependency_management | **Type:** dependency_graph | **Difficulty:** hard\n        **Repos:** prometheus + thanos\n\n        ## Context\n\n        Prometheus changed its TSDB storage engine API for block compaction\nand chunk encoding. Thanos extends Prometheus as a sidecar for\nlong-term storage and depends on these internal APIs.\n\nYour task:\n1. Find where Prometheus defines TSDB storage and compaction APIs\n2. Find where Thanos implements its Prometheus sidecar integration\n3. Identify TSDB API changes that break Thanos' block uploading\n4. Document the dependency chain and affected Thanos components\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/prometheus--v2.47.0, github.com/sg-evals/thanos--v0.32.0\n\nThe evaluator's `file` module only supports writing `.json`/`.csv`/`.svg` \u2014 I'll write the markdown directly as a structured response below. The full analysis follows:\n\n---\n\n# Prometheus TSDB \u2192 Thanos Impact Report\n\n## 1. Dependency Declaration\n\n**File:** [`go.mod:65`](https://demo.sourcegraph.com/r/github.com/sg-evals/thanos--v0.32.0/-/blob/go.mod?L65)\n```\ngithub.com/prometheus/prometheus v0.44.1-0.20230524110021-37e5249e33e4\n```\nThanos v0.32.0 pins a **pre-release Prometheus 2.44 commit**. Upgrading to Prometheus v2.47.0 (`v0.47.0` module tag) requires a go.mod bump and full API-compatibility audit across `tsdb`, `tsdb/chunkenc`, `tsdb/chunks`, and `storage` packages.\n\n---\n\n## 2. Prometheus TSDB API Surface (v2.47.0)\n\n### 2.1 `tsdb.Compactor` interface\n[`tsdb/compact.go:55-74`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.47.0/-/blob/tsdb/compact.go?L55-74)\n```go\ntype Compactor interface {\n    Plan(dir string) ([]string, error)\n    Write(dest string, b BlockReader, mint, maxt int64, parent *BlockMeta) (ulid.ULID, error)\n    Compact(dest string, dirs []string, open []*Block) (ulid.ULID, error)\n}\n```\n\n### 2.2 `tsdb.LeveledCompactor` constructor\n[`tsdb/compact.go:147-174`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.47.0/-/blob/tsdb/compact.go?L147-174)\n```go\nfunc NewLeveledCompactor(\n    ctx context.Context, r prometheus.Registerer, l log.Logger,\n    ranges []int64, pool chunkenc.Pool,\n    mergeFunc storage.VerticalChunkSeriesMergeFunc,  // \u2190 added in ~2.43\n) (*LeveledCompactor, error)\n```\n\n### 2.3 `tsdb.BlockPopulator` interface (new)\n[`tsdb/compact.go:666-668`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.47.0/-/blob/tsdb/compact.go?L666-668)\n```go\ntype BlockPopulator interface {\n    PopulateBlock(ctx, metrics *CompactorMetrics, logger, chunkPool, mergeFunc,\n                  blocks []BlockReader, meta *BlockMeta, indexw IndexWriter, chunkw ChunkWriter) error\n}\n```\n`LeveledCompactor.CompactWithBlockPopulator` added at [`tsdb/compact.go:398`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.47.0/-/blob/tsdb/compact.go?L398-396).\n\n### 2.4 `BlockMetaCompaction.Hints` \u2014 new field\n[`tsdb/block.go:178-224`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.47.0/-/blob/tsdb/block.go?L178-224)\n```go\ntype BlockMetaCompaction struct {\n    Level     int         `json:\"level\"`\n    Sources   []ulid.ULID `json:\"sources,omitempty\"`\n    Deletable bool        `json:\"deletable,omitempty\"`\n    Parents   []BlockDesc `json:\"parents,omitempty\"`\n    Failed    bool        `json:\"failed,omitempty\"`\n    Hints     []string    `json:\"hints,omitempty\"`  // NEW: e.g. \"from-out-of-order\"\n}\n```\nConstant: `CompactionHintFromOutOfOrder = \"from-out-of-order\"`.\n\n### 2.5 Chunk encoding API \u2014 critical additions\n[`tsdb/chunkenc/chunk.go:29-53`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.47.0/-/blob/tsdb/chunkenc/chunk.go?L29-53)\n```go\nconst (\n    EncNone           Encoding = iota  // 0\n    EncXOR                             // 1\n    EncHistogram                       // 2\n    EncFloatHistogram                  // 3 \u2190 NEW in Prometheus 2.40+\n)\n```\n\n**`Iterator.Next()` now returns `ValueType` instead of `bool`:**\n[`tsdb/chunkenc/chunk.go:115-147`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.47.0/-/blob/tsdb/chunkenc/chunk.go?L115-147)\n```go\nNext() ValueType   // ValNone|ValFloat|ValHistogram|ValFloatHistogram\nAtHistogram() (int64, *histogram.Histogram)\nAtFloatHistogram() (int64, *histogram.FloatHistogram)\nAtT() int64\n```\n\n**`Appender` interface extended:**\n[`tsdb/chunkenc/chunk.go:96-113`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.47.0/-/blob/tsdb/chunkenc/chunk.go?L96-113)\n```go\nAppendHistogram(prev *HistogramAppender, t int64, h *histogram.Histogram, appendOnly bool) (Chunk, bool, Appender, error)\nAppendFloatHistogram(prev *FloatHistogramAppender, t int64, h *histogram.FloatHistogram, appendOnly bool) (Chunk, bool, Appender, error)\n```\n\n---\n\n## 3. How Thanos Consumes These APIs\n\n### 3.1 Thanos `compact.Compactor` interface\n[`pkg/compact/compact.go:786-804`](https://demo.sourcegraph.com/r/github.com/sg-evals/thanos--v0.32.0/-/blob/pkg/compact/compact.go?L786-804)\n\nThanos mirrors the Prometheus `Compactor` and adds `CompactWithBlockPopulator`. It already delegates `tsdb.BlockPopulator` via `GetBlockPopulator` at [`pkg/compact/compact.go:756-784`](https://demo.sourcegraph.com/r/github.com/sg-evals/thanos--v0.32.0/-/blob/pkg/compact/compact.go?L756-784), returning `tsdb.DefaultBlockPopulator{}` \u2014 compatible with v2.47.0.\n\n### 3.2 Compactor instantiation\n[`cmd/thanos/compact.go:328`](https://demo.sourcegraph.com/r/github.com/sg-evals/thanos--v0.32.0/-/blob/cmd/thanos/compact.go?L328)\n```go\ncomp, err := tsdb.NewLeveledCompactor(ctx, reg, logger, levels, downsample.NewPool(), mergeFunc)\n```\nSignature already includes `mergeFunc` \u2014 **compatible** with v2.47.0.\n\n### 3.3 Block metadata wrapping\n[`pkg/block/metadata/meta.go:56-62`](https://demo.sourcegraph.com/r/github.com/sg-evals/thanos--v0.32.0/-/blob/pkg/block/metadata/meta.go?L56-62)\n```go\ntype Meta struct {\n    tsdb.BlockMeta          // embedded struct\n    Thanos Thanos `json:\"thanos\"`\n}\n```\n`tsdb.BlockMeta` is embedded directly. The new `Hints` field uses `omitempty` so JSON parsing won't break, but struct literal initializations may fail to compile if `BlockMetaCompaction` gains required fields.\n\n### 3.4 Shipper block upload\n[`pkg/shipper/shipper.go:280-387`](https://demo.sourcegraph.com/r/github.com/sg-evals/thanos--v0.32.0/-/blob/pkg/shipper/shipper.go?L280-387)\n\nThe `Sync()` loop gates on `m.Compaction.Level > 1`, calls `tsdb.OverlappingBlocks()`, then streams raw block files via `block.Upload()`. No chunk decoding occurs here \u2014 upload breakage is confined to meta-format changes.\n\n---\n\n## 4. Critical Bug: `EncFloatHistogram` Not Handled in Store Gateway\n\n**File:** [`pkg/store/bucket.go:1130-1148`](https://demo.sourcegraph.com/r/github.com/sg-evals/thanos--v0.32.0/-/blob/pkg/store/bucket.go?L1130-1148)\n\n```go\nfunc populateChunk(out *storepb.AggrChunk, in chunkenc.Chunk, ...) error {\n    // Only XOR (1) and Histogram (2) pass through:\n    if in.Encoding() == chunkenc.EncXOR || in.Encoding() == chunkenc.EncHistogram {\n        out.Raw = &storepb.Chunk{\n            Type: storepb.Chunk_Encoding(in.Encoding() - 1),\n            ...\n        }\n        return nil\n    }\n    // EncFloatHistogram (3) falls through to:\n    if in.Encoding() != downsample.ChunkEncAggr {\n        return errors.Errorf(\"unsupported chunk encoding %d\", in.Encoding())  // \u2190 RUNTIME ERROR\n    }\n```\n\n**When Prometheus 2.47.0 writes blocks with float histograms**, the Thanos Store Gateway returns `\"unsupported chunk encoding 3\"` for every series in those blocks.\n\nThe Thanos StoreAPI wire format **already defines** `Chunk_FLOAT_HISTOGRAM = 2` in [`pkg/store/storepb/types.pb.go:65-75`](https://demo.sourcegraph.com/r/github.com/sg-evals/thanos--v0.32.0/-/blob/pkg/store/storepb/types.pb.go?L65-75) and the query layer's `chunkEncoding()` in [`pkg/query/iter.go:174-183`](https://demo.sourcegraph.com/r/github.com/sg-evals/thanos--v0.32.0/-/blob/pkg/query/iter.go?L174-183) already maps it correctly. The **only missing piece** is the routing guard in `populateChunk`.\n\n---\n\n## 5. Breaking Changes Matrix\n\n| Change | Prometheus Location | Nature | Thanos Impact | Severity |\n|--------|--------------------|----|---|---|\n| `EncFloatHistogram` not routed in `populateChunk` | `tsdb/chunkenc/chunk.go:33` | New encoding value | `pkg/store/bucket.go:1134` runtime error on float histogram blocks | **CRITICAL** |\n| `Iterator.Next()` returns `ValueType` not `bool` | `tsdb/chunkenc/chunk.go:120` | Signature change | All iterator loops in downsample, store, query paths fail to compile | **HIGH** |\n| `Appender` adds `AppendHistogram`/`AppendFloatHistogram` | `tsdb/chunkenc/chunk.go:111-112` | Interface addition | Custom appender implementations in receive/downsample must be updated | **HIGH** |\n| `BlockMetaCompaction.Hints` added | `tsdb/block.go:193` | Additive JSON field | JSON parse safe (`omitempty`); struct literals in tests may not compile | **LOW** |\n| `BlockPopulator` interface added | `tsdb/compact.go:666` | New interface | Already consumed by Thanos; compatible | **NONE** |\n| `NewLeveledCompactor` `mergeFunc` param | `tsdb/compact.go:148` | Signature addition | Already passed by Thanos at `cmd/thanos/compact.go:328` | **NONE** |\n\n---\n\n## 6. Affected Thanos Components\n\n| Component | File | Risk |\n|-----------|------|------|\n| **Store Gateway** | `pkg/store/bucket.go` | CRITICAL \u2013 `EncFloatHistogram` not handled |\n| **Downsample** | `pkg/compact/downsample/` | HIGH \u2013 iterator API changed |\n| **Receive** | `pkg/receive/multitsdb.go`, `cmd/thanos/receive.go` | MEDIUM \u2013 appender interface |\n| **Query layer** | `pkg/query/iter.go` | LOW \u2013 already maps `FLOAT_HISTOGRAM` |\n| **Shipper** | `pkg/shipper/shipper.go` | LOW \u2013 no chunk decoding |\n| **Compactor** | `pkg/compact/compact.go` | LOW \u2013 passes through to tsdb |\n\n---\n\n## 7. Migration Recommendations\n\n**1. Fix `populateChunk` immediately (blocks all float-histogram queries):**\n```go\n// pkg/store/bucket.go ~line 1134\nif in.Encoding() == chunkenc.EncXOR ||\n   in.Encoding() == chunkenc.EncHistogram ||\n   in.Encoding() == chunkenc.EncFloatHistogram {   // \u2190 ADD THIS\n```\n\n**2. Update iterator loops** from `for iter.Next()` to:\n```go\nfor typ := iter.Next(); typ != chunkenc.ValNone; typ = iter.Next() {\n    switch typ {\n    case chunkenc.ValFloat:          t, v := iter.At()\n    case chunkenc.ValHistogram:      t, h := iter.AtHistogram()\n    case chunkenc.ValFloatHistogram: t, fh := iter.AtFloatHistogram()\n    }\n}\n```\n\n**3. Implement `AppendFloatHistogram`** in all custom `chunkenc.Appender` implementations.\n\n**4. Bump `go.mod`** to `github.com/prometheus/prometheus v0.47.0` and `go mod tidy`.\n\n**5. Staged rollout:** deploy Prometheus 2.47.0 with native histograms disabled \u2192 fix Thanos Store Gateway \u2192 rebuild all Thanos components \u2192 enable native histograms.\n\n## Sources\n\n- [repo:^github.com/sg-evals/prometheus--v2.47.0$ tsdb compaction block](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fprometheus--v2.47.0$%20tsdb%20compaction%20block)\n- [repo:^github.com/sg-evals/thanos--v0.32.0$ go.mod prometheus](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fthanos--v0.32.0$%20go.mod%20prometheus)\n- [github.com/sg-evals/thanos--v0.32.0/go.mod@4f040e8?L1-70](/github.com/sg-evals/thanos--v0.32.0@4f040e8a7deabc007cfa3bda2f5d3a432011e7b3/-/blob/go.mod?L1-70)\n- [repo:^github.com/sg-evals/thanos--v0.32.0$ block upload shipper prometheus tsdb](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fthanos--v0.32.0$%20block%20upload%20shipper%20prometheus%20tsdb)\n- [repo:^github.com/sg-evals/prometheus--v2.47.0$ tsdb/chunkenc chunk encoding](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fprometheus--v2.47.0$%20tsdb%2Fchunkenc%20chunk%20encoding)\n- [github.com/sg-evals/prometheus--v2.47.0/tsdb/compact.go@a89d063?L1-100](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/tsdb/compact.go?L1-100)\n- [repo:^github.com/sg-evals/prometheus--v2.47.0$ tsdb/compact.go Compactor interface Write Plan](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fprometheus--v2.47.0$%20tsdb%2Fcompact.go%20Compactor%20interface%20Write%20Plan)\n- [repo:^github.com/sg-evals/thanos--v0.32.0$ tsdb.Compactor tsdb.BlockReader compact](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fthanos--v0.32.0$%20tsdb.Compactor%20tsdb.BlockReader%20compact)\n- [repo:^github.com/sg-evals/prometheus--v2.47.0$ tsdb/block.go BlockReader interface](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fprometheus--v2.47.0$%20tsdb%2Fblock.go%20BlockReader%20interface)\n- [github.com/sg-evals/prometheus--v2.47.0/tsdb/block.go@a89d063?L41-200](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/tsdb/block.go?L41-200)\n- [github.com/sg-evals/thanos--v0.32.0/pkg/compact/compact.go@4f040e8?L780-870](/github.com/sg-evals/thanos--v0.32.0@4f040e8a7deabc007cfa3bda2f5d3a432011e7b3/-/blob/pkg/compact/compact.go?L780-870)\n- [repo:^github.com/sg-evals/prometheus--v2.47.0$ tsdb/chunkenc/chunk.go EncHistogram EncFloatHistogram](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fprometheus--v2.47.0$%20tsdb%2Fchunkenc%2Fchunk.go%20EncHistogram%20EncFloatHistogram)\n- [github.com/sg-evals/prometheus--v2.47.0/tsdb/chunkenc/chunk.go@a89d063](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/tsdb/chunkenc/chunk.go)\n- [repo:^github.com/sg-evals/thanos--v0.32.0$ chunkenc EncHistogram EncFloatHistogram encoding](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fthanos--v0.32.0$%20chunkenc%20EncHistogram%20EncFloatHistogram%20encoding)\n- [repo:^github.com/sg-evals/thanos--v0.32.0$ pkg/store storepb chunk encoding histogram](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fthanos--v0.32.0$%20pkg%2Fstore%20storepb%20chunk%20encoding%20histogram)\n- [github.com/sg-evals/thanos--v0.32.0/pkg/store/bucket.go@4f040e8?L1125-1160](/github.com/sg-evals/thanos--v0.32.0@4f040e8a7deabc007cfa3bda2f5d3a432011e7b3/-/blob/pkg/store/bucket.go?L1125-1160)\n- [repo:^github.com/sg-evals/thanos--v0.32.0$ pkg/compact NewLeveledCompactor tsdb.NewLeveledCompactor](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fthanos--v0.32.0$%20pkg%2Fcompact%20NewLeveledCompactor%20tsdb.NewLeveledCompactor)\n- [github.com/sg-evals/prometheus--v2.47.0/tsdb/compact.go@a89d063?L130-180](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/tsdb/compact.go?L130-180)\n- [repo:^github.com/sg-evals/thanos--v0.32.0$ pkg/block/metadata meta.go BlockMeta thanos](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fthanos--v0.32.0$%20pkg%2Fblock%2Fmetadata%20meta.go%20BlockMeta%20thanos)\n- [github.com/sg-evals/thanos--v0.32.0/pkg/block/metadata/meta.go@4f040e8?L55-165](/github.com/sg-evals/thanos--v0.32.0@4f040e8a7deabc007cfa3bda2f5d3a432011e7b3/-/blob/pkg/block/metadata/meta.go?L55-165)\n- [github.com/sg-evals/thanos--v0.32.0/pkg/shipper/shipper.go@4f040e8?L1-130](/github.com/sg-evals/thanos--v0.32.0@4f040e8a7deabc007cfa3bda2f5d3a432011e7b3/-/blob/pkg/shipper/shipper.go?L1-130)\n- [repo:^github.com/sg-evals/prometheus--v2.47.0$ tsdb/compact.go populateBlock Write func](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fprometheus--v2.47.0$%20tsdb%2Fcompact.go%20populateBlock%20Write%20func)\n- [github.com/sg-evals/thanos--v0.32.0/pkg/shipper/shipper.go@4f040e8?L130-280](/github.com/sg-evals/thanos--v0.32.0@4f040e8a7deabc007cfa3bda2f5d3a432011e7b3/-/blob/pkg/shipper/shipper.go?L130-280)\n- [repo:^github.com/sg-evals/prometheus--v2.47.0$ tsdb/compact.go Write func LeveledCompactor](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fprometheus--v2.47.0$%20tsdb%2Fcompact.go%20Write%20func%20LeveledCompactor)\n- [github.com/sg-evals/thanos--v0.32.0/pkg/shipper/shipper.go@4f040e8?L280-400](/github.com/sg-evals/thanos--v0.32.0@4f040e8a7deabc007cfa3bda2f5d3a432011e7b3/-/blob/pkg/shipper/shipper.go?L280-400)\n- [repo:^github.com/sg-evals/prometheus--v2.47.0$ tsdb/compact.go BlockPopulator interface CompactWithBlockPopulator](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fprometheus--v2.47.0$%20tsdb%2Fcompact.go%20BlockPopulator%20interface%20CompactWithBlockPopulator)\n- [github.com/sg-evals/thanos--v0.32.0/pkg/store/bucket.go@4f040e8?L1130-1155](/github.com/sg-evals/thanos--v0.32.0@4f040e8a7deabc007cfa3bda2f5d3a432011e7b3/-/blob/pkg/store/bucket.go?L1130-1155)\n- [repo:^github.com/sg-evals/prometheus--v2.47.0$ tsdb/compact.go CompactorMetrics ChunkSize ChunkSamples ChunkRange](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fprometheus--v2.47.0$%20tsdb%2Fcompact.go%20CompactorMetrics%20ChunkSize%20ChunkSamples%20ChunkRange)\n- [repo:^github.com/sg-evals/thanos--v0.32.0$ pkg/compact/overlapping.go OR pkg/compact/compact.go BlockPopulator tsdb.BlockPopulator](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fthanos--v0.32.0$%20pkg%2Fcompact%2Foverlapping.go%20OR%20pkg%2Fcompact%2Fcompact.go%20BlockPopulator%20tsdb.BlockPopulator)\n- [github.com/sg-evals/prometheus--v2.47.0/tsdb/compact.go@a89d063?L660-700](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/tsdb/compact.go?L660-700)\n- [github.com/sg-evals/prometheus--v2.47.0/tsdb/block.go@a89d063?L195-230](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/tsdb/block.go?L195-230)\n\n\nGenerated files:\n- files/IMPACT_REPORT.json: /.api/agent-files/v1/deep-search/2139569e-7f00-48c9-800a-e82eb816db2b/files/IMPACT_REPORT.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "dep-graph-dual-prometheus-thanos-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1934
+    },
+    "mrr": 0.125,
+    "map_score": 0.0625,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0769,
+    "n_retrieved": 13,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "go.mod",
+    "tsdb/compact.go",
+    "tsdb/block.go",
+    "tsdb/chunkenc/chunk.go",
+    "pkg/compact/compact.go",
+    "cmd/thanos/compact.go",
+    "pkg/block/metadata/meta.go",
+    "thanos/pkg/shipper/shipper.go",
+    "pkg/store/bucket.go",
+    "pkg/store/storepb/types.pb.go",
+    "pkg/query/iter.go",
+    "pkg/receive/multitsdb.go",
+    "cmd/thanos/receive.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "dep-graph-dual-prometheus-thanos-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1934
+    },
+    "mrr": 0.125,
+    "map_score": 0.0625,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0769,
+    "n_retrieved": 13,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

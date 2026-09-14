@@ -19,12 +19,28 @@ import argparse
 import json
 import os
 import re
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 ACCOUNT_NAME_RE = re.compile(r"account(\d+)$")
+
+
+def _retired_accounts() -> frozenset[str]:
+    """Read the retired-account list from capacity, whatever the caller's path.
+
+    This module is imported by launchers that put different directories on
+    sys.path, so the import is done here against this file's own directory
+    rather than at module scope.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from capacity import retired_accounts
+    finally:
+        sys.path.pop(0)
+    return retired_accounts()
 
 
 def default_sessions_per_account() -> int:
@@ -69,11 +85,16 @@ def discover_managed_account_homes(real_home: Path) -> list[Path]:
     if not homes_dir.is_dir():
         return []
 
+    retired = _retired_accounts()
     homes: list[Path] = []
     for path in homes_dir.iterdir():
         if not path.is_dir():
             continue
-        if ACCOUNT_NAME_RE.fullmatch(path.name):
+        # A retired account's token still validates, so an expiry-only check
+        # reports it healthy while every agent call 403s. Readiness output that
+        # counts it is worse than silence: it tells an operator there is
+        # capacity that will fail every task routed to it.
+        if ACCOUNT_NAME_RE.fullmatch(path.name) and path.name not in retired:
             homes.append(path)
 
     return sorted(homes, key=lambda path: int(ACCOUNT_NAME_RE.fullmatch(path.name).group(1)))

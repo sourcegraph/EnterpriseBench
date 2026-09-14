@@ -1,0 +1,40 @@
+{
+  "task_id": "support-map-envoy-connpool-001",
+  "checkpoints": {
+    "code_paths": {
+      "expected_solution": "Core code paths: (1) source/common/http/conn_pool_base.cc \u2014 HTTP connection pool base implementation \u2014 defines overflow behavior when max connections exceeded. (2) source/common/http/conn_pool_base.h \u2014 Header declaring connection pool overflow logic and max_connections threshold. (3) source/common/conn_pool/conn_pool_base.cc \u2014 Generic connection pool base \u2014 pending request overflow and circuit breaking integration. (4) source/common/upstream/conn_pool_map_impl.h \u2014 Connection pool map managing per-host pools \u2014 routes requests to specific pools.",
+      "evaluation_criteria": [
+        "Must identify source/common/http/conn_pool_base.cc as part of the core code path",
+        "Must identify source/common/http/conn_pool_base.h as part of the core code path",
+        "Must identify source/common/conn_pool/conn_pool_base.cc as part of the core code path",
+        "Must reference specific functions, types, or methods from the cited files",
+        "Must explain how source/common/http/conn_pool_base.cc interacts with source/common/http/conn_pool_base.h"
+      ]
+    },
+    "ownership": {
+      "expected_solution": "Ownership: the code lives under source/common/conn_pool, source/common/http, source/common/upstream. Subsystem keywords: conn_pool_base, ConnPoolBase, conn_pool_map_impl, ConnPoolMapImpl, conn_pool_base.cc, conn_pool_base.h.",
+      "evaluation_criteria": [
+        "Must identify the owning subsystem (e.g. directory 'source/common/http')",
+        "Must reference the secondary subsystem 'source/common/http'",
+        "Must reference at least one of the ownership keywords: conn_pool_base, ConnPoolBase, conn_pool_map_impl"
+      ]
+    },
+    "severity": {
+      "expected_solution": "Severity: HIGH. The reported symptom affects production stability or correctness for many users; should be fixed in the next release. In this case: Map customer-reported 'upstream connect error, reset reason: overflow' to Envoy connection pool implementation.",
+      "evaluation_criteria": [
+        "Must assess severity as HIGH",
+        "Must justify the severity rating with reference to user impact or blast radius",
+        "Must align severity with the type of failure (e.g. crash vs incorrect-result vs degraded behavior)"
+      ]
+    },
+    "related_issues": {
+      "expected_solution": "Related files and references: (1) envoy/http/conn_pool.h \u2014 Public API header for HTTP connection pool interface. (2) docs/root/intro/arch_overview/upstream/circuit_breaking.rst \u2014 Documentation explaining circuit breaking config (max_connections, max_pending_requests). (3) envoy/router/router.h \u2014 Router interface referencing reset reasons including overflow.",
+      "evaluation_criteria": [
+        "Must reference envoy/http/conn_pool.h as a related file",
+        "Must reference docs/root/intro/arch_overview/upstream/circuit_breaking.rst as a related file",
+        "Must reference envoy/router/router.h as a related file",
+        "Related files should extend beyond the strict required_files set"
+      ]
+    }
+  }
+}

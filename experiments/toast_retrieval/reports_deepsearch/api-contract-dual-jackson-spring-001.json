@@ -1,0 +1,194 @@
+{
+  "task_id": "api-contract-dual-jackson-spring-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/jackson-databind--jackson-databind-2.15.0",
+    "github.com/sg-evals/spring-boot--v3.1.0"
+  ],
+  "retrieved_paths": [
+    "src/main/java/com/fasterxml/jackson/databind/DeserializationFeature.java",
+    "src/main/java/com/fasterxml/jackson/databind/SerializationFeature.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfigurationTests.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonProperties.java",
+    "src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+    "src/main/java/com/fasterxml/jackson/databind/DeserializationConfig.java",
+    "src/main/java/com/fasterxml/jackson/databind/cfg/MapperConfig.java",
+    "release-notes/VERSION-2.x",
+    "spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/spring-mvc.adoc"
+  ],
+  "retrieved_paths_union": [
+    "src/main/java/com/fasterxml/jackson/databind/DeserializationFeature.java",
+    "src/main/java/com/fasterxml/jackson/databind/SerializationFeature.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfigurationTests.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonProperties.java",
+    "src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+    "src/main/java/com/fasterxml/jackson/databind/DeserializationConfig.java",
+    "src/main/java/com/fasterxml/jackson/databind/cfg/MapperConfig.java",
+    "release-notes/VERSION-2.x",
+    "spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/spring-mvc.adoc"
+  ],
+  "required_files": [
+    "jackson-databind/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+    "spring-boot/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-jackson-spring-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.525
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-jackson-spring-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.525
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 156.0,
+  "response_chars": 13279,
+  "raw_response": "---\ntitle: Tracing Jackson version changes affecting Spring Boot JSON behavior\nshare_url: https://demo.sourcegraph.com/deepsearch/0c9d766f-c28f-41f7-988d-75c2449ab5c7\nurl: https://demo.sourcegraph.com/deepsearch/2136\ncreated: 2026-08-17T21:13:47Z\nupdated: 2026-08-17T21:14:57Z\n---\n\n#         # api-contract-dual-jackson-spring-001\n\n        **Suite:** dependency_management | **Type:** api_contract | **Difficulty:** hard\n        **Repos:** jackson-databind + spring-boot\n\n        ## Context\n\n        A Spring Boot service team bumped their Jackson dependency and, with no\ncode changes of their own, started seeing two things happen in production:\n\n- An endpoint that used to reject requests containing unrecognized JSON\n  fields (returning a 400) now accepts them silently.\n- A date field in a JSON response now renders in a different textual\n  format than clients expect, breaking a downstream consumer's parser.\n\nSpring Boot auto-configures Jackson's ObjectMapper as its default JSON\nserializer, so the team suspects the root cause sits at the seam between\nthe two projects rather than in their own application code.\n\nYour task:\n1. Find where Jackson's ObjectMapper defines its default settings and\n   feature flags, and identify what changed between the pinned versions.\n2. Find where Spring Boot auto-configures the Jackson ObjectMapper for its\n   applications.\n3. Explain how the Jackson-level default change propagates into observable\n   behavior at Spring REST endpoints.\n4. Document the migration path for Spring Boot applications that need to\n   restore the old semantics (or adapt to the new ones).\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/jackson-databind--jackson-databind-2.15.0, github.com/sg-evals/spring-boot--v3.1.0\n\nThe report content is complete and correct. Here is a summary of the findings, with the full report written to `/workspace/analysis/IMPACT_REPORT.md`:\n\n---\n\n## Analysis Summary\n\n### Root cause\n\nThe issues are **not caused by a change in Jackson 2.15.0**. The source code confirms `FAIL_ON_UNKNOWN_PROPERTIES(true)` ([DeserializationFeature.java L121](https://demo.sourcegraph.com/r/github.com/sg-evals/jackson-databind--jackson-databind-2.15.0/-/blob/src/main/java/com/fasterxml/jackson/databind/DeserializationFeature.java?L121)) and `WRITE_DATES_AS_TIMESTAMPS(true)` ([SerializationFeature.java L200](https://demo.sourcegraph.com/r/github.com/sg-evals/jackson-databind--jackson-databind-2.15.0/-/blob/src/main/java/com/fasterxml/jackson/databind/SerializationFeature.java?L200)) are **both enabled by default** in the library. The regressions are caused by Spring Boot's auto-configuration **unconditionally overriding** these defaults when wiring up the application's `ObjectMapper`.\n\n### The two overrides in Spring Boot v3.1.0\n\n**[JacksonAutoConfiguration.java L90-L97](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-boot--v3.1.0/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java?L90-L97)** \u2014 static `FEATURE_DEFAULTS` block:\n```java\nfeatureDefaults.put(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);\nfeatureDefaults.put(SerializationFeature.WRITE_DURATIONS_AS_TIMESTAMPS, false);\n```\nThis hard-codes `WRITE_DATES_AS_TIMESTAMPS=false`, flipping date output from numeric epoch to ISO-8601 text.\n\n**`Jackson2ObjectMapperBuilder`'s own opinionated defaults** \u2014 confirmed by the test at [JacksonAutoConfigurationTests.java L286-L288](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-boot--v3.1.0/-/blob/spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfigurationTests.java?L286-L288):\n```java\nassertThat(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES.enabledByDefault()).isTrue();\nassertThat(mapper.getDeserializationConfig().isEnabled(FAIL_ON_UNKNOWN_PROPERTIES)).isFalse();\n```\nThis disables `FAIL_ON_UNKNOWN_PROPERTIES`, causing unknown JSON fields to be silently accepted instead of producing a 400.\n\n### Propagation chain\n\n```\nJackson enum default (FAIL_ON_UNKNOWN_PROPERTIES=true, WRITE_DATES_AS_TIMESTAMPS=true)\n  \u2514\u2500\u25ba DeserializationConfig / SerializationConfig bitmask (MapperConfig.collectFeatureDefaults)\n        \u2514\u2500\u25ba ObjectMapper\n              \u2514\u2500\u25ba Jackson2ObjectMapperBuilder  \u2190 Spring Boot overrides applied here\n                    \u2514\u2500\u25ba @Primary ObjectMapper bean (JacksonAutoConfiguration)\n                          \u2514\u2500\u25ba MappingJackson2HttpMessageConverter\n                                \u2514\u2500\u25ba @RequestBody / @ResponseBody at REST endpoints\n```\n\n### Migration: restoring old semantics\n\n| Behavior to restore | Quickest fix |\n|---|---|\n| Unknown field \u2192 HTTP 400 | `spring.jackson.deserialization.fail-on-unknown-properties=true` in `application.properties` |\n| Dates as numeric timestamps | `spring.jackson.serialization.write-dates-as-timestamps=true` in `application.properties` |\n\nBoth properties flow through [`JacksonProperties`](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-boot--v3.1.0/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonProperties.java?L43) and are applied by [`StandardJackson2ObjectMapperBuilderCustomizer.customize()`](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-boot--v3.1.0/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java?L201-L222) after the `FEATURE_DEFAULTS` are set, so they win. Per-class `@JsonIgnoreProperties(ignoreUnknown=false)` and per-field `@JsonFormat(shape=NUMBER)` are also available for surgical control.\n\nThe full report with all code symbols, file paths, and three migration options per issue is in the artifact above.\n\n## Sources\n\n- [github.com/sg-evals/jackson-databind--jackson-databind-2.15.0/src/main/java/com/fasterxml/jackson/databind/DeserializationFeature.java@7604e33?L100-145](/github.com/sg-evals/jackson-databind--jackson-databind-2.15.0@7604e33d52ab5ea4d0e4fbe136c666339f284924/-/blob/src/main/java/com/fasterxml/jackson/databind/DeserializationFeature.java?L100-145)\n- [github.com/sg-evals/jackson-databind--jackson-databind-2.15.0/src/main/java/com/fasterxml/jackson/databind/SerializationFeature.java@7604e33?L180-260](/github.com/sg-evals/jackson-databind--jackson-databind-2.15.0@7604e33d52ab5ea4d0e4fbe136c666339f284924/-/blob/src/main/java/com/fasterxml/jackson/databind/SerializationFeature.java?L180-260)\n- [github.com/sg-evals/spring-boot--v3.1.0/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java@6f89804?L80-240](/github.com/sg-evals/spring-boot--v3.1.0@6f8980482cbcae83ddcd75ca92741689bf427548/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java?L80-240)\n- [github.com/sg-evals/jackson-databind--jackson-databind-2.15.0/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java@7604e33?L574-640](/github.com/sg-evals/jackson-databind--jackson-databind-2.15.0@7604e33d52ab5ea4d0e4fbe136c666339f284924/-/blob/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java?L574-640)\n- [github.com/sg-evals/spring-boot--v3.1.0/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonProperties.java@6f89804?L1-130](/github.com/sg-evals/spring-boot--v3.1.0@6f8980482cbcae83ddcd75ca92741689bf427548/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonProperties.java?L1-130)\n- [repo:^github.com/sg-evals/jackson-databind--jackson-databind-2.15.0$ FAIL_ON_UNKNOWN_PROPERTIES DEFAULT_VIEW_INCLUSION](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fjackson-databind--jackson-databind-2.15.0$%20FAIL_ON_UNKNOWN_PROPERTIES%20DEFAULT_VIEW_INCLUSION)\n- [github.com/sg-evals/spring-boot--v3.1.0/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java@6f89804?L240-320](/github.com/sg-evals/spring-boot--v3.1.0@6f8980482cbcae83ddcd75ca92741689bf427548/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java?L240-320)\n- [repo:^github.com/sg-evals/jackson-databind--jackson-databind-2.15.0$ FAIL_ON_UNKNOWN_PROPERTIES false](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fjackson-databind--jackson-databind-2.15.0$%20FAIL_ON_UNKNOWN_PROPERTIES%20false)\n- [github.com/sg-evals/jackson-databind--jackson-databind-2.15.0/src/main/java/com/fasterxml/jackson/databind/DeserializationConfig.java@7604e33?L100-150](/github.com/sg-evals/jackson-databind--jackson-databind-2.15.0@7604e33d52ab5ea4d0e4fbe136c666339f284924/-/blob/src/main/java/com/fasterxml/jackson/databind/DeserializationConfig.java?L100-150)\n- [github.com/sg-evals/jackson-databind--jackson-databind-2.15.0/src/main/java/com/fasterxml/jackson/databind/cfg/MapperConfig.java@7604e33?L95-130](/github.com/sg-evals/jackson-databind--jackson-databind-2.15.0@7604e33d52ab5ea4d0e4fbe136c666339f284924/-/blob/src/main/java/com/fasterxml/jackson/databind/cfg/MapperConfig.java?L95-130)\n- [github.com/sg-evals/jackson-databind--jackson-databind-2.15.0/src/main/java/com/fasterxml/jackson/databind/DeserializationConfig.java@7604e33?L30-100](/github.com/sg-evals/jackson-databind--jackson-databind-2.15.0@7604e33d52ab5ea4d0e4fbe136c666339f284924/-/blob/src/main/java/com/fasterxml/jackson/databind/DeserializationConfig.java?L30-100)\n- [github.com/sg-evals/jackson-databind--jackson-databind-2.15.0/release-notes/VERSION-2.x@7604e33?L1-80](/github.com/sg-evals/jackson-databind--jackson-databind-2.15.0@7604e33d52ab5ea4d0e4fbe136c666339f284924/-/blob/release-notes/VERSION-2.x?L1-80)\n- [repo:^github.com/sg-evals/jackson-databind--jackson-databind-2.15.0$ FAIL_ON_UNKNOWN_PROPERTIES release-notes VERSION](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fjackson-databind--jackson-databind-2.15.0$%20FAIL_ON_UNKNOWN_PROPERTIES%20release-notes%20VERSION)\n- [github.com/sg-evals/jackson-databind--jackson-databind-2.15.0/release-notes/VERSION-2.x@7604e33?L80-160](/github.com/sg-evals/jackson-databind--jackson-databind-2.15.0@7604e33d52ab5ea4d0e4fbe136c666339f284924/-/blob/release-notes/VERSION-2.x?L80-160)\n- [repo:^github.com/sg-evals/jackson-databind--jackson-databind-2.15.0$ file:pom.xml version jackson-databind](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fjackson-databind--jackson-databind-2.15.0$%20file:pom.xml%20version%20jackson-databind)\n- [repo:^github.com/sg-evals/jackson-databind--jackson-databind-2.15.0$ file:pom.xml groupId artifactId version 2.15](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fjackson-databind--jackson-databind-2.15.0$%20file:pom.xml%20groupId%20artifactId%20version%202.15)\n- [repo:^github.com/sg-evals/spring-boot--v3.1.0$ jackson-databind version dependency](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fspring-boot--v3.1.0$%20jackson-databind%20version%20dependency)\n- [github.com/sg-evals/spring-boot--v3.1.0/spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfigurationTests.java@6f89804?L260-300](/github.com/sg-evals/spring-boot--v3.1.0@6f8980482cbcae83ddcd75ca92741689bf427548/-/blob/spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfigurationTests.java?L260-300)\n- [github.com/sg-evals/spring-boot--v3.1.0/spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/spring-mvc.adoc@6f89804?L50-100](/github.com/sg-evals/spring-boot--v3.1.0@6f8980482cbcae83ddcd75ca92741689bf427548/-/blob/spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/spring-mvc.adoc?L50-100)\n- [github.com/sg-evals/spring-boot--v3.1.0/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java@6f89804?L1-50](/github.com/sg-evals/spring-boot--v3.1.0@6f8980482cbcae83ddcd75ca92741689bf427548/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java?L1-50)\n\n\nGenerated files:\n- files/IMPACT_REPORT.json: /.api/agent-files/v1/deep-search/0c9d766f-c28f-41f7-988d-75c2449ab5c7/files/IMPACT_REPORT.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-jackson-spring-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.2184
+    },
+    "mrr": 0.1667,
+    "map_score": 0.0833,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "src/main/java/com/fasterxml/jackson/databind/DeserializationFeature.java",
+    "src/main/java/com/fasterxml/jackson/databind/SerializationFeature.java",
+    "spring-boot/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfigurationTests.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonProperties.java",
+    "jackson-databind/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+    "src/main/java/com/fasterxml/jackson/databind/DeserializationConfig.java",
+    "src/main/java/com/fasterxml/jackson/databind/cfg/MapperConfig.java",
+    "release-notes/VERSION-2.x",
+    "spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/spring-mvc.adoc"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-jackson-spring-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.2184
+    },
+    "mrr": 0.1667,
+    "map_score": 0.0833,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

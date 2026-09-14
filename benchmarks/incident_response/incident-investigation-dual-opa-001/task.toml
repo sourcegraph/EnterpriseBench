@@ -1,0 +1,176 @@
+# Incident Investigation: Gatekeeper ConstraintTemplate compile fails after OPA v0->v1 ast version migration
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "opa-rego-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "incident-investigation-dual-opa-001"
+suite = "incident_response"
+task_type = "incident_investigation"
+difficulty = "hard"
+estimated_duration_minutes = 45
+session_type = "single"
+description = "Trace why ConstraintTemplate compilation in Gatekeeper rejects valid Rego after the constraint-framework rego driver pinned `ast.RegoV0` while users wrote `import rego.v1` modules"
+prompt = """
+Your platform team operates an OPA Gatekeeper deployment that admits hundreds
+of policies authored across multiple product teams. After upgrading Gatekeeper
+to v3.17.1 (which bumps `open-policy-agent/frameworks` to a release that
+imports `github.com/open-policy-agent/opa/v1/...`), several
+ConstraintTemplate resources fail to install with errors like:
+
+  status:
+    byPod:
+    - errors:
+      - code: ingest_error
+        message: |-
+          rego_parse_error: var cannot be used for rule name
+              package my.constraint
+                          ^
+          rego_compile_error: rules must not shadow builtin
+            metadata.name (use a different name)
+
+Affected templates compile cleanly with `opa eval` against the same OPA
+binary version Gatekeeper claims to embed (v0.69.0 / v1.0.0 line). New
+templates that DON'T use `import rego.v1` install fine. Templates authored
+with `import rego.v1` (the modern syntax that became default in OPA v1.0)
+fail.
+
+Investigation notes from the platform engineer:
+- Gatekeeper ingests ConstraintTemplates through the
+  `constrainttemplate_controller.Reconcile` path which calls
+  `cfClient.AddTemplate(ctx, unversionedCT)`.
+- The `cfClient` is constructed in `constraint/pkg/client/...` from
+  `open-policy-agent/frameworks`.
+- The framework's rego driver builds an `ast.Compiler` per template inside
+  `constraint/pkg/client/drivers/rego/compilers.go::addTemplate` and uses it
+  to evaluate violations.
+- The driver's `eval()` invocation in `constraint/pkg/client/drivers/rego/driver.go`
+  calls `rego.New(...)` with `rego.SetRegoVersion(ast.RegoV0)` — pinning the
+  Rego language version to v0 even though the user's module declared v1.
+- OPA's own `rego.Compiler` plus `topdown.eval` in `topdown/eval.go` honour
+  per-module Rego version when the compiler is configured with
+  `WithDefaultRegoVersion(ast.RegoV1)` or when the module declares
+  `import rego.v1`.
+- The mismatch means the driver compiles a v1 module with a v0-only language
+  configuration; v1 syntax (`if`, `contains`, `import rego.v1`) is treated as
+  parse errors.
+
+Repos and revisions:
+- /workspace/frameworks/ (open-policy-agent/frameworks @ tag v0.0.0-20240903190546-bb78d2e89500
+  pinned via Gatekeeper v3.17.1's go.mod)
+- /workspace/opa/ (open-policy-agent/opa @ v0.69.0)
+
+Your task:
+1. Find the Gatekeeper-side entry point that submits a ConstraintTemplate to
+   the constraint framework (the controller's Reconcile loop).
+2. Find where the `frameworks` rego driver compiles a template's Rego module
+   and where it pins the Rego language version.
+3. In OPA itself, find how `topdown` decides whether a module is v0 vs v1
+   syntax, and where the Rego version flows from the compiler into evaluation.
+4. Trace the full propagation: user authors `import rego.v1` policy ->
+   Gatekeeper controller submits it to framework client -> rego driver
+   compiles with `ast.RegoV0` -> OPA's parser rejects v1-only syntax ->
+   error surfaces back to the ConstraintTemplate status condition.
+
+Write your incident report to /workspace/frameworks/INCIDENT_REPORT.md with:
+- Root cause identification (file and function in each repo)
+- The specific call site where Rego version is pinned to v0
+- Why the symptom only manifests for `import rego.v1` modules
+- Remediation: the framework driver should respect the module's declared
+  version, OR detect v1 syntax and switch the compiler to RegoV1
+"""
+
+[[repos]]
+url = "https://github.com/open-policy-agent/frameworks"
+rev = "v0.20.0"
+path = "frameworks"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/open-policy-agent/opa"
+rev = "v0.69.0"
+path = "opa"
+role = "dependency"
+
+[metadata]
+languages = ["go"]
+total_loc = 350_000
+dependency_depth = 2
+frameworks = ["opa", "gatekeeper", "rego"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "root_cause_identification"
+weight = 0.35
+verifier = "checks/check_root_cause.sh"
+description = "Agent identifies frameworks rego driver eval() pinning ast.RegoV0 and OPA topdown reading the version from the compiler"
+timeout_seconds = 60
+
+[[checkpoints]]
+name = "error_chain_trace"
+weight = 0.30
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces: user Rego v1 module -> ConstraintTemplate controller AddTemplate -> framework rego driver compile with RegoV0 -> OPA parser rejects v1 syntax"
+timeout_seconds = 60
+
+[[checkpoints]]
+name = "affected_components"
+weight = 0.15
+verifier = "checks/check_affected_components.sh"
+description = "Agent names the framework's rego driver, OPA's ast/topdown packages, and the Gatekeeper constrainttemplate controller"
+timeout_seconds = 60
+
+[[checkpoints]]
+name = "remediation_proposal"
+weight = 0.20
+verifier = "checks/check_remediation.sh"
+description = "Agent proposes either reading version from the module's package or adding a SetRegoVersion option to the driver"
+timeout_seconds = 60
+
+[artifacts]
+required = ["incident_report"]
+optional = ["code_patch"]
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Tracing ConstraintTemplate ingest from a Gatekeeper controller into the constraint framework's rego driver and then into OPA's topdown evaluator requires navigating three Go module boundaries with non-obvious internal-API call sites; MCP cross-repo navigation is essential because the version mismatch is silent at compile time and only surfaces as a runtime parse error from OPA inside the driver's eval()."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "constraint/pkg/client/drivers/rego/driver.go"
+repo = "frameworks"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "constraint/pkg/client/drivers/rego/compilers.go"
+repo = "frameworks"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "topdown/eval.go"
+repo = "opa"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "ast/parser.go"
+repo = "opa"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "constraint/pkg/client/drivers/rego/new.go"
+repo = "frameworks"
+confidence = 0.75
+
+[[ground_truth.sufficient_files]]
+path = "rego/rego.go"
+repo = "opa"
+confidence = 0.80

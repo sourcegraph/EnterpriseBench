@@ -753,6 +753,129 @@ class TestServerTreatmentOverlay:
         )
 
 
+class TestTreatmentVariants:
+    """Each decomposed arm applies its own half of the branch, and only that."""
+
+    @staticmethod
+    def _context(method: str, tool: str | None = None) -> dict:
+        return {7: {"method": method, "tool": tool}}
+
+    @staticmethod
+    def _search(times: int = 1) -> dict:
+        """Run *times* direct searches, returning the last treated payload."""
+        treated: dict = {}
+        for _ in range(times):
+            treated = TestTreatmentVariants._treat(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 7,
+                    "result": {
+                        "content": [{"text": "hits"}],
+                        "structuredContent": {"text": "hits"},
+                    },
+                },
+                "tools/call",
+                "nudge",
+                tool="keyword_search",
+            )
+        return treated
+
+    @staticmethod
+    def _treat(payload: dict, method: str, variant: str, tool: str | None = None) -> dict:
+        body = json.dumps(payload).encode()
+        treated = mcp_telemetry_proxy.apply_treatment(
+            body,
+            "application/json",
+            TestTreatmentVariants._context(method, tool),
+            variant,
+        )
+        return json.loads(treated)
+
+    @pytest.fixture(autouse=True)
+    def _fresh_nudge(self):
+        sourcegraph_server_treatment.reset_nudge_state()
+        yield
+        sourcegraph_server_treatment.reset_nudge_state()
+
+    def test_instructions_variant_leaves_the_tool_list_alone(self) -> None:
+        payload = TestServerTreatmentOverlay._tools_body()
+        treated = self._treat(payload, "tools/list", "instructions")
+        assert treated == payload
+
+    def test_edges_variant_leaves_initialize_alone(self) -> None:
+        treated = self._treat(
+            {"jsonrpc": "2.0", "id": 7, "result": {}}, "initialize", "edges"
+        )
+        assert "instructions" not in treated["result"]
+
+    def test_edges_variant_still_rewrites_the_tool_list(self) -> None:
+        treated = self._treat(
+            TestServerTreatmentOverlay._tools_body(), "tools/list", "edges"
+        )
+        assert "runs its own multi-round search" in treated["result"]["tools"][0][
+            "description"
+        ]
+
+    def test_nudge_reaches_the_schema_carrying_result_the_model_reads(self) -> None:
+        """A schema-carrying tool's structuredContent is what the client shows."""
+        treated = self._search(sourcegraph_server_treatment.NUDGE_AFTER_CALLS)
+        assert "code_finder runs this search loop" in treated["result"][
+            "structuredContent"
+        ]["text"]
+        assert "code_finder runs this search loop" in treated["result"]["content"][0][
+            "text"
+        ]
+
+    def test_a_result_with_no_text_raises_rather_than_running_as_control(self) -> None:
+        self._search(sourcegraph_server_treatment.NUDGE_AFTER_CALLS - 1)
+        with pytest.raises(sourcegraph_server_treatment.TreatmentError):
+            self._treat(
+                {"jsonrpc": "2.0", "id": 7, "result": {"content": []}},
+                "tools/call",
+                "nudge",
+                tool="keyword_search",
+            )
+
+    def test_the_referral_waits_until_the_agent_is_hunting(self) -> None:
+        """A first search on a literal the agent already knows is left alone."""
+        early = self._search(sourcegraph_server_treatment.NUDGE_AFTER_CALLS - 1)
+        assert early["result"]["structuredContent"]["text"] == "hits"
+        assert "code_finder runs this search loop" in self._search()["result"][
+            "structuredContent"
+        ]["text"]
+
+    def test_nudge_fires_once_per_process(self) -> None:
+        after = sourcegraph_server_treatment.NUDGE_AFTER_CALLS
+        assert "code_finder" in self._search(after)["result"]["content"][0]["text"]
+        assert self._search()["result"]["content"][0]["text"] == "hits"
+
+    def test_nudge_leaves_code_finder_results_alone(self) -> None:
+        payload = {"jsonrpc": "2.0", "id": 7, "result": {"content": [{"text": "hits"}]}}
+        self._search(sourcegraph_server_treatment.NUDGE_AFTER_CALLS - 1)
+        assert self._treat(payload, "tools/call", "nudge", tool="code_finder") == payload
+
+    def test_nudge_leaves_errors_alone(self) -> None:
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "result": {"isError": True, "content": [{"text": "boom"}]},
+        }
+        self._search(sourcegraph_server_treatment.NUDGE_AFTER_CALLS - 1)
+        assert (
+            self._treat(payload, "tools/call", "nudge", tool="keyword_search") == payload
+        )
+
+    def test_nudge_variant_does_not_touch_the_tool_list(self) -> None:
+        payload = TestServerTreatmentOverlay._tools_body()
+        assert self._treat(payload, "tools/list", "nudge") == payload
+
+    def test_an_unknown_variant_raises_rather_than_serving_control_text(self) -> None:
+        with pytest.raises(sourcegraph_server_treatment.TreatmentError):
+            self._treat(
+                {"jsonrpc": "2.0", "id": 7, "result": {}}, "initialize", "not-a-variant"
+            )
+
+
 def test_forced_finder_allows_a_repeat_call_once_every_repo_is_covered(
     tmp_path: Path,
 ) -> None:

@@ -1,0 +1,187 @@
+{
+  "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/fastapi--0.110.0",
+    "github.com/sg-evals/pydantic--v2.6.4"
+  ],
+  "retrieved_paths": [
+    "fastapi/routing.py",
+    "fastapi/dependencies/utils.py",
+    "pydantic/main.py",
+    "pydantic/_internal/_generate_schema.py",
+    "pydantic/_internal/_discriminated_union.py",
+    "docs/errors/usage_errors.md",
+    "pydantic/functional_validators.py"
+  ],
+  "retrieved_paths_union": [
+    "fastapi/routing.py",
+    "fastapi/dependencies/utils.py",
+    "pydantic/main.py",
+    "pydantic/_internal/_generate_schema.py",
+    "pydantic/_internal/_discriminated_union.py",
+    "docs/errors/usage_errors.md",
+    "pydantic/functional_validators.py"
+  ],
+  "required_files": [
+    "fastapi/fastapi/dependencies/utils.py",
+    "fastapi/fastapi/routing.py",
+    "pydantic/pydantic/main.py",
+    "pydantic/pydantic/_internal/_discriminated_union.py"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.8889,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.9829,
+      "10": 0.9829
+    },
+    "mrr": 1.0,
+    "map_score": 0.95,
+    "file_recall": 1.0,
+    "context_efficiency": 0.5714,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.8889,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.9829,
+      "10": 0.9829
+    },
+    "mrr": 1.0,
+    "map_score": 0.95,
+    "file_recall": 1.0,
+    "context_efficiency": 0.5714,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "elapsed_seconds": 16.7,
+  "response_chars": 4007,
+  "raw_response": "FastAPI validates the parsed request body through `ModelField.validate`; Pydantic v2 compiles model validators and discriminated unions into the core schema, with `before` model validators wrapping the inner model schema. Removing the discriminator before tagged-union validation changes or prevents variant selection; any optional/defaulted union field can then materialize as its default (`None`) without a FastAPI 422.\n\nRelevant files:\n\n- [sg-evals/fastapi--0.110.0:fastapi/routing.py?L196-L285](/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/routing.py?L196-L285) - Route handler reads JSON and calls `solve_dependencies`; the solved values are passed to the endpoint.\n- [sg-evals/fastapi--0.110.0:fastapi/dependencies/utils.py?L522-L647](/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/dependencies/utils.py?L522-L647) - `solve_dependencies()` resolves path/query/header/cookie parameters, then delegates body parameters to `request_body_to_args()`.\n- [sg-evals/fastapi--0.110.0:fastapi/dependencies/utils.py?L685-L764](/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/dependencies/utils.py?L685-L764) - `request_body_to_args()` extracts each body value and calls `field.validate(value, values, loc=loc)`, which invokes the Pydantic-backed field validator and assigns the validated model to `values[field.name]`.\n- [sg-evals/fastapi--0.110.0:fastapi/dependencies/utils.py?L767-L810](/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/dependencies/utils.py?L767-L810) - `get_body_field()` preserves a single Pydantic body parameter or creates an aggregate `BodyModel` for multiple body parameters.\n- [sg-evals/pydantic--v2.6.4:pydantic/main.py?L513-L538](/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/main.py?L513-L538) - `BaseModel.model_validate_json()` delegates to `__pydantic_validator__.validate_json(...)`; the equivalent Python-object path is `model_validate()` at lines 500\u2013511.\n- [sg-evals/pydantic--v2.6.4:pydantic/_internal/_generate_schema.py?L2018-L2062](/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/_internal/_generate_schema.py?L2018-L2062) - `apply_model_validators()` wraps the core schema. `mode='inner'` applies only `before` validators, using `core_schema.*_before_validator_function`, so the preprocessor runs before normal field/union validation.\n- [sg-evals/pydantic--v2.6.4:pydantic/_internal/_generate_schema.py?L1061-L1074](/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/_internal/_generate_schema.py?L1061-L1074) - Field schema generation applies `Field(discriminator=...)` through `_apply_discriminator_to_union()`.\n- [sg-evals/pydantic--v2.6.4:pydantic/_internal/_generate_schema.py?L402-L418](/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/_internal/_generate_schema.py?L402-L418) - `_apply_discriminator_to_union()` converts the union using `_discriminated_union.apply_discriminator()`.\n- [sg-evals/pydantic--v2.6.4:pydantic/_internal/_discriminated_union.py?L38-L95](/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/_internal/_discriminated_union.py?L38-L95) - `apply_discriminators()` and `apply_discriminator()` transform the union into a tagged union.\n- [sg-evals/pydantic--v2.6.4:pydantic/_internal/_discriminated_union.py?L98-L116](/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/_internal/_discriminated_union.py?L98-L116) - `_ApplyInferredDiscriminator` documents and initializes discriminator-key inference and tagged-choice construction.\n- [sg-evals/pydantic--v2.6.4:docs/errors/usage_errors.md?L296-L301](/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/docs/errors/usage_errors.md?L296-L301) - Pydantic explicitly forbids `before`, `wrap`, or `plain` validators directly on the discriminator field because changing it affects model-type selection.\n- [sg-evals/pydantic--v2.6.4:pydantic/functional_validators.py?L530-L590](/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/functional_validators.py?L530-L590) - Public `model_validator(mode='before')` declaration and semantics.",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.5856,
+      "10": 0.5856
+    },
+    "mrr": 1.0,
+    "map_score": 0.4167,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2857,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "fastapi/fastapi/routing.py",
+    "fastapi/fastapi/dependencies/utils.py",
+    "pydantic/pydantic/main.py",
+    "pydantic/_internal/_generate_schema.py",
+    "pydantic/pydantic/_internal/_discriminated_union.py",
+    "docs/errors/usage_errors.md",
+    "pydantic/functional_validators.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.5856,
+      "10": 0.5856
+    },
+    "mrr": 1.0,
+    "map_score": 0.4167,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2857,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

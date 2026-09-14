@@ -1,0 +1,160 @@
+# Imported from CodeScaleBench CCX-compliance-189 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-compliance-189"
+suite = "security_operations"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Grafana User Permission Model Role Coverage Audit"
+
+[[repos]]
+url = "https://github.com/grafana/grafana"
+rev = "26d36ec"
+path = "grafana"
+role = "primary"
+
+[metadata]
+languages = ["go"]
+csb_mirror = "sg-evals/grafana--26d36ec"
+csb_commit = "26d36ec"
+csb_family = "csb_org_compliance"
+csb_category = "compliance-audit"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "pkg/apimachinery/identity/role_type.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/org/model.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/accesscontrol/roles.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/accesscontrol/accesscontrol.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/accesscontrol/evaluator.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/accesscontrol/middleware.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/middleware/middleware.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/middleware/auth.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/accesscontrol/ossaccesscontrol/dashboard.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/accesscontrol/ossaccesscontrol/folder.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/accesscontrol/resourcepermissions/options.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/accesscontrol/resourcepermissions/service.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/dashboards/accesscontrol.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/sqlstore/permissions/dashboard.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/authz/rbac/service.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/authz/zanzana/server/server_batch_check.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/authz/zanzana/common/tuple.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/apiserver/auth/authorizer/role.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/api/accesscontrol.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/folder/folderimpl/folder.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"

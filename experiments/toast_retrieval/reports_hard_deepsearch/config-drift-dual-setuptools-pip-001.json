@@ -1,0 +1,233 @@
+{
+  "task_id": "config-drift-dual-setuptools-pip-001",
+  "policy": "deepsearch",
+  "suite": "platform_engineering",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/setuptools--v67.0.0",
+    "github.com/sg-evals/pip--23.0"
+  ],
+  "retrieved_paths": [
+    "docs/pkg_resources.rst",
+    "pkg_resources/__init__.py",
+    "setuptools/_reqs.py",
+    "setuptools/command/easy_install.py",
+    "setuptools/installer.py",
+    "setuptools/command/develop.py",
+    "setuptools/command/test.py",
+    "src/pip/_vendor/vendor.txt",
+    "src/pip/_vendor/README.rst",
+    "src/pip/_vendor/pkg_resources/__init__.py",
+    "src/pip/_internal/metadata/base.py",
+    "src/pip/_internal/resolution/resolvelib/base.py",
+    "src/pip/_internal/commands/index.py",
+    "src/pip/_vendor/pkg_resources/py31compat.py",
+    "tools/vendoring/patches/pkg_resources.patch",
+    "src/pip/_internal/metadata/__init__.py",
+    "src/pip/_internal/metadata/pkg_resources.py",
+    "src/pip/_vendor/pygments/plugin.py",
+    "src/pip/_internal/commands/debug.py",
+    "github.com/sg-evals/setuptools--v67.0.0",
+    "github.com/sg-evals/pip--23.0",
+    "resolvelib/base.py",
+    "commands/index.py"
+  ],
+  "retrieved_paths_union": [
+    "docs/pkg_resources.rst",
+    "pkg_resources/__init__.py",
+    "setuptools/_reqs.py",
+    "setuptools/command/easy_install.py",
+    "setuptools/installer.py",
+    "setuptools/command/develop.py",
+    "setuptools/command/test.py",
+    "src/pip/_vendor/vendor.txt",
+    "src/pip/_vendor/README.rst",
+    "src/pip/_vendor/pkg_resources/__init__.py",
+    "src/pip/_internal/metadata/base.py",
+    "src/pip/_internal/resolution/resolvelib/base.py",
+    "src/pip/_internal/commands/index.py",
+    "src/pip/_vendor/pkg_resources/py31compat.py",
+    "tools/vendoring/patches/pkg_resources.patch",
+    "src/pip/_internal/metadata/__init__.py",
+    "src/pip/_internal/metadata/pkg_resources.py",
+    "src/pip/_vendor/pygments/plugin.py",
+    "src/pip/_internal/commands/debug.py",
+    "github.com/sg-evals/setuptools--v67.0.0",
+    "github.com/sg-evals/pip--23.0",
+    "resolvelib/base.py",
+    "commands/index.py"
+  ],
+  "required_files": [
+    "setuptools/pkg_resources/__init__.py",
+    "pip/src/pip/_vendor/pkg_resources/__init__.py"
+  ],
+  "ir_scores": {
+    "task_id": "config-drift-dual-setuptools-pip-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.5641
+    },
+    "mrr": 0.5,
+    "map_score": 0.35,
+    "file_recall": 1.0,
+    "context_efficiency": 0.087,
+    "n_retrieved": 23,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "config-drift-dual-setuptools-pip-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.5641
+    },
+    "mrr": 0.5,
+    "map_score": 0.35,
+    "file_recall": 1.0,
+    "context_efficiency": 0.087,
+    "n_retrieved": 23,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 229.3,
+  "response_chars": 21805,
+  "raw_response": "---\ntitle: Analyze config drift between setuptools and pip over pkg_resources deprecation\nshare_url: https://demo.sourcegraph.com/deepsearch/22b5d836-a649-4fea-869c-f08bd348388c\nurl: https://demo.sourcegraph.com/deepsearch/2234\ncreated: 2026-08-18T02:08:53Z\nupdated: 2026-08-18T02:11:37Z\n---\n\n#         # config-drift-dual-setuptools-pip-001\n\n        **Suite:** platform_engineering | **Type:** config_drift | **Difficulty:** expert\n        **Repos:** setuptools + pip\n\n        ## Context\n\n        setuptools 67.0 deprecated pkg_resources in favor of importlib.metadata.\npip vendors its own copy of pkg_resources and uses it for metadata\nresolution, entry point discovery, and namespace package handling.\n\nYour task:\n1. Find where setuptools deprecated/changed pkg_resources APIs\n2. Find where pip vendors and uses pkg_resources internally\n3. Identify which pip features depend on deprecated pkg_resources behavior\n4. Document the drift between setuptools' intended migration path and\n   pip's vendored copy\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/setuptools--v67.0.0, github.com/sg-evals/pip--23.0\n\nThe report content is fully researched. Here is the complete analysis as it would appear in `/workspace/analysis/IMPACT_REPORT.md`:\n\n---\n\n# Config Drift Impact Report: setuptools pkg_resources Deprecation vs pip Vendored Copy\n\n**Repos:** `github.com/sg-evals/setuptools--v67.0.0` | `github.com/sg-evals/pip--23.0`\n\n---\n\n## 1. Summary\n\nsetuptools 67.0 has officially deprecated `pkg_resources` in favor of `importlib.resources` / `importlib.metadata`, and has made breaking API changes (notably removing `LegacyVersion` and making `parse_version` a strict PEP 440 validator). pip 23.0 vendors a **23-major-version-old** fork of `pkg_resources` (from setuptools 44.0.0) that still depends on removed APIs, Python 2 shims (`six`), and requires a manual patch to work at all. The default metadata backend on Python < 3.11 in pip 23.0 is this vendored `pkg_resources`.\n\n---\n\n## 2. setuptools 67.0 \u2014 Changes in pkg_resources\n\n### 2.1 Official Deprecation Notice\n**File:** [`docs/pkg_resources.rst:13\u201319`](https://demo.sourcegraph.com/r/github.com/sg-evals/setuptools--v67.0.0/-/blob/docs/pkg_resources.rst?L13-19)\n\nAn explicit `.. attention::` block states:\n> Use of `pkg_resources` is discouraged in favor of `importlib.resources`, `importlib.metadata`, and their backports. Please consider using those libraries instead of `pkg_resources`.\n\n**Nature:** Documentation/behavioral \u2014 the module is not removed, but marked deprecated.\n\n### 2.2 `parse_version` \u2014 Breaking Signature Change\n**File:** [`pkg_resources/__init__.py:122`](https://demo.sourcegraph.com/r/github.com/sg-evals/setuptools--v67.0.0/-/blob/pkg_resources/__init__.py?L122)\n\n```python\n# setuptools 67.0\nparse_version = packaging.version.Version\n```\n\n`parse_version` is now a **direct alias** for `packaging.version.Version`, which raises `InvalidVersion` on non-PEP-440 strings. Previously it returned a `LegacyVersion` silently.\n\n**Nature:** Breaking behavioral change.\n\n### 2.3 `LegacyVersion` \u2014 Removed\n`LegacyVersion` no longer exists in setuptools 67.0's bundled `packaging` copy (removed in packaging 22.0). Code doing `isinstance(v, LegacyVersion)` or relying on the silent fallback will break.\n\n**Nature:** Removal.\n\n### 2.4 `setuptools._reqs.parse` \u2014 Deprecated Drop-in for `parse_requirements`\n**File:** [`setuptools/_reqs.py:15\u201319`](https://demo.sourcegraph.com/r/github.com/sg-evals/setuptools--v67.0.0/-/blob/setuptools/_reqs.py?L15-19)\n\n```python\ndef parse(strs):\n    \"\"\"\n    Deprecated drop-in replacement for pkg_resources.parse_requirements.\n    \"\"\"\n```\n\n**Nature:** Soft deprecation \u2014 still functional but labeled deprecated.\n\n### 2.5 `appdirs` \u2192 `platformdirs`\n**File:** [`pkg_resources/_vendor/platformdirs/`](https://demo.sourcegraph.com/r/github.com/sg-evals/setuptools--v67.0.0/-/tree/pkg_resources/_vendor/platformdirs)\n\nsetuptools 67.0 vendors `platformdirs \u2265 2.6.2`; the old `appdirs` dependency is gone. `pkg_resources` now imports from `pkg_resources.extern.platformdirs`.\n\n**Nature:** Dependency rename/replacement.\n\n### 2.6 Deprecated setuptools Commands Still Using pkg_resources\nThe following files are themselves deprecated but illustrate continued internal `pkg_resources` coupling:\n- [`setuptools/command/easy_install.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/setuptools--v67.0.0/-/blob/setuptools/command/easy_install.py): uses `pkg_resources.Environment`, `find_distributions`, `normalize_path`, `resource_string`\n- [`setuptools/installer.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/setuptools--v67.0.0/-/blob/setuptools/installer.py): uses `pkg_resources.get_distribution`, `Environment`, `find_distributions`\n- [`setuptools/command/develop.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/setuptools--v67.0.0/-/blob/setuptools/command/develop.py): references `pkg_resources.Distribution`\n- [`setuptools/command/test.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/setuptools--v67.0.0/-/blob/setuptools/command/test.py): uses `resource_listdir` etc.\n\n---\n\n## 3. pip 23.0 \u2014 Vendored pkg_resources and Its Divergence\n\n### 3.1 Vendored Version is setuptools 44.0.0\n**File:** [`src/pip/_vendor/vendor.txt:19`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_vendor/vendor.txt?L19)\n\n```\nsetuptools==44.0.0\n```\n\npip vendors `pkg_resources` from setuptools 44.0.0 \u2014 **23 major versions** behind setuptools 67.0. Per [`src/pip/_vendor/README.rst:101\u2013104`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_vendor/README.rst?L101-104):\n> `setuptools` is completely stripped to only keep `pkg_resources`. `pkg_resources` has been modified to import its dependencies from `pip._vendor`.\n\n### 3.2 `LegacyVersion` \u2014 Still Used, Will Break\n**File:** [`src/pip/_vendor/pkg_resources/__init__.py:127\u2013131`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_vendor/pkg_resources/__init__.py?L127-131) and [`L2652\u20132676`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_vendor/pkg_resources/__init__.py?L2652-2676)\n\n```python\n# pip's vendored pkg_resources\ndef parse_version(v):\n    try:\n        return packaging.version.Version(v)\n    except packaging.version.InvalidVersion:\n        return packaging.version.LegacyVersion(v)   # removed upstream since packaging 22.0\n```\n\n`Distribution._warn_legacy_version` also directly references `packaging.version.LegacyVersion`. This is safe only as long as pip's vendored `packaging` is old enough to include `LegacyVersion`.\n\n**Downstream propagation within pip:**\n- [`src/pip/_internal/metadata/base.py:50`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_internal/metadata/base.py?L50): `DistributionVersion = Union[LegacyVersion, Version]`\n- [`src/pip/_internal/resolution/resolvelib/base.py:12`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_internal/resolution/resolvelib/base.py?L12): `CandidateVersion = Union[LegacyVersion, Version]`\n- [`src/pip/_internal/commands/index.py:5`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_internal/commands/index.py?L5): imports `LegacyVersion`\n\n**Nature:** Latent breakage \u2014 the moment pip upgrades vendored `packaging` past 22.0, all three files fail at import time.\n\n### 3.3 `six` \u2014 Removed Upstream, Still Present\n**File:** [`src/pip/_vendor/pkg_resources/__init__.py:57\u201358`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_vendor/pkg_resources/__init__.py?L57-58) and [`src/pip/_vendor/pkg_resources/py31compat.py:5`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_vendor/pkg_resources/py31compat.py?L5)\n\n```python\nfrom pip._vendor import six\nfrom pip._vendor.six.moves import urllib, map, filter\n```\n\nsetuptools 67.0 has no `six` import; Python 2 support was dropped at setuptools 58.x. pip's vendored copy still carries `six` (pinned at `six==1.16.0` in `vendor.txt`) solely because the vendored `pkg_resources` requires it.\n\n**Nature:** Stale transitive dependency.\n\n### 3.4 `appdirs` \u2192 `platformdirs` Requires Manual Patch\n**File:** [`tools/vendoring/patches/pkg_resources.patch`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/tools/vendoring/patches/pkg_resources.patch)\n\n```diff\n-from pkg_resources.extern import appdirs\n+from pkg_resources.extern import platformdirs\n...\n-or appdirs.user_cache_dir(appname='Python-Eggs')\n+or platformdirs.user_cache_dir(appname='Python-Eggs')\n```\n\npip has to manually patch every vendor sync because the base (setuptools 44.0.0) still uses `appdirs`. This patch must be re-applied on every future vendor update.\n\n**Nature:** Ongoing manual divergence / maintenance debt.\n\n### 3.5 pkg_resources is the Default Metadata Backend for Python < 3.11\n**File:** [`src/pip/_internal/metadata/__init__.py:29\u201365`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_internal/metadata/__init__.py?L29-65)\n\n```python\ndef _should_use_importlib_metadata() -> bool:\n    if sys.version_info < (3, 11):\n        return False    # pkg_resources backend used by default\n\ndef select_backend() -> Backend:\n    if _should_use_importlib_metadata():\n        from . import importlib\n        return cast(Backend, importlib)\n    from . import pkg_resources       # default on Python < 3.11\n    return cast(Backend, pkg_resources)\n```\n\nOn Python < 3.11, pip routes **all** metadata resolution through the vendored `pkg_resources` backend in [`src/pip/_internal/metadata/pkg_resources.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_internal/metadata/pkg_resources.py):\n\n| API used | pkg_resources symbol |\n|----------|---------------------|\n| `Distribution.from_directory` | `PathMetadata`, `Distribution`, `DistInfoDistribution` |\n| `Distribution.from_wheel` | `DistInfoDistribution` |\n| `Distribution.iter_entry_points` | `self._dist.get_entry_map()` |\n| `Distribution.iter_dependencies` | `self._dist.requires()` |\n| `Environment.default` | `pkg_resources.working_set` |\n| `Environment.from_paths` | `pkg_resources.WorkingSet` |\n| `Environment.get_distribution` | `self._ws.require()`, `DistributionNotFound` |\n\n**Nature:** Architectural coupling \u2014 the entire pip metadata layer for Python < 3.11 depends on the deprecated vendored `pkg_resources`.\n\n### 3.6 Namespace Package Handling via Runtime Patching\n**File:** [`src/pip/_vendor/pkg_resources/__init__.py:2290\u20132303`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_vendor/pkg_resources/__init__.py?L2290-2303)\n\nThe vendored copy implements `fixup_namespace_packages` and `file_ns_handler`, managing namespace packages through `pkg_resources`'s `_namespace_handlers` registry \u2014 a mechanism setuptools 67.0 has moved away from in favor of PEP 420 implicit namespaces.\n\n**Nature:** Behavioral divergence \u2014 legacy `declare_namespace()`-style packages may behave differently.\n\n---\n\n## 4. Drift Summary Table\n\n| Area | setuptools 67.0 | pip 23.0 (vendored setuptools 44.0.0) | Drift Type |\n|------|-----------------|---------------------------------------|------------|\n| `parse_version` | Strict PEP 440 (`Version` alias) | Falls back to `LegacyVersion` | Breaking behavioral |\n| `LegacyVersion` | Removed | Still used throughout | Removal |\n| Python 2 / `six` | Fully removed | Still imported (`six==1.16.0`) | Stale dependency |\n| `appdirs` | Replaced by `platformdirs` | Manual patch applied; base still `appdirs` | Manual divergence |\n| `pkg_resources` status | Deprecated | Default backend (Python < 3.11) | Architectural drift |\n| Namespace packages | Implicit PEP 420 via importlib | Runtime `_namespace_handlers` patching | Behavioral |\n| Base setuptools version | 67.0 | 44.0.0 | 23 major versions lag |\n\n---\n\n## 5. Affected pip Features\n\n| pip Feature | Dependency | Risk |\n|-------------|------------|------|\n| Metadata resolution (Python < 3.11) | `pkg_resources.Distribution`, `WorkingSet` | **High** |\n| Entry point discovery | `get_entry_map()`, `iter_entry_points` | **High** |\n| Dependency resolution | `working_set.require()`, `DistributionNotFound` | **High** |\n| Version comparison | `LegacyVersion` fallback | **Medium** (breaks if `packaging` is upgraded) |\n| Namespace package installs | `fixup_namespace_packages` | **Medium** |\n| Pygments plugin discovery | `iter_entry_points` from vendored pkg_resources ([`src/pip/_vendor/pygments/plugin.py:54\u201356`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_vendor/pygments/plugin.py?L54-56)) | Low |\n| `pip debug` version reporting | `setuptools\u2192pkg_resources` alias ([`src/pip/_internal/commands/debug.py:52\u201354`](https://demo.sourcegraph.com/r/github.com/sg-evals/pip--23.0/-/blob/src/pip/_internal/commands/debug.py?L52-54)) | Low |\n\n---\n\n## 6. Migration Recommendations\n\n### For pip Maintainers\n\n1. **Upgrade vendored `pkg_resources` to setuptools 67.x.** Update `vendor.txt` from `setuptools==44.0.0` to `setuptools==67.x`, re-run `vendoring sync`, and retire the `appdirs` patch.\n\n2. **Remove all `LegacyVersion` references from pip internals.** Update `DistributionVersion` and `CandidateVersion` type aliases; remove `LegacyVersion` imports from `base.py`, `resolvelib/base.py`, and `commands/index.py`.\n\n3. **Lower the `importlib.metadata` threshold.** The `sys.version_info < (3, 11)` gate in `_should_use_importlib_metadata()` means Python 3.8\u20133.10 users still run through the deprecated backend. `importlib.metadata` is stable since Python 3.8; consider changing the gate or flipping the default via `_PIP_USE_IMPORTLIB_METADATA=1`.\n\n4. **Replace `get_entry_map()` with `importlib.metadata.entry_points(group=...)`** in `Distribution.iter_entry_points`.\n\n5. **Remove `six`.** Once the vendored `pkg_resources` is upgraded, `six` and `py31compat.py` can be dropped from the vendor bundle entirely.\n\n6. **Audit namespace package install behavior.** Verify that packages using `pkg_resources.declare_namespace()` continue to work once `fixup_namespace_packages` is removed.\n\n### For Downstream Integrators / Distros\n\n- When debundling pip's `pkg_resources`, ensure the system copy is from a setuptools version that still includes `LegacyVersion` **or** that pip's internal `LegacyVersion` references have been patched out.\n- The `debug.py` alias (`if module_name == \"setuptools\": module_name = \"pkg_resources\"`) will misreport versions when system setuptools and pip's vendored copy diverge significantly.\n\n## Sources\n\n- [repo:^github.com/sg-evals/setuptools--v67.0.0$ pkg_resources deprecated](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fsetuptools--v67.0.0$%20pkg_resources%20deprecated)\n- [repo:^github.com/sg-evals/pip--23.0$ pkg_resources file:vendor](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fpip--23.0$%20pkg_resources%20file:vendor)\n- [repo:^github.com/sg-evals/setuptools--v67.0.0$ DeprecationWarning pkg_resources importlib.metadata](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fsetuptools--v67.0.0$%20DeprecationWarning%20pkg_resources%20importlib.metadata)\n- [repo:^github.com/sg-evals/pip--23.0$ pkg_resources file:src/pip](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fpip--23.0$%20pkg_resources%20file:src%2Fpip)\n- [github.com/sg-evals/setuptools--v67.0.0/pkg_resources/__init__.py@88ad8ae?L1-100](/github.com/sg-evals/setuptools--v67.0.0@88ad8aeaf8d087f2cb76ab5ac849956d10cb4ed4/-/blob/pkg_resources/__init__.py?L1-100)\n- [github.com/sg-evals/pip--23.0/src/pip/_internal/metadata/__init__.py@734169d](/github.com/sg-evals/pip--23.0@734169db53a3e7cd725723af80d68ff92fe53f31/-/blob/src/pip/_internal/metadata/__init__.py)\n- [github.com/sg-evals/pip--23.0/src/pip/_internal/metadata/pkg_resources.py@734169d](/github.com/sg-evals/pip--23.0@734169db53a3e7cd725723af80d68ff92fe53f31/-/blob/src/pip/_internal/metadata/pkg_resources.py)\n- [repo:^github.com/sg-evals/setuptools--v67.0.0$ SetuptoolsDeprecationWarning pkg_resources](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fsetuptools--v67.0.0$%20SetuptoolsDeprecationWarning%20pkg_resources)\n- [github.com/sg-evals/pip--23.0](/github.com/sg-evals/pip--23.0)\n- [github.com/sg-evals/pip--23.0/src/pip/_vendor/pkg_resources/__init__.py@734169d?L1-100](/github.com/sg-evals/pip--23.0@734169db53a3e7cd725723af80d68ff92fe53f31/-/blob/src/pip/_vendor/pkg_resources/__init__.py?L1-100)\n- [repo:^github.com/sg-evals/setuptools--v67.0.0$ importlib.metadata file:pkg_resources](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fsetuptools--v67.0.0$%20importlib.metadata%20file:pkg_resources)\n- [github.com/sg-evals/setuptools--v67.0.0/docs/pkg_resources.rst@88ad8ae?L1-60](/github.com/sg-evals/setuptools--v67.0.0@88ad8aeaf8d087f2cb76ab5ac849956d10cb4ed4/-/blob/docs/pkg_resources.rst?L1-60)\n- [github.com/sg-evals/pip--23.0/src/pip/_vendor/pkg_resources/__init__.py@734169d?L100-200](/github.com/sg-evals/pip--23.0@734169db53a3e7cd725723af80d68ff92fe53f31/-/blob/src/pip/_vendor/pkg_resources/__init__.py?L100-200)\n- [repo:^github.com/sg-evals/pip--23.0$ six import file:src/pip/_vendor/pkg_resources](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fpip--23.0$%20six%20import%20file:src%2Fpip%2F_vendor%2Fpkg_resources)\n- [repo:^github.com/sg-evals/pip--23.0$ LegacyVersion packaging.version](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fpip--23.0$%20LegacyVersion%20packaging.version)\n- [repo:^github.com/sg-evals/setuptools--v67.0.0$ LegacyVersion packaging.version](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fsetuptools--v67.0.0$%20LegacyVersion%20packaging.version)\n- [github.com/sg-evals/pip--23.0/tools/vendoring/patches/pkg_resources.patch@734169d](/github.com/sg-evals/pip--23.0@734169db53a3e7cd725723af80d68ff92fe53f31/-/blob/tools/vendoring/patches/pkg_resources.patch)\n- [repo:^github.com/sg-evals/pip--23.0$ entry_points iter_entry_points pkg_resources](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fpip--23.0$%20entry_points%20iter_entry_points%20pkg_resources)\n- [repo:^github.com/sg-evals/setuptools--v67.0.0$ parse_version pkg_resources/__init__.py packaging.version](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fsetuptools--v67.0.0$%20parse_version%20pkg_resources%2F__init__.py%20packaging.version)\n- [repo:^github.com/sg-evals/pip--23.0$ namespace_packages file_ns_handler](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fpip--23.0$%20namespace_packages%20file_ns_handler)\n- [github.com/sg-evals/setuptools--v67.0.0/pkg_resources/__init__.py@88ad8ae?L115-135](/github.com/sg-evals/setuptools--v67.0.0@88ad8aeaf8d087f2cb76ab5ac849956d10cb4ed4/-/blob/pkg_resources/__init__.py?L115-135)\n- [github.com/sg-evals/pip--23.0/src/pip/_vendor/pkg_resources/__init__.py@734169d?L2640-2680](/github.com/sg-evals/pip--23.0@734169db53a3e7cd725723af80d68ff92fe53f31/-/blob/src/pip/_vendor/pkg_resources/__init__.py?L2640-2680)\n- [repo:^github.com/sg-evals/pip--23.0$ _reqs parse_requirements file:src/pip](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fpip--23.0$%20_reqs%20parse_requirements%20file:src%2Fpip)\n- [github.com/sg-evals/pip--23.0/src/pip/_vendor/README.rst@734169d?L90-130](/github.com/sg-evals/pip--23.0@734169db53a3e7cd725723af80d68ff92fe53f31/-/blob/src/pip/_vendor/README.rst?L90-130)\n- [repo:^github.com/sg-evals/setuptools--v67.0.0$ appdirs platformdirs file:pkg_resources](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fsetuptools--v67.0.0$%20appdirs%20platformdirs%20file:pkg_resources)\n- [repo:^github.com/sg-evals/setuptools--v67.0.0$ pkg_resources _reqs.py parse_requirements](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fsetuptools--v67.0.0$%20pkg_resources%20_reqs.py%20parse_requirements)\n- [repo:^github.com/sg-evals/pip--23.0$ vendor.txt pkg_resources setuptools](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fpip--23.0$%20vendor.txt%20pkg_resources%20setuptools)\n- [repo:^github.com/sg-evals/pip--23.0$ file:vendor.txt setuptools](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fpip--23.0$%20file:vendor.txt%20setuptools)\n- [github.com/sg-evals/setuptools--v67.0.0/setuptools/_reqs.py@88ad8ae](/github.com/sg-evals/setuptools--v67.0.0@88ad8aeaf8d087f2cb76ab5ac849956d10cb4ed4/-/blob/setuptools/_reqs.py)\n- [github.com/sg-evals/pip--23.0/src/pip/_vendor/pkg_resources/__init__.py@734169d?L3255-3300](/github.com/sg-evals/pip--23.0@734169db53a3e7cd725723af80d68ff92fe53f31/-/blob/src/pip/_vendor/pkg_resources/__init__.py?L3255-3300)\n\n\nGenerated files:\n- files/IMPACT_REPORT_content.json: /.api/agent-files/v1/deep-search/22b5d836-a649-4fea-869c-f08bd348388c/files/IMPACT_REPORT_content.json\n- files/IMPACT_REPORT.csv: /.api/agent-files/v1/deep-search/22b5d836-a649-4fea-869c-f08bd348388c/files/IMPACT_REPORT.csv\n- files/IMPACT_REPORT_md.json: /.api/agent-files/v1/deep-search/22b5d836-a649-4fea-869c-f08bd348388c/files/IMPACT_REPORT_md.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "config-drift-dual-setuptools-pip-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.5641
+    },
+    "mrr": 0.5,
+    "map_score": 0.35,
+    "file_recall": 1.0,
+    "context_efficiency": 0.087,
+    "n_retrieved": 23,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "docs/pkg_resources.rst",
+    "setuptools/pkg_resources/__init__.py",
+    "setuptools/_reqs.py",
+    "setuptools/command/easy_install.py",
+    "setuptools/installer.py",
+    "setuptools/command/develop.py",
+    "setuptools/command/test.py",
+    "src/pip/_vendor/vendor.txt",
+    "src/pip/_vendor/README.rst",
+    "pip/src/pip/_vendor/pkg_resources/__init__.py",
+    "src/pip/_internal/metadata/base.py",
+    "src/pip/_internal/resolution/resolvelib/base.py",
+    "src/pip/_internal/commands/index.py",
+    "src/pip/_vendor/pkg_resources/py31compat.py",
+    "tools/vendoring/patches/pkg_resources.patch",
+    "src/pip/_internal/metadata/__init__.py",
+    "src/pip/_internal/metadata/pkg_resources.py",
+    "src/pip/_vendor/pygments/plugin.py",
+    "src/pip/_internal/commands/debug.py",
+    "github.com/sg-evals/setuptools--v67.0.0",
+    "github.com/sg-evals/pip--23.0",
+    "resolvelib/base.py",
+    "commands/index.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "config-drift-dual-setuptools-pip-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.5641
+    },
+    "mrr": 0.5,
+    "map_score": 0.35,
+    "file_recall": 1.0,
+    "context_efficiency": 0.087,
+    "n_retrieved": 23,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

@@ -1,0 +1,194 @@
+{
+  "task_id": "support-mapping-dual-nextjs-webpack-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/next.js--v13.5.6",
+    "github.com/sg-evals/webpack--v5.88.2"
+  ],
+  "retrieved_paths": [
+    "packages/next/src/build/webpack-build/impl.ts",
+    "packages/next/src/build/webpack-config.ts",
+    "lib/ResolverFactory.js",
+    "lib/NormalModuleFactory.js",
+    "lib/sharing/resolveMatchedConfigs.js",
+    "lib/sharing/ConsumeSharedPlugin.js",
+    "lib/dependencies/HarmonyModulesPlugin.js",
+    "lib/dependencies/HarmonyExportDependencyParserPlugin.js",
+    "lib/dependencies/HarmonyExportImportedSpecifierDependency.js",
+    "react-dom/index.js"
+  ],
+  "retrieved_paths_union": [
+    "packages/next/src/build/webpack-build/impl.ts",
+    "packages/next/src/build/webpack-config.ts",
+    "lib/ResolverFactory.js",
+    "lib/NormalModuleFactory.js",
+    "lib/sharing/resolveMatchedConfigs.js",
+    "lib/sharing/ConsumeSharedPlugin.js",
+    "lib/dependencies/HarmonyModulesPlugin.js",
+    "lib/dependencies/HarmonyExportDependencyParserPlugin.js",
+    "lib/dependencies/HarmonyExportImportedSpecifierDependency.js",
+    "react-dom/index.js"
+  ],
+  "required_files": [
+    "packages/next/src/build/webpack-config.ts",
+    "lib/NormalModuleFactory.js"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-nextjs-webpack-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6509,
+      "10": 0.6509
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-nextjs-webpack-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6509,
+      "10": 0.6509
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 21.8,
+  "response_chars": 5640,
+  "raw_response": "Next.js generates separate client/server/edge webpack configs, injects React aliases and rules, then invokes the customer\u2019s `config.webpack`; Module Federation subsequently resolves shared requests and webpack validates the resulting module graph/export bindings.\n\nRelevant files:\n\n- [sg-evals/next.js--v13.5.6:packages/next/src/build/webpack-build/impl.ts?L55-L145](/r/github.com/sg-evals/next.js--v13.5.6/-/blob/packages/next/src/build/webpack-build/impl.ts?L55-L145) - Production build entry: creates page entrypoints and calls `getBaseWebpackConfig` for client, server, and edge compilations.\n- [sg-evals/next.js--v13.5.6:packages/next/src/build/webpack-config.ts?L424-L470](/r/github.com/sg-evals/next.js--v13.5.6/-/blob/packages/next/src/build/webpack-config.ts?L424-L470) - `getBaseWebpackConfig`, the central Next.js webpack configuration generator.\n- [sg-evals/next.js--v13.5.6:packages/next/src/build/webpack-config.ts?L152-L205](/r/github.com/sg-evals/next.js--v13.5.6/-/blob/packages/next/src/build/webpack-config.ts?L152-L205) - `createRSCAliases`; maps `react`, `react-dom`, `react-dom/client`, server variants, JSX runtimes, and React Server Components packages to Next\u2019s compiled/vendored implementations.\n- [sg-evals/next.js--v13.5.6:packages/next/src/build/webpack-config.ts?L1659-L1715](/r/github.com/sg-evals/next.js--v13.5.6/-/blob/packages/next/src/build/webpack-config.ts?L1659-L1715) - Server Components webpack rules; applies layer-specific `resolve.alias` values for React and React-DOM.\n- [sg-evals/next.js--v13.5.6:packages/next/src/build/webpack-config.ts?L2368-L2387](/r/github.com/sg-evals/next.js--v13.5.6/-/blob/packages/next/src/build/webpack-config.ts?L2368-L2387) - Finalizes the generated configuration through `buildConfiguration`, including module rules and resolve settings.\n- [sg-evals/next.js--v13.5.6:packages/next/src/build/webpack-config.ts?L2405-L2427](/r/github.com/sg-evals/next.js--v13.5.6/-/blob/packages/next/src/build/webpack-config.ts?L2405-L2427) - Calls the user\u2019s `config.webpack(webpackConfig, context)` after Next\u2019s defaults have been installed. Custom plugins such as Module Federation are added here.\n- [sg-evals/next.js--v13.5.6:packages/next/src/build/webpack-build/impl.ts?L274-L311](/r/github.com/sg-evals/next.js--v13.5.6/-/blob/packages/next/src/build/webpack-build/impl.ts?L274-L311) - Converts webpack compilation errors into the production build failure; also detects incorrectly overridden aliases.\n\n- [sg-evals/webpack--v5.88.2:lib/ResolverFactory.js?L118-L149](/r/github.com/sg-evals/webpack--v5.88.2/-/blob/lib/ResolverFactory.js?L118-L149) - Creates and caches enhanced-resolve resolvers from the effective resolve options.\n- [sg-evals/webpack--v5.88.2:lib/NormalModuleFactory.js?L1018-L1088](/r/github.com/sg-evals/webpack--v5.88.2/-/blob/lib/NormalModuleFactory.js?L1018-L1088) - Resolves loader/module requests and converts resolved paths into normal module creation data.\n- [sg-evals/webpack--v5.88.2:lib/sharing/resolveMatchedConfigs.js?L35-L90](/r/github.com/sg-evals/webpack--v5.88.2/-/blob/lib/sharing/resolveMatchedConfigs.js?L35-L90) - Module Federation shared configuration resolution; classifies requests as resolved, unresolved, or prefixed and uses the normal resolver for fallbacks.\n- [sg-evals/webpack--v5.88.2:lib/sharing/ConsumeSharedPlugin.js?L115-L187](/r/github.com/sg-evals/webpack--v5.88.2/-/blob/lib/sharing/ConsumeSharedPlugin.js?L115-L187) - Resolves shared-module fallback imports; a `react-dom` fallback is resolved using the effective resolver, including Next\u2019s aliases.\n- [sg-evals/webpack--v5.88.2:lib/dependencies/HarmonyModulesPlugin.js?L32-L137](/r/github.com/sg-evals/webpack--v5.88.2/-/blob/lib/dependencies/HarmonyModulesPlugin.js?L32-L137) - Installs parser plugins that record ES-module imports and exports.\n- [sg-evals/webpack--v5.88.2:lib/dependencies/HarmonyExportDependencyParserPlugin.js?L128-L185](/r/github.com/sg-evals/webpack--v5.88.2/-/blob/lib/dependencies/HarmonyExportDependencyParserPlugin.js?L128-L185) - Creates export and star-reexport dependencies while building the module graph.\n- [sg-evals/webpack--v5.88.2:lib/dependencies/HarmonyExportImportedSpecifierDependency.js?L786-L860](/r/github.com/sg-evals/webpack--v5.88.2/-/blob/lib/dependencies/HarmonyExportImportedSpecifierDependency.js?L786-L860) - `_getErrors` compares terminal export bindings from multiple star-export sources and emits a `HarmonyLinkingError` when the same export resolves to different modules.\n\n**Conflict mapping:** Next aliases exact requests such as `react-dom$` and `react-dom/client$` to compiled/vendored files. The customer\u2019s Module Federation configuration then marks React/React-DOM as shared and may resolve a fallback or remote-provided module. Because aliases are applied before normal resolution, the shared request can resolve to Next\u2019s aliased implementation while another Federation path resolves the package\u2019s physical `react-dom/index.js`. Webpack then sees distinct module/export bindings in the same graph; its Harmony export-linking phase reports the conflicting `default`/module resolution or the missing `react-dom/client` path.\n\n**Configuration implication:** preserve Next\u2019s existing `config.resolve.alias`, `module.rules`, and `resolve` options; add Module Federation without replacing them. Share React and React-DOM as singletons with matching versions, and avoid overriding `react-dom`, `react-dom/client`, or Next\u2019s layer-specific aliases. If Federation requires a fallback, explicitly point it at the same React/React-DOM implementation used by Next rather than allowing a second physical package copy.",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-nextjs-webpack-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6509,
+      "10": 0.6509
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "packages/next/src/build/webpack-build/impl.ts",
+    "packages/next/src/build/webpack-config.ts",
+    "lib/ResolverFactory.js",
+    "lib/NormalModuleFactory.js",
+    "lib/sharing/resolveMatchedConfigs.js",
+    "lib/sharing/ConsumeSharedPlugin.js",
+    "lib/dependencies/HarmonyModulesPlugin.js",
+    "lib/dependencies/HarmonyExportDependencyParserPlugin.js",
+    "lib/dependencies/HarmonyExportImportedSpecifierDependency.js",
+    "react-dom/index.js"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-nextjs-webpack-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6509,
+      "10": 0.6509
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

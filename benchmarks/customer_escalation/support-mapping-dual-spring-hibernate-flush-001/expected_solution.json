@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-spring-hibernate-flush-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: spring-framework/spring-orm/src/main/java/org/springframework/orm/jpa/JpaTransactionManager.java, spring-framework/spring-tx/src/main/java/org/springframework/transaction/support/TransactionTemplate.java, hibernate-orm/hibernate-core/src/main/java/org/hibernate/internal/SessionImpl.java, hibernate-orm/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultAutoFlushEventListener.java. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify spring-framework/spring-orm/src/main/java/org/springframework/orm/jpa/JpaTransactionManager.java as part of the error source",
+        "Must identify spring-framework/spring-tx/src/main/java/org/springframework/transaction/support/TransactionTemplate.java as part of the error source",
+        "Must identify hibernate-orm/hibernate-core/src/main/java/org/hibernate/internal/SessionImpl.java as part of the error source",
+        "Must identify hibernate-orm/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultAutoFlushEventListener.java as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) Spring's TransactionTemplate wraps the operation in a JTA-style transaction via JpaTransactionManager which delegates flush decisions to the EntityManager -> (2) Hibernate's SessionImpl owns the dirty-entity action queue; an HQL query triggers DefaultAutoFlushEventListener which flushes pending actions before the query runs -> (3) A native SQL query path bypasses DefaultAutoFlushEventListener because Hibernate cannot determine which entities the SQL touches; FlushMode.AUTO does not apply to native queries -> (4) The native query reads the database directly, sees the pre-save value, and Hibernate's first-level cache still holds the new value; the transaction commits with the discrepancy invisible until downstream code re-reads.",
+      "evaluation_criteria": [
+        "Must describe the step: Spring's TransactionTemplate wraps the operation in a JTA-style transaction via ...",
+        "Must describe the step: Hibernate's SessionImpl owns the dirty-entity action queue; an HQL query trigger...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Customer's @Transactional method calls save() then immediately executes a native query (entityManager.createNativeQuery); (2) Hibernate's auto-flush listener does not fire for native queries, so dirty entities are not written before the SQL executes; (3) Spring's JpaTransactionManager defers the flush to commit, leaving the in-method native read against stale persistent state.",
+      "evaluation_criteria": [
+        "Must identify the condition: Customer's @Transactional method calls save() then immediately executes a native...",
+        "Must identify the condition: Hibernate's auto-flush listener does not fire for native queries, so dirty entit...",
+        "Must identify the condition: Spring's JpaTransactionManager defers the flush to commit, leaving the in-method...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

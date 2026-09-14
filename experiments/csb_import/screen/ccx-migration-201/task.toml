@@ -1,0 +1,130 @@
+# Imported from CodeScaleBench CCX-migration-201 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-migration-201"
+suite = "technical_debt"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Envoy xDS v2 to v3 API Migration"
+
+[[repos]]
+url = "https://github.com/envoyproxy/envoy"
+rev = "v1.31.2"
+path = "envoy"
+role = "primary"
+
+[metadata]
+languages = ["cpp"]
+csb_mirror = "sg-evals/envoy--v1.31.2"
+csb_commit = "cc4a75482810de4b84c301d13deb551bd3147339"
+csb_family = "csb_org_migration"
+csb_category = "migration-inventory"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "source/common/config/type_to_endpoint.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/common/config/utility.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/common/config/subscription_factory_impl.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/extensions/config_subscription/grpc/grpc_mux_impl.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/extensions/config_subscription/grpc/new_grpc_mux_impl.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/extensions/config_subscription/grpc/grpc_subscription_factory.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/extensions/config_subscription/grpc/grpc_subscription_impl.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/extensions/config_subscription/grpc/grpc_collection_subscription_factory.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/extensions/config_subscription/grpc/watch_map.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/extensions/config_subscription/grpc/delta_subscription_state.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/extensions/config_subscription/grpc/pausable_ack_queue.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/common/upstream/cluster_manager_impl.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"

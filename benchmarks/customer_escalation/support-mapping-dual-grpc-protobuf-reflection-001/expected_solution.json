@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-grpc-protobuf-reflection-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: grpc/src/cpp/ext/proto_server_reflection.cc, grpc/src/cpp/ext/proto_server_reflection.h, protobuf/src/google/protobuf/descriptor.cc, protobuf/src/google/protobuf/descriptor.h. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify grpc/src/cpp/ext/proto_server_reflection.cc as part of the error source",
+        "Must identify grpc/src/cpp/ext/proto_server_reflection.h as part of the error source",
+        "Must identify protobuf/src/google/protobuf/descriptor.cc as part of the error source",
+        "Must identify protobuf/src/google/protobuf/descriptor.h as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) grpc-cpp's ProtoServerReflection in proto_server_reflection.cc queries DescriptorPool::generated_pool() to enumerate registered files and symbols -> (2) protobuf v4 changed how generated descriptors register: each .pb.cc registers into the generated_pool via a static initializer, but the pool is now sharded per ABI version -> (3) If the customer's binary links proto-generated code from two .so's compiled with different protobuf headers, only one .so's descriptors land in the pool grpc-cpp queries -> (4) ProtoServerReflection::FileContainingSymbol looks up by symbol name in DescriptorPool::FindFileContainingSymbol; missing entries return nullptr, surfaced to the client as 'message not found'.",
+      "evaluation_criteria": [
+        "Must describe the step: grpc-cpp's ProtoServerReflection in proto_server_reflection.cc queries Descripto...",
+        "Must describe the step: protobuf v4 changed how generated descriptors register: each .pb.cc registers in...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Customer's binary links protobuf-generated code from multiple shared libraries built against different protobuf header versions; (2) protobuf v4's descriptor pool sharding leaves only one .so's descriptors visible to generated_pool; (3) grpc-cpp's reflection service depends on a unified generated_pool and silently returns nullptr on miss.",
+      "evaluation_criteria": [
+        "Must identify the condition: Customer's binary links protobuf-generated code from multiple shared libraries b...",
+        "Must identify the condition: protobuf v4's descriptor pool sharding leaves only one .so's descriptors visible...",
+        "Must identify the condition: grpc-cpp's reflection service depends on a unified generated_pool and silently r...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

@@ -1,0 +1,97 @@
+# dependency_graph: Trace Log4j2 API bridge changes affecting Spring Boot loggin
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "java-enterprise-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "dep-graph-dual-log4j-spring-001"
+suite = "dependency_management"
+task_type = "dependency_graph"
+difficulty = "hard"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Trace Log4j2 API bridge changes affecting Spring Boot logging auto-configuration"
+prompt = """
+Log4j2 restructured its bridge modules (log4j-to-slf4j, log4j-api) in
+a major release, changing how Spring Boot's logging auto-configuration
+detects and configures logging providers.
+
+Your task:
+1. Find where Log4j2 defines its API bridge modules
+2. Find where Spring Boot auto-configures logging providers
+3. Identify how the bridge module restructuring affects detection logic
+4. Document the dependency chain from Spring Boot → SLF4J → Log4j2
+
+Write your analysis to /workspace/analysis/IMPACT_REPORT.md
+"""
+
+[[repos]]
+url = "https://github.com/apache/logging-log4j2"
+rev = "rel/2.20.0"
+path = "log4j2"
+role = "dependency"
+
+[[repos]]
+url = "https://github.com/spring-projects/spring-boot"
+rev = "v3.1.0"
+path = "spring-boot"
+role = "primary"
+
+[metadata]
+languages = ["java"]
+total_loc = 200_000
+dependency_depth = 2
+frameworks = ["log4j2", "spring-boot", "slf4j"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "log4j_bridges"
+weight = 0.30
+verifier = "checks/check_log4j_bridges.sh"
+description = "Agent identifies Log4j2 bridge modules"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "spring_logging_config"
+weight = 0.40
+verifier = "checks/check_spring_logging_config.sh"
+description = "Agent finds Spring Boot logging auto-config"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "dep_chain"
+weight = 0.30
+verifier = "checks/check_dep_chain.sh"
+description = "Agent documents dependency chain"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = ["migration_guide"]
+
+[tool_access]
+expected_mcp_benefit = "medium"
+mcp_benefit_rationale = "Bridge module detection logic in Spring Boot can be found via class name search"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "log4j2/log4j-api/src/main/java/org/apache/logging/log4j/LogManager.java"
+repo = "log4j2"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "spring-boot/spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/LoggingSystem.java"
+repo = "spring-boot"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "spring-boot/spring-boot-project/spring-boot/src/main/java/org/springframework/boot/logging/log4j2/Log4J2LoggingSystem.java"
+repo = "spring-boot"
+confidence = 0.85

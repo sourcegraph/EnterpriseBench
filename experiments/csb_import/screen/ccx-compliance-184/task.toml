@@ -1,0 +1,124 @@
+# Imported from CodeScaleBench CCX-compliance-184 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-compliance-184"
+suite = "security_operations"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Kubernetes Pod Security Context Validation"
+
+[[repos]]
+url = "https://github.com/kubernetes/kubernetes"
+rev = "v1.32.0"
+path = "kubernetes"
+role = "primary"
+
+[metadata]
+languages = ["go"]
+csb_mirror = "sg-evals/kubernetes--v1.32.0"
+csb_commit = "v1.32.0"
+csb_family = "csb_org_compliance"
+csb_category = "compliance-audit"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_secure composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/pod-security-admission/policy/check_runAsNonRoot.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/pod-security-admission/policy/check_privileged.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/pod-security-admission/policy/check_capabilities_baseline.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/pod-security-admission/policy/check_capabilities_restricted.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/pod-security-admission/policy/check_seccompProfile_baseline.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/pod-security-admission/policy/check_seccompProfile_restricted.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/pod-security-admission/policy/checks.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/pod-security-admission/policy/visitor.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/pod-security-admission/policy/helpers.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/apis/core/validation/validation.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kubelet/kuberuntime/security_context_others.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kubelet/kuberuntime/security_context.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/securitycontext/accessors.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "plugin/pkg/admission/security/podsecurity/admission.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"

@@ -1,0 +1,122 @@
+# support_code_mapping: Map customer Wagtail page-tree query slowdown to the Django ORM treebeard MP_Node path-encoding boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "wagtail-django-cms-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-django-wagtail-treepath-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 35
+session_type = "single"
+description = "Map customer Wagtail page-tree query slowdown to the Django ORM treebeard MP_Node path-encoding boundary"
+prompt = """
+A customer reports that their Wagtail site's page navigation is suddenly
+executing N+1 queries per request after they upgraded Django and added a
+thin custom Page subclass. Wagtail's get_descendants() now produces a query
+plan that scans the entire wagtailcore_page table instead of using the
+MP_Node materialized path index.
+
+Your task:
+1. Find where Wagtail's Page model is defined and how it inherits from
+   treebeard's MP_Node (the materialized-path tree mixin) for path-prefix
+   queries.
+2. Find where Django's QuerySet builds the SQL for a startswith path lookup
+   and how the query planner picks between an index scan and a full table
+   scan based on the Field's db_index and ordering.
+3. Trace the cross-repo path from Page.get_descendants() through MP_Node's
+   path filter into Django's QuerySet.filter() and the SQL builder. Cite
+   each file and the function or attribute responsible.
+4. Identify why the customer's custom Page subclass disables the path index
+   (Meta.indexes inheritance + abstract base class semantics on Wagtail's
+   AbstractPage).
+"""
+
+[[repos]]
+url = "https://github.com/wagtail/wagtail"
+rev = "v5.2.2"
+path = "wagtail"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/django/django"
+rev = "4.2.10"
+path = "django"
+role = "upstream"
+
+[metadata]
+languages = ["python"]
+total_loc = 900000
+dependency_depth = 2
+frameworks = ["django", "wagtail", "treebeard"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Tracing get_descendants() from Wagtail's Page model into Django's QuerySet path filter requires cross-repo navigation: Wagtail defines the MP_Node-based Page tree, Django enforces the SQL builder choice. The query plan regression is invisible from either repo alone."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "wagtail/wagtail/models/__init__.py"
+repo = "wagtail"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "wagtail/wagtail/query.py"
+repo = "wagtail"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "django/django/db/models/query.py"
+repo = "django"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "django/django/db/models/sql/compiler.py"
+repo = "django"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "django/django/db/models/options.py"
+repo = "django"
+confidence = 0.75
+
+[[ground_truth.sufficient_files]]
+path = "django/django/db/models/fields/__init__.py"
+repo = "django"
+confidence = 0.7

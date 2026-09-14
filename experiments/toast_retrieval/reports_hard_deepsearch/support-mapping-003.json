@@ -1,0 +1,194 @@
+{
+  "task_id": "support-mapping-003",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/grafana--v10.2.0"
+  ],
+  "retrieved_paths": [
+    "pkg/services/dashboardimport/service/service.go",
+    "public/app/features/manage-dashboards/state/actions.ts",
+    "public/app/features/dashboard/state/PanelModel.ts",
+    "packages/grafana-data/src/panel/getPanelOptionsWithDefaults.ts",
+    "public/app/plugins/panel/table/module.tsx",
+    "packages/grafana-data/src/field/fieldOverrides.ts",
+    "pkg/services/dashboardimport/api/api.go",
+    "public/app/plugins/panel/table/migrations.ts",
+    "pkg/kinds/dashboard/dashboard_spec_gen.go",
+    "packages/grafana-schema/src/veneer/dashboard.types.ts"
+  ],
+  "retrieved_paths_union": [
+    "pkg/services/dashboardimport/service/service.go",
+    "public/app/features/manage-dashboards/state/actions.ts",
+    "public/app/features/dashboard/state/PanelModel.ts",
+    "packages/grafana-data/src/panel/getPanelOptionsWithDefaults.ts",
+    "public/app/plugins/panel/table/module.tsx",
+    "packages/grafana-data/src/field/fieldOverrides.ts",
+    "pkg/services/dashboardimport/api/api.go",
+    "public/app/plugins/panel/table/migrations.ts",
+    "pkg/kinds/dashboard/dashboard_spec_gen.go",
+    "packages/grafana-schema/src/veneer/dashboard.types.ts"
+  ],
+  "required_files": [
+    "pkg/services/dashboardimport/service/service.go",
+    "pkg/services/dashboards/database/database.go",
+    "pkg/components/simplejson/simplejson.go"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-003",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.1,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-003",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.1,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 110.4,
+  "response_chars": 14174,
+  "raw_response": "---\ntitle: Grafana dashboard formatting lost after importing exported JSON\nshare_url: https://demo.sourcegraph.com/deepsearch/68925d88-af23-461a-a137-a0535ec3ba59\nurl: https://demo.sourcegraph.com/deepsearch/2196\ncreated: 2026-08-18T01:43:06Z\nupdated: 2026-08-18T01:44:33Z\n---\n\n# # Support Ticket: Dashboards lose all their formatting after import\n\n**Priority:** Medium\n**Submitted by:** Platform Analytics Team\n**Product:** Grafana (self-hosted)\n\n**Codebase:** Available at `/workspace/grafana/`\n\n---\n\nHi there,\n\nWe're trying to migrate dashboards from our staging Grafana instance to production. We export the dashboard as JSON from staging, then import it into production. The panels all show up and the queries work, but all the visual formatting is gone.\n\nSpecifically, our table panels lose their column widths, the text alignment resets to defaults, and some custom color thresholds we set up disappear. We spent a lot of time getting these dashboards looking right and now we have to redo all the formatting by hand every time we promote a dashboard.\n\nThis happens with every dashboard we import, not just one specific one. The JSON export looks fine when we inspect it -- all the settings are there in the file. But after import, those settings just vanish.\n\nIs there something in the import process that strips out panel configuration? We need to understand what's happening so we can figure out a workaround.\n\nPlease also identify any related source files or components involved in dashboard serialization beyond the core import path (e.g., dashboard model definitions, panel plugin configuration handling, JSON schema validation).\n\nBest,\nAlex\n\n\nSearch only these repositories: github.com/sg-evals/grafana--v10.2.0\n\nNow I have a thorough picture of the issue. Let me compile the findings.\n\n---\n\n## Root Cause: `cleanProperties` strips unrecognized `fieldConfig` entries after plugin load\n\nThe formatting loss is **not** caused by the import pipeline stripping data \u2014 the JSON roundtrip itself is lossless. The problem occurs **after** import, during panel initialization in the browser, inside [`getPanelOptionsWithDefaults`](getPanelOptionsWithDefaults).\n\nHere is the precise chain of events:\n\n---\n\n### 1. Import pipeline (lossless \u2014 not the culprit)\n\nThe backend import service in [`pkg/services/dashboardimport/service/service.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/dashboardimport/service/service.go?L81-L84) only strips three metadata keys (`__elements`, `__inputs`, `__requires`) before saving. The actual panel JSON \u2014 including `fieldConfig`, `options`, column widths, alignment, and thresholds \u2014 passes through untouched.\n\nOn the frontend, [`importDashboard` in `actions.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/public/app/features/manage-dashboards/state/actions.ts?L198-L232) also only manipulates `__inputs` / data source substitutions, then POSTs the full dashboard JSON to `api/dashboards/import`.\n\n---\n\n### 2. The real problem: `cleanProperties` in `getPanelOptionsWithDefaults`\n\nWhen the imported dashboard is **first rendered**, each panel goes through [`PanelModel.pluginLoaded`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/public/app/features/dashboard/state/PanelModel.ts?L435-L465), which calls [`applyPluginOptionDefaults`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/public/app/features/dashboard/state/PanelModel.ts?L423-L433). That function calls [`getPanelOptionsWithDefaults`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/packages/grafana-data/src/panel/getPanelOptionsWithDefaults.ts?L34-L51) \u2192 `applyFieldConfigDefaults` \u2192 **`cleanProperties`**.\n\n`cleanProperties` walks every property inside `fieldConfig.defaults` and **deletes any property not registered in the plugin's `fieldConfigRegistry`**:\n\n```typescript\n// packages/grafana-data/src/panel/getPanelOptionsWithDefaults.ts  L114-L141\nfunction cleanProperties(obj: any, parentPath: string, fieldConfigRegistry: FieldConfigOptionsRegistry) {\n  for (const propName of Object.keys(obj)) {\n    const fullPath = `${parentPath}${propName}`;\n    const existsInRegistry = !!fieldConfigRegistry.getIfExists(fullPath);\n\n    if (isArray(value) || !isObject(value)) {\n      if (!existsInRegistry) {\n        unset(obj, propName);   // <-- silently deleted\n      }\n    } else {\n      const childPropFound = cleanProperties(value, `${fullPath}.`, fieldConfigRegistry);\n      if (!childPropFound) {\n        unset(obj, propName);   // <-- silently deleted\n      }\n    }\n  }\n}\n```\n\nAdditionally, overrides are filtered at [line 79\u201381](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/packages/grafana-data/src/panel/getPanelOptionsWithDefaults.ts?L79-L81):\n\n```typescript\nresult.overrides = filterFieldConfigOverrides(result.overrides, (prop) => {\n  return plugin.fieldConfigRegistry.getIfExists(prop.id) !== undefined;\n});\n```\n\nAny override property whose `id` is not in the registry is silently dropped.\n\n---\n\n### 3. Which specific fields get dropped and why\n\nThe table panel registers its custom `fieldConfig` properties in [`public/app/plugins/panel/table/module.tsx`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/public/app/plugins/panel/table/module.tsx?L25-L100):\n\n| Registered property | JSON path | What it controls |\n|---|---|---|\n| `custom.minWidth` | `fieldConfig.defaults.custom.minWidth` | Minimum column width |\n| `custom.width` | `fieldConfig.defaults.custom.width` | Explicit column width |\n| `custom.align` | `fieldConfig.defaults.custom.align` | Text alignment |\n| `custom.cellOptions` | `fieldConfig.defaults.custom.cellOptions` | Color/display mode |\n| `custom.filterable` | `fieldConfig.defaults.custom.filterable` | Column filter toggle |\n| `custom.hidden` | `fieldConfig.defaults.custom.hidden` | Hide column |\n\n**Any property in `fieldConfig.defaults.custom` or in override `properties` that is not in this registered list will be silently removed by `cleanProperties` / `filterFieldConfigOverrides` on first load.** This is the most likely cause if you are seeing cross-version issues (e.g., a property added in one Grafana version being exported to an instance running an older version with a narrower registry).\n\nFor **thresholds and color specifically**: if the exported JSON has `fieldConfig.defaults.color` but without a valid `mode`, [`validateFieldConfig`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/packages/grafana-data/src/field/fieldOverrides.ts?L390-L411) at line 400\u2013403 deletes the color block entirely:\n\n```typescript\n} else if (!config.color.mode) {\n  delete config.color;\n}\n```\n\n---\n\n### 4. `getSaveModel` \u2014 default-value elision at export time\n\nA secondary contributor: [`PanelModel.getSaveModel`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/public/app/features/dashboard/state/PanelModel.ts?L298-L334) skips any property that `isEqual` to the panel's declared defaults:\n\n```typescript\nif (isEqual(this[property], defaults[property])) {\n  continue;  // not written to the exported JSON\n}\n```\n\nThe `defaults` object (lines [117\u2013128](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/public/app/features/dashboard/state/PanelModel.ts?L117-L128)) sets `fieldConfig: { defaults: {}, overrides: [] }`. If the staging panel's `fieldConfig` was built solely from plugin defaults (no explicit overrides stored), those values won't appear in the exported JSON at all \u2014 so importing the file leaves those fields at whatever the production instance's plugin defaults are, which may differ.\n\n---\n\n### Summary of what causes each symptom\n\n| Symptom | Cause |\n|---|---|\n| Column widths disappear | `custom.width` / `custom.minWidth` override properties dropped by `filterFieldConfigOverrides` if not in registry, or not exported because they equal plugin defaults |\n| Text alignment resets | `custom.align` defaults to `'auto'`; if set to `'auto'` in staging it may not be exported (`getSaveModel` elision), or is set in an override that `filterFieldConfigOverrides` silently drops |\n| Color thresholds vanish | Overrides with `id: 'thresholds'` dropped if not in registry; `color` block deleted by `validateFieldConfig` if `mode` is missing |\n\n---\n\n### Related files and components\n\n| File | Role |\n|---|---|\n| [`pkg/services/dashboardimport/service/service.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/dashboardimport/service/service.go) | Backend import orchestration |\n| [`pkg/services/dashboardimport/api/api.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/dashboardimport/api/api.go) | HTTP handler for `POST /api/dashboards/import` |\n| [`public/app/features/manage-dashboards/state/actions.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/public/app/features/manage-dashboards/state/actions.ts) | Frontend import action / payload builder |\n| [`public/app/features/dashboard/state/PanelModel.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/public/app/features/dashboard/state/PanelModel.ts) | `getSaveModel` (export) + `pluginLoaded` / `applyPluginOptionDefaults` (import-side initialization) |\n| [`packages/grafana-data/src/panel/getPanelOptionsWithDefaults.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/packages/grafana-data/src/panel/getPanelOptionsWithDefaults.ts) | **`cleanProperties`** and **`filterFieldConfigOverrides`** \u2014 the actual field-stripping logic |\n| [`packages/grafana-data/src/field/fieldOverrides.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/packages/grafana-data/src/field/fieldOverrides.ts?L390-L411) | `validateFieldConfig` \u2014 deletes `color` if `mode` is absent |\n| [`public/app/plugins/panel/table/module.tsx`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/public/app/plugins/panel/table/module.tsx) | Defines which custom `fieldConfig` properties are registered for table panels |\n| [`public/app/plugins/panel/table/migrations.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/public/app/plugins/panel/table/migrations.ts) | Legacy angular \u2192 react table migration (alignment, thresholds, cell color) |\n| [`pkg/kinds/dashboard/dashboard_spec_gen.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/kinds/dashboard/dashboard_spec_gen.go?L365-L451) | Generated Go schema for `FieldConfig` / `FieldConfigSource` |\n| [`packages/grafana-schema/src/veneer/dashboard.types.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/packages/grafana-schema/src/veneer/dashboard.types.ts) | TypeScript schema types for panels and field config |\n\n---\n\n### Recommended workaround\n\n1. **Ensure both Grafana instances are on the same version.** The `fieldConfigRegistry` is populated at runtime from the installed plugin version. A mismatch means properties registered in the newer plugin are unknown to the older one and get stripped.\n2. **Verify all affected properties are stored as overrides, not defaults.** Properties stored in `fieldConfig.defaults.custom.*` that exactly match plugin defaults are elided at export time by `getSaveModel`. Storing them as per-column overrides (`fieldConfig.overrides`) is more robust.\n3. **Check that `color` objects always include a `mode` field** before exporting, since `validateFieldConfig` silently drops any `color` block that lacks a `mode`.\n\n## Sources\n\n- [github.com/sg-evals/grafana--v10.2.0/pkg/services/dashboardimport/service/service.go@6e54105](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/services/dashboardimport/service/service.go)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/features/dashboard/state/PanelModel.ts@6e54105?L280-360](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/features/dashboard/state/PanelModel.ts?L280-360)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/features/manage-dashboards/state/actions.ts@6e54105?L1-240](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/features/manage-dashboards/state/actions.ts?L1-240)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/features/dashboard/state/PanelModel.ts@6e54105?L1-130](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/features/dashboard/state/PanelModel.ts?L1-130)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/features/dashboard/state/PanelModel.ts@6e54105?L130-280](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/features/dashboard/state/PanelModel.ts?L130-280)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/plugins/panel/table/migrations.ts@6e54105](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/plugins/panel/table/migrations.ts)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/features/dashboard/state/PanelModel.ts@6e54105?L360-530](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/features/dashboard/state/PanelModel.ts?L360-530)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/plugins/panel/table/module.tsx@6e54105?L1-100](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/plugins/panel/table/module.tsx?L1-100)\n- [github.com/sg-evals/grafana--v10.2.0/packages/grafana-data/src/panel/getPanelOptionsWithDefaults.ts@6e54105](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/packages/grafana-data/src/panel/getPanelOptionsWithDefaults.ts)\n- [github.com/sg-evals/grafana--v10.2.0/packages/grafana-data/src/field/fieldOverrides.ts@6e54105?L360-430](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/packages/grafana-data/src/field/fieldOverrides.ts?L360-430)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-003",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.1,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "pkg/services/dashboardimport/service/service.go",
+    "public/app/features/manage-dashboards/state/actions.ts",
+    "public/app/features/dashboard/state/PanelModel.ts",
+    "packages/grafana-data/src/panel/getPanelOptionsWithDefaults.ts",
+    "public/app/plugins/panel/table/module.tsx",
+    "packages/grafana-data/src/field/fieldOverrides.ts",
+    "pkg/services/dashboardimport/api/api.go",
+    "public/app/plugins/panel/table/migrations.ts",
+    "pkg/kinds/dashboard/dashboard_spec_gen.go",
+    "packages/grafana-schema/src/veneer/dashboard.types.ts"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-003",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.1,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

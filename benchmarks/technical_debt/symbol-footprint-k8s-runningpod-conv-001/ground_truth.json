@@ -1,0 +1,37 @@
+{
+  "task_id": "symbol-footprint-k8s-runningpod-conv-001",
+  "repo": "kubernetes/kubernetes",
+  "repo_rev": "v1.34.0",
+  "required_files": [
+    {
+      "path": "pkg/kubelet/container/helpers.go",
+      "repo": "kubernetes",
+      "confidence": 1.0,
+      "source": "deterministic",
+      "rationale": "Contains a word-boundary occurrence of 'ConvertPodStatusToRunningPod'."
+    },
+    {
+      "path": "pkg/kubelet/kubelet.go",
+      "repo": "kubernetes",
+      "confidence": 1.0,
+      "source": "deterministic",
+      "rationale": "Contains a word-boundary occurrence of 'ConvertPodStatusToRunningPod'."
+    },
+    {
+      "path": "pkg/kubelet/kuberuntime/kuberuntime_manager.go",
+      "repo": "kubernetes",
+      "confidence": 1.0,
+      "source": "deterministic",
+      "rationale": "Contains a word-boundary occurrence of 'ConvertPodStatusToRunningPod'."
+    }
+  ],
+  "sufficient_files": [],
+  "provenance": {
+    "oracle": "text (word-boundary match)",
+    "command": "git grep -lw 'ConvertPodStatusToRunningPod' -- pkg",
+    "clone": "kubernetes--v1.34.0",
+    "scope": "pkg",
+    "excluded": "(^|/)(tests?|testing|vendor|third_party|node_modules|examples?|docs?|fixtures?)(/|$)|_test\\.|test_|\\.pb\\.go$|(^|/)CHANGELOG|generated",
+    "bias_note": "The oracle for this axis is the same class of tool as one experimental condition's primitive. That condition can reproduce this key more directly than the others, which is a property of the axis and must be stated with any per-category claim drawn from it."
+  }
+}

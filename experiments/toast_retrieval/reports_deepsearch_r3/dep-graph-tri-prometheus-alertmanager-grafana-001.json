@@ -1,0 +1,208 @@
+{
+  "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/prometheus--v2.47.0",
+    "github.com/sg-evals/alertmanager--v0.26.0",
+    "github.com/sg-evals/grafana--v10.2.0"
+  ],
+  "retrieved_paths": [
+    "notifier/notifier.go",
+    "rules/alerting.go",
+    "rules/manager.go",
+    "types/types.go",
+    "api/v2/api.go",
+    "pkg/services/ngalert/api/lotex_prom.go",
+    "web/api/v1/api.go",
+    "api/v2/models/alert.go",
+    "public/app/features/alerting/unified/api/alertmanager.ts",
+    "pkg/services/ngalert/api/api_prometheus.go",
+    "api/v1/api.go",
+    "public/app/features/alerting/unified/api/prometheus.ts",
+    "api/v2/compat.go",
+    "api/v2/models/gettable_alert.go"
+  ],
+  "retrieved_paths_union": [
+    "notifier/notifier.go",
+    "rules/alerting.go",
+    "rules/manager.go",
+    "types/types.go",
+    "api/v2/api.go",
+    "pkg/services/ngalert/api/lotex_prom.go",
+    "web/api/v1/api.go",
+    "api/v2/models/alert.go",
+    "public/app/features/alerting/unified/api/alertmanager.ts",
+    "pkg/services/ngalert/api/api_prometheus.go",
+    "api/v1/api.go",
+    "public/app/features/alerting/unified/api/prometheus.ts",
+    "api/v2/compat.go",
+    "api/v2/models/gettable_alert.go"
+  ],
+  "required_files": [
+    "prometheus/rules/alerting.go",
+    "alertmanager/api/v2/restapi/operations/alert/post_alerts.go",
+    "grafana/pkg/services/ngalert/api/api_prometheus.go"
+  ],
+  "ir_scores": {
+    "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.2961,
+      "10": 0.4317
+    },
+    "mrr": 0.5,
+    "map_score": 0.2333,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.2961,
+      "10": 0.4317
+    },
+    "mrr": 0.5,
+    "map_score": 0.2333,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 220.5,
+  "response_chars": 6527,
+  "raw_response": "---\ntitle: Trace Prometheus\u2013Alertmanager\u2013Grafana alert API contract and migration impact\nshare_url: https://demo.sourcegraph.com/deepsearch/033a9589-732d-47ba-9b19-bc16967134b2\nurl: https://demo.sourcegraph.com/deepsearch/2182\ncreated: 2026-08-17T23:03:59Z\nupdated: 2026-08-17T23:07:27Z\n---\n\n#         # dep-graph-tri-prometheus-alertmanager-grafana-001\n\n        **Suite:** dependency_management | **Type:** dependency_graph | **Difficulty:** expert\n        **Repos:** prometheus + alertmanager + grafana\n\n        ## Context\n\n        Prometheus changed its alerting rule evaluation and notification API.\nAlertmanager receives alerts from Prometheus, and Grafana reads alert\nstate from both. Changes in Prometheus' alert format cascade downstream.\n\nYour task:\n1. Find where Prometheus defines alert rule evaluation and notification format\n2. Find where Alertmanager receives and processes Prometheus alerts\n3. Find where Grafana queries Prometheus and Alertmanager for alert state\n4. Document the three-way API contract and cascade points\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/prometheus--v2.47.0, github.com/sg-evals/alertmanager--v0.26.0, github.com/sg-evals/grafana--v10.2.0\n\n**Error:** An error occurred while processing your question.\n\n## Sources\n\n- [github.com/sg-evals/prometheus--v2.47.0/notifier/notifier.go@a89d063?L56-91](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/notifier/notifier.go?L56-91)\n- [github.com/sg-evals/prometheus--v2.47.0/rules/alerting.go@a89d063?L49-110](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/rules/alerting.go?L49-110)\n- [github.com/sg-evals/prometheus--v2.47.0/rules/manager.go@a89d063?L1241-1268](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/rules/manager.go?L1241-1268)\n- [github.com/sg-evals/alertmanager--v0.26.0/types/types.go@fbc1fdc?L280-340](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/types/types.go?L280-340)\n- [github.com/sg-evals/alertmanager--v0.26.0/api/v2/api.go@fbc1fdc?L308-360](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/api/v2/api.go?L308-360)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/services/ngalert/api/lotex_prom.go@6e54105?L1-80](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/services/ngalert/api/lotex_prom.go?L1-80)\n- [github.com/sg-evals/prometheus--v2.47.0/web/api/v1/api.go@a89d063?L1166-1212](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/web/api/v1/api.go?L1166-1212)\n- [github.com/sg-evals/alertmanager--v0.26.0/api/v2/models/alert.go@fbc1fdc](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/api/v2/models/alert.go)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/features/alerting/unified/api/alertmanager.ts@6e54105?L116-160](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/features/alerting/unified/api/alertmanager.ts?L116-160)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/services/ngalert/api/api_prometheus.go@6e54105?L203-250](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/services/ngalert/api/api_prometheus.go?L203-250)\n- [github.com/sg-evals/alertmanager--v0.26.0/api/v1/api.go@fbc1fdc?L395-445](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/api/v1/api.go?L395-445)\n- [github.com/sg-evals/prometheus--v2.47.0/notifier/notifier.go@a89d063?L451-510](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/notifier/notifier.go?L451-510)\n- [github.com/sg-evals/alertmanager--v0.26.0/api/v2/api.go@fbc1fdc?L233-308](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/api/v2/api.go?L233-308)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/features/alerting/unified/api/prometheus.ts@6e54105?L1-140](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/features/alerting/unified/api/prometheus.ts?L1-140)\n- [repo:^github.com/sg-evals/alertmanager--v0.26.0$ OpenAPIAlertsToAlerts](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Falertmanager--v0.26.0$%20OpenAPIAlertsToAlerts)\n- [github.com/sg-evals/alertmanager--v0.26.0/api/v2/compat.go@fbc1fdc?L140-210](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/api/v2/compat.go?L140-210)\n- [github.com/sg-evals/prometheus--v2.47.0/notifier/notifier.go@a89d063?L510-560](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/notifier/notifier.go?L510-560)\n- [repo:^github.com/sg-evals/prometheus--v2.47.0$ alertsToOpenAPIAlerts](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fprometheus--v2.47.0$%20alertsToOpenAPIAlerts)\n- [github.com/sg-evals/alertmanager--v0.26.0/api/v2/compat.go@fbc1fdc?L1-140](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/api/v2/compat.go?L1-140)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/services/ngalert/api/api_prometheus.go@6e54105?L1-80](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/services/ngalert/api/api_prometheus.go?L1-80)\n- [github.com/sg-evals/prometheus--v2.47.0/rules/alerting.go@a89d063?L324-430](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/rules/alerting.go?L324-430)\n- [github.com/sg-evals/alertmanager--v0.26.0/api/v2/models/gettable_alert.go@fbc1fdc](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/api/v2/models/gettable_alert.go)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.2961,
+      "10": 0.4317
+    },
+    "mrr": 0.5,
+    "map_score": 0.2333,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "notifier/notifier.go",
+    "prometheus/rules/alerting.go",
+    "rules/manager.go",
+    "types/types.go",
+    "api/v2/api.go",
+    "pkg/services/ngalert/api/lotex_prom.go",
+    "web/api/v1/api.go",
+    "api/v2/models/alert.go",
+    "public/app/features/alerting/unified/api/alertmanager.ts",
+    "grafana/pkg/services/ngalert/api/api_prometheus.go",
+    "api/v1/api.go",
+    "public/app/features/alerting/unified/api/prometheus.ts",
+    "api/v2/compat.go",
+    "api/v2/models/gettable_alert.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.2961,
+      "10": 0.4317
+    },
+    "mrr": 0.5,
+    "map_score": 0.2333,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

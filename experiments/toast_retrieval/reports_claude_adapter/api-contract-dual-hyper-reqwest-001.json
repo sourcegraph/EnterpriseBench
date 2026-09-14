@@ -1,0 +1,250 @@
+{
+  "task_id": "api-contract-dual-hyper-reqwest-001",
+  "policy": "claude_adapter",
+  "model": "anthropic/claude-sonnet-5",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/hyper--v1.0.0",
+    "github.com/sg-evals/reqwest--v0.11.22"
+  ],
+  "retrieved_paths": [
+    "src/body/mod.rs",
+    "src/body/incoming.rs",
+    "src/body/length.rs",
+    "Cargo.toml",
+    "src/async_impl/body.rs",
+    "src/async_impl/client.rs",
+    "src/blocking/body.rs",
+    "src/blocking/client.rs",
+    "src/async_impl/response.rs",
+    "src/async_impl/decoder.rs",
+    "src/async_impl/h3_client/mod.rs"
+  ],
+  "required_files": [
+    "hyper/src/body/mod.rs",
+    "reqwest/src/async_impl/client.rs"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "claude_adapter",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8316
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1818,
+    "n_retrieved": 11,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "rounds_executed": 4,
+  "input_tokens": 29968,
+  "output_tokens": 1296,
+  "token_counting": "provider_reported",
+  "elapsed_seconds": 18.4,
+  "transcript": [
+    {
+      "role": "system",
+      "content": "You are a code retrieval policy. Given a task, find the source files required to carry it out. Search only these repositories: github.com/sg-evals/hyper--v1.0.0, github.com/sg-evals/reqwest--v0.11.22. When you are confident, call submit_files with every required file, most important first, using repo-relative paths exactly as the tools returned them."
+    },
+    {
+      "role": "user",
+      "content": "        # api-contract-dual-hyper-reqwest-001\n\n        **Suite:** dependency_management | **Type:** api_contract | **Difficulty:** hard\n        **Repos:** hyper + reqwest\n\n        ## Context\n\n        Between the versions pinned in this workspace, hyper made a breaking\nchange to how it represents request/response bodies, and reqwest is pinned\nto a version that predates that change. The reqwest HTTP client depends\nheavily on hyper's body-related types in its client implementation.\n\nYour task:\n1. Find where hyper defines its body-related types and traits in this\n   version, and work out what changed relative to what reqwest expects.\n2. Find where reqwest uses hyper's body type(s) in its client implementation.\n3. Identify the contract mismatch between hyper's current body types\n   and reqwest's existing usage.\n4. Document the migration path for each affected reqwest module, citing the\n   specific files, types, and functions involved on both sides.\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_015M9Lmmvy9u9ZvUKeRVT7ht",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"pub struct Body|pub trait Body|mod body\", \"top_k\": 50}"
+          }
+        },
+        {
+          "id": "toolu_01DieC49p8symJufFjYWcfRm",
+          "type": "function",
+          "function": {
+            "name": "list_files",
+            "arguments": "{\"repo\": \"github.com/sg-evals/hyper--v1.0.0\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_015M9Lmmvy9u9ZvUKeRVT7ht",
+      "content": "[]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01DieC49p8symJufFjYWcfRm",
+      "content": "[\".github/FUNDING.yml\", \".github/ISSUE_TEMPLATE/bug_report.md\", \".github/ISSUE_TEMPLATE/feature_request.md\", \".github/PULL_REQUEST_TEMPLATE\", \".github/workflows/CI.yml\", \".github/workflows/bench.yml\", \".github/workflows/external-types.toml\", \".gitignore\", \"CHANGELOG.md\", \"CONTRIBUTING.md\", \"Cargo.toml\", \"LICENSE\", \"README.md\", \"SECURITY.md\", \"benches/body.rs\", \"benches/connect.rs\", \"benches/end_to_end.rs\", \"benches/pipeline.rs\", \"benches/server.rs\", \"benches/support/mod.rs\", \"benches/support/tokiort.rs\", \"capi/README.md\", \"capi/cbindgen.toml\", \"capi/examples/Makefile\", \"capi/examples/client.c\", \"capi/examples/upload.c\", \"capi/gen_header.sh\", \"capi/include/hyper.h\", \"docs/CODE_OF_CONDUCT.md\", \"docs/COMMITS.md\", \"docs/GOVERNANCE.md\", \"docs/ISSUES.md\", \"docs/MAINTAINERS.md\", \"docs/MSRV.md\", \"docs/PULL_REQUESTS.md\", \"docs/README.md\", \"docs/ROADMAP.md\", \"docs/TENETS.md\", \"docs/VISION.md\", \"docs/vision-arch.svg\", \"examples/README.md\", \"examples/client.rs\", \"examples/client_json.rs\", \"examples/echo.rs\", \"examples/gateway.rs\", \"examples/graceful_shutdown.rs\", \"examples/hello.rs\", \"examples/http_proxy.rs\", \"examples/multi_server.rs\", \"examples/params.rs\", \"examples/send_file.rs\", \"examples/send_file_index.html\", \"examples/service_struct_impl.rs\", \"examples/single_threaded.rs\", \"examples/state.rs\", \"examples/upgrades.rs\", \"examples/web_api.rs\", \"src/body/incoming.rs\", \"src/body/length.rs\", \"src/body/mod.rs\", \"src/cfg.rs\", \"src/client/conn/http1.rs\", \"src/client/conn/http2.rs\", \"src/client/conn/mod.rs\", \"src/client/dispatch.rs\", \"src/client/mod.rs\", \"src/client/tests.rs\", \"src/common/buf.rs\", \"src/common/date.rs\", \"src/common/io/compat.rs\", \"src/common/io/mod.rs\", \"src/common/io/rewind.rs\", \"src/common/mod.rs\", \"src/common/task.rs\", \"src/common/time.rs\", \"src/common/watch.rs\", \"src/error.rs\", \"src/ext/h1_reason_phrase.rs\", \"src/ext/mod.rs\", \"src/ffi/body.rs\", \"src/ffi/client.rs\", \"src/ffi/error.rs\", \"src/ffi/http_types.rs\", \"src/ffi/io.rs\", \"src/ffi/macros.rs\", \"src/ffi/mod.rs\", \"src/ffi/task.rs\", \"src/headers.rs\", \"src/lib.rs\", \"src/mock.rs\", \"src/proto/h1/conn.rs\", \"src/proto/h1/decode.rs\", \"src/proto/h1/dispatch.rs\", \"src/proto/h1/encode.rs\", \"src/proto/h1/io.rs\", \"src/proto/h1/mod.rs\", \"src/proto/h1/role.rs\", \"src/proto/h2/client.rs\", \"src/proto/h2/mod.rs\", \"src/proto/h2/ping.rs\", \"src/proto/h2/server.rs\", \"src/proto/mod.rs\", \"src/rt/bounds.rs\", \"src/rt/io.rs\", \"src/rt/mod.rs\", \"src/rt/timer.rs\", \"src/server/conn/http1.rs\", \"src/server/conn/http2.rs\", \"src/server/conn/mod.rs\", \"src/server/mod.rs\", \"src/service/http.rs\", \"src/service/mod.rs\", \"src/service/service.rs\", \"src/service/util.rs\", \"src/trace.rs\", \"src/upgrade.rs\", \"tests/client.rs\", \"tests/integration.rs\", \"tests/server.rs\", \"tests/support/mod.rs\", \"tests/support/tokiort.rs\"]"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_01SjTwvsb65DfdrDx8qaTFN1",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"repo\": \"github.com/sg-evals/hyper--v1.0.0\", \"path\": \"src/body/mod.rs\"}"
+          }
+        },
+        {
+          "id": "toolu_01JYYzuYNLGyzRKjKbfGrL8q",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"repo\": \"github.com/sg-evals/hyper--v1.0.0\", \"path\": \"Cargo.toml\"}"
+          }
+        },
+        {
+          "id": "toolu_01VHyQmc6nFnfmbda6owFwgW",
+          "type": "function",
+          "function": {
+            "name": "list_files",
+            "arguments": "{\"repo\": \"github.com/sg-evals/reqwest--v0.11.22\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01SjTwvsb65DfdrDx8qaTFN1",
+      "content": "{\"repo\": \"github.com/sg-evals/hyper--v1.0.0\", \"path\": \"src/body/mod.rs\", \"content\": \"//! Streaming bodies for Requests and Responses\\n//!\\n//! For both [Clients](crate::client) and [Servers](crate::server), requests and\\n//! responses use streaming bodies, instead of complete buffering. This\\n//! allows applications to not use memory they don't need, and allows exerting\\n//! back-pressure on connections by only reading when asked.\\n//!\\n//! There are two pieces to this in hyper:\\n//!\\n//! - **The [`Body`] trait** describes all possible bodies.\\n//!   hyper allows any body type that implements `Body`, allowing\\n//!   applications to have fine-grained control over their streaming.\\n//! - **The [`Incoming`] concrete type**, which is an implementation\\n//!   of `Body`, and returned by hyper as a \\\"receive stream\\\" (so, for server\\n//!   requests and client responses).\\n//!\\n//! There are additional implementations available in [`http-body-util`][],\\n//! such as a `Full` or `Empty` body.\\n//!\\n//! [`http-body-util`]: https://docs.rs/http-body-util\\n\\npub use bytes::{Buf, Bytes};\\npub use http_body::Body;\\npub use http_body::Frame;\\npub use http_body::SizeHint;\\n\\npub use self::incoming::Incoming;\\n\\n#[cfg(all(any(feature = \\\"client\\\", feature = \\\"server\\\"), feature = \\\"http1\\\"))]\\npub(crate) use self::incoming::Sender;\\npub(crate) use self::length::DecodedLength;\\n\\nmod incoming;\\nmod length;\\n\\nfn _assert_send_sync() {\\n    fn _assert_send<T: Send>() {}\\n    fn _assert_sync<T: Sync>() {}\\n\\n    _assert_send::<Incoming>();\\n    _assert_sync::<Incoming>();\\n}\"}"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01JYYzuYNLGyzRKjKbfGrL8q",
+      "content": "{\"repo\": \"github.com/sg-evals/hyper--v1.0.0\", \"path\": \"Cargo.toml\", \"content\": \"[package]\\nname = \\\"hyper\\\"\\nversion = \\\"1.0.0\\\"\\ndescription = \\\"A fast and correct HTTP library.\\\"\\nreadme = \\\"README.md\\\"\\nhomepage = \\\"https://hyper.rs\\\"\\ndocumentation = \\\"https://docs.rs/hyper\\\"\\nrepository = \\\"https://github.com/hyperium/hyper\\\"\\nlicense = \\\"MIT\\\"\\nauthors = [\\\"Sean McArthur <sean@seanmonstar.com>\\\"]\\nkeywords = [\\\"http\\\", \\\"hyper\\\", \\\"hyperium\\\"]\\ncategories = [\\\"network-programming\\\", \\\"web-programming::http-client\\\", \\\"web-programming::http-server\\\"]\\nedition = \\\"2018\\\"\\nrust-version = \\\"1.63\\\" # keep in sync with MSRV.md dev doc\\n\\ninclude = [\\n  \\\"Cargo.toml\\\",\\n  \\\"LICENSE\\\",\\n  \\\"src/**/*\\\",\\n]\\n\\n[dependencies]\\nbytes = \\\"1\\\"\\nfutures-channel = \\\"0.3\\\"\\nfutures-util = { version = \\\"0.3\\\", default-features = false }\\nhttp = \\\"1\\\"\\nhttp-body = \\\"1\\\"\\npin-project-lite = \\\"0.2.4\\\"\\ntokio = { version = \\\"1.13\\\", features = [\\\"sync\\\"] }\\n\\n# Optional\\n\\nh2 = { version = \\\"0.4\\\", optional = true }\\nhttp-body-util = { version = \\\"0.1\\\", optional = true }\\nhttparse = { version = \\\"1.8\\\", optional = true }\\nhttpdate = { version = \\\"1.0\\\", optional = true }\\nitoa = { version = \\\"1\\\", optional = true }\\nlibc = { version = \\\"0.2\\\", optional = true }\\ntracing = { version = \\\"0.1\\\", default-features = false, features = [\\\"std\\\"], optional = true }\\nwant = { version = \\\"0.3\\\", optional = true }\\n\\n[dev-dependencies]\\nform_urlencoded = \\\"1\\\"\\nhttp-body-util = \\\"0.1\\\"\\npretty_env_logger = \\\"0.5\\\"\\nspmc = \\\"0.3\\\"\\nserde = { version = \\\"1.0\\\", features = [\\\"derive\\\"] }\\nserde_json = \\\"1.0\\\"\\ntokio = { version = \\\"1\\\", features = [\\n    \\\"fs\\\",\\n    \\\"macros\\\",\\n    \\\"net\\\",\\n    \\\"io-std\\\",\\n    \\\"io-util\\\",\\n    \\\"rt\\\",\\n    \\\"rt-multi-thread\\\", # so examples can use #[tokio::main]\\n    \\\"sync\\\",\\n    \\\"time\\\",\\n    \\\"test-util\\\",\\n] }\\ntokio-test = \\\"0.4\\\"\\n\\n[features]\\n# Nothing by default\\ndefault = []\\n\\n# Easily turn it all on\\nfull = [\\n    \\\"client\\\",\\n    \\\"http1\\\",\\n    \\\"http2\\\",\\n    \\\"server\\\",\\n]\\n\\n# HTTP versions\\nhttp1 = [\\\"dep:httparse\\\", \\\"dep:itoa\\\"]\\nhttp2 = [\\\"dep:h2\\\"]\\n\\n# Client/Server\\nclient = [\\\"dep:want\\\"]\\nserver = [\\\"dep:httpdate\\\"]\\n\\n# C-API support (currently unstable (no semver))\\nffi = [\\\"dep:libc\\\", \\\"dep:http-body-util\\\"]\\n\\n# Utilize tracing (currently unstable)\\ntracing = [\\\"dep:tracing\\\"]\\n\\n# internal features used in CI\\nnightly = []\\n\\n[package.metadata.docs.rs]\\nfeatures = [\\\"ffi\\\", \\\"full\\\", \\\"tracing\\\"]\\nrustdoc-args = [\\\"--cfg\\\", \\\"docsrs\\\", \\\"--cfg\\\", \\\"hyper_unstable_ffi\\\", \\\"--cfg\\\", \\\"hyper_unstable_tracing\\\"]\\n\\n[package.metadata.playground]\\nfeatures = [\\\"full\\\"]\\n\\n[profile.release]\\ncodegen-units = 1\\nincremental = false\\n\\n[profile.bench]\\ncodegen-units = 1\\nincremental = false\\n\\n[[example]]\\nname = \\\"client\\\"\\npath = \\\"examples/client.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[example]]\\nname = \\\"client_json\\\"\\npath = \\\"examples/client_json.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[example]]\\nname = \\\"echo\\\"\\npath = \\\"examples/echo.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[example]]\\nname = \\\"gateway\\\"\\npath = \\\"examples/gateway.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[example]]\\nname = \\\"graceful_shutdown\\\"\\npath = \\\"examples/graceful_shutdown.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[example]]\\nname = \\\"hello\\\"\\npath = \\\"examples/hello.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[example]]\\nname = \\\"http_proxy\\\"\\npath = \\\"examples/http_proxy.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[example]]\\nname = \\\"multi_server\\\"\\npath = \\\"examples/multi_server.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[example]]\\nname = \\\"params\\\"\\npath = \\\"examples/params.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[example]]\\nname = \\\"send_file\\\"\\npath = \\\"examples/send_file.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[example]]\\nname = \\\"service_struct_impl\\\"\\npath = \\\"examples/service_struct_impl.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[example]]\\nname = \\\"single_threaded\\\"\\npath = \\\"examples/single_threaded.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[example]]\\nname = \\\"state\\\"\\npath = \\\"examples/state.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[example]]\\nname = \\\"upgrades\\\"\\npath = \\\"examples/upgrades.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n\\n[[example]]\\nname = \\\"web_api\\\"\\npath = \\\"examples/web_api.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n\\n[[bench]]\\nname = \\\"body\\\"\\npath = \\\"benches/body.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[bench]]\\nname = \\\"connect\\\"\\npath = \\\"benches/connect.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[bench]]\\nname = \\\"end_to_end\\\"\\npath = \\\"benches/end_to_end.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[bench]]\\nname = \\\"pipeline\\\"\\npath = \\\"benches/pipeline.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[bench]]\\nname = \\\"server\\\"\\npath = \\\"benches/server.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n\\n[[test]]\\nname = \\\"client\\\"\\npath = \\\"tests/client.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[test]]\\nname = \\\"integration\\\"\\npath = \\\"tests/integration.rs\\\"\\nrequired-features = [\\\"full\\\"]\\n\\n[[test]]\\nname = \\\"server\\\"\\npath = \\\"tests/server.rs\\\"\\nrequired-features = [\\\"full\\\"]\"}"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01VHyQmc6nFnfmbda6owFwgW",
+      "content": "[\".github/FUNDING.yml\", \".github/dependabot.yml\", \".github/workflows/ci.yml\", \".gitignore\", \"CHANGELOG.md\", \"Cargo.toml\", \"LICENSE-APACHE\", \"LICENSE-MIT\", \"README.md\", \"examples/blocking.rs\", \"examples/form.rs\", \"examples/h3_simple.rs\", \"examples/json_dynamic.rs\", \"examples/json_typed.rs\", \"examples/simple.rs\", \"examples/tor_socks.rs\", \"examples/wasm_github_fetch/.gitignore\", \"examples/wasm_github_fetch/Cargo.toml\", \"examples/wasm_github_fetch/README.md\", \"examples/wasm_github_fetch/index.js\", \"examples/wasm_github_fetch/package-lock.json\", \"examples/wasm_github_fetch/package.json\", \"examples/wasm_github_fetch/src/lib.rs\", \"examples/wasm_github_fetch/webpack.config.js\", \"src/async_impl/body.rs\", \"src/async_impl/client.rs\", \"src/async_impl/decoder.rs\", \"src/async_impl/h3_client/connect.rs\", \"src/async_impl/h3_client/dns.rs\", \"src/async_impl/h3_client/mod.rs\", \"src/async_impl/h3_client/pool.rs\", \"src/async_impl/mod.rs\", \"src/async_impl/multipart.rs\", \"src/async_impl/request.rs\", \"src/async_impl/response.rs\", \"src/async_impl/upgrade.rs\", \"src/blocking/body.rs\", \"src/blocking/client.rs\", \"src/blocking/mod.rs\", \"src/blocking/multipart.rs\", \"src/blocking/request.rs\", \"src/blocking/response.rs\", \"src/blocking/wait.rs\", \"src/connect.rs\", \"src/cookie.rs\", \"src/dns/gai.rs\", \"src/dns/mod.rs\", \"src/dns/resolve.rs\", \"src/dns/trust_dns.rs\", \"src/error.rs\", \"src/into_url.rs\", \"src/lib.rs\", \"src/proxy.rs\", \"src/redirect.rs\", \"src/response.rs\", \"src/tls.rs\", \"src/util.rs\", \"src/wasm/body.rs\", \"src/wasm/client.rs\", \"src/wasm/mod.rs\", \"src/wasm/multipart.rs\", \"src/wasm/request.rs\", \"src/wasm/response.rs\", \"tests/badssl.rs\", \"tests/blocking.rs\", \"tests/brotli.rs\", \"tests/client.rs\", \"tests/cookie.rs\", \"tests/deflate.rs\", \"tests/gzip.rs\", \"tests/multipart.rs\", \"tests/proxy.rs\", \"tests/redirect.rs\", \"tests/support/mod.rs\", \"tests/support/server.rs\", \"tests/timeouts.rs\", \"tests/upgrade.rs\", \"tests/wasm_simple.rs\"]"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_015V5SjC1DdovnPsKdWRhoLA",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"repo\": \"github.com/sg-evals/reqwest--v0.11.22\", \"path\": \"Cargo.toml\"}"
+          }
+        },
+        {
+          "id": "toolu_01EGRyAHgXSpjf7bdVoaWVAn",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"repo\": \"github.com/sg-evals/reqwest--v0.11.22\", \"path\": \"src/async_impl/body.rs\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_015V5SjC1DdovnPsKdWRhoLA",
+      "content": "{\"repo\": \"github.com/sg-evals/reqwest--v0.11.22\", \"path\": \"Cargo.toml\", \"content\": \"[package]\\nname = \\\"reqwest\\\"\\nversion = \\\"0.11.22\\\" # remember to update html_root_url\\ndescription = \\\"higher level HTTP client library\\\"\\nkeywords = [\\\"http\\\", \\\"request\\\", \\\"client\\\"]\\ncategories = [\\\"web-programming::http-client\\\", \\\"wasm\\\"]\\nrepository = \\\"https://github.com/seanmonstar/reqwest\\\"\\ndocumentation = \\\"https://docs.rs/reqwest\\\"\\nauthors = [\\\"Sean McArthur <sean@seanmonstar.com>\\\"]\\nreadme = \\\"README.md\\\"\\nlicense = \\\"MIT OR Apache-2.0\\\"\\nedition = \\\"2018\\\"\\nrust-version = \\\"1.63.0\\\"\\nautotests = true\\n\\n[package.metadata.docs.rs]\\nall-features = true\\nrustdoc-args = [\\\"--cfg\\\", \\\"docsrs\\\", \\\"--cfg\\\", \\\"reqwest_unstable\\\"]\\ntargets = [\\\"x86_64-unknown-linux-gnu\\\", \\\"wasm32-unknown-unknown\\\"]\\n\\n[package.metadata.playground]\\nfeatures = [\\n    \\\"blocking\\\",\\n    \\\"cookies\\\",\\n    \\\"json\\\",\\n    \\\"multipart\\\",\\n]\\n\\n[features]\\ndefault = [\\\"default-tls\\\"]\\n\\n# Note: this doesn't enable the 'native-tls' feature, which adds specific\\n# functionality for it.\\ndefault-tls = [\\\"hyper-tls\\\", \\\"native-tls-crate\\\", \\\"__tls\\\", \\\"tokio-native-tls\\\"]\\n\\n# Enables native-tls specific functionality not available by default.\\nnative-tls = [\\\"default-tls\\\"]\\nnative-tls-alpn = [\\\"native-tls\\\", \\\"native-tls-crate/alpn\\\"]\\nnative-tls-vendored = [\\\"native-tls\\\", \\\"native-tls-crate/vendored\\\"]\\n\\nrustls-tls = [\\\"rustls-tls-webpki-roots\\\"]\\nrustls-tls-manual-roots = [\\\"__rustls\\\"]\\nrustls-tls-webpki-roots = [\\\"webpki-roots\\\", \\\"__rustls\\\"]\\nrustls-tls-native-roots = [\\\"rustls-native-certs\\\", \\\"__rustls\\\"]\\n\\nblocking = [\\\"futures-util/io\\\", \\\"tokio/rt-multi-thread\\\", \\\"tokio/sync\\\"]\\n\\ncookies = [\\\"cookie_crate\\\", \\\"cookie_store\\\"]\\n\\ngzip = [\\\"async-compression\\\", \\\"async-compression/gzip\\\", \\\"tokio-util\\\"]\\n\\nbrotli = [\\\"async-compression\\\", \\\"async-compression/brotli\\\", \\\"tokio-util\\\"]\\n\\ndeflate = [\\\"async-compression\\\", \\\"async-compression/zlib\\\", \\\"tokio-util\\\"]\\n\\njson = [\\\"serde_json\\\"]\\n\\nmultipart = [\\\"mime_guess\\\"]\\n\\ntrust-dns = [\\\"trust-dns-resolver\\\"]\\n\\nstream = [\\\"tokio/fs\\\", \\\"tokio-util\\\", \\\"wasm-streams\\\"]\\n\\nsocks = [\\\"tokio-socks\\\"]\\n\\n# Experimental HTTP/3 client.\\nhttp3 = [\\\"rustls-tls-manual-roots\\\", \\\"h3\\\", \\\"h3-quinn\\\", \\\"quinn\\\", \\\"futures-channel\\\"]\\n\\n# Internal (PRIVATE!) features used to aid testing.\\n# Don't rely on these whatsoever. They may disappear at anytime.\\n\\n# Enables common types used for TLS. Useless on its own.\\n__tls = []\\n\\n# Enables common rustls code.\\n# Equivalent to rustls-tls-manual-roots but shorter :)\\n__rustls = [\\\"hyper-rustls\\\", \\\"tokio-rustls\\\", \\\"rustls\\\", \\\"__tls\\\", \\\"rustls-pemfile\\\"]\\n\\n# When enabled, disable using the cached SYS_PROXIES.\\n__internal_proxy_sys_no_cache = []\\n\\n[dependencies]\\nbase64 = \\\"0.21\\\"\\nhttp = \\\"0.2\\\"\\nurl = \\\"2.2\\\"\\nbytes = \\\"1.0\\\"\\nserde = \\\"1.0\\\"\\nserde_urlencoded = \\\"0.7.1\\\"\\ntower-service = \\\"0.3\\\"\\nfutures-core = { version = \\\"0.3.0\\\", default-features = false }\\nfutures-util = { version = \\\"0.3.0\\\", default-features = false }\\n\\n# Optional deps...\\n\\n## json\\nserde_json = { version = \\\"1.0\\\", optional = true }\\n## multipart\\nmime_guess = { version = \\\"2.0\\\", default-features = false, optional = true }\\n\\n[target.'cfg(not(target_arch = \\\"wasm32\\\"))'.dependencies]\\nencoding_rs = \\\"0.8\\\"\\nhttp-body = \\\"0.4.0\\\"\\nhyper = { version = \\\"0.14.21\\\", default-features = false, features = [\\\"tcp\\\", \\\"http1\\\", \\\"http2\\\", \\\"client\\\", \\\"runtime\\\"] }\\nh2 = \\\"0.3.10\\\"\\nonce_cell = \\\"1\\\"\\nlog = \\\"0.4\\\"\\nmime = \\\"0.3.16\\\"\\npercent-encoding = \\\"2.1\\\"\\ntokio = { version = \\\"1.0\\\", default-features = false, features = [\\\"net\\\", \\\"time\\\"] }\\npin-project-lite = \\\"0.2.0\\\"\\nipnet = \\\"2.3\\\"\\n\\n# Optional deps...\\n\\n## default-tls\\nhyper-tls = { version = \\\"0.5\\\", optional = true }\\nnative-tls-crate = { version = \\\"0.2.10\\\", optional = true, package = \\\"native-tls\\\" }\\ntokio-native-tls = { version = \\\"0.3.0\\\", optional = true }\\n\\n# rustls-tls\\nhyper-rustls = { version = \\\"0.24.0\\\", default-features = false, optional = true }\\nrustls = { version = \\\"0.21.6\\\", features = [\\\"dangerous_configuration\\\"], optional = true }\\ntokio-rustls = { version = \\\"0.24\\\", optional = true }\\nwebpki-roots = { version = \\\"0.25\\\", optional = true }\\nrustls-native-certs = { version = \\\"0.6\\\", optional = true }\\nrustls-pemfile = { version = \\\"1.0\\\", optional = true }\\n\\n## cookies\\ncookie_crate = { version = \\\"0.16\\\", package = \\\"cookie\\\", optional = true }\\ncookie_store = { version = \\\"0.16\\\", optional = true }\\n\\n## compression\\nasync-compression = { version = \\\"0.4.0\\\", default-features = false, features = [\\\"tokio\\\"], optional = true }\\ntokio-util = { version = \\\"0.7.1\\\", default-features = false, features = [\\\"codec\\\", \\\"io\\\"], optional = true }\\n\\n## socks\\ntokio-socks = { version = \\\"0.5.1\\\", optional = true }\\n\\n## trust-dns\\ntrust-dns-resolver = { version = \\\"0.23\\\", optional = true, features = [\\\"tokio-runtime\\\"] }\\n\\n# HTTP/3 experimental support\\nh3 = { version=\\\"0.0.2\\\", optional = true }\\nh3-quinn = { version=\\\"0.0.3\\\", optional = true }\\nquinn = { version = \\\"0.10\\\", default-features = false, features = [\\\"tls-rustls\\\", \\\"ring\\\", \\\"runtime-tokio\\\"], optional = true  }\\nfutures-channel = { version=\\\"0.3\\\", optional = true}\\n\\n\\n[target.'cfg(not(target_arch = \\\"wasm32\\\"))'.dev-dependencies]\\nenv_logger = \\\"0.8\\\"\\nhyper = { version = \\\"0.14\\\", default-features = false, features = [\\\"tcp\\\", \\\"stream\\\", \\\"http1\\\", \\\"http2\\\", \\\"client\\\", \\\"server\\\", \\\"runtime\\\"] }\\nserde = { version = \\\"1.0\\\", features = [\\\"derive\\\"] }\\nlibflate = \\\"1.0\\\"\\nbrotli_crate = { package = \\\"brotli\\\", version = \\\"3.3.0\\\" }\\ndoc-comment = \\\"0.3\\\"\\ntokio = { version = \\\"1.0\\\", default-features = false, features = [\\\"macros\\\", \\\"rt-multi-thread\\\"] }\\n\\n[target.'cfg(windows)'.dependencies]\\nwinreg = \\\"0.50.0\\\"\\n\\n[target.'cfg(target_os = \\\"macos\\\")'.dependencies]\\nsystem-configuration = \\\"0.5.1\\\"\\n\\n# wasm\\n\\n[target.'cfg(target_arch = \\\"wasm32\\\")'.dependencies]\\njs-sys = \\\"0.3.45\\\"\\nserde_json = \\\"1.0\\\"\\nwasm-bindgen = \\\"0.2.68\\\"\\nwasm-bindgen-futures = \\\"0.4.18\\\"\\nwasm-streams = { version = \\\"0.3\\\", optional = true }\\n\\n[target.'cfg(target_arch = \\\"wasm32\\\")'.dependencies.web-sys]\\nversion = \\\"0.3.25\\\"\\nfeatures = [\\n    \\\"AbortController\\\",\\n    \\\"AbortSignal\\\",\\n    \\\"Headers\\\",\\n    \\\"Request\\\",\\n    \\\"RequestInit\\\",\\n    \\\"RequestMode\\\",\\n    \\\"Response\\\",\\n    \\\"Window\\\",\\n    \\\"FormData\\\",\\n    \\\"Blob\\\",\\n    \\\"BlobPropertyBag\\\",\\n    \\\"ServiceWorkerGlobalScope\\\",\\n    \\\"RequestCredentials\\\",\\n    \\\"File\\\",\\n    \\\"ReadableStream\\\"\\n]\\n\\n[target.'cfg(target_arch = \\\"wasm32\\\")'.dev-dependencies]\\nwasm-bindgen = { version = \\\"0.2.68\\\", features = [\\\"serde-serialize\\\"] }\\nwasm-bindgen-test = \\\"0.3\\\"\\n\\n[[example]]\\nname = \\\"blocking\\\"\\npath = \\\"examples/blocking.rs\\\"\\nrequired-features = [\\\"blocking\\\"]\\n\\n[[example]]\\nname = \\\"json_dynamic\\\"\\npath = \\\"examples/json_dynamic.rs\\\"\\nrequired-features = [\\\"json\\\"]\\n\\n[[example]]\\nname = \\\"json_typed\\\"\\npath = \\\"examples/json_typed.rs\\\"\\nrequired-features = [\\\"json\\\"]\\n\\n[[example]]\\nname = \\\"tor_socks\\\"\\npath = \\\"examples/tor_socks.rs\\\"\\nrequired-features = [\\\"socks\\\"]\\n\\n[[example]]\\nname = \\\"form\\\"\\npath = \\\"examples/form.rs\\\"\\n\\n[[example]]\\nname = \\\"simple\\\"\\npath = \\\"examples/simple.rs\\\"\\n\\n[[test]]\\nname = \\\"blocking\\\"\\npath = \\\"tests/blocking.rs\\\"\\nrequired-features = [\\\"blocking\\\"]\\n\\n[[test]]\\nname = \\\"cookie\\\"\\npath = \\\"tests/cookie.rs\\\"\\nrequired-features = [\\\"cookies\\\"]\\n\\n[[test]]\\nname = \\\"gzip\\\"\\npath = \\\"tests/gzip.rs\\\"\\nrequired-features = [\\\"gzip\\\"]\\n\\n[[test]]\\nname = \\\"brotli\\\"\\npath = \\\"tests/brotli.rs\\\"\\nrequired-features = [\\\"brotli\\\"]\\n\\n[[test]]\\nname = \\\"deflate\\\"\\npath = \\\"tests/deflate.rs\\\"\\nrequired-features = [\\\"deflate\\\"]\\n\\n[[test]]\\nname = \\\"multipart\\\"\\npath = \\\"tests/multipart.rs\\\"\\nrequired-features = [\\\"multipart\\\"]\"}"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01EGRyAHgXSpjf7bdVoaWVAn",
+      "content": "{\"repo\": \"github.com/sg-evals/reqwest--v0.11.22\", \"path\": \"src/async_impl/body.rs\", \"content\": \"use std::fmt;\\nuse std::future::Future;\\nuse std::pin::Pin;\\nuse std::task::{Context, Poll};\\n\\nuse bytes::Bytes;\\nuse futures_core::Stream;\\nuse http_body::Body as HttpBody;\\nuse pin_project_lite::pin_project;\\n#[cfg(feature = \\\"stream\\\")]\\nuse tokio::fs::File;\\nuse tokio::time::Sleep;\\n#[cfg(feature = \\\"stream\\\")]\\nuse tokio_util::io::ReaderStream;\\n\\n/// An asynchronous request body.\\npub struct Body {\\n    inner: Inner,\\n}\\n\\n// The `Stream` trait isn't stable, so the impl isn't public.\\npub(crate) struct ImplStream(Body);\\n\\nenum Inner {\\n    Reusable(Bytes),\\n    Streaming {\\n        body: Pin<\\n            Box<\\n                dyn HttpBody<Data = Bytes, Error = Box<dyn std::error::Error + Send + Sync>>\\n                    + Send\\n                    + Sync,\\n            >,\\n        >,\\n        timeout: Option<Pin<Box<Sleep>>>,\\n    },\\n}\\n\\npin_project! {\\n    struct WrapStream<S> {\\n        #[pin]\\n        inner: S,\\n    }\\n}\\n\\nstruct WrapHyper(hyper::Body);\\n\\nimpl Body {\\n    /// Returns a reference to the internal data of the `Body`.\\n    ///\\n    /// `None` is returned, if the underlying data is a stream.\\n    pub fn as_bytes(&self) -> Option<&[u8]> {\\n        match &self.inner {\\n            Inner::Reusable(bytes) => Some(bytes.as_ref()),\\n            Inner::Streaming { .. } => None,\\n        }\\n    }\\n\\n    /// Wrap a futures `Stream` in a box inside `Body`.\\n    ///\\n    /// # Example\\n    ///\\n    /// ```\\n    /// # use reqwest::Body;\\n    /// # use futures_util;\\n    /// # fn main() {\\n    /// let chunks: Vec<Result<_, ::std::io::Error>> = vec![\\n    ///     Ok(\\\"hello\\\"),\\n    ///     Ok(\\\" \\\"),\\n    ///     Ok(\\\"world\\\"),\\n    /// ];\\n    ///\\n    /// let stream = futures_util::stream::iter(chunks);\\n    ///\\n    /// let body = Body::wrap_stream(stream);\\n    /// # }\\n    /// ```\\n    ///\\n    /// # Optional\\n    ///\\n    /// This requires the `stream` feature to be enabled.\\n    #[cfg(feature = \\\"stream\\\")]\\n    #[cfg_attr(docsrs, doc(cfg(feature = \\\"stream\\\")))]\\n    pub fn wrap_stream<S>(stream: S) -> Body\\n    where\\n        S: futures_core::stream::TryStream + Send + Sync + 'static,\\n        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,\\n        Bytes: From<S::Ok>,\\n    {\\n        Body::stream(stream)\\n    }\\n\\n    pub(crate) fn stream<S>(stream: S) -> Body\\n    where\\n        S: futures_core::stream::TryStream + Send + Sync + 'static,\\n        S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,\\n        Bytes: From<S::Ok>,\\n    {\\n        use futures_util::TryStreamExt;\\n\\n        let body = Box::pin(WrapStream {\\n            inner: stream.map_ok(Bytes::from).map_err(Into::into),\\n        });\\n        Body {\\n            inner: Inner::Streaming {\\n                body,\\n                timeout: None,\\n            },\\n        }\\n    }\\n\\n    pub(crate) fn response(body: hyper::Body, timeout: Option<Pin<Box<Sleep>>>) -> Body {\\n        Body {\\n            inner: Inner::Streaming {\\n                body: Box::pin(WrapHyper(body)),\\n                timeout,\\n            },\\n        }\\n    }\\n\\n    #[cfg(feature = \\\"blocking\\\")]\\n    pub(crate) fn wrap(body: hyper::Body) -> Body {\\n        Body {\\n            inner: Inner::Streaming {\\n                body: Box::pin(WrapHyper(body)),\\n                timeout: None,\\n            },\\n        }\\n    }\\n\\n    pub(crate) fn empty() -> Body {\\n        Body::reusable(Bytes::new())\\n    }\\n\\n    pub(crate) fn reusable(chunk: Bytes) -> Body {\\n        Body {\\n            inner: Inner::Reusable(chunk),\\n        }\\n    }\\n\\n    pub(crate) fn try_reuse(self) -> (Option<Bytes>, Self) {\\n        let reuse = match self.inner {\\n            Inner::Reusable(ref chunk) => Some(chunk.clone()),\\n            Inner::Streaming { .. } => None,\\n        };\\n\\n        (reuse, self)\\n    }\\n\\n    pub(crate) fn try_clone(&self) -> Option<Body> {\\n        match self.inner {\\n            Inner::Reusable(ref chunk) => Some(Body::reusable(chunk.clone())),\\n            Inner::Streaming { .. } => None,\\n        }\\n    }\\n\\n    pub(crate) fn into_stream(self) -> ImplStream {\\n        ImplStream(self)\\n    }\\n\\n    #[cfg(feature = \\\"multipart\\\")]\\n    pub(crate) fn content_length(&self) -> Option<u64> {\\n        match self.inner {\\n            Inner::Reusable(ref bytes) => Some(bytes.len() as u64),\\n            Inner::Streaming { ref body, .. } => body.size_hint().exact(),\\n        }\\n    }\\n}\\n\\nimpl From<hyper::Body> for Body {\\n    #[inline]\\n    fn from(body: hyper::Body) -> Body {\\n        Self {\\n            inner: Inner::Streaming {\\n                body: Box::pin(WrapHyper(body)),\\n                timeout: None,\\n            },\\n        }\\n    }\\n}\\n\\nimpl From<Bytes> for Body {\\n    #[inline]\\n    fn from(bytes: Bytes) -> Body {\\n        Body::reusable(bytes)\\n    }\\n}\\n\\nimpl From<Vec<u8>> for Body {\\n    #[inline]\\n    fn from(vec: Vec<u8>) -> Body {\\n        Body::reusable(vec.into())\\n    }\\n}\\n\\nimpl From<&'static [u8]> for Body {\\n    #[inline]\\n    fn from(s: &'static [u8]) -> Body {\\n        Body::reusable(Bytes::from_static(s))\\n    }\\n}\\n\\nimpl From<String> for Body {\\n    #[inline]\\n    fn from(s: String) -> Body {\\n        Body::reusable(s.into())\\n    }\\n}\\n\\nimpl From<&'static str> for Body {\\n    #[inline]\\n    fn from(s: &'static str) -> Body {\\n        s.as_bytes().into()\\n    }\\n}\\n\\n#[cfg(feature = \\\"stream\\\")]\\n#[cfg_attr(docsrs, doc(cfg(feature = \\\"stream\\\")))]\\nimpl From<File> for Body {\\n    #[inline]\\n    fn from(file: File) -> Body {\\n        Body::wrap_stream(ReaderStream::new(file))\\n    }\\n}\\n\\nimpl fmt::Debug for Body {\\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\\n        f.debug_struct(\\\"Body\\\").finish()\\n    }\\n}\\n\\n// ===== impl ImplStream =====\\n\\nimpl HttpBody for ImplStream {\\n    type Data = Bytes;\\n    type Error = crate::Error;\\n\\n    fn poll_data(\\n        mut self: Pin<&mut Self>,\\n        cx: &mut Context,\\n    ) -> Poll<Option<Result<Self::Data, Self::Error>>> {\\n        let opt_try_chunk = match self.0.inner {\\n            Inner::Streaming {\\n                ref mut body,\\n                ref mut timeout,\\n            } => {\\n                if let Some(ref mut timeout) = timeout {\\n                    if let Poll::Ready(()) = timeout.as_mut().poll(cx) {\\n                        return Poll::Ready(Some(Err(crate::error::body(crate::error::TimedOut))));\\n                    }\\n                }\\n                futures_core::ready!(Pin::new(body).poll_data(cx))\\n                    .map(|opt_chunk| opt_chunk.map(Into::into).map_err(crate::error::body))\\n            }\\n            Inner::Reusable(ref mut bytes) => {\\n                if bytes.is_empty() {\\n                    None\\n                } else {\\n                    Some(Ok(std::mem::replace(bytes, Bytes::new())))\\n                }\\n            }\\n        };\\n\\n        Poll::Ready(opt_try_chunk)\\n    }\\n\\n    fn poll_trailers(\\n        self: Pin<&mut Self>,\\n        _cx: &mut Context,\\n    ) -> Poll<Result<Option<http::HeaderMap>, Self::Error>> {\\n        Poll::Ready(Ok(None))\\n    }\\n\\n    fn is_end_stream(&self) -> bool {\\n        match self.0.inner {\\n            Inner::Streaming { ref body, .. } => body.is_end_stream(),\\n            Inner::Reusable(ref bytes) => bytes.is_empty(),\\n        }\\n    }\\n\\n    fn size_hint(&self) -> http_body::SizeHint {\\n        match self.0.inner {\\n            Inner::Streaming { ref body, .. } => body.size_hint(),\\n            Inner::Reusable(ref bytes) => {\\n                let mut hint = http_body::SizeHint::default();\\n                hint.set_exact(bytes.len() as u64);\\n                hint\\n            }\\n        }\\n    }\\n}\\n\\nimpl Stream for ImplStream {\\n    type Item = Result<Bytes, crate::Error>;\\n\\n    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {\\n        self.poll_data(cx)\\n    }\\n}\\n\\n// ===== impl WrapStream =====\\n\\nimpl<S, D, E> HttpBody for WrapStream<S>\\nwhere\\n    S: Stream<Item = Result<D, E>>,\\n    D: Into<Bytes>,\\n    E: Into<Box<dyn std::error::Error + Send + Sync>>,\\n{\\n    type Data = Bytes;\\n    type Error = E;\\n\\n    fn poll_data(\\n        self: Pin<&mut Self>,\\n        cx: &mut Context,\\n    ) -> Poll<Option<Result<Self::Data, Self::Error>>> {\\n        let item = futures_core::ready!(self.project().inner.poll_next(cx)?);\\n\\n        Poll::Ready(item.map(|val| Ok(val.into())))\\n    }\\n\\n    fn poll_trailers(\\n        self: Pin<&mut Self>,\\n        _cx: &mut Context,\\n    ) -> Poll<Result<Option<http::HeaderMap>, Self::Error>> {\\n        Poll::Ready(Ok(None))\\n    }\\n}\\n\\n// ===== impl WrapHyper =====\\n\\nimpl HttpBody for WrapHyper {\\n    type Data = Bytes;\\n    type Error = Box<dyn std::error::Error + Send + Sync>;\\n\\n    fn poll_data(\\n        mut self: Pin<&mut Self>,\\n        cx: &mut Context,\\n    ) -> Poll<Option<Result<Self::Data, Self::Error>>> {\\n        // safe pin projection\\n        Pin::new(&mut self.0)\\n            .poll_data(cx)\\n            .map(|opt| opt.map(|res| res.map_err(Into::into)))\\n    }\\n\\n    fn poll_trailers(\\n        self: Pin<&mut Self>,\\n        _cx: &mut Context,\\n    ) -> Poll<Result<Option<http::HeaderMap>, Self::Error>> {\\n        Poll::Ready(Ok(None))\\n    }\\n\\n    fn is_end_stream(&self) -> bool {\\n        self.0.is_end_stream()\\n    }\\n\\n    fn size_hint(&self) -> http_body::SizeHint {\\n        HttpBody::size_hint(&self.0)\\n    }\\n}\\n\\n#[cfg(test)]\\nmod tests {\\n    use super::Body;\\n\\n    #[test]\\n    fn test_as_bytes() {\\n        let test_data = b\\\"Test body\\\";\\n        let body = Body::from(&test_data[..]);\\n        assert_eq!(body.as_bytes(), Some(&test_data[..]));\\n    }\\n}\"}"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_01QRnwgNJCgcyrj4825GLSeY",
+          "type": "function",
+          "function": {
+            "name": "submit_files",
+            "arguments": "{\"files\": [{\"repo\":\"github.com/sg-evals/hyper--v1.0.0\",\"path\":\"src/body/mod.rs\"},{\"repo\":\"github.com/sg-evals/hyper--v1.0.0\",\"path\":\"src/body/incoming.rs\"},{\"repo\":\"github.com/sg-evals/hyper--v1.0.0\",\"path\":\"src/body/length.rs\"},{\"repo\":\"github.com/sg-evals/hyper--v1.0.0\",\"path\":\"Cargo.toml\"},{\"repo\":\"github.com/sg-evals/reqwest--v0.11.22\",\"path\":\"Cargo.toml\"},{\"repo\":\"github.com/sg-evals/reqwest--v0.11.22\",\"path\":\"src/async_impl/body.rs\"},{\"repo\":\"github.com/sg-evals/reqwest--v0.11.22\",\"path\":\"src/async_impl/client.rs\"},{\"repo\":\"github.com/sg-evals/reqwest--v0.11.22\",\"path\":\"src/blocking/body.rs\"},{\"repo\":\"github.com/sg-evals/reqwest--v0.11.22\",\"path\":\"src/blocking/client.rs\"},{\"repo\":\"github.com/sg-evals/reqwest--v0.11.22\",\"path\":\"src/async_impl/response.rs\"},{\"repo\":\"github.com/sg-evals/reqwest--v0.11.22\",\"path\":\"src/async_impl/decoder.rs\"},{\"repo\":\"github.com/sg-evals/reqwest--v0.11.22\",\"path\":\"src/async_impl/h3_client/mod.rs\"}]}"
+          }
+        }
+      ]
+    }
+  ],
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "claude_adapter",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8316
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1818,
+    "n_retrieved": 11,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "hyper/src/body/mod.rs",
+    "src/body/incoming.rs",
+    "src/body/length.rs",
+    "Cargo.toml",
+    "src/async_impl/body.rs",
+    "reqwest/src/async_impl/client.rs",
+    "src/blocking/body.rs",
+    "src/blocking/client.rs",
+    "src/async_impl/response.rs",
+    "src/async_impl/decoder.rs",
+    "src/async_impl/h3_client/mod.rs"
+  ],
+  "scoring": "aligned_suffix_v1"
+}

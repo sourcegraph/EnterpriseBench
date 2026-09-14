@@ -220,6 +220,19 @@ If MCP search returns no results:
 # ---------------------------------------------------------------------------
 
 
+# Arms that leave the choice of tool to the agent: the server as shipped, and
+# every arm that varies only what the server itself says.
+_DEFAULT_PREAMBLE_MODES = frozenset(
+    {
+        "mcp_default",
+        "mcp_treatment",
+        "mcp_treat_instr",
+        "mcp_treat_edges",
+        "mcp_treat_nudge",
+    }
+)
+
+
 def _build_repo_scope(repos: Sequence[dict]) -> str:
     """Build Sourcegraph repo scoping section from task repos.
 
@@ -328,6 +341,9 @@ def build_system_prompt(
         "mcp_only",
         "mcp_default",
         "mcp_treatment",
+        "mcp_treat_instr",
+        "mcp_treat_edges",
+        "mcp_treat_nudge",
         "mcp_code_finder",
         "mcp_assisted",
     }:
@@ -350,7 +366,7 @@ def build_system_prompt(
         parts.append(_ASSISTED_FINDER_WORKFLOW)
     elif mode == "mcp_only":
         parts.append(_DIRECT_MCP_RULE)
-    elif mode in ("mcp_default", "mcp_treatment"):
+    elif mode in _DEFAULT_PREAMBLE_MODES:
         # No directive either way. The three Finder arms all tell the agent
         # what to do with code_finder (forbid, bootstrap, or force one call per
         # repo), which measures the tool rather than the server as shipped.

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 
@@ -15,8 +14,47 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
-VALID_MODES = ("baseline", "mcp_only", "hybrid", "cli")
-MODE_SUFFIXES = ("_hybrid", "_mcp_only", "_baseline")
+VALID_MODES = (
+    "baseline",
+    "mcp_only",
+    "mcp_default",
+    "mcp_treatment",
+    "mcp_treat_instr",
+    "mcp_treat_edges",
+    "mcp_treat_nudge",
+    "mcp_code_finder",
+    "mcp_assisted",
+    "mcp_toast",
+    "hybrid",
+    "cli",
+)
+MODE_SUFFIXES = (
+    "_mcp_code_finder",
+    "_mcp_default",
+    "_mcp_treatment",
+    "_mcp_treat_instr",
+    "_mcp_treat_edges",
+    "_mcp_treat_nudge",
+    "_mcp_assisted",
+    "_mcp_toast",
+    "_hybrid",
+    "_mcp_only",
+    "_baseline",
+)
+
+# Separates a mode from a variant label in a run directory name
+# (results/runs/<task_id>/<mode>--<label>/). "--" cannot appear in a mode name
+# (single underscores) or inside a label (the run_task CLI validator forbids
+# consecutive hyphens), so splitting on the first occurrence is total.
+VARIANT_LABEL_SEPARATOR = "--"
+
+
+def split_variant_label(dirname: str) -> tuple[str, str | None]:
+    """Split '<mode>--<label>' into (mode, label); label is None when absent."""
+    if VARIANT_LABEL_SEPARATOR not in dirname:
+        return dirname, None
+    mode, _, label = dirname.partition(VARIANT_LABEL_SEPARATOR)
+    return mode, label
 
 
 def strip_mode_suffix(dirname: str) -> tuple[str, str]:

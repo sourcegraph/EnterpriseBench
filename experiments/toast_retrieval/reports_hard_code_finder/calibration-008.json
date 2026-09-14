@@ -1,0 +1,172 @@
+{
+  "task_id": "calibration-008",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/click--8.2.1"
+  ],
+  "retrieved_paths": [
+    "src/click/testing.py",
+    "src/click/types.py",
+    "src/click/utils.py"
+  ],
+  "retrieved_paths_union": [
+    "src/click/testing.py",
+    "src/click/types.py",
+    "src/click/utils.py"
+  ],
+  "required_files": [
+    "src/click/testing.py",
+    "src/click/utils.py"
+  ],
+  "ir_scores": {
+    "task_id": "calibration-008",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.8,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.9197,
+      "5": 0.9197,
+      "10": 0.9197
+    },
+    "mrr": 1.0,
+    "map_score": 0.8333,
+    "file_recall": 1.0,
+    "context_efficiency": 0.6667,
+    "n_retrieved": 3,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "calibration-008",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.8,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.9197,
+      "5": 0.9197,
+      "10": 0.9197
+    },
+    "mrr": 1.0,
+    "map_score": 0.8333,
+    "file_recall": 1.0,
+    "context_efficiency": 0.6667,
+    "n_retrieved": 3,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 11.3,
+  "response_chars": 1968,
+  "raw_response": "Input stream handling is in `CliRunner.isolation()` and `make_input_stream()`. The likely close path is Click\u2019s `File` parameter cleanup during context teardown, which can close the wrapped stdin stream before later reads.\n\nRelevant files:\n\n- [sg-evals/click--8.2.1:src/click/testing.py?L127-L144](/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L127-L144) - Converts string/bytes input to `io.BytesIO`, or extracts a binary reader from an existing stream.\n- [sg-evals/click--8.2.1:src/click/testing.py?L275-L329](/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L275-L329) - `CliRunner.isolation()` creates the input stream, optionally wraps it with `EchoingStdin`, and installs `_NamedTextIOWrapper` as `sys.stdin`.\n- [sg-evals/click--8.2.1:src/click/testing.py?L348-L370](/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L348-L370) - Click\u2019s prompt and character-reading hooks consume the isolated stdin wrapper.\n- [sg-evals/click--8.2.1:src/click/testing.py?L392-L421](/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L392-L421) - Isolation teardown restores the original global streams and Click internals; wrapper destruction/closure can close its underlying input buffer.\n- [sg-evals/click--8.2.1:src/click/testing.py?L423-L534](/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L423-L534) - `invoke()` enters isolation, calls `cli.main()`, flushes captured streams in `finally`, then exits isolation.\n- [sg-evals/click--8.2.1:src/click/types.py?L709-L830](/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/types.py?L709-L830) - `File` parameter type and context-managed file cleanup; relevant when stdin is passed through a `File` option/argument.\n- [sg-evals/click--8.2.1:src/click/utils.py?L158-L179](/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/utils.py?L158-L179) - `LazyFile.close()` and `close_intelligently()`, including the distinction between owned files and stdin.",
+  "ir_scores_unaligned": {
+    "task_id": "calibration-008",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.8,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.9197,
+      "5": 0.9197,
+      "10": 0.9197
+    },
+    "mrr": 1.0,
+    "map_score": 0.8333,
+    "file_recall": 1.0,
+    "context_efficiency": 0.6667,
+    "n_retrieved": 3,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "src/click/testing.py",
+    "src/click/types.py",
+    "src/click/utils.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "calibration-008",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.8,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.9197,
+      "5": 0.9197,
+      "10": 0.9197
+    },
+    "mrr": 1.0,
+    "map_score": 0.8333,
+    "file_recall": 1.0,
+    "context_efficiency": 0.6667,
+    "n_retrieved": 3,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

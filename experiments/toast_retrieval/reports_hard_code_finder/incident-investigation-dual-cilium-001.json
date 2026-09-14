@@ -1,0 +1,193 @@
+{
+  "task_id": "incident-investigation-dual-cilium-001",
+  "policy": "code_finder",
+  "suite": "incident_response",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/cilium--v1.16.4",
+    "github.com/sg-evals/ebpf--v0.16.0"
+  ],
+  "retrieved_paths": [
+    "pkg/endpoint/policy.go",
+    "pkg/endpoint/bpf.go",
+    "pkg/datapath/loader/cache.go",
+    "pkg/datapath/loader/loader.go",
+    "pkg/datapath/loader/netlink.go",
+    "map.go",
+    "collection.go",
+    "elf_reader.go",
+    "github.com/sg-evals/ebpf--v0.16.0"
+  ],
+  "retrieved_paths_union": [
+    "pkg/endpoint/policy.go",
+    "pkg/endpoint/bpf.go",
+    "pkg/datapath/loader/cache.go",
+    "pkg/datapath/loader/loader.go",
+    "pkg/datapath/loader/netlink.go",
+    "map.go",
+    "collection.go",
+    "elf_reader.go",
+    "github.com/sg-evals/ebpf--v0.16.0"
+  ],
+  "required_files": [
+    "pkg/datapath/loader/netlink.go",
+    "pkg/bpf/collection.go",
+    "map.go",
+    "collection.go"
+  ],
+  "ir_scores": {
+    "task_id": "incident-investigation-dual-cilium-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2222,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.151,
+      "10": 0.4202
+    },
+    "mrr": 0.2,
+    "map_score": 0.2405,
+    "file_recall": 0.75,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 9,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "incident-investigation-dual-cilium-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2222,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.151,
+      "10": 0.4202
+    },
+    "mrr": 0.2,
+    "map_score": 0.2405,
+    "file_recall": 0.75,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 9,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 31.4,
+  "response_chars": 4481,
+  "raw_response": "I could not write `/workspace/cilium/INCIDENT_REPORT.md` because the available tools only supported repository search/read operations, not filesystem writes. Findings so far:\n\n- **Cilium regeneration path:** `pkg/endpoint/policy.go:353-460` serializes an individual endpoint with `e.buildMutex`, then calls `regenerateBPF`. `pkg/endpoint/bpf.go:520-685` obtains the compilation read lock and invokes `Loader().ReloadDatapath`.\n- **Shared mutable object:** `pkg/datapath/loader/cache.go:155-230` caches a parsed `*ebpf.CollectionSpec` per template hash and returns `s.Copy()`. The copy is shallow for nested mutable structures except `Contents`; Cilium explicitly clones `MapSpec.Extra` because of the referenced cilium/ebpf bug (`cache.go:165-175`).\n- **Cilium mutates the handed-off spec:** `pkg/datapath/loader/loader.go:445-468` documents that `reloadDatapath` modifies its `CollectionSpec`, replacing the template endpoint ID in `pm.Contents`. `pkg/datapath/loader/netlink.go:51-68` also mutates map contents by clearing policy-call map `Contents` before loading.\n- **Underlying library consumer:** in `github.com/sg-evals/ebpf--v0.16.0`, `map.go:281-309` calls `newMapWithOptions`; `map.go:390-464` (`MapSpec.createMap`) drains `spec.Extra`, calls `fixupMagicFields`, builds `sys.MapCreateAttr` from `spec.MaxEntries`, and invokes `sys.MapCreate`.\n- `MapSpec.Extra` is a mutable `*bytes.Reader` (`map.go:50-89`), and `MapSpec.Copy()` only clones it when called (`map.go:95-120`). Concurrent consumers of a shared spec can therefore race while draining `Extra`; the library\u2019s `createMap` explicitly consumes it at `map.go:403-406`. This is the strongest code-grounded explanation for corrupted map metadata and invalid `max_entries` reaching the syscall.\n- **Collection loading:** `collection.go:352-388` creates maps first, iterating `spec.Maps`; each map eventually reaches `MapSpec.createMap`.\n- **Likely race trace:** two endpoint regenerations obtain the same cached template spec, mutate/use its map definitions during `reloadDatapath \u2192 loadDatapath \u2192 bpf.LoadCollection \u2192 ebpf.NewCollectionWithOptions \u2192 loadMap \u2192 MapSpec.createMap`; concurrent mutation/consumption of shared `MapSpec` state\u2014especially `Extra` and map contents\u2014can tear fields observed by the second loader. The reported `max_entries=2147483647` is consistent with a corrupted `MapSpec` being converted directly into `MapCreateAttr.MaxEntries` at `map.go:414-420`.\n- **Remediation:** fix Cilium\u2019s cache handoff in `pkg/datapath/loader/cache.go`, returning a genuinely deep, independently usable `CollectionSpec` for every regeneration, including all `MapSpec` objects, nested `InnerMap`, `Contents`, `Extra`, and relevant BTF state. Do not rely solely on `CollectionSpec.Copy()` if the cilium/ebpf version leaves mutable internals shared. As defense in depth, cilium/ebpf should make `createMap` consume a private copy of `MapSpec.Extra` rather than mutating caller-owned state, but the primary ownership fix belongs in Cilium because `reloadDatapath` explicitly mutates its input.\n\nRelevant files:\n\n- [cilium--v1.16.4:pkg/endpoint/policy.go?L353-L460](/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/endpoint/policy.go?L353-L460)\n- [cilium--v1.16.4:pkg/endpoint/bpf.go?L520-L685](/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/endpoint/bpf.go?L520-L685)\n- [cilium--v1.16.4:pkg/datapath/loader/cache.go?L26-L45](/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/cache.go?L26-L45)\n- [cilium--v1.16.4:pkg/datapath/loader/cache.go?L155-L230](/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/cache.go?L155-L230)\n- [cilium--v1.16.4:pkg/datapath/loader/loader.go?L445-L490](/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/loader.go?L445-L490)\n- [cilium--v1.16.4:pkg/datapath/loader/netlink.go?L51-L122](/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/netlink.go?L51-L122)\n- [ebpf--v0.16.0:map.go?L50-L120](/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/map.go?L50-L120)\n- [ebpf--v0.16.0:map.go?L281-L309](/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/map.go?L281-L309)\n- [ebpf--v0.16.0:map.go?L390-L464](/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/map.go?L390-L464)\n- [ebpf--v0.16.0:collection.go?L352-L388](/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/collection.go?L352-L388)\n- [ebpf--v0.16.0:elf_reader.go?L808-L842](/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/elf_reader.go?L808-L842)\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "incident-investigation-dual-cilium-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2222,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.151,
+      "10": 0.4202
+    },
+    "mrr": 0.2,
+    "map_score": 0.2405,
+    "file_recall": 0.75,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 9,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "pkg/endpoint/policy.go",
+    "pkg/endpoint/bpf.go",
+    "pkg/datapath/loader/cache.go",
+    "pkg/datapath/loader/loader.go",
+    "pkg/datapath/loader/netlink.go",
+    "map.go",
+    "collection.go",
+    "elf_reader.go",
+    "github.com/sg-evals/ebpf--v0.16.0"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "incident-investigation-dual-cilium-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2222,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.151,
+      "10": 0.4202
+    },
+    "mrr": 0.2,
+    "map_score": 0.2405,
+    "file_recall": 0.75,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 9,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

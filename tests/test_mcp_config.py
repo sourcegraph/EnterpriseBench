@@ -115,6 +115,7 @@ class TestMcpAuthHeaders:
             cmd: list[str],
             timeout: int = 120,
             workdir: str = "/workspace",
+            user: str | None = None,
         ):
             return MagicMock(returncode=0, stdout="", stderr="")
 
@@ -563,10 +564,12 @@ class TestVerifyMcpEndpoint:
     @staticmethod
     def _exec_router(curl_results):
         """A _docker_exec stand-in: curl calls pull from ``curl_results`` (an
-        iterator of CompletedProcess-likes); chmod / rm return benign success."""
+        iterator of CompletedProcess-likes); id / chown / chmod / rm return
+        benign success. ``user`` is accepted because the staging of the auth
+        header runs its ownership fixups as root."""
         it = iter(curl_results)
 
-        def _exec(container_id, cmd, timeout=120, workdir="/workspace"):
+        def _exec(container_id, cmd, timeout=120, workdir="/workspace", user=None):
             if cmd and cmd[0] == "curl":
                 return next(it)
             return MagicMock(returncode=0, stdout="", stderr="")
@@ -618,7 +621,7 @@ class TestVerifyMcpEndpoint:
         captured_cmds: list[list[str]] = []
         header_writes: list[tuple[str, str]] = []
 
-        def capture_exec(container_id, cmd, timeout=120, workdir="/workspace"):
+        def capture_exec(container_id, cmd, timeout=120, workdir="/workspace", user=None):
             captured_cmds.append(cmd)
             if cmd and cmd[0] == "curl":
                 return MagicMock(returncode=0, stdout="200", stderr="")
@@ -657,7 +660,7 @@ class TestVerifyMcpEndpoint:
         """The staged header must be locked down (0600) and scrubbed afterward."""
         cmds: list[list[str]] = []
 
-        def capture_exec(container_id, cmd, timeout=120, workdir="/workspace"):
+        def capture_exec(container_id, cmd, timeout=120, workdir="/workspace", user=None):
             cmds.append(cmd)
             if cmd and cmd[0] == "curl":
                 return MagicMock(returncode=0, stdout="200", stderr="")
@@ -692,7 +695,7 @@ class TestMcpDualConfig:
         def mock_docker_cp(src: str, dest: str):
             cp_dests.append(dest)
 
-        def mock_docker_exec(container_id, cmd, timeout=120, workdir="/workspace"):
+        def mock_docker_exec(container_id, cmd, timeout=120, workdir="/workspace", user=None):
             return MagicMock(returncode=0, stdout="", stderr="")
 
         def mock_mcp_exec(container_id, cmd, timeout=30):
@@ -726,6 +729,73 @@ class TestMcpDualConfig:
         assert any(
             d.endswith("/home/agent/.claude/settings.json") for d in user_writes
         ), f"Expected user-level trust settings.json, got {user_writes}"
+
+
+class TestMcpConfigOwnership:
+    """The agent must be able to read the config written for it.
+
+    ``docker cp`` stamps the copied file with the host temp file's uid (1000)
+    and 0600, and the image's default exec user is ``agent`` -- so an
+    unqualified ``chown agent:agent`` is a no-op run by a user who cannot
+    perform it. Whether the agent could read its own MCP config then came down
+    to whether uid 1000 happened to be ``agent`` in that task's base image
+    (Python: yes; Node: it is ``node``). Claude Code reports the unreadable
+    file as a config *parse* failure, so the symptom names the wrong cause.
+    """
+
+    @staticmethod
+    def _configure(exec_side_effect):
+        def mock_mcp_exec(container_id, cmd, timeout=30, env_names=()):
+            return MagicMock(returncode=0, stdout="sourcegraph  Connected", stderr="")
+
+        with (
+            patch("run_task._docker_exec", side_effect=exec_side_effect),
+            patch("run_task._docker_cp", MagicMock()),
+            patch("run_task._verify_mcp_endpoint", return_value=True),
+            patch("run_task._mcp_exec", side_effect=mock_mcp_exec),
+            patch.dict(os.environ, {"SOURCEGRAPH_ACCESS_TOKEN": "sgp_test"}),
+        ):
+            return _configure_mcp("test-container", "mcp_only")
+
+    def test_every_config_path_is_chowned_to_agent_as_root(self) -> None:
+        calls: list[tuple[list[str], str | None]] = []
+
+        def capture(container_id, cmd, timeout=120, workdir="/workspace", user=None):
+            calls.append((cmd, user))
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        assert self._configure(capture) is True
+
+        for path in (
+            "/workspace/.mcp.json",
+            "/home/agent/.claude/.mcp.json",
+            "/home/agent/.mcp.json",
+        ):
+            chowns = [
+                user
+                for cmd, user in calls
+                if cmd[:2] == ["chown", "agent:agent"] and cmd[-1] == path
+            ]
+            assert chowns == ["root"], f"{path} was not chowned as root: {chowns}"
+
+    def test_a_failed_chown_fails_preflight(self) -> None:
+        def capture(container_id, cmd, timeout=120, workdir="/workspace", user=None):
+            if cmd[:2] == ["chown", "agent:agent"] and cmd[-1].endswith(".mcp.json"):
+                return MagicMock(returncode=1, stdout="", stderr="Operation not permitted")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        assert self._configure(capture) is False
+
+    def test_a_config_the_agent_cannot_read_fails_preflight(self) -> None:
+        """The readability probe runs as the agent, not as root."""
+
+        def capture(container_id, cmd, timeout=120, workdir="/workspace", user=None):
+            if cmd[:2] == ["test", "-r"]:
+                assert user == "agent", f"readability probed as {user!r}, not the agent"
+                return MagicMock(returncode=1, stdout="", stderr="")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        assert self._configure(capture) is False
 
 
 # ---------------------------------------------------------------------------

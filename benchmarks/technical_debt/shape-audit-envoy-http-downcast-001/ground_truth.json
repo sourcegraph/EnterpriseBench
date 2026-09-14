@@ -1,0 +1,37 @@
+{
+  "task_id": "shape-audit-envoy-http-downcast-001",
+  "repo": "envoyproxy/envoy",
+  "repo_rev": "v1.31.2",
+  "required_files": [
+    {
+      "path": "source/common/http/codec_client.cc",
+      "repo": "envoy",
+      "confidence": 1.0,
+      "source": "deterministic",
+      "rationale": "Contains at least one match for the specified code shape."
+    },
+    {
+      "path": "source/common/http/http3/conn_pool.cc",
+      "repo": "envoy",
+      "confidence": 1.0,
+      "source": "deterministic",
+      "rationale": "Contains at least one match for the specified code shape."
+    },
+    {
+      "path": "source/common/http/mixed_conn_pool.cc",
+      "repo": "envoy",
+      "confidence": 1.0,
+      "source": "deterministic",
+      "rationale": "Contains at least one match for the specified code shape."
+    }
+  ],
+  "sufficient_files": [],
+  "provenance": {
+    "oracle": "parser (ast-grep pattern match)",
+    "command": "ast-grep run --pattern 'dynamic_cast<$T>($X)' --lang cpp source/common/http",
+    "clone": "envoy--v1.31.2",
+    "scope": "source/common/http",
+    "excluded": "(^|/)(tests?|testing|vendor|third_party|node_modules|examples?|docs?|fixtures?)(/|$)|_test\\.|test_|\\.pb\\.go$|(^|/)CHANGELOG|generated",
+    "bias_note": "The oracle for this axis is the same class of tool as one experimental condition's primitive. That condition can reproduce this key more directly than the others, which is a property of the axis and must be stated with any per-category claim drawn from it."
+  }
+}

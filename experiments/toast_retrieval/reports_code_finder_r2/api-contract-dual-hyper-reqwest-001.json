@@ -1,0 +1,212 @@
+{
+  "task_id": "api-contract-dual-hyper-reqwest-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/hyper--v1.0.0",
+    "github.com/sg-evals/reqwest--v0.11.22"
+  ],
+  "retrieved_paths": [
+    "hyper--v1.0.0/src/body/mod.rs",
+    "src/body/incoming.rs",
+    "hyper--v1.0.0/Cargo.toml",
+    "src/client/conn/http1.rs",
+    "src/client/conn/http2.rs",
+    "hyper--v1.0.0/docs/ROADMAP.md",
+    "reqwest--v0.11.22/Cargo.toml",
+    "src/async_impl/body.rs",
+    "src/async_impl/client.rs",
+    "src/async_impl/response.rs",
+    "src/async_impl/decoder.rs",
+    "src/async_impl/h3_client/mod.rs",
+    "src/async_impl/h3_client/pool.rs",
+    "src/blocking/body.rs",
+    "tests/support/server.rs",
+    "tests/blocking.rs"
+  ],
+  "retrieved_paths_union": [
+    "hyper--v1.0.0/src/body/mod.rs",
+    "src/body/incoming.rs",
+    "hyper--v1.0.0/Cargo.toml",
+    "src/client/conn/http1.rs",
+    "src/client/conn/http2.rs",
+    "hyper--v1.0.0/docs/ROADMAP.md",
+    "reqwest--v0.11.22/Cargo.toml",
+    "src/async_impl/body.rs",
+    "src/async_impl/client.rs",
+    "src/async_impl/response.rs",
+    "src/async_impl/decoder.rs",
+    "src/async_impl/h3_client/mod.rs",
+    "src/async_impl/h3_client/pool.rs",
+    "src/blocking/body.rs",
+    "tests/support/server.rs",
+    "tests/blocking.rs"
+  ],
+  "required_files": [
+    "hyper/src/body/mod.rs",
+    "reqwest/src/async_impl/client.rs"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1846
+    },
+    "mrr": 0.1111,
+    "map_score": 0.0556,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0625,
+    "n_retrieved": 16,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1846
+    },
+    "mrr": 0.1111,
+    "map_score": 0.0556,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0625,
+    "n_retrieved": 16,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 24.4,
+  "response_chars": 3798,
+  "raw_response": "I could not write `/workspace/analysis/IMPACT_REPORT.md` because the tool session ended before file-writing access was available. Findings so far:\n\n- **hyper body API:** `hyper--v1.0.0/src/body/mod.rs:1-34` exports `http_body::Body`, `Frame`, `SizeHint`, and the concrete receive body `Incoming`. `src/body/incoming.rs:170-203` implements `Body` with `Data = Bytes`, `Error = hyper::Error`, and `poll_frame`.\n- **hyper dependencies:** `hyper--v1.0.0/Cargo.toml:22-35` uses `http = \"1\"`, `http-body = \"1\"`, and optional `http-body-util = \"0.1\"`.\n- **hyper client contract:** `src/client/conn/http1.rs:21-24,51-64,116-123,160-184` and `src/client/conn/http2.rs:22-25` use generic request bodies implementing hyper\u2019s re-exported `Body`; responses are `Response<Incoming>`. `send_request` accepts `Request<B>` and returns `Response<Incoming>`.\n- **historical migration note:** `hyper--v1.0.0/docs/ROADMAP.md:185-195` states the old `Body` struct was removed, variants split into separate types, and `HttpBody` was renamed to `Body`; received bodies became `Incoming`.\n- **reqwest dependency mismatch:** `reqwest--v0.11.22/Cargo.toml:100-104` pins `hyper = \"0.14.21\"` and `http-body = \"0.4.0\"`, while the target hyper version uses hyper 1.x/http-body 1.x.\n- **reqwest request body implementation:** `src/async_impl/body.rs:8,24-35,45,111-127,156-179` imports the old `http_body::Body` trait, wraps `hyper::Body`, and implements `From<hyper::Body>`. Its `ImplStream` is passed to hyper\u2019s client.\n- **reqwest client implementation:** `src/async_impl/client.rs:1648` defines `HyperClient = hyper::Client<Connector, super::body::ImplStream>`. Request construction at `src/async_impl/client.rs:1817-1830` sends `body.into_stream()` through `self.inner.hyper.request(req)`.\n- **reqwest response implementation:** `src/async_impl/response.rs:33-47` requires `hyper::Response<hyper::Body>`; `:80-84` imports `hyper::body::HttpBody` for `size_hint`; `:258-260` calls `hyper::body::to_bytes`.\n- **reqwest decoder:** `src/async_impl/decoder.rs:15-20,51-75` imports `hyper::body::HttpBody` and operates over `ImplStream`.\n- **reqwest HTTP/3 path:** `src/async_impl/h3_client/mod.rs:12-14,48-60,78-84` aliases `hyper::Body` as `HyperBody` and returns `Response<HyperBody>`. `src/async_impl/h3_client/pool.rs:15-17,124-150` also constructs `HyperBody::from(resp_body)`.\n- **reqwest blocking body:** `src/blocking/body.rs:133-146,259-261` uses `hyper::Body::channel`, `hyper::body::Sender`, and `async_impl::Body::wrap`.\n- **tests/support:** `tests/support/server.rs:41-43`, `tests/blocking.rs:90-92,117-120`, and timeout/compression tests use `hyper::Body`, `to_bytes`, `channel`, or `wrap_stream`.\n\n**Contract mismatch and migration recommendation:** reqwest 0.11 expects hyper 0.14\u2019s concrete `hyper::Body`, `hyper::body::HttpBody`, `Body::channel`, `Body::wrap_stream`, and `body::to_bytes`. Hyper 1.0 instead exposes the `http_body 1.x` `Body` trait and `Incoming`; it no longer provides the old concrete `hyper::Body` API. Migration requires:\n1. Replace request streaming with an `http_body 1.x` implementation, commonly `http_body_util::StreamBody`, `Full`, `Empty`, or a boxed body.\n2. Change response types from `hyper::Response<hyper::Body>` to `hyper::Response<hyper::body::Incoming>`.\n3. Replace `HttpBody` imports with `hyper::body::Body`/`http_body::Body`.\n4. Replace `hyper::body::to_bytes` with `http_body_util::BodyExt::collect`.\n5. Replace `hyper::Body::channel` with an appropriate `http_body`/`http-body-util` streaming channel or custom body implementation.\n6. Update HTTP and body dependency versions together (`http 1`, `http-body 1`, hyper 1), and adapt HTTP/3 code separately because its body type must also implement the new body contract.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1846
+    },
+    "mrr": 0.1111,
+    "map_score": 0.0556,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0625,
+    "n_retrieved": 16,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "hyper--v1.0.0/src/body/mod.rs",
+    "src/body/incoming.rs",
+    "hyper--v1.0.0/Cargo.toml",
+    "src/client/conn/http1.rs",
+    "src/client/conn/http2.rs",
+    "hyper--v1.0.0/docs/ROADMAP.md",
+    "reqwest--v0.11.22/Cargo.toml",
+    "src/async_impl/body.rs",
+    "reqwest/src/async_impl/client.rs",
+    "src/async_impl/response.rs",
+    "src/async_impl/decoder.rs",
+    "src/async_impl/h3_client/mod.rs",
+    "src/async_impl/h3_client/pool.rs",
+    "src/blocking/body.rs",
+    "tests/support/server.rs",
+    "tests/blocking.rs"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1846
+    },
+    "mrr": 0.1111,
+    "map_score": 0.0556,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0625,
+    "n_retrieved": 16,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

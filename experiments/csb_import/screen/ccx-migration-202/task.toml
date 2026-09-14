@@ -1,0 +1,88 @@
+# Imported from CodeScaleBench CCX-migration-202 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-migration-202"
+suite = "technical_debt"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Envoy HTTP/1.1 to HTTP/2 Header Normalization Migration"
+
+[[repos]]
+url = "https://github.com/envoyproxy/envoy"
+rev = "v1.31.2"
+path = "envoy"
+role = "primary"
+
+[metadata]
+languages = ["cpp"]
+csb_mirror = "sg-evals/envoy--v1.31.2"
+csb_commit = "cc4a75482810de4b84c301d13deb551bd3147339"
+csb_family = "csb_org_migration"
+csb_category = "migration-inventory"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "source/common/http/utility.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/common/http/http2/codec_impl.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/common/http/http1/codec_impl.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/common/http/conn_manager_utility.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/common/http/header_utility.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/common/http/conn_manager_impl.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/common/http/header_map_impl.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/common/http/http1/header_formatter.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"

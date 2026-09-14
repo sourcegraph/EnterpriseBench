@@ -1,0 +1,40 @@
+{
+  "task_id": "support-map-grafana-import-003",
+  "checkpoints": {
+    "code_paths": {
+      "expected_solution": "Core code paths: (1) pkg/services/dashboardimport/service/service.go \u2014 Dashboard import service \u2014 processes incoming dashboards and triggers schema migrations. (2) pkg/services/dashboards/database/database.go \u2014 Dashboard database layer \u2014 stores dashboards after import, may apply schema version. (3) pkg/components/simplejson/simplejson.go \u2014 JSON handling for dashboard models \u2014 fieldConfig merging during schema migration.",
+      "evaluation_criteria": [
+        "Must identify pkg/services/dashboardimport/service/service.go as part of the core code path",
+        "Must identify pkg/services/dashboards/database/database.go as part of the core code path",
+        "Must identify pkg/components/simplejson/simplejson.go as part of the core code path",
+        "Must reference specific functions, types, or methods from the cited files",
+        "Must explain how pkg/services/dashboardimport/service/service.go interacts with pkg/services/dashboards/database/database.go"
+      ]
+    },
+    "ownership": {
+      "expected_solution": "Ownership: the code lives under pkg/components/simplejson, pkg/services/dashboardimport, pkg/services/dashboards. Subsystem keywords: dashboard-import, schema-migration, fieldConfig, panel-config, serialization.",
+      "evaluation_criteria": [
+        "Must identify the owning subsystem (e.g. directory 'pkg/services/dashboardimport')",
+        "Must reference the secondary subsystem 'pkg/services/dashboards'",
+        "Must reference at least one of the ownership keywords: dashboard-import, schema-migration, fieldConfig"
+      ]
+    },
+    "severity": {
+      "expected_solution": "Severity: MEDIUM. The reported symptom affects a real user workflow but has a workaround or limited blast radius. In this case: Map customer-reported dashboard formatting loss after import to Grafana import and schema migration code.",
+      "evaluation_criteria": [
+        "Must assess severity as MEDIUM",
+        "Must justify the severity rating with reference to user impact or blast radius",
+        "Must align severity with the type of failure (e.g. crash vs incorrect-result vs degraded behavior)"
+      ]
+    },
+    "related_issues": {
+      "expected_solution": "Related files and references: (1) pkg/services/dashboards/service/dashboard_service.go \u2014 Dashboard service orchestrating save/import operations. (2) public/app/features/dashboard/state/DashboardModel.ts \u2014 Frontend dashboard model \u2014 schema version handling and panel config. (3) public/app/features/manage-dashboards/DashboardImportPage.tsx \u2014 Frontend import page \u2014 UI entry point for dashboard import flow.",
+      "evaluation_criteria": [
+        "Must reference pkg/services/dashboards/service/dashboard_service.go as a related file",
+        "Must reference public/app/features/dashboard/state/DashboardModel.ts as a related file",
+        "Must reference public/app/features/manage-dashboards/DashboardImportPage.tsx as a related file",
+        "Related files should extend beyond the strict required_files set"
+      ]
+    }
+  }
+}

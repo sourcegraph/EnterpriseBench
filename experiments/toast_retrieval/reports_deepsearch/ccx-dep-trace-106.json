@@ -1,0 +1,181 @@
+{
+  "task_id": "ccx-dep-trace-106",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/gcc--releases_gcc-14.2.0"
+  ],
+  "retrieved_paths": [
+    "gcc/passes.def",
+    "gcc/passes.cc",
+    "gcc/tree-pass.h",
+    "gcc/pass_manager.h",
+    "gcc/tree-ssa-dce.cc"
+  ],
+  "retrieved_paths_union": [
+    "gcc/passes.def",
+    "gcc/passes.cc",
+    "gcc/tree-pass.h",
+    "gcc/pass_manager.h",
+    "gcc/tree-ssa-dce.cc"
+  ],
+  "required_files": [
+    "gcc/passes.def",
+    "gcc/passes.cc",
+    "gcc/pass_manager.h",
+    "gcc/tree-ssa-dce.cc",
+    "gcc/tree-pass.h"
+  ],
+  "ir_scores": {
+    "task_id": "ccx-dep-trace-106",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.6,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 0.6667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 5,
+    "n_ground_truth": 5,
+    "n_overlap": 5
+  },
+  "ir_scores_union": {
+    "task_id": "ccx-dep-trace-106",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.6,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 0.6667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 5,
+    "n_ground_truth": 5,
+    "n_overlap": 5
+  },
+  "elapsed_seconds": 36.8,
+  "response_chars": 2320,
+  "raw_response": "Here are the findings for each question, all in repo `github.com/sg-evals/gcc--releases_gcc-14.2.0`:\n\n---\n\n**1. Master pass ordering list**\n[`gcc/passes.def`](https://demo.sourcegraph.com/r/github.com/sg-evals/gcc--releases_gcc-14.2.0/-/blob/gcc/passes.def) \u2014 Uses `NEXT_PASS`, `PUSH_INSERT_PASSES_WITHIN`, `POP_INSERT_PASSES`, and `TERMINATE_PASS_LIST` macros to define the complete ordered pipeline for `all_lowering_passes`, `all_small_ipa_passes`, `all_regular_ipa_passes`, `all_lto_gen_passes`, `all_late_ipa_passes`, and `all_passes`.\n\n**2. Pass manager implementation**\n[`gcc/passes.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/gcc--releases_gcc-14.2.0/-/blob/gcc/passes.cc) \u2014 Implements `pass_manager`, including `finish_optimization_passes`, `register_pass`, and pass execution orchestration.\n\n**3. Base class and pass manager interface**\n- [`gcc/tree-pass.h`](https://demo.sourcegraph.com/r/github.com/sg-evals/gcc--releases_gcc-14.2.0/-/blob/gcc/tree-pass.h) \u2014 Defines `opt_pass` (base class), `gimple_opt_pass`, `rtl_opt_pass`, `simple_ipa_opt_pass`, `ipa_opt_pass_d`, and `pass_data`.\n- [`gcc/pass_manager.h`](https://demo.sourcegraph.com/r/github.com/sg-evals/gcc--releases_gcc-14.2.0/-/blob/gcc/pass_manager.h) \u2014 Declares the `pass_manager` class interface with methods like `finish_optimization_passes`, `execute_early_local_passes`, etc.\n\n**4. Concrete GIMPLE DCE pass**\n[`gcc/tree-ssa-dce.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/gcc--releases_gcc-14.2.0/-/blob/gcc/tree-ssa-dce.cc) \u2014 Implements `pass_dce` (simple SSA dead code elimination extending `gimple_opt_pass`) and `pass_cd_dce` (control-dependence DCE). Factory: `make_pass_dce()`.\n\n**5. Pass registration macros and tree-SSA declarations**\n[`gcc/tree-pass.h`](https://demo.sourcegraph.com/r/github.com/sg-evals/gcc--releases_gcc-14.2.0/-/blob/gcc/tree-pass.h) \u2014 Contains the `NEXT_PASS` macro infrastructure and all `extern gimple_opt_pass *make_pass_*()` declarations for tree-SSA passes.\n\nThe JSON answer has been written to `/workspace/agent_output/answer.json` (available at the download link above).\n\nGenerated files:\n- files/answer.json: /.api/agent-files/v1/deep-search/1caba927-f820-40e3-92c6-36c9364c9643/files/answer.json\n\nLink: https://demo.sourcegraph.com/deepsearch/1caba927-f820-40e3-92c6-36c9364c9643",
+  "ir_scores_unaligned": {
+    "task_id": "ccx-dep-trace-106",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.6,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 0.6667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 5,
+    "n_ground_truth": 5,
+    "n_overlap": 5
+  },
+  "retrieved_paths_aligned": [
+    "gcc/passes.def",
+    "gcc/passes.cc",
+    "gcc/tree-pass.h",
+    "gcc/pass_manager.h",
+    "gcc/tree-ssa-dce.cc"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "ccx-dep-trace-106",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.6,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 0.6667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 5,
+    "n_ground_truth": 5,
+    "n_overlap": 5
+  },
+  "scoring": "aligned_suffix_v1"
+}

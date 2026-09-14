@@ -1,0 +1,88 @@
+# Imported from CodeScaleBench CCX-platform-243 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-platform-243"
+suite = "platform_engineering"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Envoy Admin API Endpoint Registration"
+
+[[repos]]
+url = "https://github.com/envoyproxy/envoy"
+rev = "v1.31.2"
+path = "envoy"
+role = "primary"
+
+[metadata]
+languages = ["cpp"]
+csb_mirror = "sg-evals/envoy--v1.31.2"
+csb_commit = "cc4a75482810de4b84c301d13deb551bd3147339"
+csb_family = "csb_org_platform"
+csb_category = "platform-knowledge"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "source/server/admin/admin.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/server/admin/admin_filter.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/server/admin/clusters_handler.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/server/admin/listeners_handler.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/server/admin/config_dump_handler.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/server/admin/stats_handler.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/server/admin/stats_request.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "source/server/admin/prometheus_stats.cc"
+repo = "envoy"
+confidence = 0.9
+source = "deterministic"

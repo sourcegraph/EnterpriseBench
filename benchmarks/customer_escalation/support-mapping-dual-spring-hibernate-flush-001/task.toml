@@ -1,0 +1,125 @@
+# support_code_mapping: Map customer Spring Boot @Transactional updates not flushing before save to the Spring TransactionTemplate / Hibernate Session.flush boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "spring-hibernate-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-spring-hibernate-flush-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 35
+session_type = "single"
+description = "Map customer Spring Boot @Transactional updates not flushing before save to the Spring TransactionTemplate / Hibernate Session.flush boundary"
+prompt = """
+A customer reports that their Spring Boot 3 service writes are
+occasionally invisible to a downstream read inside the same
+@Transactional method. The trace shows a save() call followed by a
+JDBC query against the same row that returns the OLD value, even though
+Hibernate's first-level cache shows the new entity. The customer
+expected the dirty entity to be flushed before the query.
+
+Your task:
+1. Find where Spring's TransactionTemplate / @Transactional configures
+   the JpaTransactionManager and how it triggers flush at synchronization
+   points.
+2. Find where Hibernate's Session.flush decides whether to write
+   pending changes to the database (FlushMode.AUTO vs MANUAL) and how
+   it interacts with native query execution.
+3. Trace the cross-repo path: Spring TransactionTemplate.execute ->
+   PlatformTransactionManager beforeCommit -> JpaTransactionManager
+   -> EntityManager flush -> Hibernate SessionImpl.flush ->
+   ActionQueue execute. Cite each file and the function or attribute
+   responsible.
+4. Identify why a native SQL query inside the same transaction does
+   not auto-flush pending changes the way HQL does, and what
+   FlushMode setting closes the gap.
+"""
+
+[[repos]]
+url = "https://github.com/spring-projects/spring-framework"
+rev = "v6.1.4"
+path = "spring-framework"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/hibernate/hibernate-orm"
+rev = "6.4.4"
+path = "hibernate-orm"
+role = "upstream"
+
+[metadata]
+languages = ["java"]
+total_loc = 1500000
+dependency_depth = 2
+frameworks = ["spring", "hibernate", "jpa"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Spring's @Transactional and Hibernate's flush semantics interact in non-obvious ways for native queries. Cross-repo navigation is required to trace why a save+native-read sees stale data."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "spring-framework/spring-orm/src/main/java/org/springframework/orm/jpa/JpaTransactionManager.java"
+repo = "spring-framework"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "spring-framework/spring-tx/src/main/java/org/springframework/transaction/support/TransactionTemplate.java"
+repo = "spring-framework"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "hibernate-orm/hibernate-core/src/main/java/org/hibernate/internal/SessionImpl.java"
+repo = "hibernate-orm"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "hibernate-orm/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultAutoFlushEventListener.java"
+repo = "hibernate-orm"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "spring-framework/spring-orm/src/main/java/org/springframework/orm/jpa/EntityManagerFactoryUtils.java"
+repo = "spring-framework"
+confidence = 0.7
+
+[[ground_truth.sufficient_files]]
+path = "hibernate-orm/hibernate-core/src/main/java/org/hibernate/engine/spi/ActionQueue.java"
+repo = "hibernate-orm"
+confidence = 0.75

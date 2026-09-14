@@ -1,0 +1,32 @@
+{
+  "task_id": "monorepo-boundary-nextjs-og-008",
+  "checkpoints": {
+    "identify_affected_packages": {
+      "expected_solution": "PR #56662 in Next.js v14.0.0 moves `ImageResponse` from `next/server` to `next/og`. Source-of-change package is `next` (`packages/next/`): new entry points `packages/next/og.js` and `packages/next/og.d.ts`, refactored implementation in `packages/next/src/server/og/image-response.ts` (replaces `packages/next/src/server/web/spec-extension/image-response.ts`), updated `packages/next/package.json` exports map, build-time configuration in `packages/next/src/build/webpack-config.ts`, middleware plugin in `packages/next/src/build/webpack/plugins/middleware-plugin.ts`, and bundler script `packages/next/taskfile.js`. The change crosses a JS/Rust language boundary: (1) `@next/swc` Rust crate `next-core` updates its TS-import resolution table (`packages/next-swc/crates/next-core/src/next_import_map.rs`), and (2) the bundled `@vercel/og` package manifest (`packages/next/src/compiled/@vercel/og/package.json`) gets a new export path.",
+      "evaluation_criteria": [
+        "Must identify the next package (packages/next/) as the source of change with new entry points packages/next/og.js and packages/next/og.d.ts",
+        "Must identify the @next/swc next-core Rust crate (packages/next-swc/crates/next-core/src/next_import_map.rs) as the cross-language affected sibling",
+        "Must explicitly call out that this crosses a JS/Rust boundary",
+        "Should reference the bundled @vercel/og manifest at packages/next/src/compiled/@vercel/og/package.json"
+      ]
+    },
+    "classify_change_impact": {
+      "expected_solution": "Overall semver = **major** (v14.0.0). The export move is breaking: any consumer importing `ImageResponse` from `next/server` will fail at type-check or runtime. Per-package: `next` = major (export removed from one path, added to another; package.json `exports` map and types both change); `@next/swc` (next-core) = major because the import map drives module-graph resolution at build time and old paths now route differently; bundled `@vercel/og` artifact = major (export-map shift). Mitigation is an explicit upgrade note: change the import statement.",
+      "evaluation_criteria": [
+        "Must classify overall semver as `major` and explain that the import-path move breaks existing consumers",
+        "Must classify @next/swc as major because the SWC import map changes how modules resolve at compile time",
+        "Must explain that the breaking surface is observable to every Next.js app importing ImageResponse",
+        "Should note that documentation/upgrade notes should call out the new import path"
+      ]
+    },
+    "identify_boundary_violations": {
+      "expected_solution": "Source-side violations: (1) `packages/next/og.js` and `packages/next/og.d.ts` — new public entry points; (2) `packages/next/src/server/og/image-response.ts` — relocated implementation; (3) `packages/next/src/server/web/spec-extension/image-response.ts` — re-shaped to forward or removed entirely; (4) `packages/next/package.json` — `exports` map, types, and bundled-deps entries; (5) `packages/next/src/build/webpack-config.ts` — webpack alias and condition resolution updated for the new entry; (6) `packages/next/src/build/webpack/plugins/middleware-plugin.ts` — Edge runtime middleware bundling references the new module path; (7) `packages/next/taskfile.js` — bundler script that copies `@vercel/og` into `src/compiled/`. Cross-language: (8) `packages/next-swc/crates/next-core/src/next_import_map.rs` — Rust import map adds `next/og` resolution and updates `next/server` to drop ImageResponse. Bundled artifact: (9) `packages/next/src/compiled/@vercel/og/package.json`. PR file count = 29.",
+      "evaluation_criteria": [
+        "Must cite packages/next/og.js and packages/next/og.d.ts as new entry points",
+        "Must cite packages/next/src/server/og/image-response.ts (the new implementation site)",
+        "Must cite packages/next-swc/crates/next-core/src/next_import_map.rs as the Rust-side import-map change",
+        "Should cite packages/next/package.json (exports map) and packages/next/src/build/webpack-config.ts as supporting violations"
+      ]
+    }
+  }
+}

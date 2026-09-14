@@ -1,0 +1,121 @@
+# support_code_mapping: Map customer axum auth middleware bypassed for tracing-instrumented routes to the Router / tower ServiceBuilder layer-order boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "rust-axum-tower-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-axum-tower-middleware-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 35
+session_type = "single"
+description = "Map customer axum auth middleware bypassed for tracing-instrumented routes to the Router / tower ServiceBuilder layer-order boundary"
+prompt = """
+A customer reports that their axum service has an auth middleware
+that runs on most routes but is silently bypassed for routes nested
+under a Router that wraps a tracing layer. Requests to those routes
+succeed without the Authorization header; the auth layer never
+produces a span.
+
+Your task:
+1. Find where axum's Router applies layers and how nested Routers
+   compose with tower::ServiceBuilder layers.
+2. Find where tower::ServiceBuilder enforces layer order and how
+   .layer() differs from .route_layer() in axum.
+3. Trace the cross-repo path: axum::Router::route_layer vs
+   axum::Router::layer -> Router::merge -> tower::ServiceBuilder ->
+   tower::Layer::layer composition. Cite each file and the function
+   responsible.
+4. Identify why route_layer() applied to a parent Router does NOT
+   wrap routes added via Router::merge from a sub-router, leaving
+   the auth layer skipped for nested routes.
+"""
+
+[[repos]]
+url = "https://github.com/tokio-rs/axum"
+rev = "axum-v0.7.5"
+path = "axum"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/tower-rs/tower"
+rev = "tower-0.4.13"
+path = "tower"
+role = "upstream"
+
+[metadata]
+languages = ["rust"]
+total_loc = 180000
+dependency_depth = 2
+frameworks = ["axum", "tower", "hyper"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Layer composition is split between axum's Router merge semantics and tower's ServiceBuilder. The bypass requires cross-repo navigation to see why route_layer skips merged routes."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "axum/axum/src/routing/mod.rs"
+repo = "axum"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "axum/axum/src/routing/path_router.rs"
+repo = "axum"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "tower/tower/src/builder/mod.rs"
+repo = "tower"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "tower/tower/src/layer/layer_fn.rs"
+repo = "tower"
+confidence = 0.75
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "axum/axum/src/middleware/from_fn.rs"
+repo = "axum"
+confidence = 0.75
+
+[[ground_truth.sufficient_files]]
+path = "tower/tower-layer/src/lib.rs"
+repo = "tower"
+confidence = 0.7

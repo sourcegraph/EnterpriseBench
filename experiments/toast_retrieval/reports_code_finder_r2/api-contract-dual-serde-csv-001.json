@@ -1,0 +1,191 @@
+{
+  "task_id": "api-contract-dual-serde-csv-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/serde--v1.0.193",
+    "github.com/sg-evals/rust-csv--1.3.0"
+  ],
+  "retrieved_paths": [
+    "serde/src/de/mod.rs",
+    "serde_derive/src/de.rs",
+    "rust-csv--1.3.0/Cargo.toml",
+    "rust-csv--1.3.0/src/deserializer.rs",
+    "src/deserializer.rs",
+    "rust-csv--1.3.0/src/string_record.rs",
+    "rust-csv--1.3.0/src/reader.rs",
+    "src/reader.rs",
+    "serde--v1.0.193/test_suite/tests/test_de.rs"
+  ],
+  "retrieved_paths_union": [
+    "serde/src/de/mod.rs",
+    "serde_derive/src/de.rs",
+    "rust-csv--1.3.0/Cargo.toml",
+    "rust-csv--1.3.0/src/deserializer.rs",
+    "src/deserializer.rs",
+    "rust-csv--1.3.0/src/string_record.rs",
+    "rust-csv--1.3.0/src/reader.rs",
+    "src/reader.rs",
+    "serde--v1.0.193/test_suite/tests/test_de.rs"
+  ],
+  "required_files": [
+    "serde/serde/src/de/mod.rs",
+    "csv/src/deserializer.rs"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-serde-csv-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.8503,
+      "10": 0.8503
+    },
+    "mrr": 1.0,
+    "map_score": 0.7,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-serde-csv-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.8503,
+      "10": 0.8503
+    },
+    "mrr": 1.0,
+    "map_score": 0.7,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 24.7,
+  "response_chars": 3898,
+  "raw_response": "I\u2019m unable to write `/workspace/analysis/IMPACT_REPORT.md` because the available search tools do not provide filesystem-write access. Findings gathered so far:\n\n- Serde\u2019s contract is `serde::de::Deserializer<'de>` and `Deserialize<'de>`:\n  - `serde/src/de/mod.rs:800-890` \u2014 data-model and entry-point contract.\n  - `serde/src/de/mod.rs:908-1122` \u2014 `Deserializer` methods, especially `deserialize_newtype_struct`, `deserialize_tuple_struct`, `deserialize_tuple`, and `deserialize_struct`.\n  - `serde/src/de/mod.rs:535-544` \u2014 `Deserialize::deserialize`.\n- Serde derive classifies ordinary structs versus tuple/newtype structs:\n  - `serde_derive/src/de.rs:280-290`.\n  - `serde_derive/src/de.rs:458-573` \u2014 tuple structs; a one-field tuple/newtype struct dispatches through `deserialize_newtype_struct` (`:520-525`), while multi-field tuple structs use `deserialize_tuple_struct` (`:527-531`).\n  - `serde_derive/src/de.rs:853-895` \u2014 generated `visit_newtype_struct`, which deserializes the single inner field and constructs the outer tuple/newtype value.\n  - `serde_derive/src/de.rs:909-1084` \u2014 named structs dispatch through `deserialize_struct`; generated visitors support both sequence and map forms.\n- csv\u2019s dependency declaration:\n  - `rust-csv--1.3.0/Cargo.toml:23-31` \u2014 runtime dependency `serde = \"1.0.55\"` and derive-enabled dev dependency.\n- csv\u2019s row deserializer:\n  - `rust-csv--1.3.0/src/deserializer.rs:21-53` \u2014 `deserialize_string_record` / `deserialize_byte_record` create `DeRecordWrap` and call `D::deserialize`.\n  - `src/deserializer.rs:55-100` \u2014 `DeRecord` abstraction for StringRecord/ByteRecord.\n  - `src/deserializer.rs:342-557` \u2014 csv\u2019s `serde::Deserializer` implementation.\n  - `src/deserializer.rs:475-505` \u2014 newtype, sequence, tuple, and tuple-struct handling. Crucially, `deserialize_newtype_struct` calls `visitor.visit_newtype_struct(self)`, while `deserialize_tuple_struct` calls `visitor.visit_seq(self)`.\n  - `src/deserializer.rs:518-529` \u2014 named structs use `visit_seq` without headers and `visit_map` with headers.\n  - `src/deserializer.rs:157-227` and `:232-322` \u2014 field iteration and primitive inference for StringRecord and ByteRecord.\n- Public csv record APIs:\n  - `rust-csv--1.3.0/src/string_record.rs:230-297` \u2014 `StringRecord::deserialize`, including positional and header-based examples.\n  - `rust-csv--1.3.0/src/reader.rs:925-943` \u2014 documented mapping rules: tuples/tuple structs are positional; named structs use headers when enabled.\n  - `src/reader.rs:1971-2007` \u2014 `Reader::deserialize` iterator reads each row and invokes `StringRecord::deserialize`.\n- Relevant tests:\n  - `rust-csv--1.3.0/src/deserializer.rs:1020-1037` \u2014 sequence fields and tail vectors.\n  - `src/deserializer.rs:1150-1163` \u2014 borrowed struct fields.\n  - `serde--v1.0.193/test_suite/tests/test_de.rs:919-940` \u2014 newtype and tuple-struct behavior.\n\nLikely impact: one-field tuple/newtype structs are the affected category. Serde derive intentionally emits `deserialize_newtype_struct` for them, whereas multi-field tuple structs use `deserialize_tuple_struct`. csv implements both entry points as sequence-oriented operations, but the newtype path invokes `Visitor::visit_newtype_struct`, which recursively deserializes exactly one inner value. Consequently, a one-field tuple/newtype wrapper around a sequence-like type (for example `struct Row(Vec<String>)`, or wrappers around arrays/tuples) can produce different behavior from an ordinary one-field named struct or multi-field tuple struct when the serde version changes derive dispatch or visitor handling. Migration should avoid relying on a one-field tuple wrapper for CSV rows; use a named struct for header-based records, a multi-field tuple struct for positional records, or explicitly implement `Deserialize`/use a custom `deserialize_with` when wrapper semantics are required.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-serde-csv-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2372,
+      "10": 0.2372
+    },
+    "mrr": 0.2,
+    "map_score": 0.1,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1111,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "serde/serde/src/de/mod.rs",
+    "serde_derive/src/de.rs",
+    "rust-csv--1.3.0/Cargo.toml",
+    "rust-csv--1.3.0/src/deserializer.rs",
+    "src/deserializer.rs",
+    "rust-csv--1.3.0/src/string_record.rs",
+    "rust-csv--1.3.0/src/reader.rs",
+    "src/reader.rs",
+    "serde--v1.0.193/test_suite/tests/test_de.rs"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-serde-csv-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2372,
+      "10": 0.2372
+    },
+    "mrr": 0.2,
+    "map_score": 0.1,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1111,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

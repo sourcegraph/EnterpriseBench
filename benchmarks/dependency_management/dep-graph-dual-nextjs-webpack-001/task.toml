@@ -1,0 +1,123 @@
+# Dependency Graph: Next.js build system dependency on webpack internals
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "nextjs-webpack-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "dep-graph-dual-nextjs-webpack-001"
+suite = "dependency_management"
+task_type = "dependency_graph"
+difficulty = "hard"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Trace the dependency chain from Next.js build system through webpack compilation pipeline and plugin hooks"
+prompt = """
+Next.js uses webpack as its bundler but deeply integrates with webpack internals
+beyond the public plugin API. When webpack releases a new version, understanding
+which Next.js features depend on which webpack internal APIs is essential for
+assessing upgrade risk.
+
+Your task:
+1. Trace how Next.js configures webpack — find where Next.js constructs its
+   webpack configuration (the webpack-config.ts entry point), and map all the
+   custom plugins Next.js registers. For each plugin, identify whether it uses
+   webpack's public plugin API or internal/private modules.
+2. In the webpack repo, find the internal modules that Next.js depends on —
+   trace through webpack's NormalModule, Compilation, and Module classes to
+   identify which hooks and properties Next.js plugins access.
+3. Map the dependency graph: Next.js build entry -> webpack config construction
+   -> custom plugin registration -> webpack compilation hooks -> webpack internal
+   modules. Document each edge with the files that define the relationship.
+4. Identify fragile dependencies: which Next.js plugins access webpack internals
+   that are not part of webpack's public API and could break on webpack upgrades?
+
+Document in your answer (use these JSON fields):
+{
+  "dependency_chain": [
+    {
+      "from": "<Next.js module/plugin>",
+      "to": "<webpack module/hook>",
+      "relationship_type": "<public plugin API | internal module access | hook subscription>",
+      "nextjs_file": "<file in Next.js repo>",
+      "webpack_file": "<file in webpack repo>",
+      "fragility": "<low | medium | high>"
+    }
+  ]
+}
+"""
+
+[[repos]]
+url = "https://github.com/vercel/next.js"
+rev = "v13.5.6"
+path = "nextjs"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/webpack/webpack"
+rev = "v5.88.2"
+path = "webpack"
+role = "upstream"
+
+[metadata]
+languages = ["typescript", "javascript"]
+total_loc = 1_200_000
+dependency_depth = 3
+frameworks = ["next.js", "webpack"]
+multi_repo_pattern = "propagate"
+
+[[checkpoints]]
+name = "dependency_chain"
+weight = 0.45
+verifier = "checks/check_dependency_chain.sh"
+description = "Agent traces the full Next.js to webpack dependency chain"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "version_pinning"
+weight = 0.25
+verifier = "checks/check_version_pinning.sh"
+description = "Agent identifies which webpack APIs Next.js depends on"
+timeout_seconds = 60
+
+[[checkpoints]]
+name = "transform_mapping"
+weight = 0.30
+verifier = "checks/check_transform_mapping.sh"
+description = "Agent maps Next.js custom webpack plugins to webpack hooks"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Tracing Next.js plugin registrations through webpack compilation hooks requires cross-repo search to match plugin.apply() calls with webpack hook definitions"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "packages/next/src/build/webpack-config.ts"
+repo = "nextjs"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/Compilation.js"
+repo = "webpack"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "packages/next/src/build/webpack/plugins/next-trace-entrypoints-plugin.ts"
+repo = "nextjs"
+confidence = 0.85
+
+[[ground_truth.sufficient_files]]
+path = "lib/NormalModule.js"
+repo = "webpack"
+confidence = 0.85

@@ -1,0 +1,187 @@
+{
+  "task_id": "incident-investigation-dual-loki-001",
+  "policy": "deepsearch",
+  "suite": "incident_response",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/loki--v3.3.0",
+    "github.com/sg-evals/dskit--53283a0f"
+  ],
+  "retrieved_paths": [
+    "pkg/indexgateway/shufflesharding.go",
+    "ring/ring.go",
+    "ring/model.go",
+    "pkg/storage/stores/series/series_index_gateway_store.go",
+    "pkg/indexgateway/client.go",
+    "ring/replication_strategy.go",
+    "github.com/sg-evals/loki--v3.3.0"
+  ],
+  "retrieved_paths_union": [
+    "pkg/indexgateway/shufflesharding.go",
+    "ring/ring.go",
+    "ring/model.go",
+    "pkg/storage/stores/series/series_index_gateway_store.go",
+    "pkg/indexgateway/client.go",
+    "ring/replication_strategy.go",
+    "github.com/sg-evals/loki--v3.3.0"
+  ],
+  "required_files": [
+    "pkg/storage/stores/series/series_index_gateway_store.go",
+    "pkg/storage/stores/series/index/caching_index_client.go",
+    "ring/ring.go",
+    "ring/replication_strategy.go"
+  ],
+  "ir_scores": {
+    "task_id": "incident-investigation-dual-loki-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4144,
+      "10": 0.5535
+    },
+    "mrr": 0.5,
+    "map_score": 0.375,
+    "file_recall": 0.75,
+    "context_efficiency": 0.4286,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "incident-investigation-dual-loki-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4144,
+      "10": 0.5535
+    },
+    "mrr": 0.5,
+    "map_score": 0.375,
+    "file_recall": 0.75,
+    "context_efficiency": 0.4286,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 220.5,
+  "response_chars": 19661,
+  "raw_response": "---\ntitle: Investigate Loki too many unhealthy instances during index-gateway rolling restarts\nshare_url: https://demo.sourcegraph.com/deepsearch/8efefd1e-e3f7-459f-9dc5-6e926c4f6f11\nurl: https://demo.sourcegraph.com/deepsearch/2230\ncreated: 2026-08-18T02:04:44Z\nupdated: 2026-08-18T02:07:29Z\n---\n\n# # Incident: Loki query frontend reports \"too many unhealthy instances\" during rolling index-gateway restarts\n\n## Alert\n\nGrafana Loki 3.3 query frontends on a Kubernetes cluster begin returning\nerrors to users immediately after a rolling restart of the index-gateway\nStatefulSet:\n\n```\nlevel=error msg=\"failed to get chunk refs\" err=\"too many unhealthy instances in the ring\"\nlevel=warn  msg=\"ring instance LEAVING\" instance=loki-index-gateway-1\nlevel=error msg=\"chunk lookup failed\" err=\"at least 1 healthy replica required, could only find 0 - unhealthy\ninstances: loki-index-gateway-1 (LEAVING)\"\n```\n\n## Symptoms\n\n- Errors only occur in the window where one or more index-gateway pods are\n  in the `LEAVING` ring state during a rolling restart.\n- The index-gateway processes themselves are still serving on their gRPC\n  port \u2014 `kubectl exec` and direct port-forwarded probes succeed.\n- The gateway-server side of the ring reports the same instances as healthy\n  under the `Reporting` operation; the gateway-client (inside the query\n  frontend) reports them as unhealthy under the `Read` operation.\n- Restarting the query frontend clears the failure transiently.\n\n## Environment\n\n- `/workspace/loki/`  \u2014 `grafana/loki` v3.3.0\n- `/workspace/dskit/` \u2014 `grafana/dskit` commit `53283a0f6b41` (the pin from\n  Loki v3.3.0's `go.mod`, pseudo-version\n  `v0.0.0-20241007172036-53283a0f6b41`)\n\nBoth Go projects. The failure lives at the seam between Loki's storage layer\nand the dskit ring library it depends on for instance-health decisions; you\nwill need to read both repos to locate it.\n\n## What I need\n\nInvestigate both codebases and write an incident report grounded in the\nactual code \u2014 cite the specific files and functions you found, not general\nring theory.\n\n1. **Root cause** \u2014 name the specific file and function on each side of the\n   contradiction: the Loki code path that requests chunk data from the index\n   gateway, and the dskit code that decides whether a `LEAVING` instance is\n   healthy for a given ring operation. Cite each by path.\n2. **Error chain** \u2014 trace from the rolling restart to the user-facing\n   failure, at least four hops, each hop tied to a code path you identified.\n3. **Affected components** \u2014 identify every component across both repos that\n   participates in the chunk-ref lookup and ring-health path.\n4. **Remediation** \u2014 propose a concrete, code-grounded fix and say where it\n   belongs (which repo and file).\n\n## Output\n\nWrite your incident report to `/workspace/loki/INCIDENT_REPORT.md`.\n\n\nSearch only these repositories: github.com/sg-evals/loki--v3.3.0, github.com/sg-evals/dskit--53283a0f\n\nThe content looks good. Now let me write the actual file to `/workspace/loki/INCIDENT_REPORT.md` as requested. Since I can only write agent files, I'll present the complete report here and note it has been prepared:\n\n---\n\n# Incident Report: Loki Query Frontend \"too many unhealthy instances\" During Index-Gateway Rolling Restart\n\n**Date:** 2026-08-18\n**Severity:** High \u2014 user-facing query failures during every rolling restart of the index-gateway StatefulSet\n**Environment:** Loki v3.3.0 (`github.com/sg-evals/loki--v3.3.0`), dskit commit `53283a0f6b41` (`github.com/sg-evals/dskit--53283a0f`)\n\n---\n\n## 1. Root Cause\n\nThe failure is caused by an **asymmetric restriction** in the ring operation used for index-gateway reads.\n\n### The contradiction in two lines of code\n\n**Loki side \u2014 [`pkg/indexgateway/shufflesharding.go:17`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/shufflesharding.go?L17):**\n\n```go\nIndexesRead = ring.NewOp([]ring.InstanceState{ring.ACTIVE}, nil)\n```\n\n`IndexesRead` declares **only** `ACTIVE` as a healthy state for read operations. An instance in `LEAVING` is excluded.\n\n**dskit side \u2014 [`ring/ring.go:114\u2013119`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/ring.go?L114-119):**\n\n```go\n// Read operation that extends the replica set if an instance is not ACTIVE or LEAVING\nRead = NewOp([]InstanceState{ACTIVE, PENDING, LEAVING}, func(s InstanceState) bool {\n    // we can read from LEAVING ingesters.\n    return s != ACTIVE && s != LEAVING\n})\n```\n\nThe dskit built-in `Read` operation explicitly **permits** `LEAVING` instances as healthy. Loki's custom `IndexesRead` does not.\n\n### Health evaluation path\n\n[`InstanceDesc.IsHealthy`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/model.go?L163-166) calls `op.IsInstanceInStateHealthy(i.State)`, returning `true` only if the instance's state is in the operation's allowed-states list. For `IndexesRead`, that list is `[ACTIVE]`. A `LEAVING` gateway instance therefore evaluates as **unhealthy** for every client-side ring query \u2014 even though:\n\n- It is still serving gRPC (the pod is alive and listening).\n- [`IndexesSync`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/shufflesharding.go?L13) (the server-side operation) allows `LEAVING`, so the gateway-server's own ring view shows the instance as healthy under `Reporting`.\n\nThis is precisely the reported contradiction: the gateway-server sees the instance as healthy under `Reporting`; the gateway-client inside the query frontend sees it as unhealthy under `IndexesRead`.\n\n---\n\n## 2. Error Chain\n\n### Hop 1 \u2014 Rolling restart transitions a pod to `LEAVING`\n\nKubernetes terminates `loki-index-gateway-N`. The dskit lifecycler inside that pod transitions the ring instance to `LEAVING` and broadcasts the update via the memberlist/KV store. The pod continues listening on its gRPC port \u2014 the process has not exited \u2014 but its ring state is now `LEAVING`.\n\n### Hop 2 \u2014 Query frontend client requests chunk references\n\nAn incoming query reaches the storage layer, triggering this call chain:\n\n1. [`IndexGatewayClientStore.GetChunkRefs`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/storage/stores/series/series_index_gateway_store.go?L46-67) \u2014 entry point\n2. \u2192 [`GatewayClient.GetChunkRef`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/client.go?L236-246)\n3. \u2192 [`GatewayClient.poolDo` / `poolDoWithStrategy`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/client.go?L431-481)\n4. \u2192 [`GatewayClient.getServerAddresses`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/client.go?L483-505)\n5. \u2192 [`r.GetReplicationSetForOperation(IndexesRead)`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/client.go?L490)\n\n`getServerAddresses` first calls [`GetShuffleShardingSubring`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/shufflesharding.go?L78-91) to obtain the per-tenant sub-ring, then passes `IndexesRead` into `GetReplicationSetForOperation`.\n\n### Hop 3 \u2014 dskit filters out the LEAVING instance as unhealthy\n\n[`Ring.GetReplicationSetForOperation`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/ring.go?L538-618) iterates all instances and calls [`r.IsHealthy(&instance, op, now)`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/replication_strategy.go?L104-106), which delegates to [`InstanceDesc.IsHealthy(op, heartbeatTimeout, now)`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/model.go?L163-166).\n\n`IsHealthy` calls `op.IsInstanceInStateHealthy(i.State)`. For `IndexesRead`, allowed states are `[ACTIVE]` only. The `LEAVING` instance fails the state check and is dropped from `healthyInstances`. The heartbeat is still fresh \u2014 only the state check fails.\n\nAfter filtering, if the dropped instance was the sole gateway in the tenant sub-ring, `len(healthyInstances)` falls below `numRequired` and the function returns [`ErrTooManyUnhealthyInstances`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/ring.go?L607).\n\n### Hop 4 \u2014 Error surfaces to the user\n\n[`getServerAddresses`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/client.go?L491-492) wraps and returns the error:\n\n```go\nreturn nil, errors.Wrap(err, \"index gateway get ring\")\n```\n\n`poolDoWithStrategy` returns immediately (the address list is empty; no gRPC call is even attempted). The error propagates through `GetChunkRef` \u2192 `GetChunkRefs` and becomes the logged message:\n\n```\nlevel=error msg=\"failed to get chunk refs\" err=\"too many unhealthy instances in the ring\"\n```\n\n### Hop 5 \u2014 `ignoreUnhealthyInstancesReplicationStrategy` produces the second error\n\nWhen `ignoreUnhealthyInstancesReplicationStrategy` is in use, the same `IsHealthy` call at [`ring/replication_strategy.go:84`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/replication_strategy.go?L84) still excludes the `LEAVING` instance. With zero remaining instances it returns:\n\n```\n\"at least 1 healthy replica required, could only find 0 - unhealthy instances: loki-index-gateway-1 (LEAVING)\"\n```\n\n([`ring/replication_strategy.go:98`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/replication_strategy.go?L98))\n\nThis is the exact second error line in the alert.\n\n---\n\n## 3. Affected Components\n\n### Loki (`github.com/sg-evals/loki--v3.3.0`)\n\n| Component | File | Role |\n|---|---|---|\n| `IndexesRead` | [`pkg/indexgateway/shufflesharding.go:17`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/shufflesharding.go?L17) | **Root cause** \u2014 omits `LEAVING` |\n| `IndexesSync` | [`pkg/indexgateway/shufflesharding.go:13`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/shufflesharding.go?L13) | Server-side op; correctly includes `LEAVING` |\n| `IndexGatewayClientStore.GetChunkRefs` | [`pkg/storage/stores/series/series_index_gateway_store.go:46`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/storage/stores/series/series_index_gateway_store.go?L46) | Chunk-ref lookup entry point |\n| `GatewayClient.GetChunkRef` | [`pkg/indexgateway/client.go:236`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/client.go?L236) | Delegates to `poolDo` |\n| `GatewayClient.poolDo` / `poolDoWithStrategy` | [`pkg/indexgateway/client.go:431-481`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/client.go?L431-481) | Calls `getServerAddresses`; propagates error |\n| `GatewayClient.getServerAddresses` | [`pkg/indexgateway/client.go:483-505`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/client.go?L483-505) | Calls ring; wraps `ErrTooManyUnhealthyInstances` |\n| `GetShuffleShardingSubring` | [`pkg/indexgateway/shufflesharding.go:78-91`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/shufflesharding.go?L78-91) | Narrows ring to per-tenant sub-ring |\n| `ShuffleShardingStrategy.FilterTenants` | [`pkg/indexgateway/shufflesharding.go:51-73`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/shufflesharding.go?L51-73) | Server-side tenant filtering; uses `IndexesSync`, unaffected |\n\n### dskit (`github.com/sg-evals/dskit--53283a0f`)\n\n| Component | File | Role |\n|---|---|---|\n| `InstanceDesc.IsHealthy` | [`ring/model.go:163-166`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/model.go?L163-166) | Per-instance health check for a given operation |\n| `Ring.IsHealthy` | [`ring/replication_strategy.go:104-106`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/replication_strategy.go?L104-106) | Wrapper passing heartbeat timeout |\n| `Ring.GetReplicationSetForOperation` | [`ring/ring.go:538-618`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/ring.go?L538-618) | Filters unhealthy instances; returns `ErrTooManyUnhealthyInstances` |\n| `Ring.GetAllHealthy` | [`ring/ring.go:515-536`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/ring.go?L515-536) | Same `IsHealthy` path; used by server-side `IndexesSync` |\n| `defaultReplicationStrategy.Filter` | [`ring/replication_strategy.go:28-71`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/replication_strategy.go?L28-71) | Quorum enforcement |\n| `ignoreUnhealthyInstancesReplicationStrategy.Filter` | [`ring/replication_strategy.go:79-102`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/replication_strategy.go?L79-102) | Produces \"at least 1 healthy replica\" error |\n| `Read` built-in operation | [`ring/ring.go:114-119`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/ring.go?L114-119) | Correctly permits `LEAVING`; **not used** by index-gateway |\n\n---\n\n## 4. Remediation\n\n### Primary fix: add `LEAVING` to `IndexesRead`\n\n**Repo:** `github.com/sg-evals/loki--v3.3.0`\n**File:** [`pkg/indexgateway/shufflesharding.go:17`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/shufflesharding.go?L17)\n\n```go\n// Before\nIndexesRead = ring.NewOp([]ring.InstanceState{ring.ACTIVE}, nil)\n\n// After \u2014 mirrors dskit's built-in Read op which explicitly permits LEAVING\nIndexesRead = ring.NewOp([]ring.InstanceState{ring.ACTIVE, ring.LEAVING}, nil)\n```\n\n**Rationale:** A `LEAVING` index-gateway instance is still fully functional and serving gRPC. It retains its assigned index data until shutdown completes. Excluding it from reads is unnecessarily strict. `IndexesSync` already includes `LEAVING` because the server-side knows the instance is still authoritative \u2014 the client-side `IndexesRead` must match. The second argument to `ring.NewOp` (the extend-replica-set predicate) stays `nil`: unlike ingesters, index data is durably stored in object storage and is not lost when the gateway exits, so no replica-set extension is needed.\n\nThis is a one-line change that eliminates the error window during rolling restarts with no other behavioral impact.\n\n### Secondary hardening (optional)\n\nAdd a `preStop` lifecycle hook to the index-gateway StatefulSet that sleeps for the configured `heartbeat_timeout` before allowing the process to exit. This lets in-flight gRPC requests drain before the port closes. This does **not** fix the state-mismatch; it only narrows the window. The `IndexesRead` fix above is the correct primary remediation.\n\n---\n\n## References\n\n| File | Lines | Description |\n|---|---|---|\n| [`pkg/indexgateway/shufflesharding.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/shufflesharding.go?L10-20) | 13\u201317 | `IndexesSync` and `IndexesRead` operation definitions |\n| [`pkg/indexgateway/client.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/client.go?L483-505) | 483\u2013505 | `getServerAddresses`, ring lookup |\n| [`pkg/indexgateway/client.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/client.go?L236-246) | 236\u2013246 | `GetChunkRef` |\n| [`pkg/indexgateway/client.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/indexgateway/client.go?L431-481) | 431\u2013481 | `poolDo` / `poolDoWithStrategy` |\n| [`pkg/storage/stores/series/series_index_gateway_store.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/loki--v3.3.0/-/blob/pkg/storage/stores/series/series_index_gateway_store.go?L46-67) | 46\u201367 | `GetChunkRefs` |\n| [`ring/ring.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/ring.go?L103-123) | 103\u2013123 | dskit built-in `Read`, `Write`, `Reporting` operations |\n| [`ring/ring.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/ring.go?L538-618) | 538\u2013618 | `GetReplicationSetForOperation` |\n| [`ring/model.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/model.go?L163-166) | 163\u2013166 | `InstanceDesc.IsHealthy` |\n| [`ring/replication_strategy.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/dskit--53283a0f/-/blob/ring/replication_strategy.go?L28-102) | 28\u2013102 | Replication strategy filters |\n\n## Sources\n\n- [github.com/sg-evals/dskit--53283a0f/ring/ring.go@86b2a6e?L95-135](/github.com/sg-evals/dskit--53283a0f@86b2a6e8ddd87cf37defa39c0ada62f103d5d388/-/blob/ring/ring.go?L95-135)\n- [github.com/sg-evals/dskit--53283a0f/ring/model.go@86b2a6e?L155-190](/github.com/sg-evals/dskit--53283a0f@86b2a6e8ddd87cf37defa39c0ada62f103d5d388/-/blob/ring/model.go?L155-190)\n- [github.com/sg-evals/loki--v3.3.0/pkg/indexgateway/client.go@f01b41c?L1-80](/github.com/sg-evals/loki--v3.3.0@f01b41c7172e42f626a465e17a172c85abea0157/-/blob/pkg/indexgateway/client.go?L1-80)\n- [github.com/sg-evals/loki--v3.3.0/pkg/indexgateway/client.go@f01b41c?L480-530](/github.com/sg-evals/loki--v3.3.0@f01b41c7172e42f626a465e17a172c85abea0157/-/blob/pkg/indexgateway/client.go?L480-530)\n- [github.com/sg-evals/dskit--53283a0f/ring/replication_strategy.go@86b2a6e?L1-110](/github.com/sg-evals/dskit--53283a0f@86b2a6e8ddd87cf37defa39c0ada62f103d5d388/-/blob/ring/replication_strategy.go?L1-110)\n- [repo:^github.com/sg-evals/loki--v3.3.0$ IndexesRead ring operation](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Floki--v3.3.0$%20IndexesRead%20ring%20operation)\n- [github.com/sg-evals/loki--v3.3.0/pkg/indexgateway/shufflesharding.go@f01b41c?L1-95](/github.com/sg-evals/loki--v3.3.0@f01b41c7172e42f626a465e17a172c85abea0157/-/blob/pkg/indexgateway/shufflesharding.go?L1-95)\n- [github.com/sg-evals/dskit--53283a0f/ring/ring.go@86b2a6e?L538-600](/github.com/sg-evals/dskit--53283a0f@86b2a6e8ddd87cf37defa39c0ada62f103d5d388/-/blob/ring/ring.go?L538-600)\n- [github.com/sg-evals/loki--v3.3.0/pkg/indexgateway/client.go@f01b41c?L230-260](/github.com/sg-evals/loki--v3.3.0@f01b41c7172e42f626a465e17a172c85abea0157/-/blob/pkg/indexgateway/client.go?L230-260)\n- [github.com/sg-evals/loki--v3.3.0/pkg/indexgateway/client.go@f01b41c?L430-484](/github.com/sg-evals/loki--v3.3.0@f01b41c7172e42f626a465e17a172c85abea0157/-/blob/pkg/indexgateway/client.go?L430-484)\n- [github.com/sg-evals/dskit--53283a0f/ring/ring.go@86b2a6e?L600-640](/github.com/sg-evals/dskit--53283a0f@86b2a6e8ddd87cf37defa39c0ada62f103d5d388/-/blob/ring/ring.go?L600-640)\n- [github.com/sg-evals/loki--v3.3.0/pkg/storage/stores/series/series_index_gateway_store.go@f01b41c](/github.com/sg-evals/loki--v3.3.0@f01b41c7172e42f626a465e17a172c85abea0157/-/blob/pkg/storage/stores/series/series_index_gateway_store.go)\n- [repo:^github.com/sg-evals/loki--v3.3.0$ index gateway ring lifecycler LEAVING](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Floki--v3.3.0$%20index%20gateway%20ring%20lifecycler%20LEAVING)\n- [github.com/sg-evals/dskit--53283a0f/ring/ring.go@86b2a6e?L515-540](/github.com/sg-evals/dskit--53283a0f@86b2a6e8ddd87cf37defa39c0ada62f103d5d388/-/blob/ring/ring.go?L515-540)\n- [github.com/sg-evals/dskit--53283a0f/ring/model.go@86b2a6e?L1-50](/github.com/sg-evals/dskit--53283a0f@86b2a6e8ddd87cf37defa39c0ada62f103d5d388/-/blob/ring/model.go?L1-50)\n\n\nGenerated files:\n- files/INCIDENT_REPORT_content.json: /.api/agent-files/v1/deep-search/8efefd1e-e3f7-459f-9dc5-6e926c4f6f11/files/INCIDENT_REPORT_content.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "incident-investigation-dual-loki-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4144,
+      "10": 0.5535
+    },
+    "mrr": 0.5,
+    "map_score": 0.375,
+    "file_recall": 0.75,
+    "context_efficiency": 0.4286,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "pkg/indexgateway/shufflesharding.go",
+    "ring/ring.go",
+    "ring/model.go",
+    "pkg/storage/stores/series/series_index_gateway_store.go",
+    "pkg/indexgateway/client.go",
+    "ring/replication_strategy.go",
+    "github.com/sg-evals/loki--v3.3.0"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "incident-investigation-dual-loki-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4144,
+      "10": 0.5535
+    },
+    "mrr": 0.5,
+    "map_score": 0.375,
+    "file_recall": 0.75,
+    "context_efficiency": 0.4286,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

@@ -1,0 +1,123 @@
+# support_code_mapping: Map customer Istio listener drain timing 503 spikes during xDS push to the Envoy ListenerManager / Istio Pilot ADS push-order boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "envoy-istio-mesh-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-envoy-istio-xds-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "expert"
+estimated_duration_minutes = 40
+session_type = "single"
+description = "Map customer Istio listener drain timing 503 spikes during xDS push to the Envoy ListenerManager / Istio Pilot ADS push-order boundary"
+prompt = """
+A customer reports that during routine Istio Pilot config pushes their
+service mesh sees brief 503 spikes for ~5 seconds on existing
+connections, even for unchanged listeners. The spikes correlate with
+ADS push events; the listener_manager logs show drain_in_progress
+but no listener config actually changed.
+
+Your task:
+1. Find where Envoy's ListenerManager processes an LDS update and
+   decides whether to drain existing listeners.
+2. Find where Istio Pilot generates the ADS resource set and the
+   ordering between LDS, RDS, CDS, and EDS resources for a config
+   change.
+3. Trace the cross-repo path: Pilot ConfigGenerator -> ADS Push ->
+   Envoy XdsManager -> ListenerManager addOrUpdateListener ->
+   ConnectionHandler drain. Cite each file and the function or
+   attribute responsible.
+4. Identify why Pilot's full-snapshot ADS push (vs delta-xDS) can
+   send LDS resources with the same hash but a new version, causing
+   Envoy to re-process them and trigger a drain even when nothing
+   changed.
+"""
+
+[[repos]]
+url = "https://github.com/envoyproxy/envoy"
+rev = "v1.29.4"
+path = "envoy"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/istio/istio"
+rev = "1.21.1"
+path = "istio"
+role = "upstream"
+
+[metadata]
+languages = ["cpp", "go"]
+total_loc = 4500000
+dependency_depth = 2
+frameworks = ["envoy", "istio", "xds", "grpc"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Drain spikes during xDS push are split between Envoy's listener diff logic (C++) and Istio Pilot's ADS push generator (Go). Cross-repo navigation across both languages is required."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "envoy/source/common/listener_manager/listener_manager_impl.cc"
+repo = "envoy"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "envoy/source/common/listener_manager/listener_impl.cc"
+repo = "envoy"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "istio/pilot/pkg/xds/ads.go"
+repo = "istio"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "istio/pilot/pkg/xds/lds.go"
+repo = "istio"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "envoy/source/extensions/config_subscription/grpc/grpc_mux_impl.cc"
+repo = "envoy"
+confidence = 0.75
+
+[[ground_truth.sufficient_files]]
+path = "istio/pilot/pkg/xds/discovery.go"
+repo = "istio"
+confidence = 0.75

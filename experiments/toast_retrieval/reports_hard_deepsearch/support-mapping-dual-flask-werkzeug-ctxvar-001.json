@@ -1,0 +1,174 @@
+{
+  "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/flask--2.3.3",
+    "github.com/sg-evals/werkzeug--2.3.7"
+  ],
+  "retrieved_paths": [
+    "src/flask/globals.py",
+    "src/werkzeug/local.py",
+    "src/flask/ctx.py"
+  ],
+  "retrieved_paths_union": [
+    "src/flask/globals.py",
+    "src/werkzeug/local.py",
+    "src/flask/ctx.py"
+  ],
+  "required_files": [
+    "flask/src/flask/globals.py",
+    "flask/src/flask/ctx.py",
+    "werkzeug/src/werkzeug/local.py"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 3,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 3,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 110.3,
+  "response_chars": 10665,
+  "raw_response": "---\ntitle: Debugging Flask request context loss across asyncio tasks and Werkzeug ContextVars\nshare_url: https://demo.sourcegraph.com/deepsearch/a128492b-c274-4aa2-8476-9b5721989bf5\nurl: https://demo.sourcegraph.com/deepsearch/2214\ncreated: 2026-08-18T01:54:56Z\nupdated: 2026-08-18T01:56:07Z\n---\n\n# # Map customer Flask request-context vanishing under asyncio + ContextVar to the Werkzeug LocalStack contextvars boundary\n\nA customer reports that their Flask 2.3 app loses request context inside\nan async view that awaits a coroutine spawned via asyncio.create_task.\nInside the spawned task, request.path raises RuntimeError: 'Working\noutside of request context.' even though the same code worked under\nFlask 2.0 with werkzeug 2.0's local-stack semantics.\n\nYour task:\n1. Find where Flask exposes the global `request` proxy and how it binds\n   to a Werkzeug LocalStack/ContextVar-backed object.\n2. Find where Werkzeug's Local switched from threadlocal to contextvars\n   and how a forked asyncio task inherits or fails to inherit the\n   active context.\n3. Trace the request-context-not-available chain: Flask app context ->\n   werkzeug Local() proxy -> contextvars.ContextVar.get() -> asyncio\n   Task.create(context=copy_context()) semantics. Cite each file and\n   the function responsible.\n4. Identify why asyncio.create_task captures the parent context but a\n   bare `ensure_future(coro)` from a thread-pool worker may not, and\n   the consequence at the werkzeug/Flask boundary.\n\n\nSearch only these repositories: github.com/sg-evals/flask--2.3.3, github.com/sg-evals/werkzeug--2.3.7\n\nNow I have everything I need. Let me compose the complete answer.\n\n---\n\n## Flask 2.3 + asyncio: Why `request.path` Raises `RuntimeError` Inside `create_task`\n\n---\n\n### 1. How `flask.request` is defined and what backs it\n\n**File:** [`src/flask/globals.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/flask--2.3.3/-/blob/src/flask/globals.py)\n\n```python\n# globals.py L4, L62, L67-68\nfrom contextvars import ContextVar\nfrom werkzeug.local import LocalProxy\n\n_cv_request: ContextVar[RequestContext] = ContextVar(\"flask.request_ctx\")  # L62\n\nrequest: Request = LocalProxy(  # L67-68\n    _cv_request, \"request\", unbound_message=_no_req_msg\n)\n```\n\n`flask.request` is a `LocalProxy` wrapping `_cv_request`, a bare `contextvars.ContextVar`. There is **no longer a `LocalStack` or `threading.local`** involved \u2014 that was removed in Flask/Werkzeug 2.0. The proxy resolves the live value of `_cv_request` on every attribute access.\n\nThe `\"request\"` argument to `LocalProxy` means every access to `flask.request` translates to:\n\n```\n_cv_request.get()  \u2192  RequestContext object  \u2192  .request attribute\n```\n\n---\n\n### 2. Werkzeug's switch from `threading.local` to `contextvars`\n\n**File:** [`src/werkzeug/local.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/src/werkzeug/local.py)\n\nThe [`Local`](https://demo.sourcegraph.com/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/src/werkzeug/local.py?L35-L101) and [`LocalStack`](https://demo.sourcegraph.com/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/src/werkzeug/local.py?L104-L120) classes both document the change at their class docstrings:\n\n```\n.. versionchanged:: 2.0\n    Uses ``ContextVar`` instead of a custom storage implementation.\n```\n\n- `Local.__init__` creates or accepts a `ContextVar[dict]` and stores it as `__storage` ([L54-L62](https://demo.sourcegraph.com/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/src/werkzeug/local.py?L54-L62)).\n- Every `__getattr__` call on a `Local` calls `self.__storage.get({})` ([L81](https://demo.sourcegraph.com/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/src/werkzeug/local.py?L81)).\n- Every `__setattr__` copies the dict and calls `self.__storage.set(values)` ([L88-L91](https://demo.sourcegraph.com/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/src/werkzeug/local.py?L88-L91)) \u2014 isolated per `contextvars` context.\n\nFlask 2.3 bypasses `Local`/`LocalStack` entirely and uses a raw `ContextVar` directly (see `_cv_request` above). Werkzeug's `LocalProxy` supports this natively via the `isinstance(local, ContextVar)` branch.\n\n---\n\n### 3. The full resolution chain and where it breaks\n\n#### Step-by-step chain\n\n```\nflask.request           (globals.py L67)\n  \u2514\u2500 LocalProxy._get_current_object()\n       \u2514\u2500 _cv_request.get()             (ContextVar.get, no default)\n            \u2514\u2500 RequestContext object    (set by RequestContext.push)\n                 \u2514\u2500 .request attribute  (the actual Request object)\n```\n\n**`LocalProxy.__init__` \u2014 ContextVar branch** ([`local.py` L502-L510](https://demo.sourcegraph.com/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/src/werkzeug/local.py?L502-L510)):\n\n```python\nelif isinstance(local, ContextVar):\n    def _get_current_object() -> T:\n        try:\n            obj = local.get()          # raises LookupError if unset\n        except LookupError:\n            raise RuntimeError(unbound_message) from None\n        return get_name(obj)           # attrgetter(\"request\")(obj)\n```\n\nIf `_cv_request` has no value in the **current** `contextvars.Context`, `local.get()` raises `LookupError`, which is caught and re-raised as `RuntimeError: Working outside of request context.`\n\n**`RequestContext.push()`** \u2014 sets the ContextVar ([`ctx.py` L369](https://demo.sourcegraph.com/r/github.com/sg-evals/flask--2.3.3/-/blob/src/flask/ctx.py?L369)):\n\n```python\nself._cv_tokens.append((_cv_request.set(self), app_ctx))\n```\n\n**`RequestContext.pop()`** \u2014 resets it ([`ctx.py` L407-L409](https://demo.sourcegraph.com/r/github.com/sg-evals/flask--2.3.3/-/blob/src/flask/ctx.py?L407-L409)):\n\n```python\ntoken, app_ctx = self._cv_tokens.pop()\n_cv_request.reset(token)\n```\n\nThe `ContextVar.set()` return value (a `Token`) scopes the value to the **current `contextvars.Context`**. That context is not global \u2014 it's per-task in asyncio.\n\n---\n\n### 4. Why `asyncio.create_task` captures context but a thread-pool worker may not\n\nThis is the root cause of the customer's breakage.\n\n#### `asyncio.create_task` \u2014 context IS captured\n\n`asyncio.create_task()` always captures the **calling coroutine's** `contextvars.copy_context()` snapshot at the moment the task is created (CPython source: `tasks.py`, `Task.__init__` calls `contextvars.copy_context()`). This means:\n\n- The spawned task gets a **copy** of the parent's context, including the current value of `_cv_request`.\n- Inside that task, `_cv_request.get()` returns the `RequestContext` set by the parent \u2014 **but only at the moment `create_task` was called**.\n\n#### The \"context is a copy, not a reference\" subtlety\n\nEven with `create_task`, the task gets a **snapshot**, not a live reference. If the parent context's `_cv_request` is reset (i.e., the request context is popped before the task actually runs), the spawned task still holds the old token value \u2014 the `RequestContext` object itself, however, may be in a torn-down state. Conversely, any `_cv_request.set()` done inside the spawned task does not propagate back to the parent.\n\n#### `asyncio.ensure_future` from a thread-pool worker \u2014 context may NOT be captured\n\n`loop.run_in_executor()` runs the callable in a `ThreadPoolExecutor`. That thread has its **own `contextvars.Context`** \u2014 Python's `contextvars` is `threading.local`-aware in the sense that each thread starts with an empty context (specifically, `copy_context()` of the context at thread creation, which for executor threads is typically the loop thread's ambient context). If `ensure_future(coro)` is called from inside that thread, it schedules the coroutine on the event loop, but the context captured is that of the **thread**, not the original request-handling coroutine.\n\nConcretely, the failure path is:\n\n```\nasync def view():\n    loop = asyncio.get_event_loop()\n    # run_in_executor moves to a thread\n    result = await loop.run_in_executor(None, sync_fn)\n\ndef sync_fn():\n    # We are in a thread-pool thread.\n    # This thread's context does NOT include _cv_request.\n    future = asyncio.run_coroutine_threadsafe(some_coro(), loop)\n    # OR: asyncio.ensure_future(some_coro()) -- same problem\n    # some_coro() gets the thread's context, where _cv_request is unset\n```\n\nThe consequence at the Werkzeug/Flask boundary: `_cv_request.get()` raises `LookupError` \u2192 `LocalProxy._get_current_object()` catches it \u2192 raises `RuntimeError: Working outside of request context.`\n\n---\n\n### Summary table\n\n| Scenario | Context inherited? | `_cv_request` visible? |\n|---|---|---|\n| `await coroutine()` in same async view | Same task, same context | Yes |\n| `asyncio.create_task(coro)` from async view | Copy of parent context at call time | Yes (snapshot) |\n| `loop.run_in_executor(None, fn)` | Thread gets executor thread's context | No (empty `_cv_request`) |\n| `ensure_future` called from executor thread | Captures thread's context | No |\n| Manual `ctx.copy(); Task(context=ctx)` | Explicit copy passed | Yes |\n\n---\n\n### The fix\n\nThe customer must propagate the context explicitly. The correct pattern is:\n\n```python\nimport contextvars\n\nasync def view():\n    ctx = contextvars.copy_context()  # snapshot current context with _cv_request set\n    task = asyncio.create_task(\n        ctx.run(some_coro)   # run coroutine inside the copied context\n    )\n    # OR for executor:\n    result = await loop.run_in_executor(None, ctx.run, sync_fn)\n```\n\n`create_task` already does this automatically when called **from within the async view** (not from a thread), which is why the code worked in Flask 2.0 \u2014 but only incidentally, because under Werkzeug 1.x the `Local` used `threading.local` keyed by thread-id, so the thread-pool worker saw the same data as the main thread. The move to `ContextVar` in Werkzeug 2.0 made context inheritance strict and explicit.\n\n## Sources\n\n- [github.com/sg-evals/flask--2.3.3/src/flask/globals.py@d0e1c40](/github.com/sg-evals/flask--2.3.3@d0e1c4015a796fdf6d8da7f788089af13bfe60f1/-/blob/src/flask/globals.py)\n- [github.com/sg-evals/werkzeug--2.3.7/src/werkzeug/local.py@4516712?L1-120](/github.com/sg-evals/werkzeug--2.3.7@4516712d475bebc03973aab385cfb6d457a0feba/-/blob/src/werkzeug/local.py?L1-120)\n- [github.com/sg-evals/flask--2.3.3/src/flask/ctx.py@d0e1c40?L340-422](/github.com/sg-evals/flask--2.3.3@d0e1c4015a796fdf6d8da7f788089af13bfe60f1/-/blob/src/flask/ctx.py?L340-422)\n- [github.com/sg-evals/werkzeug--2.3.7/src/werkzeug/local.py@4516712?L377-560](/github.com/sg-evals/werkzeug--2.3.7@4516712d475bebc03973aab385cfb6d457a0feba/-/blob/src/werkzeug/local.py?L377-560)\n- [github.com/sg-evals/flask--2.3.3/src/flask/ctx.py@d0e1c40?L220-280](/github.com/sg-evals/flask--2.3.3@d0e1c4015a796fdf6d8da7f788089af13bfe60f1/-/blob/src/flask/ctx.py?L220-280)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 3,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "flask/src/flask/globals.py",
+    "werkzeug/src/werkzeug/local.py",
+    "flask/src/flask/ctx.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 3,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

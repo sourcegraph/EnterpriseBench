@@ -1,0 +1,118 @@
+# Imported from CodeScaleBench CCX-crossorg-295 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-crossorg-295"
+suite = "platform_engineering"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "CockroachDB Raft Consensus and Lease Management Cross-Component Discovery"
+
+[[repos]]
+url = "https://github.com/cockroachdb/cockroach"
+rev = "v24.3.0"
+path = "cockroach"
+role = "primary"
+
+[metadata]
+languages = ["go"]
+csb_mirror = "sg-evals/cockroach--v24.3.0"
+csb_commit = "v24.3.0"
+csb_family = "csb_org_crossorg"
+csb_category = "cross-org-discovery"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "pkg/kv/kvserver/replica_raft.go"
+repo = "cockroach"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kv/kvserver/store_raft.go"
+repo = "cockroach"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kv/kvserver/replica_application_state_machine.go"
+repo = "cockroach"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kv/kvserver/scheduler.go"
+repo = "cockroach"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kv/kvserver/replica_range_lease.go"
+repo = "cockroach"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kv/kvserver/batcheval/cmd_lease_request.go"
+repo = "cockroach"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kv/kvserver/batcheval/cmd_lease_transfer.go"
+repo = "cockroach"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kv/kvserver/leases/build.go"
+repo = "cockroach"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kv/kvserver/leases/status.go"
+repo = "cockroach"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kv/kvserver/kvserverpb/lease_status.go"
+repo = "cockroach"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kv/kvserver/liveness/liveness.go"
+repo = "cockroach"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kv/kvserver/liveness/livenesspb/liveness.go"
+repo = "cockroach"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kv/kvserver/liveness/cache.go"
+repo = "cockroach"
+confidence = 0.9
+source = "deterministic"

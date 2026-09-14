@@ -683,3 +683,87 @@ def test_compute_run_ir_scores_none_when_no_required_files(tmp_path: Path) -> No
     )
     gt = _write_ground_truth(tmp_path / "ground_truth.json", [])
     assert compute_run_ir_scores(trace, gt, "t", "c") is None
+
+
+# ---------------------------------------------------------------------------
+# Agentic retrieval tools (code_finder / deepsearch)
+# ---------------------------------------------------------------------------
+
+
+def test_code_finder_citations_are_retrieved_paths(tmp_path: Path) -> None:
+    """Code Finder answers in prose with blob links, not a result list.
+
+    An mcp_code_finder run calls nothing else by contract, so if these are
+    not scraped the whole arm reports no retrieval signal and its recall is
+    undefined rather than low.
+    """
+    answer = (
+        "The check runs in "
+        "https://demo.sourcegraph.com/github.com/sg-evals/k8s/-/blob/"
+        f"{MANAGER}?L40-72 and is wired up in `{WORKER_TEST}`."
+    )
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _assistant_tool_use("c1", "mcp__sourcegraph__code_finder", {"task": "probes"}),
+            _user_tool_result("c1", answer),
+        ],
+    )
+    assert sorted(retrieved_files_from_trace(trace)) == sorted([MANAGER, WORKER_TEST])
+
+
+def test_deepsearch_citations_are_retrieved_paths(tmp_path: Path) -> None:
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _assistant_tool_use("d1", "mcp__sourcegraph__deepsearch", {"query": "probes"}),
+            _user_tool_result("d1", f"see /-/blob/{MANAGER}#L12"),
+        ],
+    )
+    assert retrieved_files_from_trace(trace) == [MANAGER]
+
+
+def test_blob_link_stops_at_the_line_range_and_closing_bracket(tmp_path: Path) -> None:
+    """A ?L range, a #fragment, or a markdown-link paren is not part of the path."""
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _assistant_tool_use("c1", "mcp__sourcegraph__code_finder", {"task": "x"}),
+            _user_tool_result("c1", f"[link](https://sg/x/-/blob/{MANAGER}?L1-9)"),
+        ],
+    )
+    assert retrieved_files_from_trace(trace) == [MANAGER]
+
+
+def test_a_tool_outside_the_known_sets_still_contributes_nothing(tmp_path: Path) -> None:
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _assistant_tool_use("u1", "mcp__sourcegraph__some_future_tool", {"q": "x"}),
+            _user_tool_result("u1", f"/-/blob/{MANAGER}"),
+        ],
+    )
+    assert retrieved_files_from_trace(trace) == []
+
+
+def test_toast_search_results_are_retrieved_paths(tmp_path: Path) -> None:
+    """The mcp_toast arm's only retrieval tool.
+
+    toast_mcp_server renders each hit under a "<repo>/-/blob/<path>" header
+    precisely so the paths it credits survive into the trace; if the tool is
+    not recognized here, that arm's recall reads as undefined rather than low.
+    """
+    result = (
+        f"github.com/sg-evals/k8s/-/blob/{MANAGER}\n"
+        "    func syncProbes() {...}\n\n"
+        f"github.com/sg-evals/k8s/-/blob/{WORKER_TEST}\n"
+        "    func TestSyncProbes(t *testing.T) {...}\n"
+    )
+    trace = _write_trace(
+        tmp_path / "agent_trace.jsonl",
+        [
+            _assistant_tool_use("t1", "mcp__toast__toast_search", {"query": "probes"}),
+            _user_tool_result("t1", result),
+        ],
+    )
+    assert sorted(retrieved_files_from_trace(trace)) == sorted([MANAGER, WORKER_TEST])

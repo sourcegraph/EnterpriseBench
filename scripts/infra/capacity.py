@@ -37,10 +37,29 @@ def _load_accounts_config() -> dict:
     return json.loads(_ACCOUNTS_CONFIG_PATH.read_text())
 
 
+def retired_accounts() -> frozenset[str]:
+    """Account names that must never be dispatched to.
+
+    A retired account is not a temporarily unhealthy one. account2's
+    organization has Claude Code subscription access disabled, so its OAuth
+    token keeps validating -- every token-expiry check reports it healthy --
+    while every agent call returns HTTP 403 in under ten seconds. Health
+    checks that look only at token expiry cannot see this, so the exclusion
+    has to be declared in config rather than detected.
+    """
+    profiles = _load_accounts_config().get("account_profiles", {})
+    return frozenset(
+        name for name, profile in profiles.items() if profile.get("retired")
+    )
+
+
 def load_tokens() -> dict:
     accounts = {}
+    retired = retired_accounts()
     for acct_dir in sorted(HOMES.glob("account*")):
         acct = acct_dir.name
+        if acct in retired:
+            continue
         creds_file = acct_dir / ".claude" / ".credentials.json"
         try:
             creds = json.loads(creds_file.read_text())

@@ -134,6 +134,7 @@ def apply_treatment(
     body: bytes,
     content_type: str,
     requests_by_id: dict[Any, dict[str, str | None]],
+    variant: str = "bundle",
 ) -> bytes:
     """Rewrite one upstream response so it matches the patched Sourcegraph server.
 
@@ -145,13 +146,20 @@ def apply_treatment(
     if _treatment is None:
         raise ValueError("treatment arm requested but overlay module is missing")
     methods = {context.get("method") for context in requests_by_id.values()}
-    if not methods & {"initialize", "tools/list"}:
+    if not any(
+        _treatment.applies_to(method or "", variant=variant) for method in methods
+    ):
         return body
 
     def treat(payload: dict[str, Any]) -> None:
         context = requests_by_id.get(_jsonrpc_id(payload.get("id")))
         if context is not None:
-            _treatment.apply(payload, method=context.get("method") or "")
+            _treatment.apply(
+                payload,
+                method=context.get("method") or "",
+                tool=context.get("tool"),
+                variant=variant,
+            )
 
     text = body.decode("utf-8", errors="strict")
     is_sse = "text/event-stream" in content_type.lower()
@@ -638,7 +646,10 @@ class TelemetryProxyHandler(BaseHTTPRequestHandler):
             content_type = headers.get("Content-Type", "application/json")
             if self.server.treatment_enabled:
                 response_body = apply_treatment(
-                    response_body, content_type, requests_by_id
+                    response_body,
+                    content_type,
+                    requests_by_id,
+                    self.server.treatment_variant,
                 )
             self._capture_responses(
                 response_body,
@@ -676,11 +687,13 @@ class TelemetryProxyServer(ThreadingHTTPServer):
         trace_path: Path,
         upstream_timeout: int = 180,
         treatment_enabled: bool = False,
+        treatment_variant: str = "bundle",
     ) -> None:
         self.upstream_url = upstream_url
         self.trace_path = trace_path
         self.upstream_timeout = upstream_timeout
         self.treatment_enabled = treatment_enabled
+        self.treatment_variant = treatment_variant
         super().__init__(address, TelemetryProxyHandler)
 
 
@@ -694,11 +707,17 @@ def main() -> int:
     treatment_enabled = os.environ.get("MCP_PROXY_TREATMENT", "").strip() == "1"
     if treatment_enabled and _treatment is None:
         raise SystemExit("MCP_PROXY_TREATMENT=1 but the overlay module is missing")
+    treatment_variant = (
+        os.environ.get("MCP_PROXY_TREATMENT_VARIANT", "").strip() or "bundle"
+    )
+    if treatment_enabled and treatment_variant not in _treatment.VARIANTS:
+        raise SystemExit(f"unknown MCP_PROXY_TREATMENT_VARIANT {treatment_variant!r}")
     server = TelemetryProxyServer(
         (bind, port),
         upstream_url=upstream_url,
         trace_path=Path(trace_value),
         treatment_enabled=treatment_enabled,
+        treatment_variant=treatment_variant,
     )
     server.serve_forever()
     return 0

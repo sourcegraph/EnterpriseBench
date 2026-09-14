@@ -1,0 +1,191 @@
+{
+  "task_id": "err-provenance-dual-requests-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/requests--v2.31.0",
+    "github.com/sg-evals/urllib3--2.1.0"
+  ],
+  "retrieved_paths": [
+    "requests/api.py",
+    "requests/sessions.py",
+    "requests/adapters.py",
+    "requests/utils.py",
+    "src/urllib3/connectionpool.py",
+    "src/urllib3/connection.py",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/util/retry.py",
+    "src/urllib3/exceptions.py"
+  ],
+  "retrieved_paths_union": [
+    "requests/api.py",
+    "requests/sessions.py",
+    "requests/adapters.py",
+    "requests/utils.py",
+    "src/urllib3/connectionpool.py",
+    "src/urllib3/connection.py",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/util/retry.py",
+    "src/urllib3/exceptions.py"
+  ],
+  "required_files": [
+    "src/requests/adapters.py",
+    "src/urllib3/connectionpool.py"
+  ],
+  "ir_scores": {
+    "task_id": "err-provenance-dual-requests-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.5438,
+      "10": 0.5438
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "err-provenance-dual-requests-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.5438,
+      "10": 0.5438
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 29.3,
+  "response_chars": 4943,
+  "raw_response": "I could not write `/workspace/ERROR_PROVENANCE.md` because repository write tools were unavailable. Findings so far:\n\n- `requests.get()` \u2192 `requests.api.request()` \u2192 temporary `Session.request()`.\n- `Session.request()` calls `merge_environment_settings()`, then `Session.send()`, which dispatches to `HTTPAdapter.send()`.\n- `HTTPAdapter` creates urllib3\u2019s `PoolManager` in `init_poolmanager()` and obtains pools through `get_connection()`.\n- `HTTPAdapter.cert_verify()` maps `verify=True` to Requests\u2019 certifi bundle (`DEFAULT_CA_BUNDLE_PATH`) and a string `verify` value to that explicit CA path.\n- `Session.merge_environment_settings()` uses `REQUESTS_CA_BUNDLE`, then `CURL_CA_BUNDLE`, only when `verify is True or verify is None` and `trust_env` is enabled. An explicit `verify` path, `verify=False`, or `Session.trust_env=False` prevents the environment variable from being used.\n- urllib3\u2019s `HTTPSConnectionPool._validate_conn()` forces `HTTPSConnection.connect()`.\n- `HTTPSConnection.connect()` calls `_ssl_wrap_socket_and_match_hostname()`, which creates an `SSLContext`, sets `verify_mode`, loads default certificates when no CA path is supplied, and calls `ssl_wrap_socket()`.\n- `ssl_wrap_socket()` calls `SSLContext.load_verify_locations(ca_certs, ca_cert_dir, ca_cert_data)` and ultimately wraps the socket through Python\u2019s SSL implementation. The TLS handshake/certificate-chain validation is therefore performed by Python\u2019s `ssl` module/OpenSSL, producing `SSLCertVerificationError`.\n- `HTTPSConnectionPool.urlopen()` catches `BaseSSLError`, converts it to urllib3 `SSLError`, and calls `Retry.increment()`.\n- `Retry.increment()` raises `MaxRetryError(..., reason=error)` after retries are exhausted.\n- `HTTPAdapter.send()` catches `MaxRetryError`; when `e.reason` is urllib3 `_SSLError`, it raises Requests\u2019 `SSLError(e, request=request)`, yielding the nested user-visible exception.\n\nRelevant files:\n\n- [sg-evals/requests--v2.31.0:requests/api.py?L14-L73](/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/api.py?L14-L73) \u2014 top-level `request()` and `get()`\n- [sg-evals/requests--v2.31.0:requests/sessions.py?L562-L589](/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/sessions.py?L562-L589) \u2014 `Session.request()` preparation, environment merge, and dispatch\n- [sg-evals/requests--v2.31.0:requests/sessions.py?L673-L684](/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/sessions.py?L673-L684) \u2014 `Session.send()` defaults\n- [sg-evals/requests--v2.31.0:requests/sessions.py?L751-L780](/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/sessions.py?L751-L780) \u2014 CA/environment precedence\n- [sg-evals/requests--v2.31.0:requests/adapters.py?L180-L197](/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L180-L197) \u2014 urllib3 `PoolManager` creation\n- [sg-evals/requests--v2.31.0:requests/adapters.py?L237-L291](/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L237-L291) \u2014 `cert_verify()`\n- [sg-evals/requests--v2.31.0:requests/adapters.py?L331-L358](/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L331-L358) \u2014 pool lookup\n- [sg-evals/requests--v2.31.0:requests/adapters.py?L434-L538](/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L434-L538) \u2014 connection initiation and exception wrapping\n- [sg-evals/requests--v2.31.0:requests/utils.py?L61-L64](/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/utils.py?L61-L64) \u2014 certifi fallback path\n- [sg-evals/urllib3--2.1.0:src/urllib3/connectionpool.py?L766-L850](/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/connectionpool.py?L766-L850) \u2014 catch, wrap, retry\n- [sg-evals/urllib3--2.1.0:src/urllib3/connectionpool.py?L966-L1107](/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/connectionpool.py?L966-L1107) \u2014 `HTTPSConnectionPool`\n- [sg-evals/urllib3--2.1.0:src/urllib3/connection.py?L609-L661](/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/connection.py?L609-L661) \u2014 TLS connection path\n- [sg-evals/urllib3--2.1.0:src/urllib3/connection.py?L708-L830](/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/connection.py?L708-L830) \u2014 SSL context, verification, hostname matching\n- [sg-evals/urllib3--2.1.0:src/urllib3/util/ssl_.py?L216-L356](/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/util/ssl_.py?L216-L356) \u2014 SSL context construction\n- [sg-evals/urllib3--2.1.0:src/urllib3/util/ssl_.py?L397-L471](/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/util/ssl_.py?L397-L471) \u2014 CA loading and socket wrapping\n- [sg-evals/urllib3--2.1.0:src/urllib3/util/retry.py?L499-L519](/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/util/retry.py?L499-L519) \u2014 `MaxRetryError`\n- [sg-evals/urllib3--2.1.0:src/urllib3/exceptions.py?L55-L103](/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/exceptions.py?L55-L103) \u2014 urllib3 `SSLError` and `MaxRetryError` definitions\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "err-provenance-dual-requests-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2372,
+      "10": 0.2372
+    },
+    "mrr": 0.2,
+    "map_score": 0.1,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1111,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "requests/api.py",
+    "requests/sessions.py",
+    "src/requests/adapters.py",
+    "requests/utils.py",
+    "src/urllib3/connectionpool.py",
+    "src/urllib3/connection.py",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/util/retry.py",
+    "src/urllib3/exceptions.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "err-provenance-dual-requests-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2372,
+      "10": 0.2372
+    },
+    "mrr": 0.2,
+    "map_score": 0.1,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1111,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

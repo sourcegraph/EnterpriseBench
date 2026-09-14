@@ -1,0 +1,202 @@
+{
+  "task_id": "incident-investigation-tri-containerd-001",
+  "policy": "deepsearch",
+  "suite": "incident_response",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/moby--v24.0.7",
+    "github.com/sg-evals/containerd--v1.7.8",
+    "github.com/sg-evals/runc--v1.1.10"
+  ],
+  "retrieved_paths": [
+    "libcontainer/standard_init_linux.go",
+    "libcontainer/system/linux.go",
+    "libcontainer/container_linux.go",
+    "libcontainer/factory_linux.go",
+    "pkg/process/init.go",
+    "runtime/v2/runc/container.go",
+    "runtime/v2/runc/task/service.go",
+    "errdefs/grpc.go",
+    "daemon/start.go",
+    "libcontainerd/remote/client.go",
+    "daemon/errors.go",
+    "pkg/process/utils.go"
+  ],
+  "retrieved_paths_union": [
+    "libcontainer/standard_init_linux.go",
+    "libcontainer/system/linux.go",
+    "libcontainer/container_linux.go",
+    "libcontainer/factory_linux.go",
+    "pkg/process/init.go",
+    "runtime/v2/runc/container.go",
+    "runtime/v2/runc/task/service.go",
+    "errdefs/grpc.go",
+    "daemon/start.go",
+    "libcontainerd/remote/client.go",
+    "daemon/errors.go",
+    "pkg/process/utils.go"
+  ],
+  "required_files": [
+    "daemon/start.go",
+    "pkg/process/init.go",
+    "libcontainer/process_linux.go"
+  ],
+  "ir_scores": {
+    "task_id": "incident-investigation-tri-containerd-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.1815,
+      "10": 0.3228
+    },
+    "mrr": 0.2,
+    "map_score": 0.1407,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 12,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "incident-investigation-tri-containerd-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.1815,
+      "10": 0.3228
+    },
+    "mrr": 0.2,
+    "map_score": 0.1407,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 12,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 235.6,
+  "response_chars": 22902,
+  "raw_response": "---\ntitle: Debugging exec format error on arm64 container startup across runc, containerd, and Docker\nshare_url: https://demo.sourcegraph.com/deepsearch/81835cde-4859-4123-a69d-4e028758041a\nurl: https://demo.sourcegraph.com/deepsearch/2245\ncreated: 2026-08-18T02:17:35Z\nupdated: 2026-08-18T02:20:17Z\n---\n\n# # Incident: Container Start Failure with \"exec format error\" on Multi-Arch Cluster\n\n## Alert\n\nA multi-architecture Kubernetes cluster reports that containers fail to start on arm64 nodes with \"exec format error\" despite pulling the correct platform-specific image.\n\n## Symptoms\n\n- `docker run` fails with: \"OCI runtime create failed: runc create failed: unable to start container process: exec: '/entrypoint.sh': permission denied or exec format error\"\n- The image manifest lists both amd64 and arm64 variants\n- `docker inspect` shows the correct arm64 image is pulled\n- The error occurs in runc during process creation, not during image pull\n- containerd logs show the container is created successfully but start fails\n- The issue only affects images using a shell script as entrypoint with a missing or incorrect shebang line\n\n## Investigation So Far\n\nThe team has identified the general area of the failure:\n\n1. Docker daemon delegates container lifecycle to containerd via gRPC\n2. containerd creates a shim process and delegates exec to runc\n3. runc uses the Linux kernel's execve() syscall to start the container process\n4. When the entrypoint is a script without a shebang, the kernel falls back to /bin/sh\n5. The image's /bin/sh may be a different architecture binary\n6. The error message varies: \"exec format error\" for wrong arch, \"permission denied\" for non-executable files\n\n## Environment\n\n- Docker (Moby) v24.0.7 at `/workspace/moby/`\n- containerd v1.7.8 at `/workspace/containerd/`\n- runc v1.1.10 at `/workspace/runc/`\n- Focus on Go code across all three repos\n\n## What I Need\n\n1. **Root Cause**: Find where runc executes the container process using execve and how it handles the exec format error. Trace through all three repos.\n\n2. **Error Chain**: Trace the full error propagation: runc execve failure -> containerd shim error -> Docker daemon error response -> user-visible error.\n\n3. **Affected Components**: Which components in each of the three repos are involved in the failure?\n\n4. **Remediation**: How should this be prevented or detected earlier?\n\n## Output\n\nWrite your findings to `/workspace/moby/INCIDENT_REPORT.md`.\n\n\nSearch only these repositories: github.com/sg-evals/moby--v24.0.7, github.com/sg-evals/containerd--v1.7.8, github.com/sg-evals/runc--v1.1.10\n\nThe evaluator's `file` module writes agent-owned files, not workspace files. Let me write the actual markdown file directly as the report content, and present the full findings inline since the workspace file write isn't possible through the tools. Here is the complete incident report:\n\n---\n\n# Incident Report: Container Start Failure \u2014 \"exec format error\" on arm64 Nodes\n\n**Date:** 2026-08-18 | **Reporter:** Stephanie Jarmak | **Affected versions:** Moby v24.0.7 \u00b7 containerd v1.7.8 \u00b7 runc v1.1.10\n\n---\n\n## 1. Executive Summary\n\nContainers whose entrypoint is a shell script **without a shebang line** (`#!/bin/sh`) fail to start on arm64 nodes with:\n\n```\nOCI runtime create failed: runc create failed: unable to start container process:\nexec: '/entrypoint.sh': exec format error\n```\n\nThe Linux kernel returns `ENOEXEC` when `execve(2)` is called on a file with no recognised binary format and no shebang. The error propagates unmodified through runc \u2192 containerd shim \u2192 Docker daemon. Docker's error-classification code does not recognise `exec format error` as a distinct case; the container receives exit code **128** (unknown) instead of the more meaningful 126. No pre-exec format validation exists in any of the three components.\n\n---\n\n## 2. Root Cause\n\n### 2.1 The kernel `execve` failure \u2014 runc\n\nAfter completing namespace setup, capability drops, seccomp, and SELinux configuration, the runc init process reaches the final exec sequence in [`libcontainer/standard_init_linux.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/runc--v1.1.10/-/blob/libcontainer/standard_init_linux.go?L197-L261):\n\n```go\n// standard_init_linux.go:197-207 \u2014 pre-exec checks\nname, err := exec.LookPath(l.config.Args[0])\nif err != nil {\n    return err\n}\n// eaccess checks execute permission on noexec mounts; does NOT check binary format\nif err := eaccess(name); err != nil {\n    return &os.PathError{Op: \"eaccess\", Path: name, Err: err}\n}\n// ... seccomp, FIFO sync, StartContainer hooks ...\nreturn system.Exec(name, l.config.Args[0:], os.Environ())  // line 261\n```\n\n[`system.Exec`](https://demo.sourcegraph.com/r/github.com/sg-evals/runc--v1.1.10/-/blob/libcontainer/system/linux.go?L43-L50) is a thin wrapper around `unix.Exec` (i.e. `execve(2)`):\n\n```go\nfunc Exec(cmd string, args []string, env []string) error {\n    for {\n        err := unix.Exec(cmd, args, env)\n        if err != unix.EINTR {\n            return &os.PathError{Op: \"exec\", Path: cmd, Err: err}\n        }\n    }\n}\n```\n\nWhen the kernel receives `execve(\"/entrypoint.sh\", \u2026)` for a file with no ELF magic and no shebang, it returns **`ENOEXEC` (errno 8)**. `system.Exec` wraps this as an `*os.PathError` and returns it.\n\n**Critical gap:** `exec.LookPath` verifies only that the file is **present and has the executable bit set**. It does not inspect the file's contents for a valid binary format or shebang line. The `eaccess` check at line 205 only detects `noexec` mount permission issues, not format errors.\n\n### 2.2 Why arm64 is uniquely affected\n\nOn amd64 the kernel's `binfmt_script` handler and `binfmt_elf` handler may produce slightly different behaviour depending on the fallback path. On arm64, with no shebang present, no `binfmt_*` handler matches and the kernel strictly rejects the file with `ENOEXEC`. If `/bin/sh` itself were an amd64-only binary (wrong arch), even a correct shebang would produce a second `ENOEXEC` during interpreter dispatch.\n\n### 2.3 The exec FIFO handshake\n\nThe parent side of the container start ([`container_linux.go:266-287`](https://demo.sourcegraph.com/r/github.com/sg-evals/runc--v1.1.10/-/blob/libcontainer/container_linux.go?L266-L287)) polls a FIFO waiting for the init process to signal readiness. When the init process dies from `ENOEXEC` before writing to the FIFO, the parent's `exec()` method returns `\"container process is already dead\"`. The actual cause is retrieved from runc's `log.json`.\n\n---\n\n## 3. Full Error Propagation Chain\n\n### Step 1 \u2014 runc: `ENOEXEC` from `execve`\n\n| Location | Code |\n|---|---|\n| [`libcontainer/factory_linux.go:334-340`](https://demo.sourcegraph.com/r/github.com/sg-evals/runc--v1.1.10/-/blob/libcontainer/factory_linux.go?L334-L340) | `newContainerInit` \u2192 `i.Init()` \u2014 on success never returns |\n| [`libcontainer/standard_init_linux.go:197-261`](https://demo.sourcegraph.com/r/github.com/sg-evals/runc--v1.1.10/-/blob/libcontainer/standard_init_linux.go?L197-L261) | LookPath + eaccess pass; `system.Exec` called |\n| [`libcontainer/system/linux.go:43-50`](https://demo.sourcegraph.com/r/github.com/sg-evals/runc--v1.1.10/-/blob/libcontainer/system/linux.go?L43-L50) | `unix.Exec` \u2192 kernel returns `ENOEXEC` \u2192 `*os.PathError` returned |\n\nrunc logs this error to its JSON log file (`log.json`) at level `\"error\"`.\n\n### Step 2 \u2014 containerd shim: wrapping and gRPC conversion\n\nThe containerd shim invokes runc as a subprocess. When runc exits non-zero, containerd reads the last `\"error\"` entry from runc's `log.json`:\n\n```go\n// pkg/process/utils.go:72-103\nfunc getLastRuntimeError(r *runc.Runc) (string, error) {\n    // scans log.json, returns last log.Level == \"error\" entry's Msg\n}\n```\n\n[`Init.runtimeError`](https://demo.sourcegraph.com/r/github.com/sg-evals/containerd--v1.7.8/-/blob/pkg/process/init.go?L474-L488) then assembles the final error message:\n\n```go\nfunc (p *Init) runtimeError(rErr error, msg string) error {\n    rMsg, err := getLastRuntimeError(p.runtime)\n    switch {\n    case rMsg == \"\":\n        return fmt.Errorf(\"%s: %w\", msg, rErr)\n    default:\n        return fmt.Errorf(\"%s: %s\", msg, rMsg)  // runc's log message wins\n    }\n}\n```\n\n[`Init.start`](https://demo.sourcegraph.com/r/github.com/sg-evals/containerd--v1.7.8/-/blob/pkg/process/init.go?L261-L263) calls this with `\"OCI runtime start failed\"`:\n\n```go\nfunc (p *Init) start(ctx context.Context) error {\n    err := p.runtime.Start(ctx, p.id)\n    return p.runtimeError(err, \"OCI runtime start failed\")\n}\n```\n\nThe assembled error bubbles through:\n- [`runtime/v2/runc/container.go:358-386`](https://demo.sourcegraph.com/r/github.com/sg-evals/containerd--v1.7.8/-/blob/runtime/v2/runc/container.go?L358-L386) \u2014 `Container.Start` \u2192 `p.Start(ctx)`\n- [`runtime/v2/runc/task/service.go:258-276`](https://demo.sourcegraph.com/r/github.com/sg-evals/containerd--v1.7.8/-/blob/runtime/v2/runc/task/service.go?L258-L276) \u2014 gRPC `Start` handler converts via `errdefs.ToGRPC(err)`\n\n[`errdefs.ToGRPC`](https://demo.sourcegraph.com/r/github.com/sg-evals/containerd--v1.7.8/-/blob/errdefs/grpc.go?L36-L65) maps known containerd error types to gRPC status codes. An `ENOEXEC`-derived error is not a known errdefs type, so it falls through and is returned **as-is** \u2014 an untyped error carrying the message string in the gRPC status description.\n\n### Step 3 \u2014 Docker daemon: classification and user-visible error\n\n[`daemon/start.go:186-194`](https://demo.sourcegraph.com/r/github.com/sg-evals/moby--v24.0.7/-/blob/daemon/start.go?L186-L194) calls `ctr.Start` (via [`libcontainerd/remote/client.go:241-248`](https://demo.sourcegraph.com/r/github.com/sg-evals/moby--v24.0.7/-/blob/libcontainerd/remote/client.go?L241-L248)), and on failure passes the error to [`setExitCodeFromError`](https://demo.sourcegraph.com/r/github.com/sg-evals/moby--v24.0.7/-/blob/daemon/errors.go?L133-L177):\n\n```go\n// daemon/errors.go:137-176\nerrDesc := status.Convert(err).Message()\n\nif contains(errDesc, syscall.EACCES.Error()) { ... exit 126 }   // \"permission denied\"\nif contains(errDesc, syscall.EISDIR.Error()) { ... exit 126 }   // \"is a directory\"\nif contains(errDesc, syscall.ENOTDIR.Error()) { ... exit 127 }  // \"not a directory\"\nif isInvalidCommand(errDesc) { ... exit 127 }                   // file not found, etc.\n\n// \"exec format error\" / ENOEXEC matches NONE of the above\nsetExitCode(exitUnknown)          // exit code 128\nreturn errdefs.Unknown(errors.New(errDesc))\n```\n\n[`isInvalidCommand`](https://demo.sourcegraph.com/r/github.com/sg-evals/moby--v24.0.7/-/blob/daemon/errors.go?L182-L196) checks only: `\"executable file not found\"`, `\"no such file or directory\"`, `\"system cannot find the file specified\"`, `\"failed to run runc create/exec call\"` \u2014 **not** `\"exec format error\"`.\n\nThe container ends up with **exit code 128** and an `errdefs.Unknown` error, providing no actionable guidance to the user.\n\n---\n\n## 4. Affected Components\n\n### runc v1.1.10\n| File | Lines | Role |\n|---|---|---|\n| [`libcontainer/system/linux.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/runc--v1.1.10/-/blob/libcontainer/system/linux.go?L43-L50) | 43\u201350 | `unix.Exec` \u2014 where `ENOEXEC` originates |\n| [`libcontainer/standard_init_linux.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/runc--v1.1.10/-/blob/libcontainer/standard_init_linux.go?L197-L261) | 197\u2013261 | Pre-exec LookPath+eaccess checks; final exec call |\n| [`libcontainer/container_linux.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/runc--v1.1.10/-/blob/libcontainer/container_linux.go?L266-L287) | 266\u2013287 | FIFO-based start handshake detects init process death |\n| [`libcontainer/factory_linux.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/runc--v1.1.10/-/blob/libcontainer/factory_linux.go?L334-L340) | 334\u2013340 | `StartInitialization` \u2014 calls `i.Init()` |\n\n### containerd v1.7.8\n| File | Lines | Role |\n|---|---|---|\n| [`pkg/process/init.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/containerd--v1.7.8/-/blob/pkg/process/init.go?L261-L263) | 261\u2013263 | `Init.start` \u2014 invokes runc, wraps error |\n| [`pkg/process/init.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/containerd--v1.7.8/-/blob/pkg/process/init.go?L474-L488) | 474\u2013488 | `runtimeError` \u2014 reads runc log, assembles message |\n| [`pkg/process/utils.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/containerd--v1.7.8/-/blob/pkg/process/utils.go?L72-L103) | 72\u2013103 | `getLastRuntimeError` \u2014 reads runc's `log.json` |\n| [`runtime/v2/runc/container.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/containerd--v1.7.8/-/blob/runtime/v2/runc/container.go?L358-L386) | 358\u2013386 | Shim `Container.Start` |\n| [`runtime/v2/runc/task/service.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/containerd--v1.7.8/-/blob/runtime/v2/runc/task/service.go?L258-L276) | 258\u2013276 | gRPC `Start` handler; `errdefs.ToGRPC` |\n| [`errdefs/grpc.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/containerd--v1.7.8/-/blob/errdefs/grpc.go?L36-L65) | 36\u201365 | gRPC error mapping \u2014 ENOEXEC passes through untyped |\n\n### Docker (Moby) v24.0.7\n| File | Lines | Role |\n|---|---|---|\n| [`daemon/start.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/moby--v24.0.7/-/blob/daemon/start.go?L98-L210) | 98\u2013210 | `containerStart` orchestration |\n| [`libcontainerd/remote/client.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/moby--v24.0.7/-/blob/libcontainerd/remote/client.go?L150-L251) | 150\u2013251 | Creates containerd task and calls `t.Start` |\n| [`daemon/errors.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/moby--v24.0.7/-/blob/daemon/errors.go?L133-L197) | 133\u2013197 | `setExitCodeFromError` + `isInvalidCommand` \u2014 **misses ENOEXEC** |\n\n---\n\n## 5. Remediation\n\n### 5.1 Immediate \u2014 Fix the image (no code changes)\n\nAdd a shebang to every shell script used as an entrypoint and ensure the executable bit is set in the image layer:\n\n```dockerfile\nCOPY entrypoint.sh /entrypoint.sh\nRUN chmod +x /entrypoint.sh\nENTRYPOINT [\"/entrypoint.sh\"]\n```\n\n`entrypoint.sh` must begin with:\n```sh\n#!/bin/sh\n```\n\nUse the **exec form** of `ENTRYPOINT` (`[\"...\"]`) so the kernel dispatches directly to the script; the shell form (`ENTRYPOINT /entrypoint.sh`) wraps it in `/bin/sh -c` which also requires `/bin/sh` to be a valid arm64 binary.\n\n### 5.2 Short-term \u2014 Shift-left detection in CI\n\nAdd a build-time or registry scan step that verifies shebang presence in all scripts. A lightweight check after `docker build`:\n\n```bash\ndocker run --rm --entrypoint sh <image> -c \\\n  'head -c2 /entrypoint.sh | grep -q \"^#!\" || (echo \"Missing shebang\"; exit 1)'\n```\n\nAlso verify all copied binaries match the target platform using `file` or `objdump -f`.\n\n### 5.3 Medium-term \u2014 runc pre-exec format validation\n\nIn [`libcontainer/standard_init_linux.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/runc--v1.1.10/-/blob/libcontainer/standard_init_linux.go?L205-L207), after the `eaccess` check, add a binary format check before the exec FIFO sync. Read the first two bytes of the file:\n\n- `\\x7fE` \u2192 ELF binary, safe to exec\n- `#!` \u2192 shebang script, safe to exec (interpreter dispatch)\n- anything else \u2192 return a descriptive `ENOEXEC` error **before** the exec attempt\n\nThis converts the opaque kernel error into a clear message at `runc create` time, surfaced before the container is even considered started.\n\n### 5.4 Medium-term \u2014 Docker error classification\n\nIn [`daemon/errors.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/moby--v24.0.7/-/blob/daemon/errors.go?L133-L177), add `\"exec format error\"` and `\"enoexec\"` to the classification logic alongside the existing `EACCES` check, returning exit code 126 with a descriptive message:\n\n```go\nif contains(errDesc, \"exec format error\") || contains(errDesc, \"enoexec\") {\n    setExitCode(exitEaccess) // 126\n    return startInvalidConfigError(errDesc +\n        \": entrypoint is not executable on this architecture \" +\n        \"(missing shebang line or wrong binary format)\")\n}\n```\n\n### 5.5 Long-term \u2014 Structured error typing in containerd\n\n`errdefs.ToGRPC` passes `ENOEXEC`-derived errors as untyped gRPC errors. Introducing a dedicated `ErrExecFormat` errdefs sentinel and propagating it from the shim would allow downstream consumers (Docker, CRI clients) to detect and handle this failure class reliably without fragile string matching.\n\n---\n\n## 6. End-to-End Error Message Trace\n\n```\n[kernel]      execve(\"/entrypoint.sh\") \u2192 ENOEXEC (errno 8)\n      \u2193\n[runc]        system.Exec \u2192 *os.PathError{Op:\"exec\", Path:\"/entrypoint.sh\", Err:ENOEXEC}\n              logged to log.json: {\"level\":\"error\",\"msg\":\"unable to start container process: exec: ...\"}\n      \u2193\n[containerd]  Init.runtimeError reads log.json \u2192 last error line becomes message\n              \u2192 \"OCI runtime start failed: unable to start container process: exec format error\"\n              \u2192 errdefs.ToGRPC \u2192 gRPC Unknown status (no code mapping)\n      \u2193\n[moby]        setExitCodeFromError: status.Convert(err).Message() \u2192\n              no match in EACCES / EISDIR / ENOTDIR / isInvalidCommand\n              \u2192 setExitCode(128), errdefs.Unknown(...)\n      \u2193\n[user]        Error: \"OCI runtime create failed: runc create failed: unable to start container\n               process: exec: '/entrypoint.sh': exec format error\"   exit code: 128\n```\n\n## Sources\n\n- [github.com/sg-evals/runc--v1.1.10/libcontainer/standard_init_linux.go@ae1b4d5?L160-230](/github.com/sg-evals/runc--v1.1.10@ae1b4d58aed9dc6a19bacc879dee6a0c2551ccad/-/blob/libcontainer/standard_init_linux.go?L160-230)\n- [github.com/sg-evals/containerd--v1.7.8/pkg/process/init.go@046aa5a?L230-300](/github.com/sg-evals/containerd--v1.7.8@046aa5a99b5a238297127e7c6f96fc9ba814b442/-/blob/pkg/process/init.go?L230-300)\n- [github.com/sg-evals/moby--v24.0.7/daemon/start.go@36f24b7?L98-210](/github.com/sg-evals/moby--v24.0.7@36f24b7ccfded9bd1c5d2d1350f4d401f8d358d5/-/blob/daemon/start.go?L98-210)\n- [github.com/sg-evals/runc--v1.1.10/libcontainer/standard_init_linux.go@ae1b4d5?L230-260](/github.com/sg-evals/runc--v1.1.10@ae1b4d58aed9dc6a19bacc879dee6a0c2551ccad/-/blob/libcontainer/standard_init_linux.go?L230-260)\n- [github.com/sg-evals/containerd--v1.7.8/runtime/v2/runc/task/service.go@046aa5a?L258-320](/github.com/sg-evals/containerd--v1.7.8@046aa5a99b5a238297127e7c6f96fc9ba814b442/-/blob/runtime/v2/runc/task/service.go?L258-320)\n- [github.com/sg-evals/moby--v24.0.7/libcontainerd/remote/client.go@36f24b7?L140-230](/github.com/sg-evals/moby--v24.0.7@36f24b7ccfded9bd1c5d2d1350f4d401f8d358d5/-/blob/libcontainerd/remote/client.go?L140-230)\n- [github.com/sg-evals/runc--v1.1.10/libcontainer/standard_init_linux.go@ae1b4d5?L260-285](/github.com/sg-evals/runc--v1.1.10@ae1b4d58aed9dc6a19bacc879dee6a0c2551ccad/-/blob/libcontainer/standard_init_linux.go?L260-285)\n- [github.com/sg-evals/containerd--v1.7.8/pkg/process/init.go@046aa5a?L1-80](/github.com/sg-evals/containerd--v1.7.8@046aa5a99b5a238297127e7c6f96fc9ba814b442/-/blob/pkg/process/init.go?L1-80)\n- [github.com/sg-evals/moby--v24.0.7/libcontainerd/remote/client.go@36f24b7?L230-290](/github.com/sg-evals/moby--v24.0.7@36f24b7ccfded9bd1c5d2d1350f4d401f8d358d5/-/blob/libcontainerd/remote/client.go?L230-290)\n- [github.com/sg-evals/runc--v1.1.10/libcontainer/system/linux.go@ae1b4d5](/github.com/sg-evals/runc--v1.1.10@ae1b4d58aed9dc6a19bacc879dee6a0c2551ccad/-/blob/libcontainer/system/linux.go)\n- [github.com/sg-evals/containerd--v1.7.8/pkg/process/init.go@046aa5a?L80-180](/github.com/sg-evals/containerd--v1.7.8@046aa5a99b5a238297127e7c6f96fc9ba814b442/-/blob/pkg/process/init.go?L80-180)\n- [repo:^github.com/sg-evals/containerd--v1.7.8$ runtimeError \"OCI runtime\"](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fcontainerd--v1.7.8$%20runtimeError%20%22OCI%20runtime%22)\n- [repo:^github.com/sg-evals/containerd--v1.7.8$ func runtimeError](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fcontainerd--v1.7.8$%20func%20runtimeError)\n- [github.com/sg-evals/runc--v1.1.10/libcontainer/container_linux.go@ae1b4d5?L553-640](/github.com/sg-evals/runc--v1.1.10@ae1b4d58aed9dc6a19bacc879dee6a0c2551ccad/-/blob/libcontainer/container_linux.go?L553-640)\n- [github.com/sg-evals/containerd--v1.7.8/pkg/process/init.go@046aa5a?L470-510](/github.com/sg-evals/containerd--v1.7.8@046aa5a99b5a238297127e7c6f96fc9ba814b442/-/blob/pkg/process/init.go?L470-510)\n- [github.com/sg-evals/runc--v1.1.10/libcontainer/factory_linux.go@ae1b4d5?L320-380](/github.com/sg-evals/runc--v1.1.10@ae1b4d58aed9dc6a19bacc879dee6a0c2551ccad/-/blob/libcontainer/factory_linux.go?L320-380)\n- [github.com/sg-evals/containerd--v1.7.8/pkg/process/utils.go@046aa5a?L60-120](/github.com/sg-evals/containerd--v1.7.8@046aa5a99b5a238297127e7c6f96fc9ba814b442/-/blob/pkg/process/utils.go?L60-120)\n- [repo:^github.com/sg-evals/moby--v24.0.7$ func setExitCodeFromError](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fmoby--v24.0.7$%20func%20setExitCodeFromError)\n- [github.com/sg-evals/runc--v1.1.10/libcontainer/container_linux.go@ae1b4d5?L400-470](/github.com/sg-evals/runc--v1.1.10@ae1b4d58aed9dc6a19bacc879dee6a0c2551ccad/-/blob/libcontainer/container_linux.go?L400-470)\n- [github.com/sg-evals/moby--v24.0.7/daemon/errors.go@36f24b7?L125-175](/github.com/sg-evals/moby--v24.0.7@36f24b7ccfded9bd1c5d2d1350f4d401f8d358d5/-/blob/daemon/errors.go?L125-175)\n- [github.com/sg-evals/containerd--v1.7.8/errdefs/grpc.go@046aa5a?L1-90](/github.com/sg-evals/containerd--v1.7.8@046aa5a99b5a238297127e7c6f96fc9ba814b442/-/blob/errdefs/grpc.go?L1-90)\n- [github.com/sg-evals/runc--v1.1.10/libcontainer/container_linux.go@ae1b4d5?L230-330](/github.com/sg-evals/runc--v1.1.10@ae1b4d58aed9dc6a19bacc879dee6a0c2551ccad/-/blob/libcontainer/container_linux.go?L230-330)\n- [github.com/sg-evals/moby--v24.0.7/daemon/errors.go@36f24b7?L1-130](/github.com/sg-evals/moby--v24.0.7@36f24b7ccfded9bd1c5d2d1350f4d401f8d358d5/-/blob/daemon/errors.go?L1-130)\n- [repo:^github.com/sg-evals/containerd--v1.7.8$ runtime/v2/runc/container.go Start](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fcontainerd--v1.7.8$%20runtime%2Fv2%2Frunc%2Fcontainer.go%20Start)\n- [github.com/sg-evals/moby--v24.0.7/daemon/errors.go@36f24b7?L173-220](/github.com/sg-evals/moby--v24.0.7@36f24b7ccfded9bd1c5d2d1350f4d401f8d358d5/-/blob/daemon/errors.go?L173-220)\n- [github.com/sg-evals/runc--v1.1.10/libcontainer/container_linux.go@ae1b4d5?L100-180](/github.com/sg-evals/runc--v1.1.10@ae1b4d58aed9dc6a19bacc879dee6a0c2551ccad/-/blob/libcontainer/container_linux.go?L100-180)\n- [github.com/sg-evals/containerd--v1.7.8/runtime/v2/runc/container.go@046aa5a?L355-420](/github.com/sg-evals/containerd--v1.7.8@046aa5a99b5a238297127e7c6f96fc9ba814b442/-/blob/runtime/v2/runc/container.go?L355-420)\n\n\nGenerated files:\n- files/INCIDENT_REPORT_content.json: /.api/agent-files/v1/deep-search/81835cde-4859-4123-a69d-4e028758041a/files/INCIDENT_REPORT_content.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "incident-investigation-tri-containerd-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.1815,
+      "10": 0.3228
+    },
+    "mrr": 0.2,
+    "map_score": 0.1407,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 12,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "libcontainer/standard_init_linux.go",
+    "libcontainer/system/linux.go",
+    "libcontainer/container_linux.go",
+    "libcontainer/factory_linux.go",
+    "pkg/process/init.go",
+    "runtime/v2/runc/container.go",
+    "runtime/v2/runc/task/service.go",
+    "errdefs/grpc.go",
+    "daemon/start.go",
+    "libcontainerd/remote/client.go",
+    "daemon/errors.go",
+    "pkg/process/utils.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "incident-investigation-tri-containerd-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.1815,
+      "10": 0.3228
+    },
+    "mrr": 0.2,
+    "map_score": 0.1407,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 12,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

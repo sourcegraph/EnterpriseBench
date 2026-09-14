@@ -1,0 +1,106 @@
+# Imported from CodeScaleBench CCX-agentic-223 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-agentic-223"
+suite = "platform_engineering"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Kubernetes sig-node Kubelet Component Ownership Map"
+
+[[repos]]
+url = "https://github.com/kubernetes/kubernetes"
+rev = "v1.32.0"
+path = "kubernetes"
+role = "primary"
+
+[metadata]
+languages = ["go"]
+csb_mirror = "sg-evals/kubernetes--v1.32.0"
+csb_commit = "v1.32.0"
+csb_family = "csb_org_org"
+csb_category = "agentic-correctness"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "pkg/kubelet/pleg/pleg.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kubelet/pleg/generic.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kubelet/pleg/evented.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kubelet/kuberuntime/kuberuntime_manager.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kubelet/kuberuntime/kuberuntime_container.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kubelet/kuberuntime/kuberuntime_sandbox.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/cri-client/pkg/remote_runtime.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/cri-client/pkg/remote_image.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kubelet/volumemanager/volume_manager.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kubelet/cm/devicemanager/manager.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/kubelet/cm/devicemanager/types.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"

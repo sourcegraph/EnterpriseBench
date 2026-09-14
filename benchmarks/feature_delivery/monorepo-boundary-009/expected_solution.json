@@ -1,0 +1,32 @@
+{
+  "task_id": "monorepo-boundary-rustc-attr-009",
+  "checkpoints": {
+    "identify_affected_packages": {
+      "expected_solution": "PR #134381 (nightly-2024-12-18) splits `rustc_attr` (`compiler/rustc_attr/`) into `rustc_attr_parsing` (parsing/validation) and `rustc_attr_data_structures` (shared types), in preparation for a future `rustc_attr_validation`. New source layout: a fresh `Cargo.toml`, `lib.rs`, attribute modules (`mod`, `allow_unstable`, `cfg`, `confusables`, `deprecation`, `repr`, `stability`, `transparency`, `util`), `session_diagnostics`, and `messages.ftl` all added under compiler/rustc_attr_parsing/; sibling data crate adds `Cargo.toml`, `lib.rs`, and modules `attributes`, `stability`, `version` under compiler/rustc_attr_data_structures/. Affected sibling crates: `rustc_ast_passes`, `rustc_builtin_macros`, `rustc_codegen_llvm`, and `rustc_codegen_gcc`.",
+      "evaluation_criteria": [
+        "Must name all four affected sibling crates: rustc_ast_passes, rustc_builtin_macros, rustc_codegen_llvm, rustc_codegen_gcc",
+        "Must reference the new lib and Cargo manifest under compiler/rustc_attr_parsing/ and the new lib and Cargo manifest under compiler/rustc_attr_data_structures/",
+        "Must reference the original crate location compiler/rustc_attr/src/builtin.rs being phased out",
+        "Should mention this is preparation for a future rustc_attr_validation crate"
+      ]
+    },
+    "classify_change_impact": {
+      "expected_solution": "Overall semver = **major** for the affected workspace edges. The old `rustc_attr` crate is renamed and its types redistributed; every dependent crate must update both its `Cargo.toml` (replace `rustc_attr` with `rustc_attr_parsing` and/or `rustc_attr_data_structures`) and its imports. Per-crate: `rustc_attr_parsing` = major (replaces `rustc_attr`; existing path-based imports break); `rustc_attr_data_structures` = major (new public API surface, but only for the type re-exports); `rustc_ast_passes`, `rustc_builtin_macros`, `rustc_codegen_llvm`, `rustc_codegen_gcc` = major because their `Cargo.toml` deps and import paths change. The compiler workspace is internal so no semver bump is published, but the *intra-workspace* contract change is unambiguously breaking.",
+      "evaluation_criteria": [
+        "Must classify the change as a major/breaking refactor inside the cargo workspace",
+        "Must explain that every dependent crate's Cargo.toml must be edited (replace rustc_attr with one or both new crates)",
+        "Must explain that import paths in every dependent crate must be retargeted to the new module paths",
+        "Should note that as an internal workspace, no public semver is bumped, but the intra-workspace contract is broken"
+      ]
+    },
+    "identify_boundary_violations": {
+      "expected_solution": "Source-of-change violations: (1) the old crate at `compiler/rustc_attr/src/builtin.rs` (and any remaining files under `compiler/rustc_attr/`) — being deleted or hollowed out; (2) new crate manifests added under compiler/rustc_attr_parsing/ and compiler/rustc_attr_data_structures/; (3) new crate roots `lib.rs` added under compiler/rustc_attr_parsing/src/ and compiler/rustc_attr_data_structures/src/; (4) attribute modules (mod, allow_unstable, cfg, confusables, deprecation, repr, stability, transparency, util) moved into compiler/rustc_attr_parsing/src/attributes/; (5) data types moved into compiler/rustc_attr_data_structures/src/ (modules: attributes, stability, version); (6) diagnostics resources `messages.ftl` and `session_diagnostics` under compiler/rustc_attr_parsing/. Downstream Cargo.toml + import edits: (7) `compiler/rustc_ast_passes/Cargo.toml` and `compiler/rustc_ast_passes/src/ast_validation.rs`; (8) `compiler/rustc_builtin_macros/Cargo.toml`, `compiler/rustc_builtin_macros/src/cfg.rs`, `compiler/rustc_builtin_macros/src/deriving/coerce_pointee.rs`, `compiler/rustc_builtin_macros/src/deriving/generic/mod.rs`; (9) `compiler/rustc_codegen_llvm/Cargo.toml`, `compiler/rustc_codegen_llvm/src/attributes.rs`; (10) `compiler/rustc_codegen_gcc/src/attributes.rs`, `compiler/rustc_codegen_gcc/src/lib.rs`. PR file count = 31.",
+      "evaluation_criteria": [
+        "Must reference the new lib and Cargo manifest under compiler/rustc_attr_parsing/ and the new lib and Cargo manifest under compiler/rustc_attr_data_structures/",
+        "Must cite at least three downstream import edits, e.g., compiler/rustc_ast_passes/src/ast_validation.rs, compiler/rustc_codegen_llvm/src/attributes.rs, compiler/rustc_codegen_gcc/src/attributes.rs",
+        "Must mention that each downstream Cargo.toml (e.g., compiler/rustc_ast_passes/Cargo.toml) must be edited",
+        "Should reference at least one moved attribute module under compiler/rustc_attr_parsing/src/attributes/"
+      ]
+    }
+  }
+}

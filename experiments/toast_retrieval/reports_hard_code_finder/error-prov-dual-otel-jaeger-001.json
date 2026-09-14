@@ -1,0 +1,194 @@
+{
+  "task_id": "error-prov-dual-otel-jaeger-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/opentelemetry-go--v1.21.0",
+    "github.com/sg-evals/jaeger--v1.51.0"
+  ],
+  "retrieved_paths": [
+    "sdk/trace/batch_span_processor.go",
+    "sdk/trace/span_exporter.go",
+    "sdk/trace/batch_span_processor_test.go",
+    "CHANGELOG.md",
+    "cmd/collector/app/handler/otlp_receiver.go",
+    "cmd/collector/app/handler/grpc_handler.go",
+    "cmd/agent/app/reporter/grpc/reporter.go",
+    "cmd/jaeger-v2/internal/exporters/storageexporter/exporter.go",
+    "cmd/jaeger-v2/internal/exporters/storageexporter/factory.go",
+    "monitoring/jaeger-mixin/prometheus_alerts.yml"
+  ],
+  "retrieved_paths_union": [
+    "sdk/trace/batch_span_processor.go",
+    "sdk/trace/span_exporter.go",
+    "sdk/trace/batch_span_processor_test.go",
+    "CHANGELOG.md",
+    "cmd/collector/app/handler/otlp_receiver.go",
+    "cmd/collector/app/handler/grpc_handler.go",
+    "cmd/agent/app/reporter/grpc/reporter.go",
+    "cmd/jaeger-v2/internal/exporters/storageexporter/exporter.go",
+    "cmd/jaeger-v2/internal/exporters/storageexporter/factory.go",
+    "monitoring/jaeger-mixin/prometheus_alerts.yml"
+  ],
+  "required_files": [
+    "otel-go/sdk/trace/batch_span_processor.go",
+    "jaeger/cmd/collector/app/handler/grpc_handler.go"
+  ],
+  "ir_scores": {
+    "task_id": "error-prov-dual-otel-jaeger-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8316
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "error-prov-dual-otel-jaeger-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8316
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 19.0,
+  "response_chars": 4488,
+  "raw_response": "I can\u2019t write to `/workspace/analysis/IMPACT_REPORT.md` because this interface exposes repository search/read tools but no filesystem-write tool. Relevant error flow and impact points are below.\n\nRelevant files:\n\n- [sg-evals/opentelemetry-go--v1.21.0:sdk/trace/batch_span_processor.go?L273-L300](/r/github.com/sg-evals/opentelemetry-go--v1.21.0/-/blob/sdk/trace/batch_span_processor.go?L273-L300) \u2014 `exportSpans` calls `SpanExporter.ExportSpans`, clears the batch even on failure, and returns the error; failed batches are intentionally dropped.\n- [sg-evals/opentelemetry-go--v1.21.0:sdk/trace/batch_span_processor.go?L303-L338](/r/github.com/sg-evals/opentelemetry-go--v1.21.0/-/blob/sdk/trace/batch_span_processor.go?L303-L338) \u2014 `processQueue` invokes `otel.Handle(err)` for export failures rather than retrying; this is the primary silent-swallowing boundary when no effective global error handler is configured.\n- [sg-evals/opentelemetry-go--v1.21.0:sdk/trace/batch_span_processor.go?L340-L371](/r/github.com/sg-evals/opentelemetry-go--v1.21.0/-/blob/sdk/trace/batch_span_processor.go?L340-L371) \u2014 shutdown draining also forwards export errors only through `otel.Handle`.\n- [sg-evals/opentelemetry-go--v1.21.0:sdk/trace/span_exporter.go?L19-L47](/r/github.com/sg-evals/opentelemetry-go--v1.21.0/-/blob/sdk/trace/span_exporter.go?L19-L47) \u2014 `SpanExporter.ExportSpans` returns errors; SDK performs no retry, and errors are expected to reach the configured error handler.\n- [sg-evals/opentelemetry-go--v1.21.0:sdk/trace/batch_span_processor_test.go?L477-L511](/r/github.com/sg-evals/opentelemetry-go--v1.21.0/-/blob/sdk/trace/batch_span_processor_test.go?L477-L511) \u2014 confirms failed export batches are dropped; `ForceFlush` returns the error, but asynchronous processing relies on `otel.Handle`.\n- [sg-evals/opentelemetry-go--v1.21.0:CHANGELOG.md?L1461-L1466](/r/github.com/sg-evals/opentelemetry-go--v1.21.0/-/blob/CHANGELOG.md?L1461-L1466) \u2014 documents the behavioral change: failed `BatchSpanProcessor` batches are dropped.\n- [sg-evals/jaeger--v1.51.0:cmd/collector/app/handler/otlp_receiver.go?L157-L184](/r/github.com/sg-evals/jaeger--v1.51.0/-/blob/cmd/collector/app/handler/otlp_receiver.go?L157-L184) \u2014 OTLP receiver converts requests and propagates `batchConsumer.consume` errors.\n- [sg-evals/jaeger--v1.51.0:cmd/collector/app/handler/grpc_handler.go?L76-L100](/r/github.com/sg-evals/jaeger--v1.51.0/-/blob/cmd/collector/app/handler/grpc_handler.go?L76-L100) \u2014 collector processing failures are returned as gRPC errors; `processor.ErrBusy` becomes `codes.ResourceExhausted`.\n- [sg-evals/jaeger--v1.51.0:cmd/agent/app/reporter/grpc/reporter.go?L71-L86](/r/github.com/sg-evals/jaeger--v1.51.0/-/blob/cmd/agent/app/reporter/grpc/reporter.go?L71-L86) \u2014 Jaeger gRPC reporter logs collector rejection and returns a wrapped `failed to export spans` error.\n- [sg-evals/jaeger--v1.51.0:cmd/jaeger-v2/internal/exporters/storageexporter/exporter.go?L51-L66](/r/github.com/sg-evals/jaeger--v1.51.0/-/blob/cmd/jaeger-v2/internal/exporters/storageexporter/exporter.go?L51-L66) \u2014 storage exporter aggregates span-write failures with `errors.Join` and returns them.\n- [sg-evals/jaeger--v1.51.0:cmd/jaeger-v2/internal/exporters/storageexporter/factory.go?L34-L46](/r/github.com/sg-evals/jaeger--v1.51.0/-/blob/cmd/jaeger-v2/internal/exporters/storageexporter/factory.go?L34-L46) \u2014 disables retry, timeout, and queueing, so downstream failures are immediately surfaced and not retried by the Jaeger exporter helper.\n- [sg-evals/jaeger--v1.51.0:monitoring/jaeger-mixin/prometheus_alerts.yml?L23-L38](/r/github.com/sg-evals/jaeger--v1.51.0/-/blob/monitoring/jaeger-mixin/prometheus_alerts.yml?L23-L38) \u2014 operational alerts for reporter errors and collector span dropping.\n\n**Trace:** collector rejects/processes unsuccessfully \u2192 Jaeger/OTLP receiver returns an error \u2192 exporter/client returns it from `ExportSpans` \u2192 OTel batch processor clears and drops the batch \u2192 asynchronous path calls `otel.Handle(err)`. The error is therefore not lost at Jaeger; it is effectively swallowed at the OTel global error-handler boundary, especially when the default/no-op handler is active.\n\n**Migration recommendations:** configure `otel.SetErrorHandler` with structured logging/metrics; enable exporter-specific retry where supported; monitor Jaeger reporter and collector drop metrics; use `ForceFlush`/`Shutdown` errors for synchronous validation; do not assume `BatchSpanProcessor` retries failed batches.",
+  "ir_scores_unaligned": {
+    "task_id": "error-prov-dual-otel-jaeger-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.2184
+    },
+    "mrr": 0.1667,
+    "map_score": 0.0833,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "otel-go/sdk/trace/batch_span_processor.go",
+    "sdk/trace/span_exporter.go",
+    "sdk/trace/batch_span_processor_test.go",
+    "CHANGELOG.md",
+    "cmd/collector/app/handler/otlp_receiver.go",
+    "jaeger/cmd/collector/app/handler/grpc_handler.go",
+    "cmd/agent/app/reporter/grpc/reporter.go",
+    "cmd/jaeger-v2/internal/exporters/storageexporter/exporter.go",
+    "cmd/jaeger-v2/internal/exporters/storageexporter/factory.go",
+    "monitoring/jaeger-mixin/prometheus_alerts.yml"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "error-prov-dual-otel-jaeger-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.2184
+    },
+    "mrr": 0.1667,
+    "map_score": 0.0833,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

@@ -1,0 +1,187 @@
+{
+  "task_id": "support-mapping-dual-jest-babel-cache-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/jest--v29.7.0",
+    "github.com/sg-evals/babel--v7.24.0"
+  ],
+  "retrieved_paths": [
+    "packages/jest-transform/src/ScriptTransformer.ts",
+    "packages/babel-jest/src/index.ts",
+    "packages/babel-core/src/config/partial.ts",
+    "packages/babel-core/src/config/item.ts",
+    "packages/babel-core/src/config/files/plugins.ts",
+    "packages/babel-jest/src/loadBabelConfig.ts",
+    "babel-jest/build/index.js"
+  ],
+  "retrieved_paths_union": [
+    "packages/jest-transform/src/ScriptTransformer.ts",
+    "packages/babel-jest/src/index.ts",
+    "packages/babel-core/src/config/partial.ts",
+    "packages/babel-core/src/config/item.ts",
+    "packages/babel-core/src/config/files/plugins.ts",
+    "packages/babel-jest/src/loadBabelConfig.ts",
+    "babel-jest/build/index.js"
+  ],
+  "required_files": [
+    "jest/packages/jest-runtime/src/index.ts",
+    "jest/packages/jest-transform/src/ScriptTransformer.ts",
+    "babel/packages/babel-core/src/config/full.ts",
+    "babel/packages/babel-core/src/config/partial.ts"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-jest-babel-cache-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.5856,
+      "10": 0.5856
+    },
+    "mrr": 1.0,
+    "map_score": 0.4167,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2857,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-jest-babel-cache-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.5856,
+      "10": 0.5856
+    },
+    "mrr": 1.0,
+    "map_score": 0.4167,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2857,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 149.0,
+  "response_chars": 14316,
+  "raw_response": "---\ntitle: Diagnosing jest transform cache failures after babel plugin upgrade\nshare_url: https://demo.sourcegraph.com/deepsearch/0dbdf6b7-e2d5-4d52-877a-6ccfbf347a75\nurl: https://demo.sourcegraph.com/deepsearch/2216\ncreated: 2026-08-18T01:56:23Z\nupdated: 2026-08-18T01:58:01Z\n---\n\n# # Map customer Jest tests passing once but failing on rerun after Babel plugin upgrade to the babel-jest transform-cache key boundary\n\nA customer reports that after upgrading @babel/plugin-transform-runtime\ntheir Jest test suite passes once on a clean checkout but every rerun\nfails with 'ReferenceError: regeneratorRuntime is not defined' in async\ntests. Clearing node_modules/.cache makes it pass once again.\n\nYour task:\n1. Find where Jest's runtime invokes its transformer to compile source\n   files and how it decides whether to use a cached transform output.\n2. Find where babel-jest computes the transform cache key (file content,\n   babel config, plugin versions) and which inputs it includes.\n3. Trace the cross-repo path: jest-runtime ScriptTransformer.transform()\n   -> babel-jest getCacheKey -> babel-core loadOptions / partialConfig\n   -> plugin signature inputs. Cite each file and the function\n   responsible.\n4. Identify why a plugin upgrade that does NOT bump the package.json\n   version (for example a local lockfile resolution change) can\n   produce a stale cache hit, and what makes the second run fail\n   when the first one passed.\n\n\nSearch only these repositories: github.com/sg-evals/jest--v29.7.0, github.com/sg-evals/babel--v7.24.0\n\nI now have all the information needed. Here is the complete analysis:\n\n---\n\n## Full Trace: Jest Transform Cache and the Stale-Cache Bug\n\n### 1. `ScriptTransformer.transformSource()` \u2014 cache check and miss path\n\n[`packages/jest-transform/src/ScriptTransformer.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/jest-transform/src/ScriptTransformer.ts)\n\n**Entry point** ([L482\u2013L535](https://demo.sourcegraph.com/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/jest-transform/src/ScriptTransformer.ts?L482-L535)):\n\n```\ntransformSource(filepath, content, options)\n  \u2192 _getFileCachePath(filename, content, options)   [L490]   \u2190 compute cache key \u2192 derive path\n  \u2192 readCodeCacheFile(cacheFilePath)                [L493]   \u2190 try disk cache\n  \u2192 if hit: return { code, sourceMapPath }          [L495-505] \u2190 STALE CACHE RETURNED HERE\n  \u2192 transformer.process(content, filename, \u2026)       [L516]   \u2190 actual transform on miss\n  \u2192 writeCodeCacheFile(cacheFilePath, code)         [L473]   \u2190 persist result\n```\n\nThe async variant ([L538\u2013L601](https://demo.sourcegraph.com/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/jest-transform/src/ScriptTransformer.ts?L538-L601)) is identical in structure, using `processAsync` or falling back to `process`.\n\n---\n\n### 2. Cache key construction \u2014 `_getCacheKey()` and `_buildCacheKeyFromFileInfo()`\n\n[L142\u2013L174](https://demo.sourcegraph.com/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/jest-transform/src/ScriptTransformer.ts?L142-L174):\n\n```typescript\n_getCacheKey(fileData, filename, options)\n  \u2192 transformer.getCacheKey(fileData, filename, transformOptions)   // delegate to babel-jest\n  \u2192 _buildCacheKeyFromFileInfo(fileData, filename, transformOptions, transformerCacheKey)\n```\n\n`_buildCacheKeyFromFileInfo` ([L114\u2013L136](https://demo.sourcegraph.com/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/jest-transform/src/ScriptTransformer.ts?L114-L136)):\n- If the transformer returned a key: `sha1(transformerCacheKey + CACHE_VERSION)`\n- Otherwise falls back to: `sha1(fileData + configString + instrument + filename + CACHE_VERSION)`\n\nThe **`CACHE_VERSION`** constant is a Jest-internal constant baked at build time \u2014 it does **not** change when plugin on-disk content changes.\n\n---\n\n### 3. `babel-jest getCacheKey()` \u2014 the key babel-jest produces\n\n[`packages/babel-jest/src/index.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/babel-jest/src/index.ts)\n\n**`getCacheKey`** ([L204\u2013L217](https://demo.sourcegraph.com/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/babel-jest/src/index.ts?L204-L217)):\n```typescript\ngetCacheKey(sourceText, sourcePath, transformOptions) {\n  const babelOptions = loadBabelConfig(   // \u2192 @babel/core loadPartialConfig\n    cwd, sourcePath,\n    mergeBabelTransformOptions(sourcePath, transformOptions)\n  );\n  return getCacheKeyFromConfig(sourceText, sourcePath, babelOptions, transformOptions);\n}\n```\n\n**`getCacheKeyFromConfig`** ([L71\u2013L103](https://demo.sourcegraph.com/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/babel-jest/src/index.ts?L71-L103)) hashes these inputs with SHA-1:\n\n| Input | Description |\n|---|---|\n| `THIS_FILE` | The compiled bytes of `babel-jest/build/index.js` itself |\n| `JSON.stringify(babelOptions.options)` | The resolved Babel options object from `loadPartialConfig` |\n| `sourceText` | File content |\n| `path.relative(config.rootDir, sourcePath)` | Relative source path |\n| `configString` | Jest's serialized config |\n| `configPath` (`babelOptions.config`, `babelOptions.babelrc`) | **File paths** of babel config files (not their content) |\n| `instrument` flag | Coverage instrumentation flag |\n| `process.env.NODE_ENV`, `process.env.BABEL_ENV` | Environment variables |\n| `process.version` | Node.js version |\n\n---\n\n### 4. What `babelOptions.options` contains \u2014 `@babel/core loadPartialConfig`\n\n[`packages/babel-core/src/config/partial.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-core/src/config/partial.ts) ([L161\u2013L198](https://demo.sourcegraph.com/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-core/src/config/partial.ts?L161-L198))\n\n`loadPartialConfig` calls `loadPrivatePartialConfig` \u2192 `buildRootChain` \u2192 maps plugin descriptors through `createItemFromDescriptor`.\n\nEach plugin in `options.plugins` is a `ConfigItem` ([`packages/babel-core/src/config/item.ts` L64\u2013L134](https://demo.sourcegraph.com/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-core/src/config/item.ts?L64-L134)) with these **enumerable** properties:\n\n```typescript\n{\n  value:   Function,      // the plugin factory function (in-memory reference, NOT serialized)\n  options: {},            // plugin options object\n  dirname: string,        // directory plugin is relative to\n  name:    string | void, // plugin name if given\n  file: {\n    request:  string,     // e.g. \"@babel/plugin-transform-runtime\"\n    resolved: string,     // absolute path on disk, e.g. \"/\u2026/node_modules/@babel/plugin-transform-runtime/lib/index.js\"\n  } | void\n}\n```\n\nWhen `JSON.stringify(babelOptions.options)` is called, the `value` (a Function) serializes as `undefined` and is **dropped**. The `file.resolved` absolute path **is** included. The **content or version** of the plugin file at that path is **not** included.\n\nPlugin loading happens in [`packages/babel-core/src/config/files/plugins.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-core/src/config/files/plugins.ts) ([L34\u2013L43](https://demo.sourcegraph.com/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-core/src/config/files/plugins.ts?L34-L43)):\n```typescript\nexport function* loadPlugin(name, dirname) {\n  const filepath = resolvePlugin(name, dirname, \u2026);   // require.resolve \u2192 absolute path\n  const value = yield* requireModule(\"plugin\", filepath);\n  return { filepath, value };\n}\n```\n\nThe cache key gets `filepath` (e.g. `/project/node_modules/@babel/plugin-transform-runtime/lib/index.js`) but **never** the file's content, mtime, or package version.\n\n---\n\n### 5. Root cause: why a version-neutral lockfile resolution change breaks the second run\n\nThe stale-cache bug is a direct consequence of the cache key only covering **plugin paths**, not **plugin file content or package version**.\n\n**Run 1 (clean checkout, old plugin version on disk):**\n\n1. `ScriptTransformer.transformSource()` computes the cache key via `_getFileCachePath` \u2192 `_getCacheKey` \u2192 `babel-jest.getCacheKey`.\n2. `loadPartialConfig` resolves `@babel/plugin-transform-runtime` \u2192 `/\u2026/node_modules/@babel/plugin-transform-runtime/lib/index.js`.\n3. `JSON.stringify(babelOptions.options)` encodes the **path string** `file.resolved`.\n4. No cache file exists; Babel transforms the file, writing code **without** `regeneratorRuntime` injection because the old plugin didn't inject it, OR the old plugin injected it and it worked fine. The result is written to the disk cache.\n\n**Lockfile change (no `package.json` version bump):**\n\n- `npm ci` / `yarn install` resolves a different (newer) version of `@babel/plugin-transform-runtime` **to the same path** (`node_modules/@babel/plugin-transform-runtime/\u2026`). The file on disk is silently replaced.\n- `package.json` still shows the same semver range; only the lockfile changed. The `package.json` version field is not part of the cache key either.\n\n**Run 2 (upgraded plugin bytes at the same path):**\n\n1. The cache key computation goes through the same path. `file.resolved` is identical \u2014 the path did not change.\n2. `THIS_FILE` (the bytes of `babel-jest/build/index.js`) is unchanged.\n3. `configPath` (the `.babelrc`/`babel.config.js` file paths) is unchanged.\n4. `JSON.stringify(babelOptions.options)` produces the **same JSON** \u2014 only the resolved path is in it, not content.\n5. The cache key is **identical** to Run 1. Jest finds the old cache file and returns it immediately ([L493\u2013L505](https://demo.sourcegraph.com/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/jest-transform/src/ScriptTransformer.ts?L493-L505)).\n6. The cached code was compiled with the **old plugin**. The new `@babel/plugin-transform-runtime` now correctly rewrites `async/await` to use `regeneratorRuntime` helpers \u2014 but those helpers are not `require`d in the stale cached output.\n7. At runtime, `regeneratorRuntime is not defined` is thrown.\n\nClearing `node_modules/.cache` destroys the stale cache entry, forcing a fresh transform with the new plugin on the next run, which is why it passes once and then fails again if the cache entry from the new-plugin run is clean.\n\n---\n\n### Summary table of what IS and IS NOT in the cache key\n\n| Factor | In key? | How |\n|---|---|---|\n| Source file content | Yes | `sourceText` hashed directly |\n| Jest config (`configString`) | Yes | serialized Jest config |\n| Babel config **file path** | Yes | `babelOptions.config` / `.babelrc` path strings |\n| Babel config **file content** | **No** | only path, not content |\n| Plugin **resolved absolute path** | Yes | `file.resolved` via `JSON.stringify(options)` |\n| Plugin **file content / bytes** | **No** | never read |\n| Plugin **`package.json` version** | **No** | never read |\n| `babel-jest` own source bytes | Yes | `THIS_FILE` = `fs.readFileSync(__filename)` |\n| `@babel/core` version / bytes | **No** | only `babel-jest` itself |\n| Node version, `NODE_ENV`, `BABEL_ENV` | Yes | explicit fields |\n\nThe gap is the middle section: the **content and version of installed Babel plugins** are invisible to the cache key. Any out-of-band on-disk change to `node_modules/@babel/plugin-transform-runtime` \u2014 whether from a lockfile resolution, a patch, or an in-place edit \u2014 produces a stale cache hit and broken output on the next run.\n\n## Sources\n\n- [github.com/sg-evals/jest--v29.7.0/packages/jest-transform/src/ScriptTransformer.ts@5fda879?L130-240](/github.com/sg-evals/jest--v29.7.0@5fda8791ff52792c6d92fe70845c721e97848a0d/-/blob/packages/jest-transform/src/ScriptTransformer.ts?L130-240)\n- [github.com/sg-evals/jest--v29.7.0/packages/babel-jest/src/index.ts@5fda879?L71-231](/github.com/sg-evals/jest--v29.7.0@5fda8791ff52792c6d92fe70845c721e97848a0d/-/blob/packages/babel-jest/src/index.ts?L71-231)\n- [github.com/sg-evals/jest--v29.7.0/packages/jest-transform/src/ScriptTransformer.ts@5fda879?L100-130](/github.com/sg-evals/jest--v29.7.0@5fda8791ff52792c6d92fe70845c721e97848a0d/-/blob/packages/jest-transform/src/ScriptTransformer.ts?L100-130)\n- [github.com/sg-evals/jest--v29.7.0/packages/jest-transform/src/ScriptTransformer.ts@5fda879?L482-601](/github.com/sg-evals/jest--v29.7.0@5fda8791ff52792c6d92fe70845c721e97848a0d/-/blob/packages/jest-transform/src/ScriptTransformer.ts?L482-601)\n- [github.com/sg-evals/jest--v29.7.0/packages/babel-jest/src/index.ts@5fda879?L1-70](/github.com/sg-evals/jest--v29.7.0@5fda8791ff52792c6d92fe70845c721e97848a0d/-/blob/packages/babel-jest/src/index.ts?L1-70)\n- [github.com/sg-evals/jest--v29.7.0/packages/babel-jest/src/loadBabelConfig.ts@5fda879](/github.com/sg-evals/jest--v29.7.0@5fda8791ff52792c6d92fe70845c721e97848a0d/-/blob/packages/babel-jest/src/loadBabelConfig.ts)\n- [repo:^github.com/sg-evals/babel--v7.24.0$ loadPartialConfig options plugins partialConfig](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fbabel--v7.24.0$%20loadPartialConfig%20options%20plugins%20partialConfig)\n- [github.com/sg-evals/babel--v7.24.0/packages/babel-core/src/config/partial.ts@00f3fd9?L1-220](/github.com/sg-evals/babel--v7.24.0@00f3fd94ee10c23578e433f7721027c9aa311999/-/blob/packages/babel-core/src/config/partial.ts?L1-220)\n- [repo:^github.com/sg-evals/babel--v7.24.0$ file:item.ts createItemFromDescriptor dirname value](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fbabel--v7.24.0$%20file:item.ts%20createItemFromDescriptor%20dirname%20value)\n- [github.com/sg-evals/babel--v7.24.0/packages/babel-core/src/config/item.ts@00f3fd9](/github.com/sg-evals/babel--v7.24.0@00f3fd94ee10c23578e433f7721027c9aa311999/-/blob/packages/babel-core/src/config/item.ts)\n- [repo:^github.com/sg-evals/babel--v7.24.0$ file:config descriptor plugin filepath resolve name](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fbabel--v7.24.0$%20file:config%20descriptor%20plugin%20filepath%20resolve%20name)\n- [github.com/sg-evals/jest--v29.7.0/packages/jest-transform/src/ScriptTransformer.ts@5fda879?L387-430](/github.com/sg-evals/jest--v29.7.0@5fda8791ff52792c6d92fe70845c721e97848a0d/-/blob/packages/jest-transform/src/ScriptTransformer.ts?L387-430)\n- [github.com/sg-evals/jest--v29.7.0/packages/jest-transform/src/ScriptTransformer.ts@5fda879?L430-485](/github.com/sg-evals/jest--v29.7.0@5fda8791ff52792c6d92fe70845c721e97848a0d/-/blob/packages/jest-transform/src/ScriptTransformer.ts?L430-485)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-jest-babel-cache-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "jest/packages/jest-transform/src/ScriptTransformer.ts",
+    "packages/babel-jest/src/index.ts",
+    "babel/packages/babel-core/src/config/partial.ts",
+    "packages/babel-core/src/config/item.ts",
+    "packages/babel-core/src/config/files/plugins.ts",
+    "packages/babel-jest/src/loadBabelConfig.ts",
+    "babel-jest/build/index.js"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-jest-babel-cache-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

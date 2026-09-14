@@ -1,0 +1,196 @@
+{
+  "task_id": "refactor-orchestration-tri-tokio-001",
+  "policy": "code_finder",
+  "suite": "technical_debt",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/tokio--tokio-1.29.1",
+    "github.com/sg-evals/hyper--v1.0.0-rc.4",
+    "github.com/sg-evals/axum--axum-v0.6.19"
+  ],
+  "retrieved_paths": [
+    "tokio/Cargo.toml",
+    "tokio/src/runtime/runtime.rs",
+    "tokio/src/runtime/builder.rs",
+    "Cargo.toml",
+    "tests/support/mod.rs",
+    "src/client/dispatch.rs",
+    "axum/Cargo.toml",
+    "examples/hyper-1-0/Cargo.toml",
+    "axum-core/Cargo.toml",
+    "examples/unix-domain-socket/Cargo.toml"
+  ],
+  "retrieved_paths_union": [
+    "tokio/Cargo.toml",
+    "tokio/src/runtime/runtime.rs",
+    "tokio/src/runtime/builder.rs",
+    "Cargo.toml",
+    "tests/support/mod.rs",
+    "src/client/dispatch.rs",
+    "axum/Cargo.toml",
+    "examples/hyper-1-0/Cargo.toml",
+    "axum-core/Cargo.toml",
+    "examples/unix-domain-socket/Cargo.toml"
+  ],
+  "required_files": [
+    "tokio/Cargo.toml",
+    "Cargo.toml",
+    "axum/Cargo.toml"
+  ],
+  "ir_scores": {
+    "task_id": "refactor-orchestration-tri-tokio-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.6714,
+      "10": 0.8278
+    },
+    "mrr": 1.0,
+    "map_score": 0.6429,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "refactor-orchestration-tri-tokio-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.6714,
+      "10": 0.8278
+    },
+    "mrr": 1.0,
+    "map_score": 0.6429,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 20.8,
+  "response_chars": 2837,
+  "raw_response": "I can\u2019t write `/workspace/REFACTOR_PLAN.md` because the available tools are read/search-only and do not provide workspace file-writing access. The checked-out manifests establish only Tokio edges for Hyper and Axum; Axum\u2019s main crate uses Hyper 0.14, not the specified Hyper 1.0-rc.4.\n\nRelevant files:\n- [sg-evals/tokio--tokio-1.29.1:tokio/Cargo.toml?L1-L11](/r/github.com/sg-evals/tokio--tokio-1.29.1/-/blob/tokio/Cargo.toml?L1-L11) - Tokio package/version (`1.29.1`)\n- [sg-evals/tokio--tokio-1.29.1:tokio/src/runtime/runtime.rs?L113-L146](/r/github.com/sg-evals/tokio--tokio-1.29.1/-/blob/tokio/src/runtime/runtime.rs?L113-L146) - `Runtime::new()` API targeted by the breaking refactor\n- [sg-evals/tokio--tokio-1.29.1:tokio/src/runtime/builder.rs?L227-L240](/r/github.com/sg-evals/tokio--tokio-1.29.1/-/blob/tokio/src/runtime/builder.rs?L227-L240) - Runtime builder constructors\n- [sg-evals/hyper--v1.0.0-rc.4:Cargo.toml?L22-L36](/r/github.com/sg-evals/hyper--v1.0.0-rc.4/-/blob/Cargo.toml?L22-L36) - Hyper\u2019s direct Tokio dependency: `tokio = { version = \"1\", features = [\"sync\"] }`\n- [sg-evals/hyper--v1.0.0-rc.4:Cargo.toml?L42-L64](/r/github.com/sg-evals/hyper--v1.0.0-rc.4/-/blob/Cargo.toml?L42-L64) - Hyper test/dev Tokio dependency and runtime features\n- [sg-evals/hyper--v1.0.0-rc.4:tests/support/mod.rs?L315-L325](/r/github.com/sg-evals/hyper--v1.0.0-rc.4/-/blob/tests/support/mod.rs?L315-L325) - Hyper test runtime construction\n- [sg-evals/hyper--v1.0.0-rc.4:src/client/dispatch.rs?L429-L435](/r/github.com/sg-evals/hyper--v1.0.0-rc.4/-/blob/src/client/dispatch.rs?L429-L435) - Hyper benchmark runtime construction\n- [sg-evals/axum--axum-v0.6.19:axum/Cargo.toml?L33-L42](/r/github.com/sg-evals/axum--axum-v0.6.19/-/blob/axum/Cargo.toml?L33-L42) - Axum main crate depends on Hyper `0.14.24`\n- [sg-evals/axum--axum-v0.6.19:axum/Cargo.toml?L54-L64](/r/github.com/sg-evals/axum--axum-v0.6.19/-/blob/axum/Cargo.toml?L54-L64) - Axum optional Tokio dependency: `1.25.0`, feature `time`\n- [sg-evals/axum--axum-v0.6.19:axum/Cargo.toml?L14-L28](/r/github.com/sg-evals/axum--axum-v0.6.19/-/blob/axum/Cargo.toml?L14-L28) - Axum feature wiring for Tokio and Hyper\n- [sg-evals/axum--axum-v0.6.19:examples/hyper-1-0/Cargo.toml?L7-L12](/r/github.com/sg-evals/axum--axum-v0.6.19/-/blob/examples/hyper-1-0/Cargo.toml?L7-L12) - Separate example depends on Hyper `1.0.0-rc.4` and Tokio `1.0`\n- [sg-evals/axum--axum-v0.6.19:axum-core/Cargo.toml?L37-L42](/r/github.com/sg-evals/axum--axum-v0.6.19/-/blob/axum-core/Cargo.toml?L37-L42) - Axum-core dev dependencies on Hyper `0.14.24` and Tokio `1.25.0`\n- [sg-evals/axum--axum-v0.6.19:examples/unix-domain-socket/Cargo.toml?L7-L12](/r/github.com/sg-evals/axum--axum-v0.6.19/-/blob/examples/unix-domain-socket/Cargo.toml?L7-L12) - Representative Axum example dependencies on Hyper `0.14` and Tokio `1.0`",
+  "ir_scores_unaligned": {
+    "task_id": "refactor-orchestration-tri-tokio-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.6714,
+      "10": 0.8278
+    },
+    "mrr": 1.0,
+    "map_score": 0.6429,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "tokio/Cargo.toml",
+    "tokio/src/runtime/runtime.rs",
+    "tokio/src/runtime/builder.rs",
+    "Cargo.toml",
+    "tests/support/mod.rs",
+    "src/client/dispatch.rs",
+    "axum/Cargo.toml",
+    "examples/hyper-1-0/Cargo.toml",
+    "axum-core/Cargo.toml",
+    "examples/unix-domain-socket/Cargo.toml"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "refactor-orchestration-tri-tokio-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.6714,
+      "10": 0.8278
+    },
+    "mrr": 1.0,
+    "map_score": 0.6429,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

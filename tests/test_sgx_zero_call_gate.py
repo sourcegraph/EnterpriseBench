@@ -290,3 +290,100 @@ class TestSgxToolCallCounting:
             + "\n"
         )
         assert _usage(tmp_path, stream)["sgx_tool_calls"] == 1
+
+    def test_codex_command_execution_counts_sgx(self, tmp_path: Path) -> None:
+        stream = json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "command": (
+                        "sgx search 'register_blueprint' && "
+                        "sgx read flask src/flask/sansio/blueprints.py"
+                    ),
+                    "status": "completed",
+                },
+            }
+        )
+
+        assert _usage(tmp_path, stream)["sgx_tool_calls"] == 2
+
+    def test_codex_bash_lc_wrapper_counts_leading_sgx(self, tmp_path: Path) -> None:
+        stream = json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "command": (
+                        "/bin/bash -lc \"sgx search 'register_blueprint' && "
+                        'sgx read flask src/flask/sansio/blueprints.py"'
+                    ),
+                    "status": "completed",
+                },
+            }
+        )
+
+        assert _usage(tmp_path, stream)["sgx_tool_calls"] == 2
+
+    def test_codex_bash_lc_wrapper_does_not_count_a_mention(
+        self, tmp_path: Path
+    ) -> None:
+        stream = json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "command": "/bin/bash -lc 'echo \"run sgx next\"'",
+                    "status": "completed",
+                },
+            }
+        )
+
+        assert _usage(tmp_path, stream)["sgx_tool_calls"] == 0
+
+    def test_opencode_bash_tool_counts_sgx(self, tmp_path: Path) -> None:
+        stream = json.dumps(
+            {
+                "type": "tool_use",
+                "part": {
+                    "type": "tool",
+                    "tool": "bash",
+                    "state": {
+                        "status": "completed",
+                        "input": {
+                            "command": "sgx search 'register_blueprint' | head -40"
+                        },
+                    },
+                },
+            }
+        )
+
+        assert _usage(tmp_path, stream)["sgx_tool_calls"] == 1
+
+    @pytest.mark.parametrize(
+        "record",
+        [
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "agent_message",
+                    "text": "I should run sgx search next.",
+                },
+            },
+            {
+                "type": "tool_use",
+                "part": {
+                    "type": "tool",
+                    "tool": "read",
+                    "state": {
+                        "status": "completed",
+                        "input": {"filePath": "/workspace/sgx-notes.md"},
+                    },
+                },
+            },
+        ],
+    )
+    def test_generated_harness_sgx_mentions_do_not_count(
+        self, tmp_path: Path, record: dict
+    ) -> None:
+        assert _usage(tmp_path, json.dumps(record))["sgx_tool_calls"] == 0

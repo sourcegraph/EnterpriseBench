@@ -1,0 +1,190 @@
+{
+  "task_id": "dep-traversal-tri-jackson-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/jackson-databind--jackson-databind-2.15.2",
+    "github.com/sg-evals/spring-framework--v6.0.11",
+    "github.com/sg-evals/spring-boot--v3.1.2"
+  ],
+  "retrieved_paths": [
+    "src/main/java/com/fasterxml/jackson/databind/Module.java",
+    "src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+    "spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java",
+    "spring-web/src/main/java/org/springframework/http/converter/json/MappingJackson2HttpMessageConverter.java",
+    "spring-web/src/main/java/org/springframework/http/converter/json/AbstractJackson2HttpMessageConverter.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/http/JacksonHttpMessageConvertersConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/web/servlet/WebMvcAutoConfiguration.java"
+  ],
+  "retrieved_paths_union": [
+    "src/main/java/com/fasterxml/jackson/databind/Module.java",
+    "src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+    "spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java",
+    "spring-web/src/main/java/org/springframework/http/converter/json/MappingJackson2HttpMessageConverter.java",
+    "spring-web/src/main/java/org/springframework/http/converter/json/AbstractJackson2HttpMessageConverter.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/http/JacksonHttpMessageConvertersConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/web/servlet/WebMvcAutoConfiguration.java"
+  ],
+  "required_files": [
+    "src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+    "spring-web/src/main/java/org/springframework/http/converter/json/MappingJackson2HttpMessageConverter.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java"
+  ],
+  "ir_scores": {
+    "task_id": "dep-traversal-tri-jackson-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4982,
+      "10": 0.6653
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.375,
+    "n_retrieved": 8,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "dep-traversal-tri-jackson-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4982,
+      "10": 0.6653
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.375,
+    "n_retrieved": 8,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 220.6,
+  "response_chars": 30044,
+  "raw_response": "---\ntitle: Trace how Spring Boot applies custom Jackson modules to ObjectMapper\nshare_url: https://demo.sourcegraph.com/deepsearch/9d4be939-e127-4cec-a9e5-9195121a559b\nurl: https://demo.sourcegraph.com/deepsearch/2145\ncreated: 2026-08-17T21:25:38Z\nupdated: 2026-08-17T21:29:15Z\n---\n\n# # Dependency Trace: Jackson ObjectMapper through Spring Framework to Spring Boot\n\n## Context\n\nJackson is the default JSON library in the Spring ecosystem. When a developer\nregisters a custom Jackson Module bean in a Spring Boot application, it should\nbe auto-detected and applied to all REST endpoints. But the path from bean\ndefinition to actual serialization crosses three repositories:\n\n- Jackson provides ObjectMapper and the Module registration API\n- Spring Framework provides Jackson2ObjectMapperBuilder and MappingJackson2HttpMessageConverter\n- Spring Boot provides JacksonAutoConfiguration that wires everything together\n\n## Task\n\nTrace how a custom Jackson Module bean flows from Spring Boot autoconfiguration\nthrough Spring Framework's builder into Jackson's ObjectMapper.\n\n## Repos in Workspace\n\n- `/workspace/jackson-databind/` -- jackson-databind 2.15.2 (upstream library)\n- `/workspace/spring-framework/` -- Spring Framework 6.0.11 (intermediary)\n- `/workspace/spring-boot/` -- Spring Boot 3.1.2 (consumer/autoconfigurer)\n\n## Expected Output\n\nWrite `/workspace/DEPENDENCY_TRACE.md` containing:\n\n1. Key classes and methods in jackson-databind for module registration\n2. How Spring Framework's Jackson2ObjectMapperBuilder and MappingJackson2HttpMessageConverter integrate with Jackson\n3. How Spring Boot's JacksonAutoConfiguration auto-detects and registers Module beans\n4. The complete class/method chain from Module bean to REST serialization\n\n\nSearch only these repositories: github.com/sg-evals/jackson-databind--jackson-databind-2.15.2, github.com/sg-evals/spring-framework--v6.0.11, github.com/sg-evals/spring-boot--v3.1.2\n\nThe content is fully traced and verified. Here is the complete `/workspace/DEPENDENCY_TRACE.md` document content, ready to be written to disk:\n\n---\n\n# Dependency Trace: Jackson Module Bean \u2192 REST Serialization\n\n## Overview\n\nWhen a developer registers a custom `Module` bean in a Spring Boot application, it flows through three repositories before reaching actual JSON serialization at REST endpoints:\n\n```\nModule @Bean\n  \u2514\u2500\u2192 JacksonAutoConfiguration (Spring Boot)\n        \u2514\u2500\u2192 StandardJackson2ObjectMapperBuilderCustomizer.configureModules()\n              \u2514\u2500\u2192 Jackson2ObjectMapperBuilder.modulesToInstall() (Spring Framework)\n                    \u2514\u2500\u2192 Jackson2ObjectMapperBuilder.configure()\n                          \u2514\u2500\u2192 ObjectMapper.registerModules() (jackson-databind)\n                                \u2514\u2500\u2192 ObjectMapper.registerModule()\n                                      \u2514\u2500\u2192 Module.setupModule(SetupContext)\n                                            \u2514\u2500\u2192 [serializers/deserializers wired into SerializerFactory]\n  \u2514\u2500\u2192 JacksonObjectMapperConfiguration \u2192 ObjectMapper bean\n  \u2514\u2500\u2192 JacksonHttpMessageConvertersConfiguration \u2192 MappingJackson2HttpMessageConverter(objectMapper)\n  \u2514\u2500\u2192 WebMvcAutoConfiguration.configureMessageConverters() \u2192 converter added to MVC\n        \u2514\u2500\u2192 AbstractJackson2HttpMessageConverter.writeInternal() \u2192 ObjectWriter.writeValue()\n```\n\n---\n\n## 1. Jackson-Databind: Module Registration API\n\n**Repository:** `github.com/sg-evals/jackson-databind--jackson-databind-2.15.2`\n\n### `Module` (abstract class)\n\n**File:** [`src/main/java/com/fasterxml/jackson/databind/Module.java`](https://demo.sourcegraph.com/r/github.com/sg-evals/jackson-databind--jackson-databind-2.15.2/-/blob/src/main/java/com/fasterxml/jackson/databind/Module.java?L25-88)\n\nThe abstract base class all custom modules must extend. Key contract:\n\n| Method | Purpose |\n|---|---|\n| `getModuleName()` | Human-readable name (required) |\n| `version()` | Module version (required) |\n| `getTypeId()` | Deduplication key; defaults to `getClass().getName()` |\n| `getDependencies()` | Returns dependent modules to register first |\n| `setupModule(SetupContext)` | **Core registration callback** \u2014 called by `ObjectMapper` to let the module wire in serializers, deserializers, type modifiers, etc. |\n\n`SetupContext` (inner interface of `Module`) exposes:\n- `addSerializers(Serializers)` \u2192 wires into `_serializerFactory`\n- `addDeserializers(Deserializers)` \u2192 wires into `_deserializationContext._factory`\n- `addBeanSerializerModifier(BeanSerializerModifier)`\n- `addBeanDeserializerModifier(BeanDeserializerModifier)`\n- `addAbstractTypeResolver(AbstractTypeResolver)`\n\n### `ObjectMapper.registerModule(Module)` \u2014 lines 842\u20131044\n\n**File:** [`src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java`](https://demo.sourcegraph.com/r/github.com/sg-evals/jackson-databind--jackson-databind-2.15.2/-/blob/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java?L842-879)\n\n```java\npublic ObjectMapper registerModule(Module module) {\n    // 1. Validate name and version are non-null\n    String name = module.getModuleName();    // throws if null\n    Version version = module.version();      // throws if null\n\n    // 2. Register dependencies first (recursive)\n    for (Module dep : module.getDependencies()) {\n        registerModule(dep);\n    }\n\n    // 3. Deduplicate by typeId if IGNORE_DUPLICATE_MODULE_REGISTRATIONS is enabled\n    if (isEnabled(MapperFeature.IGNORE_DUPLICATE_MODULE_REGISTRATIONS)) {\n        Object typeId = module.getTypeId();\n        if (typeId != null) {\n            if (!_registeredModuleTypes.add(typeId)) {\n                return this;  // skip if already registered\n            }\n        }\n    }\n\n    // 4. Call setupModule \u2014 module hooks into ObjectMapper internals\n    module.setupModule(new Module.SetupContext() { ... });\n    return this;\n}\n```\n\n`SetupContext` is implemented as an anonymous class inside this call, delegating directly to the `ObjectMapper`'s `_serializerFactory` and `_deserializationContext._factory` fields \u2014 this is where the module's custom serializers become live. See the [SetupContext implementation at lines 879\u20131044](https://demo.sourcegraph.com/r/github.com/sg-evals/jackson-databind--jackson-databind-2.15.2/-/blob/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java?L879-1044).\n\n### `ObjectMapper.registerModules(Iterable<? extends Module>)` \u2014 lines 1077\u20131084\n\nSimple loop calling `registerModule()` for each module. This is what Spring Framework's builder ultimately calls.\n\n---\n\n## 2. Spring Framework: Builder and Converter\n\n**Repository:** `github.com/sg-evals/spring-framework--v6.0.11`\n\n### `Jackson2ObjectMapperBuilder`\n\n**File:** [`spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java`](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java)\n\nA fluent builder for constructing and configuring `ObjectMapper` instances. Key module-related state fields:\n\n| Field | Set by | Meaning |\n|---|---|---|\n| `this.modules` | `modulesToInstall(Module...)` | Explicit module instances to register |\n| `this.moduleClasses` | `modulesToInstall(Class<>...)` | Module classes to instantiate then register |\n| `this.findWellKnownModules` | `modulesToInstall(...)` sets `true` | Auto-register JSR-310, Joda-Time, Kotlin |\n| `this.findModulesViaServiceLoader` | `findModulesViaServiceLoader(true)` | Delegate to `ObjectMapper.findModules()` |\n\n#### [`modulesToInstall(Module... modules)`](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java?L583-587) \u2014 lines 583\u2013587\n\n```java\npublic Jackson2ObjectMapperBuilder modulesToInstall(Module... modules) {\n    this.modules = new ArrayList<>(Arrays.asList(modules));\n    this.findWellKnownModules = true;   // still register well-known modules too\n    return this;\n}\n```\n\nThis is the path Spring Boot's customizer takes. Note that `findWellKnownModules = true` means JSR-310, Joda-Time, and Kotlin modules are also auto-detected on the classpath \u2014 even when user modules are supplied.\n\n#### [`configure(ObjectMapper objectMapper)`](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java?L710-793) \u2014 lines 710\u2013793\n\nThe heart of the builder, called from `build()`:\n\n```java\npublic void configure(ObjectMapper objectMapper) {\n    MultiValueMap<Object, Module> modulesToRegister = new LinkedMultiValueMap<>();\n\n    // Step A: resolve module sources\n    if (this.findModulesViaServiceLoader) {\n        ObjectMapper.findModules(this.moduleClassLoader)\n                    .forEach(m -> registerModule(m, modulesToRegister));\n    } else if (this.findWellKnownModules) {\n        registerWellKnownModulesIfAvailable(modulesToRegister);  // JSR-310, Joda, Kotlin\n    }\n\n    // Step B: add explicitly provided module instances (line 721\u2013723)\n    if (this.modules != null) {\n        this.modules.forEach(m -> registerModule(m, modulesToRegister));\n    }\n\n    // Step C: instantiate and add module classes (line 724\u2013728)\n    if (this.moduleClasses != null) {\n        for (Class<? extends Module> cls : this.moduleClasses) {\n            registerModule(BeanUtils.instantiateClass(cls), modulesToRegister);\n        }\n    }\n\n    // Step D: flatten and register on the ObjectMapper (line 733)\n    objectMapper.registerModules(modules);   // \u2190 calls into jackson-databind\n\n    // ... remaining config: dateFormat, features, mixIns, handlerInstantiator ...\n}\n```\n\nThe private [`registerModule(Module, MultiValueMap)` helper at lines 795\u2013802](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java?L795-802) uses the module's `typeId` as a deduplication key: if two modules share a typeId, `modulesToRegister.set(...)` overwrites the earlier one, effectively keeping only the last.\n\n#### [`build()`](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java?L691-703) \u2014 lines 691\u2013703\n\n```java\npublic <T extends ObjectMapper> T build() {\n    ObjectMapper mapper = (this.factory != null)\n        ? new ObjectMapper(this.factory) : new ObjectMapper();\n    configure(mapper);\n    return (T) mapper;\n}\n```\n\n### `MappingJackson2HttpMessageConverter`\n\n**File:** [`spring-web/src/main/java/org/springframework/http/converter/json/MappingJackson2HttpMessageConverter.java`](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/http/converter/json/MappingJackson2HttpMessageConverter.java?L58-73)\n\n```java\n// Default constructor \u2014 standalone use, no Spring Boot auto-config\npublic MappingJackson2HttpMessageConverter() {\n    this(Jackson2ObjectMapperBuilder.json().build());\n}\n\n// Constructor used by Spring Boot auto-config (receives the pre-built ObjectMapper bean)\npublic MappingJackson2HttpMessageConverter(ObjectMapper objectMapper) {\n    super(objectMapper, MediaType.APPLICATION_JSON, new MediaType(\"application\", \"*+json\"));\n}\n```\n\n### `AbstractJackson2HttpMessageConverter.writeInternal()`\n\n**File:** [`spring-web/src/main/java/org/springframework/http/converter/json/AbstractJackson2HttpMessageConverter.java`](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/http/converter/json/AbstractJackson2HttpMessageConverter.java?L439-494) \u2014 lines 439\u2013494\n\nThe serialization entry point called by Spring MVC for every `@ResponseBody` / `@RestController` response:\n\n```java\nprotected void writeInternal(Object object, Type type, HttpOutputMessage outputMessage) {\n    ObjectMapper objectMapper = selectObjectMapper(clazz, contentType);\n\n    try (JsonGenerator generator = objectMapper.getFactory()\n                                               .createGenerator(outputStream, encoding)) {\n        ObjectWriter objectWriter = objectMapper.writer();\n        // ... apply serializationView, filters, javaType ...\n        objectWriter.writeValue(generator, value);\n        // \u2191 triggers all serializers registered by Module.setupModule()\n    }\n}\n```\n\n---\n\n## 3. Spring Boot: Auto-Configuration\n\n**Repository:** `github.com/sg-evals/spring-boot--v3.1.2`\n\n### `JacksonAutoConfiguration`\n\n**File:** [`spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java`](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-boot--v3.1.2/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java)\n\nAnnotated `@AutoConfiguration @ConditionalOnClass(ObjectMapper.class)`. Four inner configuration classes are relevant:\n\n#### 3a. `Jackson2ObjectMapperBuilderCustomizerConfiguration` \u2014 [lines 172\u2013343](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-boot--v3.1.2/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java?L172-343)\n\nDeclares the customizer bean that collects **all `Module` beans** from the application context:\n\n```java\n@Bean\nStandardJackson2ObjectMapperBuilderCustomizer standardJacksonObjectMapperBuilderCustomizer(\n        JacksonProperties jacksonProperties,\n        ObjectProvider<Module> modules) {     // \u2190 auto-detects ALL Module beans\n    return new StandardJackson2ObjectMapperBuilderCustomizer(\n        jacksonProperties,\n        modules.stream().toList());           // \u2190 collected into a list\n}\n```\n\n`ObjectProvider<Module>` is Spring's lazy dependency injection provider for all beans of type `com.fasterxml.jackson.databind.Module` \u2014 including user-defined ones.\n\n#### 3b. `StandardJackson2ObjectMapperBuilderCustomizer.configureModules()` \u2014 [lines 306\u2013308](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-boot--v3.1.2/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java?L306-308)\n\n```java\nprivate void configureModules(Jackson2ObjectMapperBuilder builder) {\n    builder.modulesToInstall(this.modules.toArray(new Module[0]));\n}\n```\n\nThis is the **cross-repository bridge**: Spring Boot hands all discovered `Module` beans to the Spring Framework builder via `modulesToInstall()`. Called from the customizer's `customize()` method at [line 218](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-boot--v3.1.2/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java?L218).\n\n#### 3c. `JacksonObjectMapperBuilderConfiguration` \u2014 [lines 148\u2013170](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-boot--v3.1.2/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java?L148-170)\n\nCreates the `Jackson2ObjectMapperBuilder` prototype bean and applies all customizers:\n\n```java\n@Bean @Scope(\"prototype\") @ConditionalOnMissingBean\nJackson2ObjectMapperBuilder jacksonObjectMapperBuilder(\n        ApplicationContext applicationContext,\n        List<Jackson2ObjectMapperBuilderCustomizer> customizers) {\n    Jackson2ObjectMapperBuilder builder = new Jackson2ObjectMapperBuilder();\n    builder.applicationContext(applicationContext);\n    for (Jackson2ObjectMapperBuilderCustomizer c : customizers) {\n        c.customize(builder);  // applies StandardJackson2ObjectMapperBuilderCustomizer\n    }\n    return builder;\n}\n```\n\n#### 3d. `JacksonObjectMapperConfiguration` \u2014 [lines 123\u2013134](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-boot--v3.1.2/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java?L123-134)\n\n```java\n@Bean @Primary @ConditionalOnMissingBean\nObjectMapper jacksonObjectMapper(Jackson2ObjectMapperBuilder builder) {\n    return builder.createXmlMapper(false).build();\n    // \u2192 build() \u2192 configure() \u2192 registerModules() \u2014 all modules now wired in\n}\n```\n\n#### 3e. Built-in Module beans also auto-collected\n\n| Bean | Class | Condition |\n|---|---|---|\n| `jsonComponentModule` | `JsonComponentModule` | Always ([line 100](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-boot--v3.1.2/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java?L100)) |\n| `jsonMixinModule` | `JsonMixinModule` | Always (via `JacksonMixinConfiguration`) |\n| `parameterNamesModule` | `ParameterNamesModule` | `@ConditionalOnClass(ParameterNamesModule.class)` |\n\nAll three are `Module` instances and are picked up alongside any user-defined modules.\n\n### `JacksonHttpMessageConvertersConfiguration`\n\n**File:** [`spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/http/JacksonHttpMessageConvertersConfiguration.java`](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-boot--v3.1.2/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/http/JacksonHttpMessageConvertersConfiguration.java?L47-54)\n\n```java\n@Bean @ConditionalOnMissingBean(MappingJackson2HttpMessageConverter.class)\nMappingJackson2HttpMessageConverter mappingJackson2HttpMessageConverter(\n        ObjectMapper objectMapper) {\n    return new MappingJackson2HttpMessageConverter(objectMapper);\n    // objectMapper already has all modules registered via the builder\n}\n```\n\n### `WebMvcAutoConfiguration.configureMessageConverters()` \u2014 [lines 223\u2013227](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-boot--v3.1.2/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/web/servlet/WebMvcAutoConfiguration.java?L223-227)\n\n```java\n@Override\npublic void configureMessageConverters(List<HttpMessageConverter<?>> converters) {\n    this.messageConvertersProvider\n        .ifAvailable(customConverters -> converters.addAll(customConverters.getConverters()));\n}\n```\n\nAdds `MappingJackson2HttpMessageConverter` to Spring MVC's converter chain. Every `@RestController` response to a JSON content type uses this converter.\n\n---\n\n## 4. Complete Class/Method Chain\n\n```\n[Application startup \u2014 bean creation phase]\n\n  @Bean MyCustomModule                                          (user code)\n    \u2193 collected by ObjectProvider<Module>\n  JacksonAutoConfiguration\n    .Jackson2ObjectMapperBuilderCustomizerConfiguration\n      .standardJacksonObjectMapperBuilderCustomizer(\n           JacksonProperties, ObjectProvider<Module>)           (Boot: line 178)\n        \u2192 new StandardJackson2ObjectMapperBuilderCustomizer(\n               jacksonProperties, modules.stream().toList())    (Boot: line 180)\n\n  JacksonAutoConfiguration\n    .JacksonObjectMapperBuilderConfiguration\n      .jacksonObjectMapperBuilder(ctx, customizers)             (Boot: line 155)\n        \u2192 new Jackson2ObjectMapperBuilder()\n        \u2192 builder.applicationContext(ctx)\n        \u2192 customizer.customize(builder)                         (Boot: line 166)\n              \u2192 configureModules(builder)                       (Boot: line 218)\n                    \u2192 builder.modulesToInstall(modules[])       (Framework: line 583)\n                          sets this.modules = [MyCustomModule, ...]\n                          sets this.findWellKnownModules = true\n\n  JacksonAutoConfiguration\n    .JacksonObjectMapperConfiguration\n      .jacksonObjectMapper(builder)                             (Boot: line 130)\n        \u2192 builder.createXmlMapper(false).build()\n              \u2192 new ObjectMapper()\n              \u2192 configure(objectMapper)                         (Framework: line 710)\n                    \u2192 registerWellKnownModulesIfAvailable(...)  (JSR-310, etc.)\n                    \u2192 this.modules.forEach(registerModule(...)) (Framework: line 722)\n                    \u2192 objectMapper.registerModules(modules)     (Framework: line 733)\n                          \u2192 ObjectMapper.registerModule(MyCustomModule)  (Jackson: line 842)\n                                \u2192 MyCustomModule.getDependencies() \u2192 register deps\n                                \u2192 MyCustomModule.setupModule(SetupContext)  (Jackson: line 879)\n                                      \u2192 context.addSerializers(...)\n                                            \u2192 _serializerFactory =\n                                                _serializerFactory\n                                                  .withAdditionalSerializers(s)\n\n  JacksonHttpMessageConvertersConfiguration\n    .MappingJackson2HttpMessageConverterConfiguration\n      .mappingJackson2HttpMessageConverter(objectMapper)        (Boot: line 52)\n        \u2192 new MappingJackson2HttpMessageConverter(objectMapper)\n              \u2192 super(objectMapper, APPLICATION_JSON, ...)      (Framework: line 72)\n                    stores objectMapper as this.defaultObjectMapper\n\n  WebMvcAutoConfiguration\n    .configureMessageConverters(converters)                     (Boot: line 223)\n      \u2192 converters.add(mappingJackson2HttpMessageConverter)\n\n[Request handling \u2014 per HTTP request]\n\n  DispatcherServlet.doDispatch(request, response)\n    \u2192 HandlerAdapter.handle(...)\n        \u2192 RequestResponseBodyMethodProcessor\n            \u2192 AbstractMessageConverterMethodProcessor.writeWithMessageConverters(...)\n                \u2192 MappingJackson2HttpMessageConverter.write(...)\n                    \u2192 AbstractJackson2HttpMessageConverter.writeInternal(...)  (Framework: line 439)\n                          \u2192 objectMapper.writer()  [has MyCustomModule's serializers]\n                          \u2192 objectWriter.writeValue(generator, value)\n                                \u2192 MyCustomModule serializer invoked for matching types\n```\n\n---\n\n## Key Invariants\n\n1. **Module deduplication (two layers):** `Jackson2ObjectMapperBuilder.configure()` uses a `MultiValueMap<Object, Module>` keyed by `module.getTypeId()` \u2014 if two modules share a typeId, the last one wins (`modulesToRegister.set(...)`). `ObjectMapper.registerModule()` independently enforces deduplication via `_registeredModuleTypes` when `IGNORE_DUPLICATE_MODULE_REGISTRATIONS` is enabled.\n\n2. **Well-known modules always registered:** `modulesToInstall()` always sets `findWellKnownModules = true`, so even when Spring Boot calls it with user modules, the builder still auto-registers JSR-310 (`JavaTimeModule`), Joda-Time, and Kotlin support if present on the classpath.\n\n3. **Prototype builder scope:** `JacksonObjectMapperBuilderConfiguration` declares the builder bean as `@Scope(\"prototype\")`, so each caller gets a fresh builder. The resulting `ObjectMapper` is a singleton `@Primary` bean shared across all converters.\n\n4. **`@ConditionalOnMissingBean` override points:** At every step \u2014 the builder, the `ObjectMapper`, and the converter \u2014 Boot's conditions allow user overrides. Providing any of these beans directly bypasses auto-configuration at that layer.\n\n## Sources\n\n- [repo:^github.com/sg-evals/jackson-databind registerModule ObjectMapper](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fjackson-databind%20registerModule%20ObjectMapper)\n- [repo:^github.com/sg-evals/spring-framework Jackson2ObjectMapperBuilder modules](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fspring-framework%20Jackson2ObjectMapperBuilder%20modules)\n- [repo:^github.com/sg-evals/spring-boot JacksonAutoConfiguration Module](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fspring-boot%20JacksonAutoConfiguration%20Module)\n- [github.com/sg-evals/jackson-databind--jackson-databind-2.15.2/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java@2b1335d?L800-900](/github.com/sg-evals/jackson-databind--jackson-databind-2.15.2@2b1335d4df63024ca7d4186b461d600ea362b532/-/blob/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java?L800-900)\n- [github.com/sg-evals/spring-boot--v3.1.2/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java@d1b58bb](/github.com/sg-evals/spring-boot--v3.1.2@d1b58bb29ffb16dc5f0f49fc192c2f308a4ffe25/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java)\n- [github.com/sg-evals/spring-framework--v6.0.11/spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java@7521aa1?L1-100](/github.com/sg-evals/spring-framework--v6.0.11@7521aa101577aaa5ceba36ab4d58940fc3e02ab3/-/blob/spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java?L1-100)\n- [github.com/sg-evals/spring-framework--v6.0.11/spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java@7521aa1?L560-720](/github.com/sg-evals/spring-framework--v6.0.11@7521aa101577aaa5ceba36ab4d58940fc3e02ab3/-/blob/spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java?L560-720)\n- [github.com/sg-evals/jackson-databind--jackson-databind-2.15.2/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java@2b1335d?L900-1000](/github.com/sg-evals/jackson-databind--jackson-databind-2.15.2@2b1335d4df63024ca7d4186b461d600ea362b532/-/blob/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java?L900-1000)\n- [repo:^github.com/sg-evals/spring-framework--v6.0.11$ MappingJackson2HttpMessageConverter writeInternal](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fspring-framework--v6.0.11$%20MappingJackson2HttpMessageConverter%20writeInternal)\n- [github.com/sg-evals/spring-framework--v6.0.11/spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java@7521aa1?L720-830](/github.com/sg-evals/spring-framework--v6.0.11@7521aa101577aaa5ceba36ab4d58940fc3e02ab3/-/blob/spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java?L720-830)\n- [github.com/sg-evals/spring-framework--v6.0.11/spring-web/src/main/java/org/springframework/http/converter/json/AbstractJackson2HttpMessageConverter.java@7521aa1?L439-540](/github.com/sg-evals/spring-framework--v6.0.11@7521aa101577aaa5ceba36ab4d58940fc3e02ab3/-/blob/spring-web/src/main/java/org/springframework/http/converter/json/AbstractJackson2HttpMessageConverter.java?L439-540)\n- [repo:^github.com/sg-evals/spring-framework--v6.0.11$ MappingJackson2HttpMessageConverter class constructor objectMapper](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fspring-framework--v6.0.11$%20MappingJackson2HttpMessageConverter%20class%20constructor%20objectMapper)\n- [github.com/sg-evals/spring-framework--v6.0.11/spring-web/src/main/java/org/springframework/http/converter/json/MappingJackson2HttpMessageConverter.java@7521aa1](/github.com/sg-evals/spring-framework--v6.0.11@7521aa101577aaa5ceba36ab4d58940fc3e02ab3/-/blob/spring-web/src/main/java/org/springframework/http/converter/json/MappingJackson2HttpMessageConverter.java)\n- [github.com/sg-evals/jackson-databind--jackson-databind-2.15.2/src/main/java/com/fasterxml/jackson/databind/Module.java@2b1335d?L1-100](/github.com/sg-evals/jackson-databind--jackson-databind-2.15.2@2b1335d4df63024ca7d4186b461d600ea362b532/-/blob/src/main/java/com/fasterxml/jackson/databind/Module.java?L1-100)\n- [repo:^github.com/sg-evals/spring-boot--v3.1.2$ WebMvcAutoConfiguration MappingJackson2HttpMessageConverter](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fspring-boot--v3.1.2$%20WebMvcAutoConfiguration%20MappingJackson2HttpMessageConverter)\n- [repo:^github.com/sg-evals/spring-boot--v3.1.2$ WebMvcAutoConfiguration configureMessageConverters Jackson2ObjectMapperBuilder](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fspring-boot--v3.1.2$%20WebMvcAutoConfiguration%20configureMessageConverters%20Jackson2ObjectMapperBuilder)\n- [github.com/sg-evals/jackson-databind--jackson-databind-2.15.2/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java@2b1335d?L1040-1100](/github.com/sg-evals/jackson-databind--jackson-databind-2.15.2@2b1335d4df63024ca7d4186b461d600ea362b532/-/blob/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java?L1040-1100)\n- [repo:^github.com/sg-evals/spring-boot--v3.1.2$ WebMvcAutoConfiguration.java MappingJackson2HttpMessageConverter](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fspring-boot--v3.1.2$%20WebMvcAutoConfiguration.java%20MappingJackson2HttpMessageConverter)\n- [github.com/sg-evals/spring-boot--v3.1.2/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/http/JacksonHttpMessageConvertersConfiguration.java@d1b58bb](/github.com/sg-evals/spring-boot--v3.1.2@d1b58bb29ffb16dc5f0f49fc192c2f308a4ffe25/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/http/JacksonHttpMessageConvertersConfiguration.java)\n- [github.com/sg-evals/spring-boot--v3.1.2/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/web/servlet/WebMvcAutoConfiguration.java@d1b58bb?L215-260](/github.com/sg-evals/spring-boot--v3.1.2@d1b58bb29ffb16dc5f0f49fc192c2f308a4ffe25/-/blob/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/web/servlet/WebMvcAutoConfiguration.java?L215-260)\n\n\nGenerated files:\n- files/DEPENDENCY_TRACE_content.json: /.api/agent-files/v1/deep-search/9d4be939-e127-4cec-a9e5-9195121a559b/files/DEPENDENCY_TRACE_content.json\n- files/DEPENDENCY_TRACE.csv: /.api/agent-files/v1/deep-search/9d4be939-e127-4cec-a9e5-9195121a559b/files/DEPENDENCY_TRACE.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "dep-traversal-tri-jackson-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4982,
+      "10": 0.6653
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.375,
+    "n_retrieved": 8,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "src/main/java/com/fasterxml/jackson/databind/Module.java",
+    "src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+    "spring-web/src/main/java/org/springframework/http/converter/json/Jackson2ObjectMapperBuilder.java",
+    "spring-web/src/main/java/org/springframework/http/converter/json/MappingJackson2HttpMessageConverter.java",
+    "spring-web/src/main/java/org/springframework/http/converter/json/AbstractJackson2HttpMessageConverter.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/http/JacksonHttpMessageConvertersConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/web/servlet/WebMvcAutoConfiguration.java"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "dep-traversal-tri-jackson-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4982,
+      "10": 0.6653
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.375,
+    "n_retrieved": 8,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

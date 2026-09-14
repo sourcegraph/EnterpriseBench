@@ -1,0 +1,196 @@
+{
+  "task_id": "dep-traversal-tri-boto3-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/boto3--1.28.0",
+    "github.com/sg-evals/s3transfer--0.6.1",
+    "github.com/sg-evals/botocore--1.31.0"
+  ],
+  "retrieved_paths": [
+    "boto3/s3/inject.py",
+    "boto3/s3/transfer.py",
+    "s3transfer/manager.py",
+    "s3transfer/upload.py",
+    "s3transfer/tasks.py",
+    "s3transfer/__init__.py",
+    "botocore/data/s3/2006-03-01/service-2.json",
+    "botocore/client.py",
+    "botocore/endpoint.py",
+    "botocore/config.py"
+  ],
+  "retrieved_paths_union": [
+    "boto3/s3/inject.py",
+    "boto3/s3/transfer.py",
+    "s3transfer/manager.py",
+    "s3transfer/upload.py",
+    "s3transfer/tasks.py",
+    "s3transfer/__init__.py",
+    "botocore/data/s3/2006-03-01/service-2.json",
+    "botocore/client.py",
+    "botocore/endpoint.py",
+    "botocore/config.py"
+  ],
+  "required_files": [
+    "boto3/s3/transfer.py",
+    "s3transfer/manager.py",
+    "botocore/client.py"
+  ],
+  "ir_scores": {
+    "task_id": "dep-traversal-tri-boto3-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.5307,
+      "10": 0.6788
+    },
+    "mrr": 0.5,
+    "map_score": 0.5139,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "dep-traversal-tri-boto3-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.5307,
+      "10": 0.6788
+    },
+    "mrr": 0.5,
+    "map_score": 0.5139,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 21.8,
+  "response_chars": 3622,
+  "raw_response": "I\u2019m unable to write `/workspace/DEPENDENCY_TRACE.md` because the available tools provide repository search/read access only, not filesystem write access.\n\nRelevant files and ranges for constructing the trace:\n\n- [sg-evals/boto3--1.28.0:boto3/s3/inject.py?L105-L149](/r/github.com/sg-evals/boto3--1.28.0/-/blob/boto3/s3/inject.py?L105-L149) - `upload_file` entry point; forwards to `S3Transfer`\n- [sg-evals/boto3--1.28.0:boto3/s3/transfer.py?L150-L243](/r/github.com/sg-evals/boto3--1.28.0/-/blob/boto3/s3/transfer.py?L150-L243) - boto3 `TransferConfig`, aliases, thread configuration\n- [sg-evals/boto3--1.28.0:boto3/s3/transfer.py?L246-L290](/r/github.com/sg-evals/boto3--1.28.0/-/blob/boto3/s3/transfer.py?L246-L290) - `S3Transfer.upload_file` delegates to `TransferManager`\n- [sg-evals/s3transfer--0.6.1:s3transfer/manager.py?L46-L145](/r/github.com/sg-evals/s3transfer--0.6.1/-/blob/s3transfer/manager.py?L46-L145) - orchestration configuration: thresholds, part size, concurrency, queues, memory, bandwidth\n- [sg-evals/s3transfer--0.6.1:s3transfer/manager.py?L300-L335](/r/github.com/sg-evals/s3transfer--0.6.1/-/blob/s3transfer/manager.py?L300-L335) - upload submission and argument validation\n- [sg-evals/s3transfer--0.6.1:s3transfer/upload.py?L245-L249](/r/github.com/sg-evals/s3transfer--0.6.1/-/blob/s3transfer/upload.py?L245-L249) - multipart threshold decision\n- [sg-evals/s3transfer--0.6.1:s3transfer/upload.py?L745-L802](/r/github.com/sg-evals/s3transfer--0.6.1/-/blob/s3transfer/upload.py?L745-L802) - `PutObjectTask` and `UploadPartTask`\n- [sg-evals/s3transfer--0.6.1:s3transfer/tasks.py?L334-L387](/r/github.com/sg-evals/s3transfer--0.6.1/-/blob/s3transfer/tasks.py?L334-L387) - task-based create/complete multipart operations\n- [sg-evals/s3transfer--0.6.1:s3transfer/__init__.py?L373-L445](/r/github.com/sg-evals/s3transfer--0.6.1/-/blob/s3transfer/__init__.py?L373-L445) - multipart initiation, part scheduling, abort-on-error, completion\n- [sg-evals/botocore--1.31.0:botocore/data/s3/2006-03-01/service-2.json?L76-L86](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/data/s3/2006-03-01/service-2.json?L76-L86) - `CreateMultipartUpload` HTTP model\n- [sg-evals/botocore--1.31.0:botocore/data/s3/2006-03-01/service-2.json?L1142-L1155](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/data/s3/2006-03-01/service-2.json?L1142-L1155) - `UploadPart` HTTP model\n- [sg-evals/botocore--1.31.0:botocore/client.py?L994-L1020](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/client.py?L994-L1020) - parameter serialization and request preparation\n- [sg-evals/botocore--1.31.0:botocore/client.py?L950-L992](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/client.py?L950-L992) - endpoint dispatch and response/error handling\n- [sg-evals/botocore--1.31.0:botocore/endpoint.py?L113-L150](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/endpoint.py?L113-L150) - HTTP request creation/preparation\n- [sg-evals/botocore--1.31.0:botocore/endpoint.py?L194-L220](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/endpoint.py?L194-L220) - retry loop and stream reset\n- [sg-evals/botocore--1.31.0:botocore/config.py?L47-L66](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/config.py?L47-L66) - connect/read timeouts and connection pool\n- [sg-evals/botocore--1.31.0:botocore/config.py?L94-L132](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/config.py?L94-L132) - S3 endpoint/addressing/payload-signing options\n- [sg-evals/botocore--1.31.0:botocore/config.py?L135-L163](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/config.py?L135-L163) - retry configuration",
+  "ir_scores_unaligned": {
+    "task_id": "dep-traversal-tri-boto3-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.5307,
+      "10": 0.6788
+    },
+    "mrr": 0.5,
+    "map_score": 0.5139,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "boto3/s3/inject.py",
+    "boto3/s3/transfer.py",
+    "s3transfer/manager.py",
+    "s3transfer/upload.py",
+    "s3transfer/tasks.py",
+    "s3transfer/__init__.py",
+    "botocore/data/s3/2006-03-01/service-2.json",
+    "botocore/client.py",
+    "botocore/endpoint.py",
+    "botocore/config.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "dep-traversal-tri-boto3-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.5307,
+      "10": 0.6788
+    },
+    "mrr": 0.5,
+    "map_score": 0.5139,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

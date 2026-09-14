@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-vitest-vite-optimize-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: vitest/packages/vitest/src/runtime/runVmTests.ts, vitest/packages/vitest/src/node/pool.ts, vite/packages/vite/src/node/optimizer/index.ts, vite/packages/vite/src/node/server/moduleGraph.ts. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify vitest/packages/vitest/src/runtime/runVmTests.ts as part of the error source",
+        "Must identify vitest/packages/vitest/src/node/pool.ts as part of the error source",
+        "Must identify vite/packages/vite/src/node/optimizer/index.ts as part of the error source",
+        "Must identify vite/packages/vite/src/node/server/moduleGraph.ts as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) Vitest's pool runs tests in worker threads that import modules via Vite's transform pipeline; the worker reuses Vite's moduleGraph for cache hits -> (2) On file save, Vite's chokidar handler invalidates the source module in moduleGraph and triggers optimizeDeps to re-pre-bundle if a pre-bundled dependency changed -> (3) optimizeDeps writes a new chunk to node_modules/.vite/deps with an updated metadata.json, but the chunk filename can collide with the previous build until cache key recomputes -> (4) Vitest's worker imports the pre-bundled chunk via the cached URL from moduleGraph; if the worker's previous import handle is still live, it reuses the stale chunk in memory and resolves re-exported symbols against the old binding.",
+      "evaluation_criteria": [
+        "Must describe the step: Vitest's pool runs tests in worker threads that import modules via Vite's transf...",
+        "Must describe the step: On file save, Vite's chokidar handler invalidates the source module in moduleGra...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Customer's tests import a re-exported symbol from a pre-bundled dependency that changes between saves; (2) Vite's optimizeDeps recomputes cache key per content hash; if the hash skips because the change is in a transitive re-export, the chunk is not rewritten; (3) Vitest's worker holds the previous chunk in module cache and does not invalidate it on the new optimizeDeps build.",
+      "evaluation_criteria": [
+        "Must identify the condition: Customer's tests import a re-exported symbol from a pre-bundled dependency that ...",
+        "Must identify the condition: Vite's optimizeDeps recomputes cache key per content hash; if the hash skips bec...",
+        "Must identify the condition: Vitest's worker holds the previous chunk in module cache and does not invalidate...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

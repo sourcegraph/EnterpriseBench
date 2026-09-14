@@ -1,0 +1,73 @@
+{
+  "task_id": "incident-investigation-dual-opa-001",
+  "task_type": "incident_investigation",
+  "repos": [
+    {
+      "url": "https://github.com/open-policy-agent/frameworks",
+      "rev": "v0.20.0",
+      "path": "frameworks"
+    },
+    {
+      "url": "https://github.com/open-policy-agent/opa",
+      "rev": "v0.69.0",
+      "path": "opa"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "constraint/pkg/client/drivers/rego/driver.go",
+      "repo": "frameworks",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "constraint/pkg/client/drivers/rego/compilers.go",
+      "repo": "frameworks",
+      "confidence": 0.90,
+      "source": "deterministic"
+    },
+    {
+      "path": "topdown/eval.go",
+      "repo": "opa",
+      "confidence": 0.90,
+      "source": "deterministic"
+    },
+    {
+      "path": "ast/parser.go",
+      "repo": "opa",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "constraint/pkg/client/drivers/rego/new.go",
+      "repo": "frameworks",
+      "confidence": 0.75
+    },
+    {
+      "path": "rego/rego.go",
+      "repo": "opa",
+      "confidence": 0.80
+    }
+  ],
+  "expected_answer": {
+    "root_cause": "The `frameworks` rego driver in constraint/pkg/client/drivers/rego/driver.go calls rego.New(...) with rego.SetRegoVersion(ast.RegoV0), pinning the Rego language to v0 regardless of what the user's module declares. When a ConstraintTemplate's Rego module includes `import rego.v1`, OPA's parser (ast/parser.go) and topdown/eval.go enforce v1 syntax rules; but the driver-supplied compiler is configured for v0, so the v1-only constructs (`if`, `contains`, `import rego.v1`) are reported as parse/compile errors. The compilers map in compilers.go::addTemplate creates a per-template compiler that does not propagate the module's declared version.",
+    "error_chain": [
+      "User authors a ConstraintTemplate whose Rego source begins with `import rego.v1`",
+      "Gatekeeper's pkg/controller/constrainttemplate/constrainttemplate_controller.go calls cfClient.AddTemplate(ctx, unversionedCT)",
+      "frameworks constraint/pkg/client/drivers/rego/compilers.go::addTemplate builds an ast.Compiler for the template",
+      "When a query is evaluated, frameworks constraint/pkg/client/drivers/rego/driver.go::eval calls rego.New(...) with rego.SetRegoVersion(ast.RegoV0)",
+      "OPA ast/parser.go parses the module under v0 rules and rejects v1-only syntax",
+      "topdown/eval.go would have honored the module's declared version if SetRegoVersion had been omitted or set to RegoV1",
+      "The parse/compile error propagates back through driver.eval to AddTemplate and into the ConstraintTemplate's status condition (ingest_error)"
+    ],
+    "affected_components": [
+      "frameworks rego driver (constraint/pkg/client/drivers/rego/driver.go, compilers.go)",
+      "OPA parser and topdown evaluator (ast/parser.go, topdown/eval.go)",
+      "Gatekeeper ConstraintTemplate controller (pkg/controller/constrainttemplate/)",
+      "All ConstraintTemplate resources whose Rego source declares `import rego.v1`"
+    ],
+    "remediation": "Modify the frameworks rego driver to (a) detect the module's declared Rego version (from its package or first import) and pass the matching ast.RegoVersion into the compiler and rego.SetRegoVersion, OR (b) expose a driver option to override the version (e.g., DriverOpt that accepts ast.RegoV1) and have Gatekeeper plumb it through. Long-term, default to ast.RegoV1 once OPA's v1 line is the supported baseline."
+  }
+}

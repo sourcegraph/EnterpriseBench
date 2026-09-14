@@ -1,0 +1,209 @@
+{
+  "task_id": "schema-evolution-dual-django-001",
+  "policy": "code_finder",
+  "suite": "feature_delivery",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/django--5.0",
+    "github.com/sg-evals/wagtail--v5.2"
+  ],
+  "retrieved_paths": [
+    "django/db/models/fields/generated.py",
+    "docs/releases/5.0.txt",
+    "django/db/backends/base/schema.py",
+    "django/db/models/fields/__init__.py",
+    "django/db/models/options.py",
+    "docs/releases/2.0.txt",
+    "wagtail/models/__init__.py",
+    "wagtail/fields.py",
+    "wagtail/migrations/0075_populate_latest_revision_and_revision_object_str.py",
+    "wagtail/migrations/0008_populate_latest_revision_created_at.py",
+    "wagtail/test/testapp/migrations/0021_remove_non_json_field_streamfields.py",
+    "wagtail/test/testapp/migrations/0015_gallerypage_gallerypageimage.py",
+    "wagtail/test/testapp/migrations/0001_squashed_0073_revisablechildmodel_secret_text.py",
+    "django/db/migrations/executor.py",
+    "docs/ref/migration-operations.txt"
+  ],
+  "retrieved_paths_union": [
+    "django/db/models/fields/generated.py",
+    "docs/releases/5.0.txt",
+    "django/db/backends/base/schema.py",
+    "django/db/models/fields/__init__.py",
+    "django/db/models/options.py",
+    "docs/releases/2.0.txt",
+    "wagtail/models/__init__.py",
+    "wagtail/fields.py",
+    "wagtail/migrations/0075_populate_latest_revision_and_revision_object_str.py",
+    "wagtail/migrations/0008_populate_latest_revision_created_at.py",
+    "wagtail/test/testapp/migrations/0021_remove_non_json_field_streamfields.py",
+    "wagtail/test/testapp/migrations/0015_gallerypage_gallerypageimage.py",
+    "wagtail/test/testapp/migrations/0001_squashed_0073_revisablechildmodel_secret_text.py",
+    "django/db/migrations/executor.py",
+    "docs/ref/migration-operations.txt"
+  ],
+  "required_files": [
+    "django/db/models/fields/__init__.py",
+    "wagtail/models/__init__.py"
+  ],
+  "ir_scores": {
+    "task_id": "schema-evolution-dual-django-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.4685
+    },
+    "mrr": 0.25,
+    "map_score": 0.2679,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1333,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "schema-evolution-dual-django-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.4685
+    },
+    "mrr": 0.25,
+    "map_score": 0.2679,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1333,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 37.1,
+  "response_chars": 6601,
+  "raw_response": "I\u2019m unable to write `/workspace/SCHEMA_IMPACT.md` because this environment only provided repository-search tools, not filesystem write access. Findings so far:\n\n- Django 5.0 introduces `GeneratedField`, with `generated=True`, `db_returning=True`, a custom `contribute_to_class()`, generated-column SQL, backend checks, and restrictions against defaults/editability.  \n  - [django--5.0:django/db/models/fields/generated.py?L11-L72](/r/github.com/sg-evals/django--5.0/-/blob/django/db/models/fields/generated.py?L11-L72)\n  - [django--5.0:docs/releases/5.0.txt?L117-L149](/r/github.com/sg-evals/django--5.0/-/blob/docs/releases/5.0.txt?L117-L149)\n  - [django--5.0:django/db/backends/base/schema.py?L426-L432](/r/github.com/sg-evals/django--5.0/-/blob/django/db/backends/base/schema.py?L426-L432)\n\n- Django\u2019s field registration path is `Field.contribute_to_class()` \u2192 `Options.add_field()`, which sets the model, registers descriptors, updates local/private fields, primary keys, and relation caches. These are the internals Wagtail\u2019s custom metaclass and fields depend on.  \n  - [django--5.0:django/db/models/fields/__init__.py?L947-L969](/r/github.com/sg-evals/django--5.0/-/blob/django/db/models/fields/__init__.py?L947-L969)\n  - [django--5.0:django/db/models/options.py?L337-L369](/r/github.com/sg-evals/django--5.0/-/blob/django/db/models/options.py?L337-L369)\n  - Django\u2019s historical removal of `virtual_only`, `virtual_fields`, and `virtual` handling is documented here: [django--5.0:docs/releases/2.0.txt?L830-L833](/r/github.com/sg-evals/django--5.0/-/blob/docs/releases/2.0.txt?L830-L833)\n\n- Django `Options.contribute_to_class()` copies and serializes `Meta` attributes, then normalizes model options. This affects inherited model metadata, ordering, permissions, unique constraints, and migration state.  \n  - [django--5.0:django/db/models/options.py?L175-L208](/r/github.com/sg-evals/django--5.0/-/blob/django/db/models/options.py?L175-L208)\n\n- Wagtail\u2019s affected model hierarchy:\n  - `PageBase` subclasses Django\u2019s `ModelBase` and performs post-class creation using `cls._meta`, registering concrete page classes.  \n    [wagtail--v5.2:wagtail/models/__init__.py?L221-L251](/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/models/__init__.py?L221-L251)\n  - `Page` inherits `AbstractPage`, `index.Indexed`, and `ClusterableModel`, and uses `PageBase`. Its fields include the multi-table/page hierarchy fields and revision-related fields.  \n    [wagtail--v5.2:wagtail/models/__init__.py?L1120-L1153](/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/models/__init__.py?L1120-L1153)\n  - `RevisionMixin` is a Django abstract model with a `ForeignKey` to `Revision`, plus revision query behavior.  \n    [wagtail--v5.2:wagtail/models/__init__.py?L254-L290](/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/models/__init__.py?L254-L290)\n  - `Orderable` is an abstract Django model with `sort_order` and `Meta.ordering`.  \n    [wagtail--v5.2:wagtail/models/__init__.py?L2682-L2688](/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/models/__init__.py?L2682-L2688)\n  - `StreamField` subclasses `models.Field`, delegates ORM lookup behavior to an internal `JSONField`, and serializes `use_json_field` through `deconstruct()`.  \n    [wagtail--v5.2:wagtail/fields.py?L85-L139](/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/fields.py?L85-L139)\n\n- Impact chain:\n  1. Django field contribution/`Options` changes affect Wagtail\u2019s custom `PageBase`, inherited page fields, parent links, relation-cache invalidation, and migration model-state serialization.\n  2. `Page`\u2019s multi-table inheritance and `ForeignKey`/parent-link assumptions are sensitive to Django\u2019s model-field resolution and related-field validation; failures surface as migration checks or `FieldError`.\n  3. `StreamField` relies on Django field registration, deconstruction, JSON lookups, deferred loading, and admin/API serialization. Its JSON transition must be represented consistently in model state and migrations.\n  4. `RevisionMixin` and `Page` revision queries depend on historical model fields, `Subquery`, `OuterRef`, casts, and generic/reverse relations.\n  5. `Orderable.Meta.ordering` depends on Django\u2019s inherited `Options` metadata and field registration.\n\n- Migration files requiring coordination:\n  - Wagtail\u2019s revision data/state migrations:\n    - [wagtail--v5.2:wagtail/migrations/0075_populate_latest_revision_and_revision_object_str.py?L1-L40](/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/migrations/0075_populate_latest_revision_and_revision_object_str.py?L1-L40)\n    - [wagtail--v5.2:wagtail/migrations/0008_populate_latest_revision_created_at.py?L1-L24](/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/migrations/0008_populate_latest_revision_created_at.py?L1-L24)\n  - Wagtail StreamField JSON migrations:\n    - [wagtail--v5.2:wagtail/test/testapp/migrations/0021_remove_non_json_field_streamfields.py?L11-L60](/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/test/testapp/migrations/0021_remove_non_json_field_streamfields.py?L11-L60)\n  - Wagtail page subclasses and orderable/parent-link migration examples:\n    - [wagtail--v5.2:wagtail/test/testapp/migrations/0015_gallerypage_gallerypageimage.py?L16-L70](/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/test/testapp/migrations/0015_gallerypage_gallerypageimage.py?L16-L70)\n    - [wagtail--v5.2:wagtail/test/testapp/migrations/0001_squashed_0073_revisablechildmodel_secret_text.py?L60-L68](/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/test/testapp/migrations/0001_squashed_0073_revisablechildmodel_secret_text.py?L60-L68)\n  - Django migration internals relevant to generated fields and model-state reuse:\n    - [django--5.0:django/db/migrations/executor.py?L306-L312](/r/github.com/sg-evals/django--5.0/-/blob/django/db/migrations/executor.py?L306-L312)\n    - [django--5.0:docs/ref/migration-operations.txt?L567-L573](/r/github.com/sg-evals/django--5.0/-/blob/docs/ref/migration-operations.txt?L567-L573)\n    - [django--5.0:django/db/backends/base/schema.py?L872-L875](/r/github.com/sg-evals/django--5.0/-/blob/django/db/backends/base/schema.py?L872-L875)\n\nCoordination requirement: upgrade Django first, regenerate/check project migrations under Django 5.0, preserve Wagtail\u2019s existing migration dependencies, ensure every `StreamField` declaration and migration consistently uses `use_json_field=True`, and do not model Wagtail revision or page fields as `GeneratedField` unless a deliberate schema migration adds/removes the generated column with backend support checks.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "schema-evolution-dual-django-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.4685
+    },
+    "mrr": 0.25,
+    "map_score": 0.2679,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1333,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "django/db/models/fields/generated.py",
+    "docs/releases/5.0.txt",
+    "django/db/backends/base/schema.py",
+    "django/db/models/fields/__init__.py",
+    "django/db/models/options.py",
+    "docs/releases/2.0.txt",
+    "wagtail/models/__init__.py",
+    "wagtail/fields.py",
+    "wagtail/migrations/0075_populate_latest_revision_and_revision_object_str.py",
+    "wagtail/migrations/0008_populate_latest_revision_created_at.py",
+    "wagtail/test/testapp/migrations/0021_remove_non_json_field_streamfields.py",
+    "wagtail/test/testapp/migrations/0015_gallerypage_gallerypageimage.py",
+    "wagtail/test/testapp/migrations/0001_squashed_0073_revisablechildmodel_secret_text.py",
+    "django/db/migrations/executor.py",
+    "docs/ref/migration-operations.txt"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "schema-evolution-dual-django-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.4685
+    },
+    "mrr": 0.25,
+    "map_score": 0.2679,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1333,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

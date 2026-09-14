@@ -1,0 +1,33 @@
+{
+  "task_id": "err-provenance-dual-celery-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "Primary error source: celery/app/task.py. Supporting: kombu/connection.py. Surface error: Trace Celery task retry storm to kombu connection pool exhaustion and ConnectionResetError origin.",
+      "evaluation_criteria": [
+        "Must identify celery/app/task.py as part of the error source",
+        "Must identify kombu/connection.py as part of the error source",
+        "Must reference the surface error message ('Trace Celery task retry storm to kombu connection pool exhaustion and Connection') or its origin",
+        "Must reference a specific function, type, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Error propagation chain: (1) Kombu connection pool in kombu/connection.py exhausts available connections to RabbitMQ broker \u2192 (2) New connection attempt fails with ConnectionResetError in kombu/transport/pyamqp.py \u2192 (3) Celery worker catches the ConnectionResetError as a generic Exception in celery/worker/request.py \u2192 (4) Celery autoretry_for=(Exception,) in celery/app/task.py matches ConnectionResetError and schedules retry \u2192 (5) Retry attempts to publish message through kombu which needs a connection from the exhausted pool \u2192 (6) Cycle repeats creating a retry storm until max_retries is reached across all affected tasks.",
+      "evaluation_criteria": [
+        "Must describe the step: 'Kombu connection pool in kombu/connection.py exhausts available connections to R'",
+        "Must describe the propagation: 'Cycle repeats creating a retry storm until max_retries is reached across all aff'",
+        "Must include all intermediate steps in the correct order",
+        "Must reference the chain in causal order (source \u2192 surface)",
+        "Must cite at least one file from the propagation path (e.g. celery/app/task.py)"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) autoretry_for=(Exception,) is too broad and catches broker-level ConnectionResetError alongside task exceptions; (2) Kombu connection pool reaches configured limit due to connection leaks or high concurrency; (3) RabbitMQ server hits max connection limit and resets new connection attempts; (4) Celery retry mechanism does not classify exceptions as task-level vs transport-level before retrying.",
+      "evaluation_criteria": [
+        "Must identify the condition: 'autoretry_for=(Exception,) is too broad and catches broker-level ConnectionReset'",
+        "Must identify the condition: 'Kombu connection pool reaches configured limit due to connection leaks or high c'",
+        "Must identify the condition: 'RabbitMQ server hits max connection limit and resets new connection attempts'",
+        "Must explain the combined conditions necessary to reproduce the error"
+      ]
+    }
+  }
+}

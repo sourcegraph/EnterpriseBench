@@ -1,0 +1,31 @@
+{
+  "task_id": "config-drift-dual-webpack-babel-001",
+  "checkpoints": {
+    "config_valid": {
+      "expected_solution": "Valid drift report covers webpack v5.88.2 and babel v7.23.9. Each drift_points entry must include config_key, webpack_behavior with webpack_source_file (lib/NormalModule.js or lib/rules/RuleSetCompiler.js), babel_behavior with babel_source_file (packages/babel-core/src/config/full.ts or packages/babel-core/src/transformation/index.ts), and an impact statement on build output. The report must be valid JSON.",
+      "evaluation_criteria": [
+        "Must produce valid JSON with a top-level drift_points array",
+        "Must reference webpack-side path lib/NormalModule.js or lib/rules/RuleSetCompiler.js",
+        "Must reference babel-side path packages/babel-core/src/config/full.ts or packages/babel-core/src/transformation/index.ts",
+        "Each drift_point must include config_key, webpack_behavior, webpack_source_file, babel_behavior, babel_source_file, impact"
+      ]
+    },
+    "drift_points": {
+      "expected_solution": "Drift between webpack v5.88.2 loader execution and babel v7.23.9 plugin/preset resolution. (1) Loader execution order: webpack's lib/NormalModule.js orchestrates loader runs in REVERSE order — for `use: [a-loader, b-loader]`, a-loader runs LAST on the module source (right-to-left / bottom-to-top). lib/rules/RuleSetCompiler.js compiles the rules and merges them; multiple matching rules concatenate their `use` arrays in declaration order (with `enforce: 'pre'` and `enforce: 'post'` partitioning). (2) Babel plugin/preset order: packages/babel-core/src/config/full.ts merges plugins and presets per the documented contract — plugins run BEFORE presets; within plugins, first-to-last; within presets, LAST-to-FIRST. packages/babel-core/src/transformation/index.ts orchestrates the actual transform passes. (3) Drift for decorators/class properties: babel-loader runs babel as a single loader pass, so Babel's intra-Babel ordering applies. But when a config splits @babel/plugin-proposal-decorators into its own loader (e.g., decorator-loader before babel-loader), webpack's right-to-left ordering reverses what users expect — the decorator transform runs AFTER class-properties (because babel-loader sits to the right of decorator-loader in the use array, hence runs first). The output differs from configuring both as Babel plugins inside a single .babelrc. (4) `enforce` keyword interaction: webpack's `enforce: 'pre'` and `enforce: 'post'` reorder loaders globally, breaking any assumption that `use` array order alone determines execution.",
+      "evaluation_criteria": [
+        "Must explain webpack's right-to-left / bottom-to-top loader execution order with reference to lib/NormalModule.js",
+        "Must explain Babel's plugins-before-presets and within-presets-last-to-first order with reference to packages/babel-core/src/config/full.ts",
+        "Must call out a concrete order-sensitive case (decorators + class-properties) where the two ordering models produce different output",
+        "Must reference lib/rules/RuleSetCompiler.js for webpack rule merging or packages/babel-core/src/transformation/index.ts for babel pass orchestration"
+      ]
+    },
+    "expected_values": {
+      "expected_solution": "Expected behaviors. webpack: in lib/NormalModule.js, loaders execute right-to-left for the `use` array; lib/rules/RuleSetCompiler.js partitions by `enforce` (pre -> normal -> post) and concatenates within each partition. babel: in packages/babel-core/src/config/full.ts, the merged config runs plugins first (in declaration order, first-to-last), then presets (in REVERSE declaration order, last-to-first); inside packages/babel-core/src/transformation/index.ts each pass walks the AST in plugin/preset order. To eliminate drift, the recommended pattern is: keep ALL Babel transforms inside a single babel-loader (one `.babelrc`/`babel.config.js`) and rely on Babel's documented plugin-vs-preset ordering — do NOT split decorator and class-property transforms across separate webpack loaders, because webpack's loader order does not align with Babel's plugin order. If multiple loaders are unavoidable (e.g., babel-loader + ts-loader + style-loader), document the right-to-left chain explicitly in the webpack config.",
+      "evaluation_criteria": [
+        "Must specify webpack's right-to-left execution rule with reference to lib/NormalModule.js",
+        "Must specify Babel's plugins-first-to-last + presets-last-to-first rule with reference to packages/babel-core/src/config/full.ts",
+        "Must give a concrete fix recommendation (consolidate transforms inside a single babel-loader; or document loader chain explicitly)"
+      ]
+    }
+  }
+}

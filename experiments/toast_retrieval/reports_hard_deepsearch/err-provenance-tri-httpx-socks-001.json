@@ -1,0 +1,189 @@
+{
+  "task_id": "err-provenance-tri-httpx-socks-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/httpx--0.27.0",
+    "github.com/sg-evals/httpcore--1.0.5",
+    "github.com/sg-evals/h11--v0.14.0"
+  ],
+  "retrieved_paths": [
+    "h11/_readers.py",
+    "h11/_util.py",
+    "h11/_abnf.py",
+    "h11/_connection.py",
+    "httpx/_transports/default.py",
+    "httpcore/_async/socks_proxy.py",
+    "httpcore/_async/http11.py"
+  ],
+  "retrieved_paths_union": [
+    "h11/_readers.py",
+    "h11/_util.py",
+    "h11/_abnf.py",
+    "h11/_connection.py",
+    "httpx/_transports/default.py",
+    "httpcore/_async/socks_proxy.py",
+    "httpcore/_async/http11.py"
+  ],
+  "required_files": [
+    "httpx/httpx/_transports/default.py",
+    "httpcore/httpcore/_async/socks_proxy.py",
+    "httpcore/httpcore/_async/http11.py",
+    "h11/h11/_readers.py",
+    "h11/h11/_connection.py"
+  ],
+  "ir_scores": {
+    "task_id": "err-provenance-tri-httpx-socks-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.6,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.2,
+      "5": 0.6,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.25,
+      "5": 0.6,
+      "10": 0.6667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.6164,
+      "10": 0.8503
+    },
+    "mrr": 1.0,
+    "map_score": 0.6962,
+    "file_recall": 1.0,
+    "context_efficiency": 0.7143,
+    "n_retrieved": 7,
+    "n_ground_truth": 5,
+    "n_overlap": 5
+  },
+  "ir_scores_union": {
+    "task_id": "err-provenance-tri-httpx-socks-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.6,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.2,
+      "5": 0.6,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.25,
+      "5": 0.6,
+      "10": 0.6667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.6164,
+      "10": 0.8503
+    },
+    "mrr": 1.0,
+    "map_score": 0.6962,
+    "file_recall": 1.0,
+    "context_efficiency": 0.7143,
+    "n_retrieved": 7,
+    "n_ground_truth": 5,
+    "n_overlap": 5
+  },
+  "elapsed_seconds": 142.7,
+  "response_chars": 12320,
+  "raw_response": "---\ntitle: Tracing httpx \u201cillegal header line\u201d through a SOCKS5 tunnel and exonerating the transport\nshare_url: https://demo.sourcegraph.com/deepsearch/e7cc18cc-7987-440b-82af-ea8404cb4a34\nurl: https://demo.sourcegraph.com/deepsearch/2239\ncreated: 2026-08-18T02:13:48Z\nupdated: 2026-08-18T02:15:08Z\n---\n\n# # Trace 'illegal header line' from an httpx client behind a SOCKS5 tunnel to its origin and exonerate the tunnel\n\nA customer integrates with a legacy vendor appliance (\"LegacyGW\") that lives\non an isolated management network. Developers reach it through an SSH dynamic\nport-forward used as a SOCKS5 proxy:\n\n    ssh -D 1080 -N jump.example-corp.net\n\n    client = httpx.AsyncClient(proxy=\"socks5://localhost:1080\")\n    resp = await client.get(\"http://legacygw.mgmt.internal:8080/api/status\")\n\nEvery single request fails with:\n\n    httpx.RemoteProtocolError: illegal header line: bytearray(b'X-Gw-Status : OK')\n\nWhat has convinced the customer this is a proxy bug: the exact same request\nthrough the exact same tunnel works from curl:\n\n    curl --socks5-hostname localhost:1080 http://legacygw.mgmt.internal:8080/api/status\n\nprints the JSON body without complaint. The customer has filed this as\n\"httpx SOCKS support corrupts response bytes\" and wants it fixed. The\nappliance vendor is unresponsive, and nobody has explained where the message\n\"illegal header line\" even comes from.\n\nYour task:\n\n1. Locate the exact origin of the message text \"illegal header line\" --\n   which repository, file, and function produce it, the validation helper\n   that formats it, and the compiled grammar regex the header line is\n   matched against.\n2. Resolve the exception-class paradox: the raising site constructs a\n   LocalProtocolError, yet the exception the customer catches is a\n   RemoteProtocolError. Find the mechanism that performs this conversion,\n   the file that defines it, and the except-block that invokes it.\n3. Trace the SOCKS transport path and show the tunnel is NOT corrupting\n   bytes: the httpx AsyncHTTPTransport branch selected for socks5:// proxy\n   URLs, the httpcore SOCKS proxy pool and per-connection class, the SOCKS5\n   handshake helper, and the point after tunnel establishment where the\n   plain HTTP/1.1 connection layer and its parser state machine take over.\n   Cite files and classes at each step.\n4. State the actual trigger: which byte sequence in the appliance's response\n   violates which grammar rule (look at the whitespace around the colon in\n   the quoted header), and why curl accepts the same response. Give the\n   support engineer a defensible verdict: is this an httpx bug, and what\n   are the customer's realistic options?\n\n- Source files across all three repositories on the failure path\n- The exception conversion mechanism, named exactly\n- The transport chain proving the SOCKS layer hands off before parsing\n\nIn answer.json, alongside your analysis fields, include a top-level\n\"citations\" list with one entry per cited file:\n{\"repo\": ..., \"file\": ..., \"evidence_span\": ...} -- where \"repo\" is the\nrepository directory (httpx, httpcore, or h11), \"file\" is the path inside\nthat repository, and \"evidence_span\" is a verbatim excerpt copied from the\ncited file (at least 20 characters). Paraphrased or fabricated spans fail\nverification.\n\n\nSearch only these repositories: github.com/sg-evals/httpx--0.27.0, github.com/sg-evals/httpcore--1.0.5, github.com/sg-evals/h11--v0.14.0\n\nThe `answer.json` is attached above. Here is the full analysis:\n\n---\n\n## 1. Origin of \"illegal header line\"\n\n**Repository:** `h11--v0.14.0`  \n**File:** [`h11/_readers.py`, line 68](https://demo.sourcegraph.com/_r/github.com/sg-evals/h11--v0.14.0/-/blob/h11/_readers.py?L68)  \n**Function:** `_decode_header_lines`\n\n```python\nmatches = validate(header_field_re, line, \"illegal header line: {!r}\", line)\n```\n\n**Validation helper:** `validate()` in [`h11/_util.py`](https://demo.sourcegraph.com/_r/github.com/sg-evals/h11--v0.14.0/-/blob/h11/_util.py?L84-L92) \u2014 calls `regex.fullmatch(data)`; on mismatch formats the message with `*format_args` and raises `LocalProtocolError(msg)`.\n\n**The compiled grammar regex** is `header_field_re = re.compile(header_field.encode(\"ascii\"))` (line 39 of `_readers.py`), where `header_field` is assembled in [`h11/_abnf.py`](https://demo.sourcegraph.com/_r/github.com/sg-evals/h11--v0.14.0/-/blob/h11/_abnf.py?L63-L70):\n\n```python\nheader_field = (\n    r\"(?P<field_name>{field_name})\"   # token: [-!#$%&'*+.^_`|~0-9a-zA-Z]+\n    r\":\"                               # literal colon \u2014 NO whitespace allowed before it\n    r\"{OWS}\"                           # optional whitespace after colon\n    r\"(?P<field_value>{field_value})\"\n    r\"{OWS}\".format(**globals())\n)\n```\n\n`field_name = token = r\"[-!#$%&'*+.^_`|~0-9a-zA-Z]+\"` \u2014 whitespace is not a valid token character.\n\n---\n\n## 2. Exception-class paradox resolved\n\nh11 internally always raises `LocalProtocolError` (even for errors in data received from the remote peer). The single public receive API, `receive_data()` / `next_event()`, catches all exceptions and converts them in [`h11/_connection.py` lines 484-487](https://demo.sourcegraph.com/_r/github.com/sg-evals/h11--v0.14.0/-/blob/h11/_connection.py?L484-L487):\n\n```python\nexcept BaseException as exc:\n    self._process_error(self.their_role)\n    if isinstance(exc, LocalProtocolError):\n        exc._reraise_as_remote_protocol_error()\n    else:\n        raise\n```\n\nThe conversion mechanism is **`_reraise_as_remote_protocol_error()`**, defined in [`h11/_util.py` lines 60-77](https://demo.sourcegraph.com/_r/github.com/sg-evals/h11--v0.14.0/-/blob/h11/_util.py?L60-L77):\n\n```python\ndef _reraise_as_remote_protocol_error(self) -> NoReturn:\n    self.__class__ = RemoteProtocolError  # mutates the in-flight object's class\n    raise self                            # re-raises with new type visible to caller\n```\n\nThis is why the customer catches `httpx.RemoteProtocolError` even though the raise site in `_decode_header_lines` says `LocalProtocolError`.\n\n---\n\n## 3. SOCKS transport chain \u2014 the tunnel does NOT corrupt bytes\n\n| Step | Class / function | File |\n|---|---|---|\n| **1. httpx selects SOCKS transport** | `AsyncHTTPTransport.__init__`: `proxy.url.scheme == \"socks5\"` \u2192 `self._pool = httpcore.AsyncSOCKSProxy(...)` | [`httpx/_transports/default.py` L311-333](https://demo.sourcegraph.com/_r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_transports/default.py?L311-L333) |\n| **2. httpcore SOCKS pool** | `AsyncSOCKSProxy(AsyncConnectionPool)` \u2014 overrides `create_connection()` to return `AsyncSocks5Connection` | [`httpcore/_async/socks_proxy.py` L104-187](https://demo.sourcegraph.com/_r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/socks_proxy.py?L104-L187) |\n| **3. Per-connection class** | `AsyncSocks5Connection.handle_async_request` \u2014 opens raw TCP to proxy server | [`httpcore/_async/socks_proxy.py` L217-300](https://demo.sourcegraph.com/_r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/socks_proxy.py?L217-L300) |\n| **4. SOCKS5 handshake** | `_init_socks5_connection()` \u2014 purely binary SOCKS5 auth + CONNECT via `socksio`; zero HTTP parsing | [`httpcore/_async/socks_proxy.py` L41-101](https://demo.sourcegraph.com/_r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/socks_proxy.py?L41-L101) |\n| **5. Hand-off to HTTP/1.1 layer** | After `_init_socks5_connection()` returns, `AsyncSocks5Connection` creates `AsyncHTTP11Connection(origin=remote_origin, stream=stream)` and delegates | [`httpcore/_async/socks_proxy.py` L289-293](https://demo.sourcegraph.com/_r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/socks_proxy.py?L289-L293) |\n| **6. HTTP/1.1 parser state machine** | `AsyncHTTP11Connection._receive_event()` calls `h11_state.next_event()` \u2192 h11 parses raw bytes from the (now unmodified) stream | [`httpcore/_async/http11.py` L219-221](https://demo.sourcegraph.com/_r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http11.py?L219-L221) |\n\nThe SOCKS layer is **completely finished** before a single byte of the HTTP response is interpreted. The stream object passed to `AsyncHTTP11Connection` is the same raw socket that received the bytes from LegacyGW.\n\n---\n\n## 4. Actual trigger and defensible verdict\n\n**Offending byte sequence:** `b'X-Gw-Status : OK'` \u2014 there is a **space before the colon**.\n\n**Rule violated:** RFC 7230 \u00a73.2 `header-field = field-name \":\" OWS field-value OWS`. `field-name` must be a `token` (`[-!#$%&'*+.^_`|~0-9a-zA-Z]+`), followed *immediately* by `:`. The space in `X-Gw-Status ` is not a token character, so `fullmatch` against `header_field_re` fails.\n\n**Why curl accepts it:** `libcurl` is deliberately lenient \u2014 it trims whitespace around both field-name and field-value before processing and does not enforce the token grammar on *received* headers. This is a known intentional permissiveness in libcurl.\n\n**Verdict: this is NOT an httpx/h11 bug.** The appliance sends a non-RFC-7230-conformant header. h11 strictly enforces the standard; that strictness is intentional and correct. The SOCKS5 tunnel is fully exonerated.\n\n**Customer's realistic options:**\n1. **Fix the appliance** \u2014 request vendor firmware update to emit `X-Gw-Status: OK` (no space before colon).\n2. **Use a lenient client** \u2014 switch to `requests` (urllib3) or `aiohttp`, which tolerate this deviation, while keeping the same SSH SOCKS5 tunnel.\n3. **Local reverse proxy** \u2014 add an nginx `proxy_pass` that rewrites the header before httpx sees it.\n4. **Pre-processing shim** \u2014 subclass `AsyncHTTP11Connection` / monkey-patch httpcore to strip spaces from header-name bytes before handing them to h11 (fragile stopgap).\n\n## Sources\n\n- [illegal header line repo:sg-evals](/search?q=patterntype:keyword%20illegal%20header%20line%20repo:sg-evals)\n- [RemoteProtocolError LocalProtocolError repo:sg-evals](/search?q=patterntype:keyword%20RemoteProtocolError%20LocalProtocolError%20repo:sg-evals)\n- [socks5 proxy transport repo:sg-evals/httpx--0.27.0](/search?q=patterntype:keyword%20socks5%20proxy%20transport%20repo:sg-evals%2Fhttpx--0.27.0)\n- [github.com/sg-evals/h11--v0.14.0/h11/_util.py@270c515](/github.com/sg-evals/h11--v0.14.0@270c51553c58d3393878ba8ae89a8c336457572a/-/blob/h11/_util.py)\n- [illegal header line _readers.py repo:sg-evals/h11--v0.14.0](/search?q=patterntype:keyword%20illegal%20header%20line%20_readers.py%20repo:sg-evals%2Fh11--v0.14.0)\n- [_reraise_as_remote_protocol_error repo:sg-evals](/search?q=patterntype:keyword%20_reraise_as_remote_protocol_error%20repo:sg-evals)\n- [github.com/sg-evals/h11--v0.14.0/h11/_readers.py@270c515?L1-120](/github.com/sg-evals/h11--v0.14.0@270c51553c58d3393878ba8ae89a8c336457572a/-/blob/h11/_readers.py?L1-120)\n- [github.com/sg-evals/h11--v0.14.0/h11/_connection.py@270c515?L475-500](/github.com/sg-evals/h11--v0.14.0@270c51553c58d3393878ba8ae89a8c336457572a/-/blob/h11/_connection.py?L475-500)\n- [github.com/sg-evals/h11--v0.14.0/h11/_abnf.py@270c515](/github.com/sg-evals/h11--v0.14.0@270c51553c58d3393878ba8ae89a8c336457572a/-/blob/h11/_abnf.py)\n- [github.com/sg-evals/httpx--0.27.0/httpx/_transports/default.py@3a7d067?L155-200](/github.com/sg-evals/httpx--0.27.0@3a7d0672239ee8b616ccf2861607b21bc9598a05/-/blob/httpx/_transports/default.py?L155-200)\n- [SOCKSProxy AsyncSOCKSProxy repo:sg-evals/httpcore--1.0.5](/search?q=patterntype:keyword%20SOCKSProxy%20AsyncSOCKSProxy%20repo:sg-evals%2Fhttpcore--1.0.5)\n- [github.com/sg-evals/httpcore--1.0.5/httpcore/_async/socks_proxy.py@21db646](/github.com/sg-evals/httpcore--1.0.5@21db64629e9da54f3cc544c0ec9c68bfbc1491d8/-/blob/httpcore/_async/socks_proxy.py)\n- [github.com/sg-evals/httpx--0.27.0/httpx/_transports/default.py@3a7d067?L280-350](/github.com/sg-evals/httpx--0.27.0@3a7d0672239ee8b616ccf2861607b21bc9598a05/-/blob/httpx/_transports/default.py?L280-350)\n- [github.com/sg-evals/httpcore--1.0.5/httpcore/_async/http11.py@21db646?L210-250](/github.com/sg-evals/httpcore--1.0.5@21db64629e9da54f3cc544c0ec9c68bfbc1491d8/-/blob/httpcore/_async/http11.py?L210-250)\n- [github.com/sg-evals/h11--v0.14.0/h11/_connection.py@270c515?L440-490](/github.com/sg-evals/h11--v0.14.0@270c51553c58d3393878ba8ae89a8c336457572a/-/blob/h11/_connection.py?L440-490)\n\n\nGenerated files:\n- files/answer.json: /.api/agent-files/v1/deep-search/e7cc18cc-7987-440b-82af-ea8404cb4a34/files/answer.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "err-provenance-tri-httpx-socks-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.2,
+      "5": 0.4,
+      "10": 0.4
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.25,
+      "5": 0.4,
+      "10": 0.2667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4852,
+      "10": 0.4852
+    },
+    "mrr": 1.0,
+    "map_score": 0.3,
+    "file_recall": 0.4,
+    "context_efficiency": 0.2857,
+    "n_retrieved": 7,
+    "n_ground_truth": 5,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "h11/h11/_readers.py",
+    "h11/_util.py",
+    "h11/_abnf.py",
+    "h11/h11/_connection.py",
+    "httpx/httpx/_transports/default.py",
+    "httpcore/httpcore/_async/socks_proxy.py",
+    "httpcore/httpcore/_async/http11.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "err-provenance-tri-httpx-socks-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.2,
+      "5": 0.4,
+      "10": 0.4
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.25,
+      "5": 0.4,
+      "10": 0.2667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4852,
+      "10": 0.4852
+    },
+    "mrr": 1.0,
+    "map_score": 0.3,
+    "file_recall": 0.4,
+    "context_efficiency": 0.2857,
+    "n_retrieved": 7,
+    "n_ground_truth": 5,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

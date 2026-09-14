@@ -60,7 +60,12 @@ from pathlib import Path
 from typing import Any
 
 from analyze_scores import parse_result
-from lib.shared import VALID_MODES, load_task_index, strip_mode_suffix
+from lib.shared import (
+    VALID_MODES,
+    load_task_index,
+    split_variant_label,
+    strip_mode_suffix,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -84,7 +89,7 @@ logger = logging.getLogger(__name__)
 # refuse an unknown version rather than reading a missing key through
 # ``.get(key, 0)`` and rendering a plausible $0.00 — the failure class
 # lib/eb_verify/scorer_guard.py exists to forbid, applied to the cost artifact.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # How ``select_attempt`` picks the one attempt that represents a (task_id, mode)
 # cell. Published in the report so a reader never has to infer it.
@@ -254,6 +259,7 @@ class TaskCost:
     run_dir: str
     normalized_score: float | None
     trace_timestamp: str = ""
+    variant_label: str | None = None
 
     @property
     def cell(self) -> tuple[str, str]:
@@ -659,32 +665,34 @@ def _get_task_meta(task_id: str, benchmarks_root: Path) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
-def _parse_dir_identity(dir_path: Path) -> tuple[str, str]:
-    """Infer (task_id, mode) from a results directory path.
+def _parse_dir_identity(dir_path: Path) -> tuple[str, str, str | None]:
+    """Infer (task_id, mode, variant_label) from a results directory path.
 
-    - results/runs/<task_id>/<mode>/     -> multi-mode layout (new)
-    - results/runs/<task_id>/            -> mode = "baseline" (legacy)
-    - results/mcp_batch*/<id>_<mode>/    -> parse mode from suffix
+    - results/runs/<task_id>/<mode>--<label>/ -> labeled multi-mode layout
+    - results/runs/<task_id>/<mode>/           -> multi-mode layout
+    - results/runs/<task_id>/                  -> baseline (legacy)
+    - results/mcp_batch*/<id>_<mode>/          -> parse mode from suffix
     """
 
     name = dir_path.name
     parent_name = dir_path.parent.name
     grandparent_name = dir_path.parent.parent.name if dir_path.parent.parent else ""
 
-    # Multi-mode layout: results/runs/<task_id>/<mode>/
-    if name in ("baseline", "mcp_only", "hybrid") and grandparent_name == "runs":
-        return parent_name, name
+    # Multi-mode layout: results/runs/<task_id>/<mode>[--<label>]/
+    mode, variant_label = split_variant_label(name)
+    if mode in VALID_MODES and grandparent_name == "runs":
+        return parent_name, mode, variant_label
 
     # Legacy single-mode: results/runs/<task_id>/
     if parent_name == "runs":
-        return name, "baseline"
+        return name, "baseline", None
 
     task_id, mode = strip_mode_suffix(name)
     # strip_mode_suffix defaults to "baseline" when no suffix found;
     # for non-runs directories without a suffix, treat as "unknown".
     if mode == "baseline" and not name.endswith("_baseline"):
-        return name, "unknown"
-    return task_id, mode
+        return name, "unknown", None
+    return task_id, mode, None
 
 
 def _attempt_score(
@@ -757,7 +765,7 @@ def scan_results_dirs(
 
         for trace_path in sorted(root_dir.rglob("agent_trace.jsonl")):
             task_dir = trace_path.parent
-            task_id, mode = _parse_dir_identity(task_dir)
+            task_id, mode, variant_label = _parse_dir_identity(task_dir)
             meta = _get_task_meta(task_id, benchmarks_root)
 
             # The trace is parsed unconditionally: it is the tier-2 cost when there
@@ -812,6 +820,7 @@ def scan_results_dirs(
                     run_dir=_run_dir_label(task_dir, root),
                     normalized_score=score,
                     trace_timestamp=scan.last_timestamp,
+                    variant_label=variant_label,
                 )
             )
 
@@ -1033,7 +1042,11 @@ def comparison_attempts(costs: list[TaskCost]) -> ComparisonSet:
     either shape. ``invalid_attempts`` enumerates it, with its run_dir and cost.
     """
 
-    in_scope = [tc for tc in costs if tc.mode in VALID_MODES]
+    in_scope = [
+        tc
+        for tc in costs
+        if tc.mode in VALID_MODES and tc.variant_label is None
+    ]
     cells = _group_by(in_scope, attrgetter("cell"))
 
     selected = {cell: pick for cell, items in cells.items()
@@ -1127,6 +1140,7 @@ def _attempt_row(tc: TaskCost) -> dict[str, Any]:
     return {
         "task_id": tc.task_id,
         "mode": tc.mode,
+        "variant_label": tc.variant_label,
         "suite": tc.suite,
         "difficulty": tc.difficulty,
         "run_dir": tc.run_dir,
@@ -1174,6 +1188,17 @@ def aggregate_report(costs: list[TaskCost]) -> dict[str, Any]:
 
     comparison = comparison_attempts(costs)
     ordered = sorted(costs, key=lambda c: (c.task_id, c.mode, c.run_dir))
+    excluded_variant_labeled_attempts = [
+        {
+            "task_id": tc.task_id,
+            "mode": tc.mode,
+            "variant_label": tc.variant_label,
+            "run_dir": tc.run_dir,
+            "cost_usd": tc.cost_usd,
+        }
+        for tc in ordered
+        if tc.variant_label is not None
+    ]
 
     # Only the trace-derived population is exposed to PRICING, so only it can be
     # mispriced. An unpriced model here is billed at DEFAULT_MODEL rates, and such
@@ -1222,10 +1247,13 @@ def aggregate_report(costs: list[TaskCost]) -> dict[str, Any]:
             # array fields are read back as lists by every consumer and test.
             "modes": list(comparison.modes),
             "excluded_unmatched_task_ids": list(comparison.excluded_task_ids),
+            "excluded_variant_labeled_attempts": excluded_variant_labeled_attempts,
             **_buckets(comparison.rows, TASKS_IN_ARM, TASKS_ACROSS_ARMS, reconcile=False),
             "per_cell": [_attempt_row(tc) for tc in comparison.rows],
         },
-        "duplicate_attempts": _duplicate_attempts(costs),
+        "duplicate_attempts": _duplicate_attempts(
+            [tc for tc in costs if tc.variant_label is None]
+        ),
         "invalid_attempts": _invalid_attempts(ordered),
         "per_attempt": [_attempt_row(tc) for tc in ordered],
     }

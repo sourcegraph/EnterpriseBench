@@ -1,0 +1,214 @@
+{
+  "task_id": "incident-investigation-dual-opa-001",
+  "policy": "deepsearch",
+  "suite": "incident_response",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/frameworks--v0.20.0",
+    "github.com/sg-evals/opa--v0.69.0"
+  ],
+  "retrieved_paths": [
+    "constraint/pkg/client/drivers/rego/schema/schema.go",
+    "constraint/pkg/client/drivers/rego/compilers.go",
+    "ast/parser_ext.go",
+    "ast/rego_v1.go",
+    "ast/policy.go",
+    "constraint/pkg/client/drivers/rego/driver.go",
+    "constraint/pkg/client/client.go",
+    "constraint/pkg/regorewriter/regorewriter.go",
+    "constraint/pkg/client/errors/errors.go",
+    "ast/parser.go",
+    "constraint/pkg/core/templates/constrainttemplate_types.go",
+    "constraint/pkg/client/drivers/rego/schema",
+    "github.com/sg-evals/frameworks--v0.20.0",
+    "github.com/sg-evals/opa--v0.69.0",
+    "regorewriter/regorewriter.go",
+    "client/errors/errors.go"
+  ],
+  "retrieved_paths_union": [
+    "constraint/pkg/client/drivers/rego/schema/schema.go",
+    "constraint/pkg/client/drivers/rego/compilers.go",
+    "ast/parser_ext.go",
+    "ast/rego_v1.go",
+    "ast/policy.go",
+    "constraint/pkg/client/drivers/rego/driver.go",
+    "constraint/pkg/client/client.go",
+    "constraint/pkg/regorewriter/regorewriter.go",
+    "constraint/pkg/client/errors/errors.go",
+    "ast/parser.go",
+    "constraint/pkg/core/templates/constrainttemplate_types.go",
+    "constraint/pkg/client/drivers/rego/schema",
+    "github.com/sg-evals/frameworks--v0.20.0",
+    "github.com/sg-evals/opa--v0.69.0",
+    "regorewriter/regorewriter.go",
+    "client/errors/errors.go"
+  ],
+  "required_files": [
+    "constraint/pkg/client/drivers/rego/driver.go",
+    "constraint/pkg/client/drivers/rego/compilers.go",
+    "topdown/eval.go",
+    "ast/parser.go"
+  ],
+  "ir_scores": {
+    "task_id": "incident-investigation-dual-opa-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.2463,
+      "10": 0.4982
+    },
+    "mrr": 0.5,
+    "map_score": 0.2833,
+    "file_recall": 0.75,
+    "context_efficiency": 0.1875,
+    "n_retrieved": 16,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "incident-investigation-dual-opa-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.2463,
+      "10": 0.4982
+    },
+    "mrr": 0.5,
+    "map_score": 0.2833,
+    "file_recall": 0.75,
+    "context_efficiency": 0.1875,
+    "n_retrieved": 16,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 330.6,
+  "response_chars": 17683,
+  "raw_response": "---\ntitle: OPA Gatekeeper rejects ConstraintTemplates using import rego.v1\nshare_url: https://demo.sourcegraph.com/deepsearch/80dd3a96-2583-47ab-b955-43bbe44c27fc\nurl: https://demo.sourcegraph.com/deepsearch/2232\ncreated: 2026-08-18T02:08:24Z\nupdated: 2026-08-18T02:13:19Z\n---\n\n# # Incident: Gatekeeper rejects ConstraintTemplates that import rego.v1\n\n## Alert\n\nAfter upgrading the cluster to OPA Gatekeeper v3.17.1, several\nConstraintTemplates fail to install. Their pod-level status conditions show\n`ingest_error` with messages that look like Rego parse errors:\n\n```\nrego_parse_error: var cannot be used for rule name\n    package my.constraint\n                ^\nrego_compile_error: rules must not shadow builtin\n  metadata.name (use a different name)\n```\n\n## Symptoms\n\n- Templates that include `import rego.v1` (modern Rego v1 syntax) fail\n  ingestion.\n- Templates without that import install cleanly.\n- The same Rego files compile and evaluate without error using the standalone\n  `opa eval` binary that ships with OPA v0.69.0/v1.0.x.\n- New templates work; the failure is independent of constraint resources or\n  user input \u2014 it happens at template-compile time inside the constraint\n  framework.\n\n## Environment\n\n- `/workspace/frameworks/` \u2014 `open-policy-agent/frameworks` at the constraint\n  module tag pinned by Gatekeeper v3.17.1's `go.mod`.\n- `/workspace/opa/` \u2014 `open-policy-agent/opa` at v0.69.0.\n\nBoth are Go projects. The failure lives at the seam between how the\nconstraint framework compiles a ConstraintTemplate's Rego and how OPA parses\nand evaluates it; you will need to read both repos to locate it.\n\n## What I need\n\nInvestigate the two codebases and write an incident report grounded in the\nactual code \u2014 cite the specific files and functions you found, not general\nRego-version theory.\n\n1. **Root cause** \u2014 find the file and function in `frameworks` that pins the\n   Rego language version used at template-compile time, AND the OPA-side\n   file(s) that decide whether v1 syntax is accepted. Cite each by path.\n2. **Error chain** \u2014 trace the v1-import template from submission into the\n   constraint framework through to parse-time rejection, at least three hops,\n   each tied to a code path you identified.\n3. **Affected components** \u2014 identify every component across both repos that\n   participates in compiling and evaluating a ConstraintTemplate's Rego.\n4. **Remediation** \u2014 propose a concrete, code-grounded fix and say which\n   repo and file it belongs in.\n\n## Output\n\nWrite your incident report to `/workspace/frameworks/INCIDENT_REPORT.md`.\n\n\nSearch only these repositories: github.com/sg-evals/frameworks--v0.20.0, github.com/sg-evals/opa--v0.69.0\n\nThe incident report has been written. Here is the full content, which reflects the actual code paths found in both repositories:\n\n---\n\n# Incident Report: Gatekeeper Rejects ConstraintTemplates That Import `rego.v1`\n\n**Repos:** `github.com/sg-evals/frameworks--v0.20.0` \u00b7 `github.com/sg-evals/opa--v0.69.0`\n\n---\n\n## 1. Root Cause\n\nTwo interlocking defects \u2014 one in each repo.\n\n### 1a. frameworks \u2014 silent version default + two-way switch\n\n**[`schema/schema.go:74\u201380`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/schema/schema.go?L74-L80)** \u2014 `GetSource` silently coerces a missing or blank `source.version` field to the string `\"v0\"`:\n```go\nif !found || version == \"\" {\n    version = \"v0\"   // silent default\n}\n```\n\n**[`compilers.go:165\u2013172`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/compilers.go?L165-L172)** \u2014 `parseConstraintTemplateTarget` maps that string through a two-arm switch:\n```go\nswitch regoSrc.Version {\ncase \"v1\":\n    version = ast.RegoV1\ndefault:\n    version = ast.RegoV0   // \"v0\" lands here\n}\n```\n`ast.RegoV0` is then passed to every [`parseModule`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/compilers.go?L250-L253) call:\n```go\nmodule, err := ast.ParseModuleWithOpts(path, rego, ast.ParserOptions{\n    RegoVersion: version,   // ast.RegoV0\n})\n```\n\n### 1b. OPA \u2014 `import rego.v1` auto-upgrades the module and triggers strict v1 validation\n\n**[`ast/parser_ext.go:698\u2013700`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/parser_ext.go?L698-L700)** \u2014 internal `parseModule` upgrades the module's effective version to `RegoV0CompatV1` the moment it sees `import rego.v1`, even if the parser was invoked with `RegoV0`:\n```go\nif mod.regoVersion == RegoV0 && Compare(stmt.Path.Value, RegoV1CompatibleRef) == 0 {\n    mod.regoVersion = RegoV0CompatV1\n}\n```\n\n**[`ast/parser_ext.go:728\u2013733`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/parser_ext.go?L728-L733)** \u2014 once upgraded, every rule is subjected to `CheckRegoV1`:\n```go\nif mod.regoVersion == RegoV0CompatV1 || mod.regoVersion == RegoV1 {\n    for _, rule := range mod.Rules { errs = append(errs, CheckRegoV1(r)...) }\n}\n```\n\n**[`ast/rego_v1.go:186\u2013207`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/rego_v1.go?L186-L207)** \u2014 `checkRegoV1Rule` enforces:\n- `NoKeywordsAsRuleNames` ([`ast/policy.go:119\u2013135`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/policy.go?L119-L135)): v1 keywords `if`, `contains`, `in`, `every` cannot be rule names \u2192 `rego_parse_error: var cannot be used for rule name`\n- `NoRootDocumentOverrides` ([`ast/rego_v1.go:26\u201337`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/rego_v1.go?L26-L37)): rules shadowing `data`, `input`, `metadata` \u2192 `rego_compile_error: rules must not shadow builtin`\n- `RequireIfKeyword` / `RequireContainsKeyword`: missing `if`/`contains` in rule heads\n\n### 1c. Secondary defect \u2014 evaluation also hardcoded to v0\n\n**[`driver.go:227`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/driver.go?L227)** \u2014 `Driver.eval` unconditionally passes `ast.RegoV0` at query time regardless of how the template was compiled.\n\n---\n\n## 2. Error Chain\n\n| Hop | Location | What happens |\n|-----|----------|--------------|\n| 1 | [`client.go:196`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/client.go?L196) | `Client.AddTemplate` selects the Rego driver, calls `driver.AddTemplate` |\n| 2 | [`driver.go:120`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/driver.go?L120) \u2192 [`compilers.go:37`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/compilers.go?L37) | `Driver.AddTemplate` \u2192 `Compilers.addTemplate` \u2192 `parseConstraintTemplate`; `GetSource` sets `Version=\"v0\"` |\n| 3 | [`compilers.go:165\u2013176`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/compilers.go?L165-L176) | Version switch maps `\"v0\"` \u2192 `ast.RegoV0`; calls `parseModule`; error wrapped as `ErrInvalidConstraintTemplate` |\n| 4 | [`ast/parser_ext.go:494\u2013500`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/parser_ext.go?L494-L500) \u2192 [`698\u2013733`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/parser_ext.go?L698-L733) \u2192 [`rego_v1.go:186`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/rego_v1.go?L186) | `ParseModuleWithOpts` receives `RegoV0`; internal `parseModule` sees `import rego.v1`, upgrades to `RegoV0CompatV1`, fires `CheckRegoV1` \u2192 parse errors propagate to pod `ingest_error` status |\n\n---\n\n## 3. Affected Components\n\n**frameworks**\n\n| Component | File |\n|---|---|\n| `Client.AddTemplate` | [`constraint/pkg/client/client.go:117`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/client.go?L117) |\n| `schema.GetSource` | [`schema/schema.go:55\u201392`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/schema/schema.go?L55-L92) |\n| `parseConstraintTemplateTarget` | [`compilers.go:147\u2013226`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/compilers.go?L147-L226) |\n| `parseModule` (frameworks) | [`compilers.go:250\u2013264`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/compilers.go?L250-L264) |\n| `compileTemplateTarget` | [`compilers.go:228\u2013247`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/compilers.go?L228-L247) |\n| `Compilers.addTemplate` | [`compilers.go:34\u201377`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/compilers.go?L34-L77) |\n| `Driver.AddTemplate` / `Driver.eval` | [`driver.go:102\u2013246`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/driver.go?L102-L246) |\n| `RegoRewriter` | [`regorewriter/regorewriter.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/regorewriter/regorewriter.go) |\n| Error sentinels | [`client/errors/errors.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/errors/errors.go) |\n\n**OPA**\n\n| Component | File |\n|---|---|\n| `RegoVersion` constants | [`ast/parser.go:31\u201346`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/parser.go?L31-L46) |\n| `ParserOptions.RegoVersion` | [`ast/parser.go:145\u2013161`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/parser.go?L145-L161) |\n| `ParseModuleWithOpts` | [`ast/parser_ext.go:494\u2013500`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/parser_ext.go?L494-L500) |\n| internal `parseModule` | [`ast/parser_ext.go:671\u2013740`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/parser_ext.go?L671-L740) |\n| `CheckRegoV1` / `checkRegoV1Rule` | [`ast/rego_v1.go:153\u2013208`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/rego_v1.go?L153-L208) |\n| `checkRootDocumentOverrides` | [`ast/rego_v1.go:26\u201364`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/rego_v1.go?L26-L64) |\n| `KeywordsV1` / `IsKeywordInRegoVersion` | [`ast/policy.go:119\u2013178`](https://demo.sourcegraph.com/r/github.com/sg-evals/opa--v0.69.0/-/blob/ast/policy.go?L119-L178) |\n\n---\n\n## 4. Remediation\n\nAll fixes are in the **frameworks** repo. OPA's behaviour is correct and requires no change.\n\n### Fix 1 (primary) \u2014 [`compilers.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/compilers.go?L165-L172)\n\nChange the default arm from `ast.RegoV0` to `ast.RegoV0CompatV1`. This matches the behaviour of `opa eval` and accepts both pure v0 modules and v0 modules that use `import rego.v1`:\n\n```go\n// BEFORE\ndefault:\n    version = ast.RegoV0\n\n// AFTER\ncase \"v0\", \"\":\n    version = ast.RegoV0CompatV1\ndefault:\n    version = ast.RegoV0CompatV1\n```\n\n### Fix 2 (secondary) \u2014 [`schema/schema.go:78\u201380`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/schema/schema.go?L78-L80)\n\nRemove the silent `\"v0\"` coercion so the version field arrives at the switch as an empty string, consolidating defaulting logic in one place:\n\n```go\n// BEFORE\nif !found || version == \"\" { version = \"v0\" }\n\n// AFTER\n// leave version as \"\" when absent; switch in compilers.go handles the default\n```\n\n### Fix 3 (tertiary) \u2014 [`driver.go:227`](https://demo.sourcegraph.com/r/github.com/sg-evals/frameworks--v0.20.0/-/blob/constraint/pkg/client/drivers/rego/driver.go?L227)\n\nRemove the hardcoded `rego.SetRegoVersion(ast.RegoV0)` from `Driver.eval`, or store the effective version per template kind during `AddTemplate` and pass it through at eval time. The compiled `ast.Compiler` already carries per-module version information; overriding it at evaluation with a fixed `RegoV0` is incorrect.\n\n---\n\n## Summary\n\nAuthors writing `import rego.v1` in their Rego source do not set `source.version: v1` in the ConstraintTemplate spec (no documentation or admission webhook requires them to). `GetSource` silently coerces the absent field to `\"v0\"`; the two-arm switch maps that to `ast.RegoV0`; `ParseModuleWithOpts` receives `RegoV0` but OPA's internal `parseModule` auto-upgrades to `RegoV0CompatV1` on sight of the import and runs `CheckRegoV1`, rejecting any rule name or body that violates v1 restrictions. The standalone `opa eval` binary does not reproduce the failure because it defaults to `RegoV0CompatV1` or higher. The fix is to change the default `ast.RegoVersion` in `compilers.go` from `RegoV0` to `RegoV0CompatV1`.\n\n## Sources\n\n- [github.com/sg-evals/frameworks--v0.20.0/constraint/pkg/client/drivers/rego/compilers.go@a6ddbcb](/github.com/sg-evals/frameworks--v0.20.0@a6ddbcbb72d6a939320f537d348a29a0c788d560/-/blob/constraint/pkg/client/drivers/rego/compilers.go)\n- [github.com/sg-evals/opa--v0.69.0/ast/parser_ext.go@ffb78c1?L640-740](/github.com/sg-evals/opa--v0.69.0@ffb78c1211692ff741d628946e5234641a420ec5/-/blob/ast/parser_ext.go?L640-740)\n- [github.com/sg-evals/frameworks--v0.20.0/constraint/pkg/client/drivers/rego/driver.go@a6ddbcb?L200-260](/github.com/sg-evals/frameworks--v0.20.0@a6ddbcbb72d6a939320f537d348a29a0c788d560/-/blob/constraint/pkg/client/drivers/rego/driver.go?L200-260)\n- [github.com/sg-evals/opa--v0.69.0/ast/parser.go@ffb78c1?L28-80](/github.com/sg-evals/opa--v0.69.0@ffb78c1211692ff741d628946e5234641a420ec5/-/blob/ast/parser.go?L28-80)\n- [github.com/sg-evals/opa--v0.69.0/ast/rego_v1.go@ffb78c1?L128-220](/github.com/sg-evals/opa--v0.69.0@ffb78c1211692ff741d628946e5234641a420ec5/-/blob/ast/rego_v1.go?L128-220)\n- [github.com/sg-evals/frameworks--v0.20.0/constraint/pkg/client/client.go@a6ddbcb?L100-160](/github.com/sg-evals/frameworks--v0.20.0@a6ddbcbb72d6a939320f537d348a29a0c788d560/-/blob/constraint/pkg/client/client.go?L100-160)\n- [github.com/sg-evals/frameworks--v0.20.0/constraint/pkg/core/templates/constrainttemplate_types.go@a6ddbcb](/github.com/sg-evals/frameworks--v0.20.0@a6ddbcbb72d6a939320f537d348a29a0c788d560/-/blob/constraint/pkg/core/templates/constrainttemplate_types.go)\n- [github.com/sg-evals/frameworks--v0.20.0/constraint/pkg/client/drivers/rego/driver.go@a6ddbcb?L1-100](/github.com/sg-evals/frameworks--v0.20.0@a6ddbcbb72d6a939320f537d348a29a0c788d560/-/blob/constraint/pkg/client/drivers/rego/driver.go?L1-100)\n- [github.com/sg-evals/frameworks--v0.20.0/constraint/pkg/client/drivers/rego/schema@a6ddbcb](/github.com/sg-evals/frameworks--v0.20.0@a6ddbcbb72d6a939320f537d348a29a0c788d560/-/blob/constraint/pkg/client/drivers/rego/schema)\n- [github.com/sg-evals/opa--v0.69.0/ast/parser_ext.go@ffb78c1?L480-510](/github.com/sg-evals/opa--v0.69.0@ffb78c1211692ff741d628946e5234641a420ec5/-/blob/ast/parser_ext.go?L480-510)\n- [github.com/sg-evals/frameworks--v0.20.0/constraint/pkg/client/drivers/rego/schema/schema.go@a6ddbcb](/github.com/sg-evals/frameworks--v0.20.0@a6ddbcbb72d6a939320f537d348a29a0c788d560/-/blob/constraint/pkg/client/drivers/rego/schema/schema.go)\n- [github.com/sg-evals/frameworks--v0.20.0/constraint/pkg/client/drivers/rego/driver.go@a6ddbcb?L100-200](/github.com/sg-evals/frameworks--v0.20.0@a6ddbcbb72d6a939320f537d348a29a0c788d560/-/blob/constraint/pkg/client/drivers/rego/driver.go?L100-200)\n- [github.com/sg-evals/opa--v0.69.0/ast/policy.go@ffb78c1?L137-180](/github.com/sg-evals/opa--v0.69.0@ffb78c1211692ff741d628946e5234641a420ec5/-/blob/ast/policy.go?L137-180)\n- [github.com/sg-evals/opa--v0.69.0/ast/policy.go@ffb78c1?L95-137](/github.com/sg-evals/opa--v0.69.0@ffb78c1211692ff741d628946e5234641a420ec5/-/blob/ast/policy.go?L95-137)\n- [github.com/sg-evals/frameworks--v0.20.0/constraint/pkg/regorewriter/regorewriter.go@a6ddbcb?L1-90](/github.com/sg-evals/frameworks--v0.20.0@a6ddbcbb72d6a939320f537d348a29a0c788d560/-/blob/constraint/pkg/regorewriter/regorewriter.go?L1-90)\n- [github.com/sg-evals/opa--v0.69.0/ast/rego_v1.go@ffb78c1?L1-130](/github.com/sg-evals/opa--v0.69.0@ffb78c1211692ff741d628946e5234641a420ec5/-/blob/ast/rego_v1.go?L1-130)\n- [github.com/sg-evals/frameworks--v0.20.0/constraint/pkg/client/errors/errors.go@a6ddbcb](/github.com/sg-evals/frameworks--v0.20.0@a6ddbcbb72d6a939320f537d348a29a0c788d560/-/blob/constraint/pkg/client/errors/errors.go)\n- [github.com/sg-evals/frameworks--v0.20.0/constraint/pkg/client/client.go@a6ddbcb?L160-230](/github.com/sg-evals/frameworks--v0.20.0@a6ddbcbb72d6a939320f537d348a29a0c788d560/-/blob/constraint/pkg/client/client.go?L160-230)\n- [github.com/sg-evals/frameworks--v0.20.0/constraint/pkg/client/drivers/rego/compilers.go@a6ddbcb?L228-265](/github.com/sg-evals/frameworks--v0.20.0@a6ddbcbb72d6a939320f537d348a29a0c788d560/-/blob/constraint/pkg/client/drivers/rego/compilers.go?L228-265)\n- [github.com/sg-evals/opa--v0.69.0/ast/parser_ext.go@ffb78c1?L491-500](/github.com/sg-evals/opa--v0.69.0@ffb78c1211692ff741d628946e5234641a420ec5/-/blob/ast/parser_ext.go?L491-500)\n\n\nGenerated files:\n- files/INCIDENT_REPORT_content.json: /.api/agent-files/v1/deep-search/80dd3a96-2583-47ab-b955-43bbe44c27fc/files/INCIDENT_REPORT_content.json\n- files/INCIDENT_REPORT.csv: /.api/agent-files/v1/deep-search/80dd3a96-2583-47ab-b955-43bbe44c27fc/files/INCIDENT_REPORT.csv\n- files/INCIDENT_REPORT_md.json: /.api/agent-files/v1/deep-search/80dd3a96-2583-47ab-b955-43bbe44c27fc/files/INCIDENT_REPORT_md.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "incident-investigation-dual-opa-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.2463,
+      "10": 0.4982
+    },
+    "mrr": 0.5,
+    "map_score": 0.2833,
+    "file_recall": 0.75,
+    "context_efficiency": 0.1875,
+    "n_retrieved": 16,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "constraint/pkg/client/drivers/rego/schema/schema.go",
+    "constraint/pkg/client/drivers/rego/compilers.go",
+    "ast/parser_ext.go",
+    "ast/rego_v1.go",
+    "ast/policy.go",
+    "constraint/pkg/client/drivers/rego/driver.go",
+    "constraint/pkg/client/client.go",
+    "constraint/pkg/regorewriter/regorewriter.go",
+    "constraint/pkg/client/errors/errors.go",
+    "ast/parser.go",
+    "constraint/pkg/core/templates/constrainttemplate_types.go",
+    "constraint/pkg/client/drivers/rego/schema",
+    "github.com/sg-evals/frameworks--v0.20.0",
+    "github.com/sg-evals/opa--v0.69.0",
+    "regorewriter/regorewriter.go",
+    "client/errors/errors.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "incident-investigation-dual-opa-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.2463,
+      "10": 0.4982
+    },
+    "mrr": 0.5,
+    "map_score": 0.2833,
+    "file_recall": 0.75,
+    "context_efficiency": 0.1875,
+    "n_retrieved": 16,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

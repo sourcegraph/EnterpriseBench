@@ -39,10 +39,15 @@ def _maximal_namespace() -> argparse.Namespace:
     return argparse.Namespace(
         source="mirror",
         agent="claude",
+        harness="claude",
+        model="claude-sonnet-4-6",
         timeout=60,
         account="3",
+        judge_model="cc:haiku",
+        judge_account=1,
         mode="hybrid",
         dry_run=True,
+        variant_label="p3",
     )
 
 
@@ -55,6 +60,8 @@ def test_producer_emits_exactly_the_contract() -> None:
     """collect_passthrough_args must emit exactly PASSTHROUGH_FLAGS — no drift."""
     emitted = {tok for tok in _forwarded_argv() if tok.startswith("--")}
     assert emitted == set(PASSTHROUGH_FLAGS)
+    assert "--judge-model" in emitted
+    assert "--judge-account" in emitted
 
 
 # (build_parser, positional args) for every runner run_benchmark dispatches to.

@@ -1,0 +1,205 @@
+{
+  "task_id": "support-mapping-dual-envoy-istio-xds-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.29.4",
+    "github.com/sg-evals/istio--1.21.1"
+  ],
+  "retrieved_paths": [
+    "source/extensions/config_subscription/grpc/grpc_mux_impl.cc",
+    "source/common/listener_manager/lds_api.cc",
+    "source/common/listener_manager/listener_manager_impl.cc",
+    "source/common/listener_manager/listener_impl.h",
+    "pilot/pkg/networking/core/configgen.go",
+    "pilot/pkg/bootstrap/discovery.go",
+    "pilot/pkg/model/xds_cache.go",
+    "pilot/pkg/xds/discovery.go",
+    "pilot/pkg/xds/ads.go",
+    "pilot/pkg/xds/xdsgen.go",
+    "pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/delta.go",
+    "source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.cc"
+  ],
+  "retrieved_paths_union": [
+    "source/extensions/config_subscription/grpc/grpc_mux_impl.cc",
+    "source/common/listener_manager/lds_api.cc",
+    "source/common/listener_manager/listener_manager_impl.cc",
+    "source/common/listener_manager/listener_impl.h",
+    "pilot/pkg/networking/core/configgen.go",
+    "pilot/pkg/bootstrap/discovery.go",
+    "pilot/pkg/model/xds_cache.go",
+    "pilot/pkg/xds/discovery.go",
+    "pilot/pkg/xds/ads.go",
+    "pilot/pkg/xds/xdsgen.go",
+    "pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/delta.go",
+    "source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.cc"
+  ],
+  "required_files": [
+    "envoy/source/common/listener_manager/listener_manager_impl.cc",
+    "envoy/source/common/listener_manager/listener_impl.cc",
+    "istio/pilot/pkg/xds/ads.go",
+    "istio/pilot/pkg/xds/lds.go"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-envoy-istio-xds-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.1952,
+      "10": 0.3127
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2071,
+    "file_recall": 0.75,
+    "context_efficiency": 0.2308,
+    "n_retrieved": 13,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-envoy-istio-xds-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.1952,
+      "10": 0.3127
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2071,
+    "file_recall": 0.75,
+    "context_efficiency": 0.2308,
+    "n_retrieved": 13,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 146.6,
+  "response_chars": 21665,
+  "raw_response": "---\ntitle: Investigate Istio ADS/LDS push order causing Envoy listener drain and 503 spikes\nshare_url: https://demo.sourcegraph.com/deepsearch/f994740e-8d12-4884-89c5-70ce11e040ce\nurl: https://demo.sourcegraph.com/deepsearch/2211\ncreated: 2026-08-18T01:53:56Z\nupdated: 2026-08-18T01:55:03Z\n---\n\n# # Map customer Istio listener drain timing 503 spikes during xDS push to the Envoy ListenerManager / Istio Pilot ADS push-order boundary\n\nA customer reports that during routine Istio Pilot config pushes their\nservice mesh sees brief 503 spikes for ~5 seconds on existing\nconnections, even for unchanged listeners. The spikes correlate with\nADS push events; the listener_manager logs show drain_in_progress\nbut no listener config actually changed.\n\nYour task:\n1. Find where Envoy's ListenerManager processes an LDS update and\n   decides whether to drain existing listeners.\n2. Find where Istio Pilot generates the ADS resource set and the\n   ordering between LDS, RDS, CDS, and EDS resources for a config\n   change.\n3. Trace the cross-repo path: Pilot ConfigGenerator -> ADS Push ->\n   Envoy XdsManager -> ListenerManager addOrUpdateListener ->\n   ConnectionHandler drain. Cite each file and the function or\n   attribute responsible.\n4. Identify why Pilot's full-snapshot ADS push (vs delta-xDS) can\n   send LDS resources with the same hash but a new version, causing\n   Envoy to re-process them and trigger a drain even when nothing\n   changed.\n\n\nSearch only these repositories: github.com/sg-evals/envoy--v1.29.4, github.com/sg-evals/istio--1.21.1\n\nI now have all the information needed for a complete, well-cited answer.\n\n---\n\n## Cross-Repo Path: Pilot ADS Push -> Envoy ListenerManager Drain\n\n### 1. Envoy: LDS Update to Listener Drain\n\n#### Subscription entry point: `GrpcMuxImpl::onDiscoveryResponse`\n\n[`source/extensions/config_subscription/grpc/grpc_mux_impl.cc:264`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/extensions/config_subscription/grpc/grpc_mux_impl.cc?L264-336)\n\nWhen Envoy's SotW ADS stream receives a `DiscoveryResponse`, `GrpcMuxImpl::onDiscoveryResponse` decodes each resource in the message and calls `processDiscoveryResources`, then dispatches to any registered `Watch` callbacks. For LDS, the registered watch callback is `LdsApiImpl`.\n\n#### LDS callback: `LdsApiImpl::onConfigUpdate`\n\n[`source/common/listener_manager/lds_api.cc:43`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/lds_api.cc?L43-141)\n\nTwo overloads exist:\n- The **delta** overload (line 44) receives explicit add/remove sets.\n- The **SotW** overload (line 122) computes removals itself by diffing current `WARMING | ACTIVE` listeners against the response set, then calls the delta overload.\n\nFor every resource in `added_resources`, it calls `listener_manager_.addOrUpdateListener(listener, resource.get().version(), true)` (line 93). Note: `resource.get().version()` is the **per-resource version string from the xDS response**, not a content hash.\n\nCritically, before processing, it pauses RDS and SDS updates via `cm_.adsMux()->pause(...)` (line 53) \u2014 but does **not** suppress re-processing of an already-applied listener.\n\n#### Hash-based deduplication: `addOrUpdateListenerInternal`\n\n[`source/common/listener_manager/listener_manager_impl.cc:529`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_manager_impl.cc?L529-628)\n\nThis is the critical function. At line 541:\n\n```cpp\nconst uint64_t hash = MessageUtil::hash(config);\n```\n\nIt then calls `blockUpdate(hash)` on any existing warming or active listener:\n\n```cpp\n// listener_impl.h:238\nbool blockUpdate(uint64_t new_hash) { return new_hash == hash_ || !added_via_api_; }\n```\n\n[`source/common/listener_manager/listener_impl.h:238`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_impl.h?L237-239)\n\n**`blockUpdate` returns `true` (skip update) only if the proto hash matches the stored hash.** If `blockUpdate` returns `false` \u2014 meaning the hashes differ \u2014 the listener proceeds down the full update path (line 578\u2013616), which:\n\n1. Creates a new `ListenerImpl` (line 580).\n2. Moves the existing active listener into `warming_listeners_` (line 599).\n3. Calls `new_listener_ref.initialize()` to begin warming (line 626).\n\n#### Drain triggered: `onListenerWarmed`\n\n[`source/common/listener_manager/listener_manager_impl.cc:764`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_manager_impl.cc?L764-794)\n\nOnce the warming listener completes (filter chain init), `onListenerWarmed` is called. At line 785\u2013787:\n\n```cpp\nauto listener = std::move(*existing_active_listener);\n*existing_active_listener = std::move(*existing_warming_listener);\ndrainListener(std::move(listener));\n```\n\n#### `drainListener`\n\n[`source/common/listener_manager/listener_manager_impl.cc:640`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_manager_impl.cc?L640-683)\n\nThe old active listener is moved to `draining_listeners_`. `stopListener` is called to stop accepting new connections, then `localDrainManager().startDrainSequence(...)` begins the drain timer. Existing connections continue to drain for the server-configured drain period (default: 45 s, `--drain-time-s`). During this window, Envoy may return 503s on connections that are mid-request when the connection handler shuts down their read filters.\n\n---\n\n### 2. Istio Pilot: ConfigGenerator -> ADS Push Ordering\n\n#### ConfigGenerator interface\n\n[`pilot/pkg/networking/core/configgen.go:27`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/networking/core/configgen.go?L27-50)\n\nDefines `BuildListeners`, `BuildClusters`/`BuildDeltaClusters`, `BuildHTTPRoutes`. Each is implemented in `v1alpha3/`.\n\n#### Generator registration\n\n[`pilot/pkg/bootstrap/discovery.go:36`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/bootstrap/discovery.go?L36-68)\n\n```go\ngenerators[v3.ClusterType]  = &xds.CdsGenerator{ConfigGenerator: cg}\ngenerators[v3.ListenerType] = &xds.LdsGenerator{ConfigGenerator: cg}\ngenerators[v3.RouteType]    = &xds.RdsGenerator{ConfigGenerator: cg}\ngenerators[v3.EndpointType] = edsGen\n```\n\n**LDS has no XdsCache entry.** CDS, RDS, EDS, and SDS all have cache entries (`XdsCacheImpl` at [`pilot/pkg/model/xds_cache.go:27`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/model/xds_cache.go?L27-32) covers `cds`, `eds`, `rds`, `sds` \u2014 no LDS type). `LdsGenerator.Generate` always calls `ConfigGenerator.BuildListeners` on every full push.\n\n#### Full push: version bump\n\n[`pilot/pkg/xds/discovery.go:254`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/discovery.go?L254-282)\n\n```go\nfunc (s *DiscoveryServer) Push(req *model.PushRequest) {\n    if !req.Full {\n        req.Push = s.globalPushContext()\n        s.dropCacheForRequest(req)\n        s.AdsPushAll(req)\n        return\n    }\n    versionLocal := s.NextVersion()          // always increments\n    push, err := s.initPushContext(req, oldPushContext, versionLocal)\n    ...\n    req.Push = push\n    s.AdsPushAll(req)\n}\n```\n\n[`pilot/pkg/xds/discovery.go:609`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/discovery.go?L609-611):\n\n```go\nfunc (s *DiscoveryServer) NextVersion() string {\n    return time.Now().Format(time.RFC3339) + \"/\" + strconv.FormatUint(s.pushVersion.Inc(), 10)\n}\n```\n\n**Every full push produces a new `PushVersion`, unconditionally.** This becomes the `VersionInfo` field of every `DiscoveryResponse` sent.\n\n#### Push ordering: `PushOrder`\n\n[`pilot/pkg/xds/ads.go:778`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/ads.go?L776-787):\n\n```go\nvar PushOrder = []string{v3.ClusterType, v3.EndpointType, v3.ListenerType, v3.RouteType, v3.SecretType}\n```\n\n`pushConnection` at line 742 calls `pushDetails()` \u2192 `orderWatchedResources()` which orders watched resources per `PushOrder`. So for a full push, the sequence sent is: **CDS \u2192 EDS \u2192 LDS \u2192 RDS \u2192 SDS**.\n\n#### Per-resource push: `pushXds` / `LdsGenerator.Generate`\n\n[`pilot/pkg/xds/xdsgen.go:96`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/xdsgen.go?L96-188)\n\nThe `DiscoveryResponse` is built as:\n\n```go\nresp := &discovery.DiscoveryResponse{\n    TypeUrl:     w.TypeUrl,\n    VersionInfo: req.Push.PushVersion,   // global version, always new on full push\n    Nonce:       nonce(req.Push.LedgerVersion),\n    Resources:   model.ResourcesToAny(res),\n}\n```\n\n[`pilot/pkg/xds/lds.go:96`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/lds.go?L96-109): `LdsGenerator.Generate` calls `BuildListeners` and wraps each listener as `protoconv.MessageToAny(c)`. There is no diff or hash comparison against the last-sent state here \u2014 the full set is always regenerated and sent.\n\n---\n\n### 3. Root Cause: Why Unchanged Listeners Trigger Drain\n\nThe bug lives at the intersection of two design decisions:\n\n#### Pilot side: `VersionInfo` always changes, content never diffed\n\nOn a full push, Pilot assigns a new `PushVersion` (timestamp + counter) to every `DiscoveryResponse`, including the LDS response. Even if no listener configuration changed, `LdsGenerator.Generate` regenerates all listeners from scratch (no LDS caching) and sends them all in a response with the **new version string**. The response body \u2014 the listener protos \u2014 may be byte-for-byte identical to the previous push.\n\n#### Envoy side: `blockUpdate` tests proto hash, but only against the stored listener hash\n\nIn `addOrUpdateListenerInternal` ([line 541\u2013566](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_manager_impl.cc?L541-566)), Envoy computes `MessageUtil::hash(config)` from the **proto bytes** and checks `blockUpdate(hash)`. This check correctly short-circuits when the proto content is identical \u2014 **but only if Envoy already has that listener in its active or warming state** with a matching hash.\n\n#### The gap: `version_info` vs proto hash\n\nThe `LdsApiImpl::onConfigUpdate` (SotW overload, [line 122](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/lds_api.cc?L122-141)) receives decoded resources. The `DecodedResourceImpl::fromResource` stores `message->version_info()` as the resource version. This version string is **not** what `blockUpdate` checks \u2014 `blockUpdate` checks the proto hash. So if the proto bytes are the same, `blockUpdate` will correctly return `true` and skip the update.\n\n**The actual trigger is subtler:** Pilot's `initPushContext` calls `dropCacheForRequest` ([line 506](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/discovery.go?L506)), which calls `s.Cache.ClearAll()` when `ConfigsUpdated` is empty (e.g. a forced full resync). After cache clear, `BuildListeners` re-executes all listener construction, including `EnvoyFilter` patches. If any `EnvoyFilter` patch is non-deterministic (e.g. uses `time.Now()`, random UUIDs in metadata, or dynamically-resolved addresses), the re-generated listener proto will differ from the previously-active hash even though no user-visible config changed. This produces a new `MessageUtil::hash(config)` \u2192 `blockUpdate` returns `false` \u2192 the listener enters warming \u2192 the active listener is drained.\n\nAdditionally, **full pushes clear and rebuild the PushContext** ([line 262\u2013272](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/discovery.go?L262-282)), which recomputes all service and sidecar scope relationships. Any sidecar scope or service reordering that changes list ordering in the listener proto (even ephemerally) will flip the hash.\n\n---\n\n### Summary: Full Call Chain\n\n| Step | Repo | File | Symbol |\n|---|---|---|---|\n| Config change triggers push | istio | [`pilot/pkg/xds/discovery.go:296`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/discovery.go?L296-306) | `DiscoveryServer.ConfigUpdate` \u2192 `pushChannel` |\n| Debounce & full push decision | istio | [`pilot/pkg/xds/discovery.go:254`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/discovery.go?L254-282) | `DiscoveryServer.Push` \u2192 `NextVersion()` + `initPushContext` |\n| Fan-out to all connections | istio | [`pilot/pkg/xds/ads.go:866`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/ads.go?L866-882) | `AdsPushAll` \u2192 `StartPush` \u2192 enqueue per-connection |\n| Per-connection ordered push | istio | [`pilot/pkg/xds/ads.go:742`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/ads.go?L742-774) | `pushConnection` \u2192 `pushDetails` (CDS\u2192EDS\u2192LDS\u2192RDS) |\n| LDS resource generation | istio | [`pilot/pkg/xds/lds.go:96`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/lds.go?L96-109) | `LdsGenerator.Generate` \u2192 `BuildListeners` (no cache) |\n| Response sent with new version | istio | [`pilot/pkg/xds/xdsgen.go:147`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/xdsgen.go?L147-154) | `pushXds`: `VersionInfo: req.Push.PushVersion` |\n| Envoy receives LDS response | envoy | [`source/extensions/config_subscription/grpc/grpc_mux_impl.cc:264`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/extensions/config_subscription/grpc/grpc_mux_impl.cc?L264-336) | `GrpcMuxImpl::onDiscoveryResponse` |\n| Dispatched to LDS callback | envoy | [`source/common/listener_manager/lds_api.cc:43`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/lds_api.cc?L43-120) | `LdsApiImpl::onConfigUpdate` \u2192 `addOrUpdateListener` |\n| Hash check (blockUpdate) | envoy | [`source/common/listener_manager/listener_manager_impl.cc:541`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_manager_impl.cc?L541-566) | `addOrUpdateListenerInternal`: `MessageUtil::hash` vs `blockUpdate` |\n| Hash mismatch \u2192 warming | envoy | [`source/common/listener_manager/listener_manager_impl.cc:597`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_manager_impl.cc?L597-599) | `warming_listeners_.emplace_back(new_listener)` |\n| Warm complete \u2192 drain active | envoy | [`source/common/listener_manager/listener_manager_impl.cc:785`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_manager_impl.cc?L782-794) | `onListenerWarmed` \u2192 `drainListener` |\n| Drain sequence | envoy | [`source/common/listener_manager/listener_manager_impl.cc:640`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_manager_impl.cc?L640-683) | `drainListener`: `stopListener` + `startDrainSequence` \u2192 503s |\n\n---\n\n### Mitigations\n\n1. **Migrate to delta-xDS (ALPN `h2`)**: With delta xDS ([`pilot/pkg/xds/delta.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/delta.go)), Pilot sends only changed resources via `GenerateDeltas`. Envoy's `DeltaSubscriptionState::isHeartbeatResource` can further suppress no-op re-sends. Pilot explicitly notes SotW is the problematic path (`ads.go:730\u2013733`).\n\n2. **Ensure listener proto determinism**: Audit `EnvoyFilter` patches and `BuildListeners` for any non-deterministic fields (timestamps, map iteration order). Proto serialization order can silently change the `MessageUtil::hash` even with identical logical config.\n\n3. **Tune drain parameters**: Reduce `--drain-time-s` and `--drain-strategy=immediate` on sidecars to shrink the 503 window when drains are unavoidable, at the cost of more abrupt connection closure.\n\n4. **Pin `PILOT_ENABLE_EDS_DEBOUNCE` and incremental push scope**: Where possible, use `req.Full = false` incremental pushes (only EDS/RDS changes). `ldsNeedsPush` ([`lds.go:79`](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/lds.go?L79-83)) returns `false` for non-full pushes, suppressing LDS entirely when only endpoints change.\n\n## Sources\n\n- [github.com/sg-evals/envoy--v1.29.4/source/common/listener_manager/lds_api.cc@81a23ec](/github.com/sg-evals/envoy--v1.29.4@81a23ecdeab0c905c871a9b1796048a963c1efd3/-/blob/source/common/listener_manager/lds_api.cc)\n- [github.com/sg-evals/envoy--v1.29.4/source/common/listener_manager/listener_manager_impl.cc@81a23ec?L449-680](/github.com/sg-evals/envoy--v1.29.4@81a23ecdeab0c905c871a9b1796048a963c1efd3/-/blob/source/common/listener_manager/listener_manager_impl.cc?L449-680)\n- [github.com/sg-evals/istio--1.21.1/pilot/pkg/xds/ads.go@bc47f2e?L730-810](/github.com/sg-evals/istio--1.21.1@bc47f2e7dfdcadd5e445358738a961c4749161bc/-/blob/pilot/pkg/xds/ads.go?L730-810)\n- [github.com/sg-evals/istio--1.21.1/pilot/pkg/xds/xdsgen.go@bc47f2e?L93-200](/github.com/sg-evals/istio--1.21.1@bc47f2e7dfdcadd5e445358738a961c4749161bc/-/blob/pilot/pkg/xds/xdsgen.go?L93-200)\n- [github.com/sg-evals/envoy--v1.29.4/source/common/listener_manager/listener_manager_impl.cc@81a23ec?L680-780](/github.com/sg-evals/envoy--v1.29.4@81a23ecdeab0c905c871a9b1796048a963c1efd3/-/blob/source/common/listener_manager/listener_manager_impl.cc?L680-780)\n- [github.com/sg-evals/istio--1.21.1/pilot/pkg/xds/xdsgen.go@bc47f2e?L1-92](/github.com/sg-evals/istio--1.21.1@bc47f2e7dfdcadd5e445358738a961c4749161bc/-/blob/pilot/pkg/xds/xdsgen.go?L1-92)\n- [github.com/sg-evals/istio--1.21.1/pilot/pkg/xds/lds.go@bc47f2e](/github.com/sg-evals/istio--1.21.1@bc47f2e7dfdcadd5e445358738a961c4749161bc/-/blob/pilot/pkg/xds/lds.go)\n- [github.com/sg-evals/istio--1.21.1/pilot/pkg/xds/discovery.go@bc47f2e?L240-330](/github.com/sg-evals/istio--1.21.1@bc47f2e7dfdcadd5e445358738a961c4749161bc/-/blob/pilot/pkg/xds/discovery.go?L240-330)\n- [github.com/sg-evals/envoy--v1.29.4/source/common/listener_manager/listener_manager_impl.cc@81a23ec?L780-860](/github.com/sg-evals/envoy--v1.29.4@81a23ecdeab0c905c871a9b1796048a963c1efd3/-/blob/source/common/listener_manager/listener_manager_impl.cc?L780-860)\n- [github.com/sg-evals/istio--1.21.1/pilot/pkg/xds/discovery.go@bc47f2e?L330-420](/github.com/sg-evals/istio--1.21.1@bc47f2e7dfdcadd5e445358738a961c4749161bc/-/blob/pilot/pkg/xds/discovery.go?L330-420)\n- [repo:^github.com/sg-evals/envoy--v1.29.4$ blockUpdate hash](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fenvoy--v1.29.4$%20blockUpdate%20hash)\n- [repo:^github.com/sg-evals/istio--1.21.1$ PushVersion NextVersion](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fistio--1.21.1$%20PushVersion%20NextVersion)\n- [github.com/sg-evals/envoy--v1.29.4/source/extensions/config_subscription/grpc/grpc_mux_impl.cc@81a23ec?L264-330](/github.com/sg-evals/envoy--v1.29.4@81a23ecdeab0c905c871a9b1796048a963c1efd3/-/blob/source/extensions/config_subscription/grpc/grpc_mux_impl.cc?L264-330)\n- [github.com/sg-evals/envoy--v1.29.4/source/extensions/config_subscription/grpc/grpc_mux_impl.cc@81a23ec?L330-410](/github.com/sg-evals/envoy--v1.29.4@81a23ecdeab0c905c871a9b1796048a963c1efd3/-/blob/source/extensions/config_subscription/grpc/grpc_mux_impl.cc?L330-410)\n- [repo:^github.com/sg-evals/envoy--v1.29.4$ isHeartbeatResource](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fenvoy--v1.29.4$%20isHeartbeatResource)\n- [repo:^github.com/sg-evals/istio--1.21.1$ AdsPushAll pushConnection](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fistio--1.21.1$%20AdsPushAll%20pushConnection)\n- [github.com/sg-evals/istio--1.21.1/pilot/pkg/xds/ads.go@bc47f2e?L839-900](/github.com/sg-evals/istio--1.21.1@bc47f2e7dfdcadd5e445358738a961c4749161bc/-/blob/pilot/pkg/xds/ads.go?L839-900)\n- [github.com/sg-evals/envoy--v1.29.4/source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.cc@81a23ec?L185-220](/github.com/sg-evals/envoy--v1.29.4@81a23ecdeab0c905c871a9b1796048a963c1efd3/-/blob/source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.cc?L185-220)\n- [repo:^github.com/sg-evals/istio--1.21.1$ pilot/pkg/xds/ads.go pushDetails](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fistio--1.21.1$%20pilot%2Fpkg%2Fxds%2Fads.go%20pushDetails)\n- [github.com/sg-evals/istio--1.21.1/pilot/pkg/xds/ads.go@bc47f2e?L985-1030](/github.com/sg-evals/istio--1.21.1@bc47f2e7dfdcadd5e445358738a961c4749161bc/-/blob/pilot/pkg/xds/ads.go?L985-1030)\n- [repo:^github.com/sg-evals/istio--1.21.1$ file:xds BuildListeners Generate cache](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fistio--1.21.1$%20file:xds%20BuildListeners%20Generate%20cache)\n- [repo:^github.com/sg-evals/istio--1.21.1$ xds cache XdsCacheEntry ResourceVersion LDS generate](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fistio--1.21.1$%20xds%20cache%20XdsCacheEntry%20ResourceVersion%20LDS%20generate)\n- [github.com/sg-evals/istio--1.21.1/pilot/pkg/model/xds_cache.go@bc47f2e?L1-100](/github.com/sg-evals/istio--1.21.1@bc47f2e7dfdcadd5e445358738a961c4749161bc/-/blob/pilot/pkg/model/xds_cache.go?L1-100)\n- [github.com/sg-evals/istio--1.21.1/pilot/pkg/xds/discovery.go@bc47f2e?L490-520](/github.com/sg-evals/istio--1.21.1@bc47f2e7dfdcadd5e445358738a961c4749161bc/-/blob/pilot/pkg/xds/discovery.go?L490-520)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-envoy-istio-xds-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 13,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "source/extensions/config_subscription/grpc/grpc_mux_impl.cc",
+    "source/common/listener_manager/lds_api.cc",
+    "envoy/source/common/listener_manager/listener_manager_impl.cc",
+    "source/common/listener_manager/listener_impl.h",
+    "pilot/pkg/networking/core/configgen.go",
+    "pilot/pkg/bootstrap/discovery.go",
+    "pilot/pkg/model/xds_cache.go",
+    "pilot/pkg/xds/discovery.go",
+    "istio/pilot/pkg/xds/ads.go",
+    "pilot/pkg/xds/xdsgen.go",
+    "istio/pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/delta.go",
+    "source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.cc"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-envoy-istio-xds-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 13,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

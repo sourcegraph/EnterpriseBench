@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-jackson-spring-deserializer-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: spring-boot/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java, spring-boot/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/Jackson2ObjectMapperBuilderCustomizer.java, jackson-databind/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java, jackson-databind/src/main/java/com/fasterxml/jackson/databind/deser/BeanDeserializerFactory.java. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify spring-boot/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java as part of the error source",
+        "Must identify spring-boot/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/Jackson2ObjectMapperBuilderCustomizer.java as part of the error source",
+        "Must identify jackson-databind/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java as part of the error source",
+        "Must identify jackson-databind/src/main/java/com/fasterxml/jackson/databind/deser/BeanDeserializerFactory.java as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) Spring Boot's JacksonAutoConfiguration creates the primary ObjectMapper bean and discovers @JsonComponent via JsonComponentModule, registering each as a SimpleModule on the bean -> (2) Jackson's ObjectMapper applies registered modules in registration order; SimpleModule.setupModule writes deserializers into the deserializer cache -> (3) BeanDeserializerFactory consults the cache when resolving the deserializer for a property; if the property type matches, the module's deserializer wins over the default -> (4) When a second ObjectMapper bean is created (cache, RabbitMQ, etc.) without invoking JacksonAutoConfiguration's customizer chain, the @JsonComponent module is never registered on it -> (5) Spring MVC's MappingJackson2HttpMessageConverter is wired to the primary ObjectMapper, but if the customer's controller is configured with a different converter or sub-context, the wrong ObjectMapper deserializes the body.",
+      "evaluation_criteria": [
+        "Must describe the step: Spring Boot's JacksonAutoConfiguration creates the primary ObjectMapper bean and...",
+        "Must describe the step: Jackson's ObjectMapper applies registered modules in registration order; SimpleM...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Customer has multiple ObjectMapper beans in the context, only the primary one wired by JacksonAutoConfiguration includes JsonComponentModule; (2) @JsonComponent registration is one-shot at the primary ObjectMapper; manually constructed ObjectMapper instances bypass it; (3) Jackson's BeanDeserializerFactory falls back to default deserializers silently when the module is not registered.",
+      "evaluation_criteria": [
+        "Must identify the condition: Customer has multiple ObjectMapper beans in the context, only the primary one wi...",
+        "Must identify the condition: @JsonComponent registration is one-shot at the primary ObjectMapper; manually co...",
+        "Must identify the condition: Jackson's BeanDeserializerFactory falls back to default deserializers silently w...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

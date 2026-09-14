@@ -26,6 +26,19 @@ def _find_stdout(*entries: tuple[str, str]) -> str:
     return "".join(f"{mtime} {path}\0" for mtime, path in entries)
 
 
+def _cp_writer(contents: dict[str, str]):
+    """Patch for _docker_cp that materialises the staged file, as the real one
+    does. ``contents`` maps a container path to the JSONL body copied out."""
+
+    def fake_cp(src: str, dest: str) -> None:
+        container_path = src.split(":", 1)[1]
+        body = contents.get(container_path)
+        if body is not None:
+            Path(dest).write_text(body)
+
+    return fake_cp
+
+
 class TestCopyAgentTrace:
     """Unit tests for _copy_agent_trace()."""
 
@@ -34,23 +47,22 @@ class TestCopyAgentTrace:
         output_dir = tmp_path / "results"
         output_dir.mkdir()
 
+        traced = f"{TRACE_ROOT}/abc123/conversation.jsonl"
         find_result = MagicMock()
         find_result.returncode = 0
-        find_result.stdout = _find_stdout(
-            ("1720000000.0", f"{TRACE_ROOT}/abc123/conversation.jsonl")
-        )
+        find_result.stdout = _find_stdout(("1720000000.0", traced))
 
-        cp_result = MagicMock()
-        cp_result.returncode = 0
-        cp_result.stderr = ""
-
-        with patch("scripts.orchestration.run_task.subprocess.run") as mock_run:
-            mock_run.side_effect = [find_result, cp_result]
+        with patch(
+            "scripts.orchestration.run_task._docker_exec", return_value=find_result
+        ) as mock_exec, patch(
+            "scripts.orchestration.run_task._docker_cp",
+            side_effect=_cp_writer({traced: '{"n": 1}\n'}),
+        ):
             result = _copy_agent_trace("container-123", output_dir)
 
         assert result is True
-        find_call = mock_run.call_args_list[0]
-        assert "find" in " ".join(find_call[0][0])
+        assert (output_dir / "agent_trace.jsonl").read_text() == '{"n": 1}\n'
+        assert "find" in " ".join(mock_exec.call_args_list[0][0][1])
 
     def test_find_command_emits_nul_delimited_mtime_records(
         self, tmp_path: Path
@@ -136,30 +148,37 @@ class TestCopyAgentTrace:
 
         assert result is False
 
-    def test_copies_newest_of_multiple_trace_files(self, tmp_path: Path) -> None:
-        """With several sessions in the container, copy the newest by mtime."""
+    def test_merges_subagent_transcripts_with_the_session_file(
+        self, tmp_path: Path
+    ) -> None:
+        """Subagent turns live in <session>/subagents/agent-*.jsonl, not in the
+        session file. Copying only the newest file dropped every tool call a
+        delegating run made, so its retrieval recall measured as if it had
+        searched nothing. All files are merged, oldest first."""
         output_dir = tmp_path / "results"
         output_dir.mkdir()
 
+        session = f"{TRACE_ROOT}/abc/conversation.jsonl"
+        sub = f"{TRACE_ROOT}/abc/subagents/agent-deadbeef.jsonl"
         find_result = MagicMock()
         find_result.returncode = 0
         find_result.stdout = _find_stdout(
-            ("1720000000.0", f"{TRACE_ROOT}/older/conversation.jsonl"),
-            ("1720009999.5", f"{TRACE_ROOT}/newest/conversation.jsonl"),
+            ("1720000000.0", session), ("1720009999.5", sub)
         )
 
-        cp_result = MagicMock()
-        cp_result.returncode = 0
-        cp_result.stderr = ""
-
-        with patch("scripts.orchestration.run_task.subprocess.run") as mock_run:
-            mock_run.side_effect = [find_result, cp_result]
+        with patch(
+            "scripts.orchestration.run_task._docker_exec", return_value=find_result
+        ), patch(
+            "scripts.orchestration.run_task._docker_cp",
+            side_effect=_cp_writer({session: '{"main": 1}', sub: '{"sub": 1}\n'}),
+        ):
             result = _copy_agent_trace("container-123", output_dir)
 
         assert result is True
-        cp_cmd = " ".join(mock_run.call_args_list[1][0][0])
-        assert "newest/conversation.jsonl" in cp_cmd
-        assert "older/conversation.jsonl" not in cp_cmd
+        lines = (output_dir / "agent_trace.jsonl").read_text().splitlines()
+        # Oldest first, and the session file's missing trailing newline must
+        # not glue two records into one unparseable line.
+        assert lines == ['{"main": 1}', '{"sub": 1}']
 
     def test_output_filename_is_agent_trace_jsonl(self, tmp_path: Path) -> None:
         """Output file should be named agent_trace.jsonl."""
@@ -172,16 +191,16 @@ class TestCopyAgentTrace:
             ("1720000000.0", f"{TRACE_ROOT}/abc/conversation.jsonl")
         )
 
-        cp_result = MagicMock()
-        cp_result.returncode = 0
-        cp_result.stderr = ""
-
-        with patch("scripts.orchestration.run_task.subprocess.run") as mock_run:
-            mock_run.side_effect = [find_result, cp_result]
+        traced = f"{TRACE_ROOT}/abc/conversation.jsonl"
+        with patch(
+            "scripts.orchestration.run_task._docker_exec", return_value=find_result
+        ), patch(
+            "scripts.orchestration.run_task._docker_cp",
+            side_effect=_cp_writer({traced: '{"n": 1}\n'}),
+        ):
             _copy_agent_trace("container-123", output_dir)
 
-        cp_cmd = mock_run.call_args_list[1][0][0]
-        assert cp_cmd[-1] == str(output_dir / "agent_trace.jsonl")
+        assert (output_dir / "agent_trace.jsonl").is_file()
 
     def test_handles_timeout_gracefully(self, tmp_path: Path) -> None:
         """Should return False if docker exec times out."""

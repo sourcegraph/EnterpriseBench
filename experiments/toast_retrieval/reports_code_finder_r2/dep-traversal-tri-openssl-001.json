@@ -1,0 +1,199 @@
+{
+  "task_id": "dep-traversal-tri-openssl-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/openssl--openssl-3.1.1",
+    "github.com/sg-evals/curl--curl-8_1_2",
+    "github.com/sg-evals/git--v2.41.0"
+  ],
+  "retrieved_paths": [
+    "Documentation/config/http.txt",
+    "http.c",
+    "lib/vtls/openssl.c",
+    "docs/libcurl/opts/CURLOPT_SSL_VERIFYPEER.3",
+    "docs/libcurl/opts/CURLOPT_PROXY_SSL_VERIFYPEER.3",
+    "docs/SSLCERTS.md",
+    "crypto/x509/x509_vfy.c",
+    "doc/man3/X509_STORE_CTX_new.pod",
+    "doc/man3/X509_VERIFY_PARAM_set_flags.pod",
+    "doc/man3/SSL_CTX_set_verify.pod",
+    "doc/man3/X509_STORE_CTX_get_error.pod"
+  ],
+  "retrieved_paths_union": [
+    "Documentation/config/http.txt",
+    "http.c",
+    "lib/vtls/openssl.c",
+    "docs/libcurl/opts/CURLOPT_SSL_VERIFYPEER.3",
+    "docs/libcurl/opts/CURLOPT_PROXY_SSL_VERIFYPEER.3",
+    "docs/SSLCERTS.md",
+    "crypto/x509/x509_vfy.c",
+    "doc/man3/X509_STORE_CTX_new.pod",
+    "doc/man3/X509_VERIFY_PARAM_set_flags.pod",
+    "doc/man3/SSL_CTX_set_verify.pod",
+    "doc/man3/X509_STORE_CTX_get_error.pod"
+  ],
+  "required_files": [
+    "http.c",
+    "lib/vtls/openssl.c",
+    "crypto/x509/x509_vfy.c"
+  ],
+  "ir_scores": {
+    "task_id": "dep-traversal-tri-openssl-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.5307,
+      "10": 0.6871
+    },
+    "mrr": 0.5,
+    "map_score": 0.5317,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2727,
+    "n_retrieved": 11,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "dep-traversal-tri-openssl-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.5307,
+      "10": 0.6871
+    },
+    "mrr": 0.5,
+    "map_score": 0.5317,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2727,
+    "n_retrieved": 11,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 20.1,
+  "response_chars": 4972,
+  "raw_response": "The verification chain runs from Git\u2019s `http.c` configuration and libcurl setup, through curl\u2019s OpenSSL backend, into OpenSSL\u2019s `X509_verify_cert()` chain-building and validation routines.\n\nRelevant files:\n\n- [sg-evals/git--v2.41.0:Documentation/config/http.txt?L154-L188](/r/github.com/sg-evals/git--v2.41.0/-/blob/Documentation/config/http.txt?L154-L188) - Git configuration entry points: `http.sslVerify`, `http.sslCAInfo`, `http.sslCAPath`, `http.sslCert`, `http.sslBackend`, and related options.\n- [sg-evals/git--v2.41.0:http.c?L41-L58](/r/github.com/sg-evals/git--v2.41.0/-/blob/http.c?L41-L58) - Global SSL configuration state used by Git\u2019s curl transport.\n- [sg-evals/git--v2.41.0:http.c?L943-L958](/r/github.com/sg-evals/git--v2.41.0/-/blob/http.c?L943-L958) - Sets `CURLOPT_SSL_VERIFYPEER` and `CURLOPT_SSL_VERIFYHOST` according to Git\u2019s verification setting.\n- [sg-evals/git--v2.41.0:http.c?L1001-L1037](/r/github.com/sg-evals/git--v2.41.0/-/blob/http.c?L1001-L1037) - Applies `GIT_SSL_VERSION`, `GIT_SSL_CIPHER_LIST`, client certificate, key, and `GIT_SSL_CAPATH` via curl options.\n- [sg-evals/git--v2.41.0:http.c?L1039-L1052](/r/github.com/sg-evals/git--v2.41.0/-/blob/http.c?L1039-L1052) - Applies `http.sslCAInfo`/`GIT_SSL_CAINFO` using `CURLOPT_CAINFO`, proxy CA configuration, and Schannel-specific behavior.\n- [sg-evals/git--v2.41.0:http.c?L1258-L1284](/r/github.com/sg-evals/git--v2.41.0/-/blob/http.c?L1258-L1284) - Reads `GIT_SSL_NO_VERIFY`, `GIT_SSL_CERT`, `GIT_SSL_CAPATH`, and `GIT_SSL_CAINFO`; defaults peer verification to enabled.\n- [sg-evals/curl--curl-8_1_2:lib/vtls/openssl.c?L3165-L3227](/r/github.com/sg-evals/curl--curl-8_1_2/-/blob/lib/vtls/openssl.c?L3165-L3227) - Loads CA blobs, CA files, CA paths, and OpenSSL default trust paths; configures CRL checking.\n- [sg-evals/curl--curl-8_1_2:lib/vtls/openssl.c?L3247-L3260](/r/github.com/sg-evals/curl--curl-8_1_2/-/blob/lib/vtls/openssl.c?L3247-L3260) - Sets OpenSSL trust-store flags such as `X509_V_FLAG_TRUSTED_FIRST` and partial-chain behavior.\n- [sg-evals/curl--curl-8_1_2:lib/vtls/openssl.c?L3684-L3689](/r/github.com/sg-evals/curl--curl-8_1_2/-/blob/lib/vtls/openssl.c?L3684-L3689) - Maps curl\u2019s peer-verification setting to `SSL_CTX_set_verify(..., SSL_VERIFY_PEER/SSL_VERIFY_NONE, ...)`.\n- [sg-evals/curl--curl-8_1_2:docs/libcurl/opts/CURLOPT_SSL_VERIFYPEER.3?L49-L63](/r/github.com/sg-evals/curl--curl-8_1_2/-/blob/docs/libcurl/opts/CURLOPT_SSL_VERIFYPEER.3?L49-L63) - Documents peer certificate verification and its security implications.\n- [sg-evals/curl--curl-8_1_2:docs/libcurl/opts/CURLOPT_PROXY_SSL_VERIFYPEER.3?L52-L68](/r/github.com/sg-evals/curl--curl-8_1_2/-/blob/docs/libcurl/opts/CURLOPT_PROXY_SSL_VERIFYPEER.3?L52-L68) - Proxy TLS verification control.\n- [sg-evals/curl--curl-8_1_2:docs/SSLCERTS.md?L34-L165](/r/github.com/sg-evals/curl--curl-8_1_2/-/blob/docs/SSLCERTS.md?L34-L165) - Curl trust-store and platform certificate behavior.\n- [sg-evals/openssl--openssl-3.1.1:crypto/x509/x509_vfy.c?L250-L305](/r/github.com/sg-evals/openssl--openssl-3.1.1/-/blob/crypto/x509/x509_vfy.c?L250-L305) - `X509_STORE_CTX_verify()` delegates to `X509_verify_cert()`, which initializes the chain and invokes verification.\n- [sg-evals/openssl--openssl-3.1.1:crypto/x509/x509_vfy.c?L210-L246](/r/github.com/sg-evals/openssl--openssl-3.1.1/-/blob/crypto/x509/x509_vfy.c?L210-L246) - OpenSSL verification sequence: build chain, extensions, authentication level, identity, revocation, signatures, name constraints, RFC 3779, and policies.\n- [sg-evals/openssl--openssl-3.1.1:crypto/x509/x509_vfy.c?L2987-L2995](/r/github.com/sg-evals/openssl--openssl-3.1.1/-/blob/crypto/x509/x509_vfy.c?L2987-L2995) - Certificate-chain construction entry point.\n- [sg-evals/openssl--openssl-3.1.1:crypto/x509/x509_vfy.c?L323-L340](/r/github.com/sg-evals/openssl--openssl-3.1.1/-/blob/crypto/x509/x509_vfy.c?L323-L340) - Issuer lookup and chain-building selection logic.\n- [sg-evals/openssl--openssl-3.1.1:doc/man3/X509_STORE_CTX_new.pod?L29-L90](/r/github.com/sg-evals/openssl--openssl-3.1.1/-/blob/doc/man3/X509_STORE_CTX_new.pod?L29-L90) - Verification context inputs: trusted store, target certificate, and untrusted intermediates.\n- [sg-evals/openssl--openssl-3.1.1:doc/man3/X509_VERIFY_PARAM_set_flags.pod?L24-L45](/r/github.com/sg-evals/openssl--openssl-3.1.1/-/blob/doc/man3/X509_VERIFY_PARAM_set_flags.pod?L24-L45) - Verification parameters including purpose, trust, time, policies, hostname, IP, and flags.\n- [sg-evals/openssl--openssl-3.1.1:doc/man3/SSL_CTX_set_verify.pod?L18-L26](/r/github.com/sg-evals/openssl--openssl-3.1.1/-/blob/doc/man3/SSL_CTX_set_verify.pod?L18-L26) - TLS-level `SSL_VERIFY_PEER` behavior and verification depth.\n- [sg-evals/openssl--openssl-3.1.1:doc/man3/X509_STORE_CTX_get_error.pod?L14-L26](/r/github.com/sg-evals/openssl--openssl-3.1.1/-/blob/doc/man3/X509_STORE_CTX_get_error.pod?L14-L26) - Verification error retrieval APIs used to expose the failure reason.",
+  "ir_scores_unaligned": {
+    "task_id": "dep-traversal-tri-openssl-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.5307,
+      "10": 0.6871
+    },
+    "mrr": 0.5,
+    "map_score": 0.5317,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2727,
+    "n_retrieved": 11,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "Documentation/config/http.txt",
+    "http.c",
+    "lib/vtls/openssl.c",
+    "docs/libcurl/opts/CURLOPT_SSL_VERIFYPEER.3",
+    "docs/libcurl/opts/CURLOPT_PROXY_SSL_VERIFYPEER.3",
+    "docs/SSLCERTS.md",
+    "crypto/x509/x509_vfy.c",
+    "doc/man3/X509_STORE_CTX_new.pod",
+    "doc/man3/X509_VERIFY_PARAM_set_flags.pod",
+    "doc/man3/SSL_CTX_set_verify.pod",
+    "doc/man3/X509_STORE_CTX_get_error.pod"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "dep-traversal-tri-openssl-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.5307,
+      "10": 0.6871
+    },
+    "mrr": 0.5,
+    "map_score": 0.5317,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2727,
+    "n_retrieved": 11,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

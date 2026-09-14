@@ -1,0 +1,65 @@
+{
+  "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/pallets/flask",
+      "rev": "2.3.3",
+      "path": "flask"
+    },
+    {
+      "url": "https://github.com/pallets/werkzeug",
+      "rev": "2.3.7",
+      "path": "werkzeug"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "flask/src/flask/globals.py",
+      "repo": "flask",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "flask/src/flask/ctx.py",
+      "repo": "flask",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "werkzeug/src/werkzeug/local.py",
+      "repo": "werkzeug",
+      "confidence": 0.95,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "flask/src/flask/app.py",
+      "repo": "flask",
+      "confidence": 0.8
+    },
+    {
+      "path": "werkzeug/src/werkzeug/wrappers/request.py",
+      "repo": "werkzeug",
+      "confidence": 0.7
+    }
+  ],
+  "error_chain": [
+    "Flask's globals.py defines `request` as a LocalProxy backed by werkzeug.local.Local with a contextvars-based storage strategy",
+    "Werkzeug's local.py replaced the threadlocal storage with contextvars.ContextVar so that async coroutines see a per-task logical context",
+    "Flask's ctx.py pushes a RequestContext onto the Local stack at the start of dispatching and pops it at request teardown",
+    "When the async view awaits asyncio.create_task(coro), the task captures the current context via copy_context, preserving the bound request proxy",
+    "When code instead schedules work onto a thread pool or uses a bare ensure_future without copying context, the spawned task evaluates ContextVar.get() in an empty context, raising RuntimeError from the LocalProxy access"
+  ],
+  "trigger_conditions": [
+    "Customer code awaits a coroutine via run_in_executor or thread-pool worker which does not propagate the active contextvars context",
+    "Werkzeug's Local switched from threadlocal to ContextVar storage, so the regression appeared after the werkzeug 2.0+ upgrade",
+    "Flask's RequestContext proxy raises RuntimeError when the underlying ContextVar.get() returns LookupError, masking the contextvars cause"
+  ],
+  "expected_answer": {
+    "error_origin": "werkzeug.local.Local's ContextVar storage returns LookupError in the spawned task because the parent context was not copied at task creation",
+    "bypass_reason": "asyncio.create_task captures the current context but ensure_future from a thread pool or run_in_executor does not, so the LocalProxy resolves to an empty contextvars binding",
+    "correct_config": "Use loop.run_in_executor with contextvars.copy_context().run, or push a Flask app/request context inside the coroutine via app.test_request_context() / app.app_context() so the proxy resolves before any thread-pool offload"
+  }
+}

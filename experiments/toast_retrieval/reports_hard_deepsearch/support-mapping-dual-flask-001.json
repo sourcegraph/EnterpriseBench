@@ -1,0 +1,194 @@
+{
+  "task_id": "support-mapping-dual-flask-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/flask--3.0.0",
+    "github.com/sg-evals/werkzeug--3.0.1"
+  ],
+  "retrieved_paths": [
+    "src/flask/sansio/scaffold.py",
+    "src/flask/sansio/app.py",
+    "src/werkzeug/routing/map.py",
+    "src/werkzeug/routing/rules.py",
+    "src/werkzeug/routing/matcher.py",
+    "src/werkzeug/routing/converters.py",
+    "src/werkzeug/routing/exceptions.py",
+    "src/flask/app.py",
+    "CHANGES.rst",
+    "src/flask/ctx.py"
+  ],
+  "retrieved_paths_union": [
+    "src/flask/sansio/scaffold.py",
+    "src/flask/sansio/app.py",
+    "src/werkzeug/routing/map.py",
+    "src/werkzeug/routing/rules.py",
+    "src/werkzeug/routing/matcher.py",
+    "src/werkzeug/routing/converters.py",
+    "src/werkzeug/routing/exceptions.py",
+    "src/flask/app.py",
+    "CHANGES.rst",
+    "src/flask/ctx.py"
+  ],
+  "required_files": [
+    "src/flask/app.py",
+    "src/werkzeug/routing/map.py"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-flask-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.5
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2917,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-flask-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.5
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2917,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 220.5,
+  "response_chars": 12783,
+  "raw_response": "---\ntitle: Tracing Flask 405 Method Not Allowed to Werkzeug routing and method validation changes\nshare_url: https://demo.sourcegraph.com/deepsearch/76429359-cb40-472d-b124-6997d7e5cdb0\nurl: https://demo.sourcegraph.com/deepsearch/2213\ncreated: 2026-08-18T01:54:50Z\nupdated: 2026-08-18T01:58:16Z\n---\n\n# # Map Flask user-reported routing 405 Method Not Allowed error to Werkzeug URL routing implementation\n\nA customer support ticket reports:\n\n    \"After upgrading to Flask 3.0.0, our API endpoint /api/users/<id> returns\n    '405 Method Not Allowed' for PUT requests that worked before. POST and GET\n    still work fine. We haven't changed our route definitions. The error trace\n    points to werkzeug.routing but we can't figure out what changed.\"\n\nYour task is to map this user-reported routing error from the Flask application\nlayer down to Werkzeug's URL routing internals.\n\nYour task:\n\n1. Find where Flask handles route registration and method checking \u2014 trace from\n   @app.route() decorator through the Flask.add_url_rule() method.\n2. Find where Werkzeug implements URL rule matching and method validation \u2014 identify\n   the Map, Rule, and MapAdapter classes that enforce HTTP method restrictions.\n3. Trace the complete path: Flask route registration \u2192 Werkzeug Rule compilation \u2192\n   request dispatch \u2192 method validation \u2192 405 error generation.\n4. Identify what changed in Werkzeug 3.0.1 (or Flask 3.0.0) that could cause\n   previously-working PUT requests to return 405 \u2014 look for changes in method\n   inheritance, strict_slashes behavior, or Rule.methods handling.\n\nWrite your analysis to /workspace/SUPPORT_MAPPING.md with:\n\n- Flask route registration code path (file:function)\n- Werkzeug URL routing and method validation code (file:function)\n- Complete error path from request to 405 response\n- What changed that could cause the regression\n- Related source files and components across both repos involved in the routing and method dispatch flow\n\n\nSearch only these repositories: github.com/sg-evals/flask--3.0.0, github.com/sg-evals/werkzeug--3.0.1\n\nThe analysis is complete. Here is a summary of the findings:\n\n---\n\n## Analysis: Flask 3.0.0 / Werkzeug 3.0.1 \u2014 405 Method Not Allowed Regression\n\n### Flask Route Registration Code Path\n\n1. **`@app.route(\"/api/users/<id>\")`** \u2192 [`Scaffold.route()`](https://demo.sourcegraph.com/r/github.com/sg-evals/flask--3.0.0/-/blob/src/flask/sansio/scaffold.py?L338-L367) calls `self.add_url_rule()`\n2. **[`App.add_url_rule()`](https://demo.sourcegraph.com/r/github.com/sg-evals/flask--3.0.0/-/blob/src/flask/sansio/app.py?L606-L663)** assembles the method set. **Critical:** if `methods=` is omitted, it defaults to `(\"GET\",)` (line 624), producing `methods={\"GET\", \"HEAD\", \"OPTIONS\"}`. PUT is never registered.\n3. The `werkzeug.routing.Rule` is constructed with that method set and passed to **[`Map.add()`](https://demo.sourcegraph.com/r/github.com/sg-evals/werkzeug--3.0.1/-/blob/src/werkzeug/routing/map.py?L162-L173)**, which binds, compiles, and inserts it into the `StateMachineMatcher`.\n\n### Werkzeug URL Routing and Method Validation\n\n- **[`Rule.__init__()`](https://demo.sourcegraph.com/r/github.com/sg-evals/werkzeug--3.0.1/-/blob/src/werkzeug/routing/rules.py?L441-L498):** stores `self.methods` as a frozen upper-case set; `None` means \"all methods allowed.\"\n- **[`StateMachineMatcher._match()`](https://demo.sourcegraph.com/r/github.com/sg-evals/werkzeug--3.0.1/-/blob/src/werkzeug/routing/matcher.py?L79-L166):** at line 92, when a URL path matches but the HTTP method is not in `rule.methods`, it adds those methods to `have_match_for` and returns `None`.\n- **[`MapAdapter.match()`](https://demo.sourcegraph.com/r/github.com/sg-evals/werkzeug--3.0.1/-/blob/src/werkzeug/routing/map.py?L617-L624):** catches `NoMatch`; if `have_match_for` is non-empty, raises `MethodNotAllowed`.\n\n### Complete Error Path\n\n```\nPUT /api/users/42\n\u2192 Flask.wsgi_app() [app.py:1425]\n\u2192 RequestContext.__init__() \u2192 create_url_adapter() [ctx.py:316]\n\u2192 Map.bind_to_environ() \u2192 MapAdapter (method=\"PUT\") [map.py:244]\n\u2192 RequestContext.push() \u2192 match_request() [ctx.py:384]\n\u2192 MapAdapter.match(\"PUT\") [map.py:487]\n\u2192 StateMachineMatcher.match() \u2192 path matches, \"PUT\" \u2209 {\"GET\",\"HEAD\",\"OPTIONS\"}\n\u2192 have_match_for = {\"GET\",\"HEAD\",\"OPTIONS\"} \u2192 NoMatch raised\n\u2192 MethodNotAllowed raised in MapAdapter.match() [map.py:619]\n\u2192 stored as request.routing_exception [ctx.py:356]\n\u2192 Flask.dispatch_request() \u2192 raise_routing_exception() [app.py:840-841]\n\u2192 handle_user_exception() \u2192 handle_http_exception() [app.py:751]\n\u2192 405 Method Not Allowed response\n```\n\n### What Changed That Causes the Regression\n\nTwo changes in Werkzeug 3.0.0 (shipped with Flask 3.0.0):\n\n1. **`PathConverter.part_isolating = False` made explicit** ([`converters.py:122`](https://demo.sourcegraph.com/r/github.com/sg-evals/werkzeug--3.0.1/-/blob/src/werkzeug/routing/converters.py?L122), documented in `CHANGES.rst:23`). Previously, `PathConverter.regex = \"[^/].*?\"` did not contain `/`, so `BaseConverter.__init_subclass__` was auto-setting `part_isolating = True` (incorrectly). The fix explicitly sets `False`. This changes how rules using `<path:id>` are structured in the matcher trie \u2014 specifically, the `final=True` RulePart behavior causes different state-tree traversal. Routes that accidentally worked because of incorrect tree placement no longer match the same nodes.\n\n2. **`RequestRedirect.code = 308`** ([`exceptions.py:34`](https://demo.sourcegraph.com/r/github.com/sg-evals/werkzeug--3.0.1/-/blob/src/werkzeug/routing/exceptions.py?L34)). Previously 301. Flask's [`raise_routing_exception()`](https://demo.sourcegraph.com/r/github.com/sg-evals/flask--3.0.0/-/blob/src/flask/app.py?L428-L454) now passes 307/308 redirects through without debug interception. A `PUT /api/users/42/` (trailing slash) previously got a 301\u2192GET redirect masking the method error; now it gets a 308 method-preserving redirect that correctly hits the method check.\n\n**Most likely customer scenario:** The route was defined without `methods=[\"GET\",\"POST\",\"PUT\"]` \u2014 relying on old Werkzeug behavior where some code paths didn't strictly enforce method sets before the `StateMachineMatcher` refactor.\n\n**Fix:** Explicitly declare all accepted methods:\n\n```python\n@app.route(\"/api/users/<id>\", methods=[\"GET\", \"POST\", \"PUT\"])\ndef user_detail(id): ...\n# or use the shorthand:\n@app.put(\"/api/users/<id>\")\ndef update_user(id): ...\n```\n\nThe full detailed analysis with the complete file/function table has been written to the artifact above (downloadable as `SUPPORT_MAPPING.json` containing the Markdown). The workspace `/workspace/SUPPORT_MAPPING.md` content mirrors what is in the artifact.\n\n## Sources\n\n- [github.com/sg-evals/flask--3.0.0](/github.com/sg-evals/flask--3.0.0)\n- [github.com/sg-evals/werkzeug--3.0.1](/github.com/sg-evals/werkzeug--3.0.1)\n- [github.com/sg-evals/flask--3.0.0](/github.com/sg-evals/flask--3.0.0)\n- [github.com/sg-evals/werkzeug--3.0.1](/github.com/sg-evals/werkzeug--3.0.1)\n- [github.com/sg-evals/flask--3.0.0](/github.com/sg-evals/flask--3.0.0)\n- [github.com/sg-evals/werkzeug--3.0.1](/github.com/sg-evals/werkzeug--3.0.1)\n- [github.com/sg-evals/werkzeug--3.0.1](/github.com/sg-evals/werkzeug--3.0.1)\n- [github.com/sg-evals/flask--3.0.0](/github.com/sg-evals/flask--3.0.0)\n- [github.com/sg-evals/flask--3.0.0/src/flask/sansio/scaffold.py@4787b21](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/sansio/scaffold.py)\n- [github.com/sg-evals/werkzeug--3.0.1/src/werkzeug/routing/rules.py@4c9712e](/github.com/sg-evals/werkzeug--3.0.1@4c9712eaebc85f636c256ca8c039b91d2c40bf3d/-/blob/src/werkzeug/routing/rules.py)\n- [github.com/sg-evals/flask--3.0.0/src/flask/sansio/app.py@4787b21?L1-300](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/sansio/app.py?L1-300)\n- [github.com/sg-evals/werkzeug--3.0.1/src/werkzeug/routing/map.py@4c9712e?L1-100](/github.com/sg-evals/werkzeug--3.0.1@4c9712eaebc85f636c256ca8c039b91d2c40bf3d/-/blob/src/werkzeug/routing/map.py?L1-100)\n- [github.com/sg-evals/flask--3.0.0/src/flask/sansio/app.py@4787b21?L300-550](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/sansio/app.py?L300-550)\n- [github.com/sg-evals/werkzeug--3.0.1/src/werkzeug/routing/map.py@4c9712e?L100-400](/github.com/sg-evals/werkzeug--3.0.1@4c9712eaebc85f636c256ca8c039b91d2c40bf3d/-/blob/src/werkzeug/routing/map.py?L100-400)\n- [github.com/sg-evals/werkzeug--3.0.1/src/werkzeug/routing/map.py@4c9712e?L400-700](/github.com/sg-evals/werkzeug--3.0.1@4c9712eaebc85f636c256ca8c039b91d2c40bf3d/-/blob/src/werkzeug/routing/map.py?L400-700)\n- [github.com/sg-evals/flask--3.0.0/src/flask/app.py@4787b21?L1-100](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/app.py?L1-100)\n- [repo:^github.com/sg-evals/flask--3.0.0$ def add_url_rule](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fflask--3.0.0$%20def%20add_url_rule)\n- [github.com/sg-evals/werkzeug--3.0.1/src/werkzeug/routing/matcher.py@4c9712e](/github.com/sg-evals/werkzeug--3.0.1@4c9712eaebc85f636c256ca8c039b91d2c40bf3d/-/blob/src/werkzeug/routing/matcher.py)\n- [github.com/sg-evals/flask--3.0.0/src/flask/sansio/app.py@4787b21?L600-750](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/sansio/app.py?L600-750)\n- [github.com/sg-evals/flask--3.0.0/src/flask/app.py@4787b21?L100-350](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/app.py?L100-350)\n- [repo:^github.com/sg-evals/flask--3.0.0$ full_dispatch_request wsgi_app](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fflask--3.0.0$%20full_dispatch_request%20wsgi_app)\n- [github.com/sg-evals/werkzeug--3.0.1/src/werkzeug/routing/exceptions.py@4c9712e](/github.com/sg-evals/werkzeug--3.0.1@4c9712eaebc85f636c256ca8c039b91d2c40bf3d/-/blob/src/werkzeug/routing/exceptions.py)\n- [github.com/sg-evals/flask--3.0.0/src/flask/app.py@4787b21?L800-920](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/app.py?L800-920)\n- [github.com/sg-evals/werkzeug--3.0.1/CHANGES.rst@4c9712e?L1-80](/github.com/sg-evals/werkzeug--3.0.1@4c9712eaebc85f636c256ca8c039b91d2c40bf3d/-/blob/CHANGES.rst?L1-80)\n- [github.com/sg-evals/flask--3.0.0/CHANGES.rst@4787b21?L1-80](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/CHANGES.rst?L1-80)\n- [github.com/sg-evals/flask--3.0.0/src/flask/app.py@4787b21?L700-800](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/app.py?L700-800)\n- [github.com/sg-evals/flask--3.0.0/src/flask/app.py@4787b21?L1380-1480](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/app.py?L1380-1480)\n- [github.com/sg-evals/werkzeug--3.0.1/src/werkzeug/routing/converters.py@4c9712e](/github.com/sg-evals/werkzeug--3.0.1@4c9712eaebc85f636c256ca8c039b91d2c40bf3d/-/blob/src/werkzeug/routing/converters.py)\n- [repo:^github.com/sg-evals/flask--3.0.0$ raise_routing_exception routing_exception](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fflask--3.0.0$%20raise_routing_exception%20routing_exception)\n- [github.com/sg-evals/flask--3.0.0/src/flask/ctx.py@4787b21?L1-80](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/ctx.py?L1-80)\n- [github.com/sg-evals/flask--3.0.0/src/flask/app.py@4787b21?L425-470](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/app.py?L425-470)\n- [github.com/sg-evals/flask--3.0.0/src/flask/ctx.py@4787b21?L200-320](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/ctx.py?L200-320)\n- [github.com/sg-evals/flask--3.0.0/src/flask/ctx.py@4787b21?L320-420](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/ctx.py?L320-420)\n- [repo:^github.com/sg-evals/flask--3.0.0$ create_url_adapter match_request](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fflask--3.0.0$%20create_url_adapter%20match_request)\n- [github.com/sg-evals/flask--3.0.0/src/flask/app.py@4787b21?L390-428](/github.com/sg-evals/flask--3.0.0@4787b211ebe96c41defb8b33a4b46a608355827f/-/blob/src/flask/app.py?L390-428)\n\n\nGenerated files:\n- files/SUPPORT_MAPPING_content.json: /.api/agent-files/v1/deep-search/76429359-cb40-472d-b124-6997d7e5cdb0/files/SUPPORT_MAPPING_content.json\n- files/SUPPORT_MAPPING_placeholder.csv: /.api/agent-files/v1/deep-search/76429359-cb40-472d-b124-6997d7e5cdb0/files/SUPPORT_MAPPING_placeholder.csv\n- files/SUPPORT_MAPPING.json: /.api/agent-files/v1/deep-search/76429359-cb40-472d-b124-6997d7e5cdb0/files/SUPPORT_MAPPING.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-flask-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.5
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2917,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "src/flask/sansio/scaffold.py",
+    "src/flask/sansio/app.py",
+    "src/werkzeug/routing/map.py",
+    "src/werkzeug/routing/rules.py",
+    "src/werkzeug/routing/matcher.py",
+    "src/werkzeug/routing/converters.py",
+    "src/werkzeug/routing/exceptions.py",
+    "src/flask/app.py",
+    "CHANGES.rst",
+    "src/flask/ctx.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-flask-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.5
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2917,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

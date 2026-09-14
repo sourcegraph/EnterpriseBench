@@ -1,0 +1,32 @@
+{
+  "task_id": "schema-evolution-dual-spring-flyway-001",
+  "checkpoints": {
+    "execution_order": {
+      "expected_solution": "Spring Boot's intended startup ordering is: (1) the application context is refreshed by `AbstractApplicationContext.refresh()` in `spring-context/src/main/java/org/springframework/context/support/AbstractApplicationContext.java`; (2) `FlywayAutoConfiguration` (`spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/flyway/FlywayAutoConfiguration.java`) runs Flyway migrations, declaring `Flyway` as a dependency of the `EntityManagerFactory` via the `FlywayJpaDependencyConfiguration` inner class which adds `@DependsOn(\"flywayInitializer\")` (or the equivalent post-processor) to every JPA `LocalContainerEntityManagerFactoryBean`; (3) only after Flyway has run does `HibernateJpaAutoConfiguration` (`spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaAutoConfiguration.java`) finish initializing the EntityManagerFactory, at which point Hibernate's `hbm2ddl.auto=validate` runs against the migrated schema. The Hibernate properties pipe lives in `spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateProperties.java`.",
+      "evaluation_criteria": [
+        "Must cite spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/flyway/FlywayAutoConfiguration.java as the Flyway entry point",
+        "Must cite spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaAutoConfiguration.java as the Hibernate entry point",
+        "Must explain that FlywayJpaDependencyConfiguration uses a @DependsOn / dependency-post-processor to force Flyway-before-EntityManagerFactory ordering",
+        "Should reference spring-context/src/main/java/org/springframework/context/support/AbstractApplicationContext.java as the surrounding context-refresh lifecycle"
+      ]
+    },
+    "race_condition": {
+      "expected_solution": "The race condition is created when something forces eager EntityManagerFactory initialization *before* `FlywayAutoConfiguration`'s dependency post-processor has had a chance to register the `flywayInitializer` dependency. Common triggers: (a) a `@PostConstruct`-annotated bean that injects a JPA repository or `EntityManager` and forces lazy-init early; (b) a custom `BeanFactoryPostProcessor` running ahead of `FlywayAutoConfiguration`'s post-processor; (c) explicit `@DependsOn(\"entityManagerFactory\")` on the user side that pulls EMF up the dependency graph; (d) misconfiguration where the JPA datasource bean and Flyway's datasource bean are *different* — `FlywayJpaDependencyConfiguration` only wires the dependency for matching datasources. When eager init wins the race, Hibernate's schema validator (`hbm2ddl.auto=validate`) runs first, sees the un-migrated schema, and throws `SchemaManagementException: missing column [user_preferences] in table [users]`. The boundary is `FlywayAutoConfiguration` (`spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/flyway/FlywayAutoConfiguration.java`) ↔ `HibernateJpaAutoConfiguration` (`spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaAutoConfiguration.java`).",
+      "evaluation_criteria": [
+        "Must explain that the race is between Flyway's @DependsOn registration and eager EntityManagerFactory initialization",
+        "Must list at least two triggers (e.g., @PostConstruct early JPA access; conflicting @DependsOn; mismatched datasource beans)",
+        "Must reference both spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/flyway/FlywayAutoConfiguration.java and spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaAutoConfiguration.java",
+        "Should reproduce the canonical error: 'SchemaManagementException: missing column ...'"
+      ]
+    },
+    "fix_identification": {
+      "expected_solution": "Fix options to guarantee Flyway runs before Hibernate validation: (1) ensure Flyway and JPA share the same `DataSource` bean — `FlywayJpaDependencyConfiguration` in `spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/flyway/FlywayAutoConfiguration.java` only wires the @DependsOn for matching datasources; using `@FlywayDataSource` on a separate bean disables the wiring. (2) Switch `spring.jpa.hibernate.ddl-auto` from `validate` to `none` and rely on Flyway's own validation (or run `validate` only after explicitly invoking Flyway). (3) Avoid `@PostConstruct` JPA access on beans that load before `FlywayAutoConfiguration`; defer such work to an `ApplicationListener<ContextRefreshedEvent>` listener. (4) Add an explicit `@DependsOn(\"flywayInitializer\")` on the bean that forces eager EMF init. (5) For Hibernate-specific tuning, `HibernateProperties` (`spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateProperties.java`) exposes `ddl-auto` through `spring.jpa.hibernate.ddl-auto` — keep it `validate` only after migrations are deterministically ordered.",
+      "evaluation_criteria": [
+        "Must propose ensuring Flyway and JPA share the same DataSource (or correctly configuring @FlywayDataSource)",
+        "Must mention adding @DependsOn(\"flywayInitializer\") on user beans that need it",
+        "Must reference spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateProperties.java for the ddl-auto setting",
+        "Should advise avoiding @PostConstruct JPA access during early bean initialization"
+      ]
+    }
+  }
+}

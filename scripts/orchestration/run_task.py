@@ -162,6 +162,9 @@ MCP_MODES = frozenset(
         "mcp_only",
         "mcp_default",
         "mcp_treatment",
+    "mcp_treat_instr",
+    "mcp_treat_edges",
+    "mcp_treat_nudge",
         "hybrid",
         *FINDER_MODES,
         *TOAST_MODES,
@@ -172,6 +175,9 @@ VALID_MODES = (
     "mcp_only",
     "mcp_default",
     "mcp_treatment",
+    "mcp_treat_instr",
+    "mcp_treat_edges",
+    "mcp_treat_nudge",
     "mcp_code_finder",
     "mcp_assisted",
     "mcp_toast",
@@ -206,12 +212,21 @@ MCP_TREATMENT_SRC = REPO_ROOT / "agents" / "harnesses" / "sourcegraph_server_tre
 MCP_TREATMENT_SCRIPT_PATH = (
     "/usr/local/lib/enterprisebench/sourcegraph_server_treatment.py"
 )
+# The arms that vary what the server tells the agent, and which part of the
+# change each one applies. ``mcp_treatment`` is the branch as committed; the
+# three others split it so the bundle's effect can be attributed. The variant
+# names are the overlay's (sourcegraph_server_treatment.VARIANTS).
+TREATMENT_VARIANTS = {
+    "mcp_treatment": "bundle",
+    "mcp_treat_instr": "instructions",
+    "mcp_treat_edges": "edges",
+    "mcp_treat_nudge": "nudge",
+}
+TREATMENT_MODES = frozenset(TREATMENT_VARIANTS)
 # Arms whose MCP client talks to the local proxy rather than Sourcegraph
 # directly: the Finder arms for their call telemetry, mcp_treatment because the
 # proxy is where the unshipped server change is applied.
-PROXY_MODES = frozenset({*FINDER_MODES, "mcp_treatment"})
-# The arm that varies the server's descriptions and initialize instructions.
-TREATMENT_MODES = frozenset({"mcp_treatment"})
+PROXY_MODES = frozenset({*FINDER_MODES, *TREATMENT_MODES})
 MCP_PROXY_TRACE_PATH = "/var/tmp/enterprisebench-mcp-trace.jsonl"
 MCP_PROXY_ENDPOINT = "http://127.0.0.1:8765/mcp"
 MCP_PROXY_HEALTH_ENDPOINT = "http://127.0.0.1:8765/healthz"
@@ -1799,10 +1814,18 @@ def _install_harness_cli(container_id: str, plan: HarnessPlan) -> bool:
         expected_version,
         plan.npm_package,
     )
+    # root, not the container's default user. `npm install -g` writes to
+    # /usr/local/lib/node_modules, which is root-owned on the Node base images
+    # and agent-owned on the Python ones -- so whether a harness CLI could be
+    # installed came down to which language a task's repos happened to need.
+    # Same hazard, and the same fix, as the MCP proxy staging below. The
+    # version check that follows deliberately stays unprivileged: it is what
+    # proves `agent` can actually execute what root just installed.
     installed = _docker_exec(
         container_id,
         ["npm", "install", "-g", plan.npm_package],
         timeout=300,
+        user="root",
     )
     if installed.returncode != 0:
         logger.error(
@@ -1846,7 +1869,17 @@ def _prepare_harness_credentials(
             )
 
         container_home = "/home/agent/.codex"
-        mkdir = _docker_exec(container_id, ["mkdir", "-p", container_home])
+        # root for the same reason the harness install above needs it. `docker
+        # cp` stamps the copied file with the *host* temp file's uid (1000),
+        # and `agent` is uid 1000 in the Python base images but 1001 in the
+        # Node ones -- so the chmod below is a permitted self-chmod on Python
+        # images and EPERM on Node ones. The credential staging therefore
+        # worked or failed according to which language a task's repos happened
+        # to need, which is the same hazard already documented at the MCP
+        # config staging.
+        mkdir = _docker_exec(
+            container_id, ["mkdir", "-p", container_home], user="root"
+        )
         if mkdir.returncode != 0:
             raise RuntimeError(
                 f"failed to create Codex home in container: {mkdir.stderr.strip()}"
@@ -1857,9 +1890,9 @@ def _prepare_harness_credentials(
         )
         for argv in (
             ["chmod", "600", f"{container_home}/auth.json"],
-            ["chown", "agent:agent", f"{container_home}/auth.json"],
+            ["chown", "-R", "agent:agent", container_home],
         ):
-            result = _docker_exec(container_id, argv)
+            result = _docker_exec(container_id, argv, user="root")
             if result.returncode != 0:
                 raise RuntimeError(
                     f"failed to secure Codex auth in container: "
@@ -3197,6 +3230,7 @@ def _start_mcp_telemetry_proxy(container_id: str, mode: str = "") -> bool:
             "MCP_PROXY_UPSTREAM_URL": SOURCEGRAPH_MCP_ENDPOINT,
             "MCP_PROXY_TRACE_PATH": MCP_PROXY_TRACE_PATH,
             "MCP_PROXY_TREATMENT": "1" if treatment else "0",
+            "MCP_PROXY_TREATMENT_VARIANT": TREATMENT_VARIANTS.get(mode, "bundle"),
         },
     )
     if started.returncode != 0:
@@ -3259,15 +3293,35 @@ def _configure_codex_mcp(container_id: str, mode: str) -> bool:
         fh.write(_codex_mcp_config(_mcp_endpoint_for_mode(mode)))
         temporary_config = fh.name
     try:
-        created = _docker_exec(container_id, ["mkdir", "-p", "/home/agent/.codex"])
+        # root, like every other staging step that has to survive both base
+        # image families. `docker cp` stamps the file with the host temp
+        # file's uid (1000); `agent` is uid 1000 on the Python images and 1001
+        # on the Node ones, so an unprivileged chown here fails on exactly the
+        # JS-repo tasks. Failures are logged rather than returned bare: this
+        # function's False is reported to the caller as "endpoint unreachable
+        # or token rejected", which sent diagnosis to the network and the
+        # token while the real fault was a mode bit.
+        created = _docker_exec(
+            container_id, ["mkdir", "-p", "/home/agent/.codex"], user="root"
+        )
         if created.returncode != 0:
+            logger.error(
+                "Could not create Codex config dir: %s",
+                (created.stderr or created.stdout).strip()[:200],
+            )
             return False
         _docker_cp(temporary_config, f"{container_id}:{config_path}")
         for argv in (
             ["chown", "agent:agent", config_path],
             ["chmod", "600", config_path],
         ):
-            if _docker_exec(container_id, argv).returncode != 0:
+            result = _docker_exec(container_id, argv, user="root")
+            if result.returncode != 0:
+                logger.error(
+                    "Could not secure Codex MCP config (%s): %s",
+                    argv[0],
+                    (result.stderr or result.stdout).strip()[:200],
+                )
                 return False
     except RuntimeError as exc:
         logger.error("Failed to write Codex MCP config: %s", exc)
@@ -3332,14 +3386,30 @@ def _configure_opencode_mcp(container_id: str, mode: str) -> bool:
         fh.write(_opencode_mcp_config(_mcp_endpoint_for_mode(mode)))
         temporary_config = fh.name
     try:
-        if _docker_exec(container_id, ["mkdir", "-p", config_dir]).returncode != 0:
+        # root, for the same base-image uid mismatch handled in the Codex
+        # path above. Not yet observed here only because no OpenCode sweep has
+        # included a JS-repo task.
+        created = _docker_exec(
+            container_id, ["mkdir", "-p", config_dir], user="root"
+        )
+        if created.returncode != 0:
+            logger.error(
+                "Could not create OpenCode config dir: %s",
+                (created.stderr or created.stdout).strip()[:200],
+            )
             return False
         _docker_cp(temporary_config, f"{container_id}:{config_path}")
         for argv in (
             ["chown", "agent:agent", config_path],
             ["chmod", "600", config_path],
         ):
-            if _docker_exec(container_id, argv).returncode != 0:
+            result = _docker_exec(container_id, argv, user="root")
+            if result.returncode != 0:
+                logger.error(
+                    "Could not secure OpenCode MCP config (%s): %s",
+                    argv[0],
+                    (result.stderr or result.stdout).strip()[:200],
+                )
                 return False
     except RuntimeError as exc:
         logger.error("Failed to write OpenCode MCP config: %s", exc)
@@ -4149,7 +4219,11 @@ def _capture_mcp_telemetry(
         # Which unshipped server change the agent was served, so a treated run
         # can be tied back to the branch that produced its tool descriptions.
         **(
-            {"server_treatment": sourcegraph_server_treatment.provenance()}
+            {
+                "server_treatment": sourcegraph_server_treatment.provenance(
+                    variant=TREATMENT_VARIANTS[mode]
+                )
+            }
             if mode in TREATMENT_MODES
             else {}
         ),

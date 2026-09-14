@@ -1,0 +1,233 @@
+{
+  "task_id": "api-contract-dual-envoy-istio-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.28.0",
+    "github.com/sg-evals/istio--1.20.0"
+  ],
+  "retrieved_paths": [
+    "api/envoy/config/cluster/v3/cluster.proto",
+    "api/envoy/api/v2/cluster.proto",
+    "api/envoy/service/discovery/v3",
+    "api/envoy/service/discovery/v3/discovery.proto",
+    "api/envoy/service/cluster/v3",
+    "api/envoy/config/listener/v3/listener.proto",
+    "pilot/pkg/networking/core/v1alpha3/cluster.go",
+    "pilot/pkg/networking/core/v1alpha3/listener.go",
+    "pilot/pkg/networking/core/v1alpha3/httproute.go",
+    "pilot/pkg/networking/core/v1alpha3/cluster_builder.go",
+    "pilot/pkg/networking/util",
+    "pilot/pkg/xds/v3",
+    "pilot/pkg/xds/cds.go",
+    "pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/v3/model.go",
+    "pilot/pkg/xds/rds.go",
+    "api/envoy/api/v2/listener.proto",
+    "api/envoy/api/v2/route.proto",
+    "api/envoy/config/route/v3/route.proto",
+    "pilot/pkg/networking/core/v1alpha3/route",
+    "pilot/pkg/networking/core/v1alpha3/route/route.go",
+    "pilot/pkg/networking/util/util.go",
+    "api/envoy/config/listener/v3/listener_components.proto"
+  ],
+  "retrieved_paths_union": [
+    "api/envoy/config/cluster/v3/cluster.proto",
+    "api/envoy/api/v2/cluster.proto",
+    "api/envoy/service/discovery/v3",
+    "api/envoy/service/discovery/v3/discovery.proto",
+    "api/envoy/service/cluster/v3",
+    "api/envoy/config/listener/v3/listener.proto",
+    "pilot/pkg/networking/core/v1alpha3/cluster.go",
+    "pilot/pkg/networking/core/v1alpha3/listener.go",
+    "pilot/pkg/networking/core/v1alpha3/httproute.go",
+    "pilot/pkg/networking/core/v1alpha3/cluster_builder.go",
+    "pilot/pkg/networking/util",
+    "pilot/pkg/xds/v3",
+    "pilot/pkg/xds/cds.go",
+    "pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/v3/model.go",
+    "pilot/pkg/xds/rds.go",
+    "api/envoy/api/v2/listener.proto",
+    "api/envoy/api/v2/route.proto",
+    "api/envoy/config/route/v3/route.proto",
+    "pilot/pkg/networking/core/v1alpha3/route",
+    "pilot/pkg/networking/core/v1alpha3/route/route.go",
+    "pilot/pkg/networking/util/util.go",
+    "api/envoy/config/listener/v3/listener_components.proto"
+  ],
+  "required_files": [
+    "envoy/api/envoy/config/cluster/v3/cluster.proto",
+    "istio/pilot/pkg/xds/ads.go"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-envoy-istio-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0435,
+    "n_retrieved": 23,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-envoy-istio-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0435,
+    "n_retrieved": 23,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 232.0,
+  "response_chars": 13290,
+  "raw_response": "---\ntitle: Analyze Envoy xDS v2 to v3 changes and Istio xDS contract points\nshare_url: https://demo.sourcegraph.com/deepsearch/c37b2f29-e591-4e65-b7b0-d072f44a6d91\nurl: https://demo.sourcegraph.com/deepsearch/2153\ncreated: 2026-08-17T22:34:13Z\nupdated: 2026-08-17T22:37:49Z\n---\n\n#         # api-contract-dual-envoy-istio-001\n\n        **Suite:** dependency_management | **Type:** api_contract | **Difficulty:** expert\n        **Repos:** envoy + istio\n\n        ## Context\n\n        Envoy's xDS (discovery service) API evolved from v2 to v3, changing\nresource type names and proto message structures. Istio's control\nplane (istiod) generates xDS configuration for Envoy sidecars.\n\nYour task:\n1. Find where Envoy defines xDS v3 API proto messages\n2. Find where Istio generates xDS configuration for Envoy\n3. Identify v2 \u2192 v3 API changes in cluster, listener, and route configs\n4. Document the contract points between Istio's xDS generator and\n   Envoy's xDS consumer\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/envoy--v1.28.0, github.com/sg-evals/istio--1.20.0\n\nThe report has been fully researched and written. Here is a summary of the key findings:\n\n---\n\n## IMPACT_REPORT.md \u2014 Summary\n\n**Both Envoy v1.28.0 and Istio 1.20.0 are exclusively v3 xDS**. The v2 API packages (`api/envoy/api/v2/`) in Envoy are `FROZEN` and kept only for migration reference. Istio pins `go-control-plane v0.11.2-0.20231019082134-6e4589f570e1` and generates only v3 type URLs.\n\n### Key v2 \u2192 v3 Contract Changes\n\n**Cluster (CDS)**\n- `hosts` field **removed** (field 7, `reserved`) \u2014 use `load_assignment`\n- `tls_context` **removed** (field 11, `reserved`) \u2014 use `transport_socket` with `envoy.transport_sockets.tls`\n- `extension_protocol_options` (Struct map) **removed** \u2014 use `typed_extension_protocol_options` (Any map)\n- `LbPolicy.ORIGINAL_DST_LB` enum value **removed** (`reserved 4`) \u2014 use `CLUSTER_PROVIDED` or `ORIGINAL_DST`\n- `http_protocol_options`, `http2_protocol_options` etc. deprecated \u2014 move to `HttpProtocolOptions` via `typed_extension_protocol_options`\n\n**Listener (LDS)**\n- `Filter.config` (Struct, fields 2/3) **removed** \u2014 only `typed_config` (Any) or ECDS `config_discovery` allowed\n- New: `additional_addresses`, `default_filter_chain`, `filter_chain_matcher`\n\n**Route (RDS)**\n- `per_filter_config` (Struct map) replaced by `typed_per_filter_config` (Any map)\n- New: `cluster_specifier_plugins`, `typed_per_filter_config` at route-config level\n\n**Discovery Protocol**\n- New: `Resource.ttl`, `ResourceLocator`/`DynamicParameterConstraints` for multi-variant subscriptions\n- `DiscoveryResponse.control_plane` identifies which istiod sent each response\n\n### Istio Contract Points\n- Type URLs: exclusively `type.googleapis.com/envoy.config.*.v3.*`\n- Cluster names: `outbound|<port>|<subset>|<hostname>` (stable across versions)\n- All filter configs via `typed_config` (Any); `CdsGenerator` supports both SotW and delta xDS\n\nThe full report with all file paths, message-level diffs, and migration recommendations is in the file above.\n\n## Sources\n\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/istio--1.20.0](/github.com/sg-evals/istio--1.20.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/istio--1.20.0](/github.com/sg-evals/istio--1.20.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/istio--1.20.0](/github.com/sg-evals/istio--1.20.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/envoy--v1.28.0](/github.com/sg-evals/envoy--v1.28.0)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/cluster/v3/cluster.proto@3e8b0ef?L1-100](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/cluster/v3/cluster.proto?L1-100)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/api/v2/cluster.proto@3e8b0ef?L1-80](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/api/v2/cluster.proto?L1-80)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/service/discovery/v3@3e8b0ef](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/service/discovery/v3)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/cluster/v3/cluster.proto@3e8b0ef?L100-280](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/cluster/v3/cluster.proto?L100-280)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/api/v2/cluster.proto@3e8b0ef?L80-250](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/api/v2/cluster.proto?L80-250)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/service/discovery/v3/discovery.proto@3e8b0ef](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/service/discovery/v3/discovery.proto)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/service/cluster/v3@3e8b0ef](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/service/cluster/v3)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/listener/v3/listener.proto@3e8b0ef?L1-80](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/listener/v3/listener.proto?L1-80)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/cluster.go@88e571c?L1-80](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/cluster.go?L1-80)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/listener.go@88e571c?L1-60](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/listener.go?L1-60)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/httproute.go@88e571c?L1-60](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/httproute.go?L1-60)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/cluster_builder.go@88e571c?L1-80](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/cluster_builder.go?L1-80)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/cluster_builder.go@88e571c?L80-200](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/cluster_builder.go?L80-200)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/util@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/util)\n- [github.com/sg-evals/istio--1.20.0](/github.com/sg-evals/istio--1.20.0)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/v3@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/v3)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/cds.go@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/cds.go)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/lds.go@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/lds.go)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/v3/model.go@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/v3/model.go)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/rds.go@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/rds.go)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/cluster.go@88e571c?L80-200](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/cluster.go?L80-200)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/cluster/v3/cluster.proto@3e8b0ef?L380-560](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/cluster/v3/cluster.proto?L380-560)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/cluster/v3/cluster.proto@3e8b0ef?L560-750](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/cluster/v3/cluster.proto?L560-750)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/api/v2/cluster.proto@3e8b0ef?L250-430](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/api/v2/cluster.proto?L250-430)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/cluster/v3/cluster.proto@3e8b0ef?L750-950](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/cluster/v3/cluster.proto?L750-950)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/api/v2/cluster.proto@3e8b0ef?L430-600](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/api/v2/cluster.proto?L430-600)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/api/v2/cluster.proto@3e8b0ef?L600-750](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/api/v2/cluster.proto?L600-750)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/api/v2/listener.proto@3e8b0ef?L1-80](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/api/v2/listener.proto?L1-80)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/listener/v3/listener.proto@3e8b0ef?L80-250](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/listener/v3/listener.proto?L80-250)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/api/v2/route.proto@3e8b0ef?L1-60](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/api/v2/route.proto?L1-60)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/route/v3/route.proto@3e8b0ef?L1-80](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/route/v3/route.proto?L1-80)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/route@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/route)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/core/v1alpha3/route/route.go@88e571c?L1-80](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/core/v1alpha3/route/route.go?L1-80)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/route/v3/route.proto@3e8b0ef?L80-180](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/route/v3/route.proto?L80-180)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/networking/util/util.go@88e571c?L1-80](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/networking/util/util.go?L1-80)\n- [go-control-plane repo:^github.com/sg-evals/istio--1.20.0$ file:go.mod](/search?q=patterntype:keyword%20go-control-plane%20repo:%5Egithub.com%2Fsg-evals%2Fistio--1.20.0$%20file:go.mod)\n- [github.com/sg-evals/envoy--v1.28.0/api/envoy/config/listener/v3/listener_components.proto@3e8b0ef?L1-60](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/api/envoy/config/listener/v3/listener_components.proto?L1-60)\n\n\nGenerated files:\n- files/IMPACT_REPORT.csv: /.api/agent-files/v1/deep-search/c37b2f29-e591-4e65-b7b0-d072f44a6d91/files/IMPACT_REPORT.csv\n- files/IMPACT_REPORT_meta.json: /.api/agent-files/v1/deep-search/c37b2f29-e591-4e65-b7b0-d072f44a6d91/files/IMPACT_REPORT_meta.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-envoy-istio-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0435,
+    "n_retrieved": 23,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "envoy/api/envoy/config/cluster/v3/cluster.proto",
+    "api/envoy/api/v2/cluster.proto",
+    "api/envoy/service/discovery/v3",
+    "api/envoy/service/discovery/v3/discovery.proto",
+    "api/envoy/service/cluster/v3",
+    "api/envoy/config/listener/v3/listener.proto",
+    "pilot/pkg/networking/core/v1alpha3/cluster.go",
+    "pilot/pkg/networking/core/v1alpha3/listener.go",
+    "pilot/pkg/networking/core/v1alpha3/httproute.go",
+    "pilot/pkg/networking/core/v1alpha3/cluster_builder.go",
+    "pilot/pkg/networking/util",
+    "pilot/pkg/xds/v3",
+    "pilot/pkg/xds/cds.go",
+    "pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/v3/model.go",
+    "pilot/pkg/xds/rds.go",
+    "api/envoy/api/v2/listener.proto",
+    "api/envoy/api/v2/route.proto",
+    "api/envoy/config/route/v3/route.proto",
+    "pilot/pkg/networking/core/v1alpha3/route",
+    "pilot/pkg/networking/core/v1alpha3/route/route.go",
+    "pilot/pkg/networking/util/util.go",
+    "api/envoy/config/listener/v3/listener_components.proto"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-envoy-istio-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0435,
+    "n_retrieved": 23,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

@@ -35,7 +35,16 @@ DEFAULT_CLAUDE_COMMAND = (
 )
 _BASELINE_MODE = "baseline"
 _MCP_MODES = frozenset(
-    {"mcp_only", "mcp_default", "mcp_treatment", "mcp_code_finder", "mcp_assisted"}
+    {
+        "mcp_only",
+        "mcp_default",
+        "mcp_treatment",
+        "mcp_treat_instr",
+        "mcp_treat_edges",
+        "mcp_treat_nudge",
+        "mcp_code_finder",
+        "mcp_assisted",
+    }
 )
 _SUPPORTED_MODES = {
     "codex": frozenset({_BASELINE_MODE, *_MCP_MODES, "cli"}),

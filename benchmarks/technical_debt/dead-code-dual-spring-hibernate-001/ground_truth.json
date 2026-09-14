@@ -1,0 +1,54 @@
+{
+  "task_id": "dead-code-dual-spring-hibernate-001",
+  "task_type": "dead_code_necropsy",
+  "repos": [
+    {
+      "url": "https://github.com/spring-projects/spring-boot",
+      "rev": "v3.1.2",
+      "path": "spring-boot"
+    },
+    {
+      "url": "https://github.com/spring-projects/spring-framework",
+      "rev": "v6.0.11",
+      "path": "spring-framework"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaAutoConfiguration.java",
+      "repo": "spring-boot",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "spring-orm/src/main/java/org/springframework/orm/jpa/vendor/HibernateJpaVendorAdapter.java",
+      "repo": "spring-framework",
+      "confidence": 0.9,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateProperties.java",
+      "repo": "spring-boot",
+      "confidence": 0.85
+    },
+    {
+      "path": "spring-orm/src/main/java/org/springframework/orm/hibernate5/HibernateTransactionManager.java",
+      "repo": "spring-framework",
+      "confidence": 0.8
+    }
+  ],
+  "dependency_trace_terms": [
+    "HibernateJpaAutoConfiguration",
+    "EntityManagerFactory",
+    "ClassUtils.isPresent",
+    "Hibernate 5",
+    "Hibernate 6",
+    "Jakarta",
+    "javax.persistence",
+    "jakarta.persistence",
+    "Dialect",
+    "ddl-auto"
+  ]
+}

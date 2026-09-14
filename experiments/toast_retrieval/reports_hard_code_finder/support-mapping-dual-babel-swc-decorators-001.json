@@ -1,0 +1,199 @@
+{
+  "task_id": "support-mapping-dual-babel-swc-decorators-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/babel--v7.24.0",
+    "github.com/sg-evals/swc--v1.4.6"
+  ],
+  "retrieved_paths": [
+    "packages/babel-plugin-proposal-decorators/src/index.ts",
+    "packages/babel-plugin-syntax-decorators/src/index.ts",
+    "packages/babel-helper-create-class-features-plugin/src/typescript.ts",
+    "packages/babel-plugin-transform-typescript/src/index.ts",
+    "packages/babel-standalone/src/preset-stage-3.ts",
+    "packages/babel-plugin-transform-typescript/test/fixtures/class/decorated-declare-properties/options.json",
+    "crates/swc_ecma_transforms/tests/fixture/legacy-metadata/metadata/nest/injection/output.ts",
+    "crates/swc_ecma_transforms/tests/fixture/legacy-metadata/metadata/generics/1/output.ts",
+    "crates/swc_ecma_transforms/tests/fixture/legacy-metadata/issues/3319/output.ts",
+    "crates/swc/tests/fixture/sourcemap/011/input/.swcrc",
+    "crates/swc_ecma_transforms_proposal/tests/decorators/2022-03-fields--to-es2015/options.json"
+  ],
+  "retrieved_paths_union": [
+    "packages/babel-plugin-proposal-decorators/src/index.ts",
+    "packages/babel-plugin-syntax-decorators/src/index.ts",
+    "packages/babel-helper-create-class-features-plugin/src/typescript.ts",
+    "packages/babel-plugin-transform-typescript/src/index.ts",
+    "packages/babel-standalone/src/preset-stage-3.ts",
+    "packages/babel-plugin-transform-typescript/test/fixtures/class/decorated-declare-properties/options.json",
+    "crates/swc_ecma_transforms/tests/fixture/legacy-metadata/metadata/nest/injection/output.ts",
+    "crates/swc_ecma_transforms/tests/fixture/legacy-metadata/metadata/generics/1/output.ts",
+    "crates/swc_ecma_transforms/tests/fixture/legacy-metadata/issues/3319/output.ts",
+    "crates/swc/tests/fixture/sourcemap/011/input/.swcrc",
+    "crates/swc_ecma_transforms_proposal/tests/decorators/2022-03-fields--to-es2015/options.json"
+  ],
+  "required_files": [
+    "babel/packages/babel-plugin-proposal-decorators/src/index.ts",
+    "babel/packages/babel-plugin-transform-typescript/src/index.ts",
+    "swc/crates/swc_ecma_transforms_proposal/src/decorators.rs",
+    "swc/crates/swc_ecma_transforms_typescript/src/lib.rs"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-babel-swc-decorators-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.5585,
+      "10": 0.5585
+    },
+    "mrr": 1.0,
+    "map_score": 0.375,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1818,
+    "n_retrieved": 11,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-babel-swc-decorators-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.5585,
+      "10": 0.5585
+    },
+    "mrr": 1.0,
+    "map_score": 0.375,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1818,
+    "n_retrieved": 11,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 21.5,
+  "response_chars": 4515,
+  "raw_response": "The regression is a legacy-vs-TC39 decorator mismatch: Nest requires legacy decorator application plus emitted `design:*` metadata; SWC only emits that path when both legacy decorators and metadata are enabled.\n\nRelevant files:\n\n- [babel--v7.24.0:packages/babel-plugin-proposal-decorators/src/index.ts?L26-L66](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-plugin-proposal-decorators/src/index.ts?L26-L66) - Selects the legacy visitor when `legacy`/`version: \"legacy\"` is configured; otherwise uses the TC39 class-features implementation.\n- [babel--v7.24.0:packages/babel-plugin-syntax-decorators/src/index.ts?L55-L118](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-plugin-syntax-decorators/src/index.ts?L55-L118) - Maps `legacy: true` to `version: \"legacy\"` and enables the legacy parser mode.\n- [babel--v7.24.0:packages/babel-helper-create-class-features-plugin/src/typescript.ts?L4-L23](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-helper-create-class-features-plugin/src/typescript.ts?L4-L23) - Explicitly requires `@babel/plugin-transform-typescript`/`@babel/preset-typescript` to run before decorators and other class-feature transforms.\n- [babel--v7.24.0:packages/babel-plugin-transform-typescript/src/index.ts?L140-L180](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-plugin-transform-typescript/src/index.ts?L140-L180) - Removes TypeScript-only declarations while preserving decorator-bearing class elements for the decorator transform.\n- [babel--v7.24.0:packages/babel-standalone/src/preset-stage-3.ts?L5-L39](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-standalone/src/preset-stage-3.ts?L5-L39) - Shows decorators configured before class-properties lowering; `decoratorsLegacy` selects legacy mode.\n- [babel--v7.24.0:packages/babel-plugin-transform-typescript/test/fixtures/class/decorated-declare-properties/options.json?L1-L6](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-plugin-transform-typescript/test/fixtures/class/decorated-declare-properties/options.json?L1-L6) - Working ordering: TypeScript transform, then legacy decorators, then class properties.\n\n- [swc--v1.4.6:crates/swc_ecma_transforms/tests/fixture/legacy-metadata/metadata/nest/injection/output.ts?L19-L50](/r/github.com/sg-evals/swc--v1.4.6/-/blob/crates/swc_ecma_transforms/tests/fixture/legacy-metadata/metadata/nest/injection/output.ts?L19-L50) - SWC\u2019s Nest-style output uses legacy `_ts_decorate`, `_ts_param`, and `_ts_metadata(\"design:paramtypes\", ...)`.\n- [swc--v1.4.6:crates/swc_ecma_transforms/tests/fixture/legacy-metadata/metadata/generics/1/output.ts?L1-L12](/r/github.com/sg-evals/swc--v1.4.6/-/blob/crates/swc_ecma_transforms/tests/fixture/legacy-metadata/metadata/generics/1/output.ts?L1-L12) - Demonstrates class decorator metadata emission, including `design:paramtypes`.\n- [swc--v1.4.6:crates/swc_ecma_transforms/tests/fixture/legacy-metadata/issues/3319/output.ts?L60-L88](/r/github.com/sg-evals/swc--v1.4.6/-/blob/crates/swc_ecma_transforms/tests/fixture/legacy-metadata/issues/3319/output.ts?L60-L88) - Shows metadata attached through `_ts_decorate` and consumed through `Reflect.getMetadata`.\n- [swc--v1.4.6:crates/swc/tests/fixture/sourcemap/011/input/.swcrc?L5-L16](/r/github.com/sg-evals/swc--v1.4.6/-/blob/crates/swc/tests/fixture/sourcemap/011/input/.swcrc?L5-L16) - Required SWC configuration: parser decorators enabled, `transform.legacyDecorator: true`, `transform.decoratorMetadata: true`.\n- [swc--v1.4.6:crates/swc_ecma_transforms_proposal/tests/decorators/2022-03-fields--to-es2015/options.json?L1-L7](/r/github.com/sg-evals/swc--v1.4.6/-/blob/crates/swc_ecma_transforms_proposal/tests/decorators/2022-03-fields--to-es2015/options.json?L1-L7) - SWC\u2019s separate TC39 decorator pipeline orders proposal decorators before class-properties lowering.\n\nConfiguration diagnosis: Babel must use `[\"@babel/plugin-transform-typescript\"]`/preset first, then `[\"@babel/plugin-proposal-decorators\", { \"legacy\": true }]` (or `version: \"legacy\"`), followed by class-properties lowering. SWC must set `parser.decorators: true`, `transform.legacyDecorator: true`, and `transform.decoratorMetadata: true`. If the customer enabled only decorator parsing or used `legacyDecorator: false`/omitted `decoratorMetadata`, SWC can still construct classes and apply a non-legacy/metadata-free transform, but emits no `_ts_metadata(\"design:paramtypes\", ...)`; consequently `reflect-metadata` has nothing to register and Nest\u2019s IoC lookup fails.",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-babel-swc-decorators-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 11,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "babel/packages/babel-plugin-proposal-decorators/src/index.ts",
+    "packages/babel-plugin-syntax-decorators/src/index.ts",
+    "packages/babel-helper-create-class-features-plugin/src/typescript.ts",
+    "babel/packages/babel-plugin-transform-typescript/src/index.ts",
+    "packages/babel-standalone/src/preset-stage-3.ts",
+    "packages/babel-plugin-transform-typescript/test/fixtures/class/decorated-declare-properties/options.json",
+    "crates/swc_ecma_transforms/tests/fixture/legacy-metadata/metadata/nest/injection/output.ts",
+    "crates/swc_ecma_transforms/tests/fixture/legacy-metadata/metadata/generics/1/output.ts",
+    "crates/swc_ecma_transforms/tests/fixture/legacy-metadata/issues/3319/output.ts",
+    "crates/swc/tests/fixture/sourcemap/011/input/.swcrc",
+    "crates/swc_ecma_transforms_proposal/tests/decorators/2022-03-fields--to-es2015/options.json"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-babel-swc-decorators-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 11,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

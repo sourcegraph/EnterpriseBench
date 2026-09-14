@@ -1,0 +1,245 @@
+{
+  "task_id": "schema-evolution-001",
+  "policy": "deepsearch",
+  "suite": "feature_delivery",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/zulip--38053e9c"
+  ],
+  "retrieved_paths": [
+    "zerver/models/groups.py",
+    "zerver/migrations/0577_merge_20240829_0153.py",
+    "zerver/actions/user_groups.py",
+    "zerver/lib/user_groups.py",
+    "zerver/views/user_groups.py",
+    "zerver/lib/mention.py",
+    "zerver/lib/message.py",
+    "zproject/backends.py",
+    "zerver/lib/event_schema.py",
+    "zerver/openapi/curl_param_value_generators.py",
+    "zerver/lib/export.py",
+    "zerver/lib/import_realm.py",
+    "zerver/models/realm_audit_logs.py",
+    "zerver/lib/markdown/__init__.py",
+    "zproject/urls.py",
+    "zerver/tests/test_user_groups.py",
+    "zerver/transaction_tests/test_user_groups.py",
+    "zerver/tests/test_import_export.py",
+    "zerver/tests/test_markdown.py",
+    "web/tests/lib/events.js",
+    "web/tests/user_groups.test.js",
+    "web/tests/dispatch.test.js",
+    "web/tests/markdown.test.js",
+    "web/tests/composebox_typeahead.test.js",
+    "zerver/migrations/0578_namedusergroup_deactivated.py",
+    "zerver/openapi/zulip.yaml"
+  ],
+  "retrieved_paths_union": [
+    "zerver/models/groups.py",
+    "zerver/migrations/0577_merge_20240829_0153.py",
+    "zerver/actions/user_groups.py",
+    "zerver/lib/user_groups.py",
+    "zerver/views/user_groups.py",
+    "zerver/lib/mention.py",
+    "zerver/lib/message.py",
+    "zproject/backends.py",
+    "zerver/lib/event_schema.py",
+    "zerver/openapi/curl_param_value_generators.py",
+    "zerver/lib/export.py",
+    "zerver/lib/import_realm.py",
+    "zerver/models/realm_audit_logs.py",
+    "zerver/lib/markdown/__init__.py",
+    "zproject/urls.py",
+    "zerver/tests/test_user_groups.py",
+    "zerver/transaction_tests/test_user_groups.py",
+    "zerver/tests/test_import_export.py",
+    "zerver/tests/test_markdown.py",
+    "web/tests/lib/events.js",
+    "web/tests/user_groups.test.js",
+    "web/tests/dispatch.test.js",
+    "web/tests/markdown.test.js",
+    "web/tests/composebox_typeahead.test.js",
+    "zerver/migrations/0578_namedusergroup_deactivated.py",
+    "zerver/openapi/zulip.yaml"
+  ],
+  "required_files": [
+    "zerver/models/groups.py",
+    "zerver/actions/user_groups.py",
+    "zerver/views/user_groups.py",
+    "zerver/lib/events.py",
+    "zerver/lib/event_schema.py",
+    "zerver/lib/user_groups.py"
+  ],
+  "ir_scores": {
+    "task_id": "schema-evolution-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.8,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.1667,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 0.8333
+    },
+    "f1": {
+      "1": 0.2857,
+      "3": 0.4444,
+      "5": 0.7273,
+      "10": 0.625
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.786,
+      "10": 0.7924
+    },
+    "mrr": 1.0,
+    "map_score": 0.6287,
+    "file_recall": 0.8333,
+    "context_efficiency": 0.1923,
+    "n_retrieved": 26,
+    "n_ground_truth": 6,
+    "n_overlap": 5
+  },
+  "ir_scores_union": {
+    "task_id": "schema-evolution-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.8,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.1667,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 0.8333
+    },
+    "f1": {
+      "1": 0.2857,
+      "3": 0.4444,
+      "5": 0.7273,
+      "10": 0.625
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.786,
+      "10": 0.7924
+    },
+    "mrr": 1.0,
+    "map_score": 0.6287,
+    "file_recall": 0.8333,
+    "context_efficiency": 0.1923,
+    "n_retrieved": 26,
+    "n_ground_truth": 6,
+    "n_overlap": 5
+  },
+  "elapsed_seconds": 335.3,
+  "response_chars": 24311,
+  "raw_response": "---\ntitle: Impact analysis for adding deactivation support to NamedUserGroup schema\nshare_url: https://demo.sourcegraph.com/deepsearch/2d87afa5-11b2-4576-a393-e28d75a4a06f\nurl: https://demo.sourcegraph.com/deepsearch/2197\ncreated: 2026-08-18T01:43:38Z\nupdated: 2026-08-18T01:47:46Z\n---\n\n# # Schema Change: Add Deactivation Support to User Groups\n\n## Context\n\nWe've been getting requests from large organizations to be able to deactivate user groups without deleting them. Right now, deleting a group is permanent and breaks any references to it in stream permissions, message mentions, etc.\n\nThe plan is to add a `deactivated` boolean field to the `NamedUserGroup` model. The migration is already written (`zerver/migrations/0578_namedusergroup_deactivated.py`), but before we proceed I need a full impact analysis of what code needs to change.\n\n## What I Need\n\n1. **Schema change identification**: Confirm the migration and model change.\n\n2. **Direct code references**: Find all Python code that queries, creates, updates, or filters `NamedUserGroup` objects. This includes the actions layer, views, and utility functions. We need to make sure deactivated groups are excluded from active queries but still accessible for admin operations.\n\n3. **Indirect references**: This is the tricky part. The `NamedUserGroup` model touches:\n   - The real-time event system (events sent to clients when groups change)\n   - The API schema (OpenAPI spec in `zerver/openapi/`)\n   - Realm import/export\n   - Audit logging\n   - Markdown rendering (group mentions like `@*groupname*`)\n   - URL routing for group endpoints\n\n   I need to know every place that needs to learn about the `deactivated` state.\n\n4. **Test coverage**: Which test files exercise user group functionality and would need new test cases for deactivation scenarios?\n\nWrite your complete analysis to `/workspace/zulip/SCHEMA_IMPACT.md` with sections for each category above, including file paths and brief descriptions of required changes.\n\n\nSearch only these repositories: github.com/sg-evals/zulip--38053e9c\n\nThe file module only supports `.csv`, `.json`, and `.svg` outputs \u2014 not `.md` files. The complete analysis is written to [SCHEMA_IMPACT_MD.json](https://demo.sourcegraph.com/.api/agent-files/v1/deep-search/2d87afa5-11b2-4576-a393-e28d75a4a06f/files/SCHEMA_IMPACT_MD.json) (the value is the full Markdown string). Here is the complete analysis inline:\n\n---\n\n## 1. Schema Change Identification\n\n### Model: [`zerver/models/groups.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/models/groups.py?L35-L115)\n\n`NamedUserGroup` (line 35) currently has `name`, `description`, `is_system_group`, `can_manage_group`, `can_mention_group`, `realm_for_sharding`. There is **no** `deactivated` field.\n\n**Required addition after `is_system_group`:**\n```python\ndeactivated = models.BooleanField(default=False, db_column=\"deactivated\")\n```\n\nSystem groups (`is_system_group=True`) must never be deactivatable \u2014 enforce this at the action layer.\n\n### Migration: `zerver/migrations/0578_namedusergroup_deactivated.py`\n\nThis file **does not yet exist**. The current latest is [`0577_merge_20240829_0153.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/migrations/0577_merge_20240829_0153.py). The migration must:\n- Declare `dependencies = [(\"zerver\", \"0577_merge_20240829_0153\")]`\n- Call `migrations.AddField(model_name=\"namedusergroup\", name=\"deactivated\", field=models.BooleanField(default=False))`\n\n---\n\n## 2. Direct Code References\n\n### 2a. Actions Layer \u2014 [`zerver/actions/user_groups.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/actions/user_groups.py)\n\n| Function | Lines | Required Change |\n|---|---|---|\n| `create_user_group_in_database` | [40\u201392](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/actions/user_groups.py?L40-L92) | No change; `deactivated` defaults to `False`. |\n| `do_send_create_user_group_event` | [168\u2013187](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/actions/user_groups.py?L168-L187) | Add `deactivated: user_group.deactivated` to the event `group` dict. |\n| `do_update_user_group_name` | [222\u2013242](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/actions/user_groups.py?L222-L242) | Guard: reject if `user_group.deactivated`. |\n| `do_update_user_group_description` | [245\u2013263](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/actions/user_groups.py?L245-L263) | Guard: reject if `user_group.deactivated`. |\n| `bulk_add_members_to_user_groups` | [274\u2013306](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/actions/user_groups.py?L274-L306) | Guard: reject if any target group is deactivated. |\n| `bulk_remove_members_from_user_groups` | [309\u2013339](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/actions/user_groups.py?L309-L339) | Policy decision: allow removal (cleanup) or block. |\n| `add_subgroups_to_user_group` | [352\u2013388](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/actions/user_groups.py?L352-L388) | Guard: reject if supergroup is deactivated. |\n| `remove_subgroups_from_user_group` | [391\u2013425](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/actions/user_groups.py?L391-L425) | Same \u2014 reject or allow for admin cleanup. |\n| `check_delete_user_group` | [433\u2013436](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/actions/user_groups.py?L433-L436) | **Major change**: repurpose to soft-delete or replace with `do_deactivate_user_group`. |\n| `do_change_user_group_permission_setting` | [439\u2013490](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/actions/user_groups.py?L439-L490) | Guard: reject if group is deactivated. |\n\n**New function to add:**\n```python\n@transaction.atomic(savepoint=False)\ndef do_deactivate_user_group(\n    user_group: NamedUserGroup, *, acting_user: UserProfile\n) -> None:\n    if user_group.is_system_group:\n        raise JsonableError(_(\"System groups cannot be deactivated.\"))\n    user_group.deactivated = True\n    user_group.save(update_fields=[\"deactivated\"])\n    RealmAuditLog.objects.create(\n        realm=user_group.realm,\n        acting_user=acting_user,\n        event_type=AuditLogEventType.USER_GROUP_DEACTIVATED,\n        event_time=timezone_now(),\n        modified_user_group=user_group,\n    )\n    do_send_user_group_update_event(user_group, dict(deactivated=True))\n```\n\n### 2b. Library \u2014 [`zerver/lib/user_groups.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/user_groups.py)\n\n| Symbol | Lines | Required Change |\n|---|---|---|\n| `UserGroupDict` TypedDict | [47\u201356](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/user_groups.py?L47-L56) | Add `deactivated: bool` key. |\n| `user_groups_in_realm_serialized` | [377\u2013435](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/user_groups.py?L377-L435) | Include `deactivated` in each group dict. Decide whether to filter `deactivated=False` for non-admin serializations. |\n| `access_user_group_by_id` | [110\u2013126](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/user_groups.py?L110-L126) | For `for_read=False` (mutation), raise `JsonableError` if `user_group.deactivated`. |\n| `has_user_group_access` | [73\u2013107](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/user_groups.py?L73-L107) | Deactivated groups non-editable except by realm admins. |\n| `update_or_create_user_group_for_setting` | [261\u2013292](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/user_groups.py?L261-L292) | Reject deactivated group IDs when used as permission setting values. |\n| `bulk_create_system_user_groups` | [594\u2013631](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/user_groups.py?L594-L631) | Raw SQL `INSERT` into `zerver_namedusergroup`; add `deactivated` column with value `False` to avoid `NOT NULL` violations after migration. |\n\n### 2c. Views \u2014 [`zerver/views/user_groups.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/views/user_groups.py)\n\n| View | Lines | Required Change |\n|---|---|---|\n| `get_user_group` (GET `/user_groups`) | [93\u201397](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/views/user_groups.py?L93-L97) | Must return `deactivated` in each group. |\n| `edit_user_group` (PATCH) | [100\u2013167](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/views/user_groups.py?L100-L167) | Reject edits on deactivated groups; optionally support `deactivated` as a settable parameter (for reactivation). |\n| `delete_user_group` (DELETE) | [170\u2013183](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/views/user_groups.py?L170-L183) | **Change behavior**: call `do_deactivate_user_group` instead of `check_delete_user_group`. |\n| `add_members_to_group_backend` | [267\u2013296](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/views/user_groups.py?L267-L296) | Reject adds to deactivated groups. |\n| `remove_members_from_group_backend` | [299\u2013323](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/views/user_groups.py?L299-L323) | Policy decision: allow or block. |\n| `add_subgroups_to_group_backend` | [326\u2013359](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/views/user_groups.py?L326-L359) | Reject adds to deactivated groups. |\n\n### 2d. Other Direct Query Sites\n\n| File | Lines | Required Change |\n|---|---|---|\n| [`zerver/lib/mention.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/mention.py?L267-L276) (`init_user_group_data`) | 267\u2013276 | **Critical**: add `deactivated=False` to the `NamedUserGroup.objects.filter(...)` query \u2014 otherwise deactivated groups can still be @-mentioned. |\n| [`zerver/lib/message.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/message.py?L1206-L1231) (`check_user_group_mention_allowed`) | 1206\u20131231 | Defense-in-depth: raise `JsonableError` if a fetched group is deactivated. |\n| [`zproject/backends.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zproject/backends.py?L992-L1008) (SSO sync) | 992\u20131008 | Skip deactivated groups when syncing group memberships from the IdP. |\n\n---\n\n## 3. Indirect References\n\n### 3a. Real-Time Event System \u2014 [`zerver/lib/event_schema.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/event_schema.py?L1810-L1909)\n\n| Symbol | Lines | Required Change |\n|---|---|---|\n| `group_type` | [1810\u20131820](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/event_schema.py?L1810-L1820) | Add `(\"deactivated\", bool)` as a **required** key \u2014 used in `user_group_add` events. |\n| `user_group_data_type` | [1861\u20131869](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/event_schema.py?L1861-L1869) | Add `(\"deactivated\", bool)` as an **optional** key \u2014 used in `user_group_update` events. |\n\nNo new event `op` is required; deactivation travels as `op: \"update\"` with `data: {\"deactivated\": true}`, consistent with how `name` and `description` changes are handled.\n\n### 3b. API Schema \u2014 `zerver/openapi/zulip.yaml`\n\n- The `UserGroup` / `BasicUserGroup` schema object needs a new `deactivated: boolean` field (required, default `false`).\n- `GET /user_groups` response schema: add `deactivated` to each group object.\n- `PATCH /user_groups/{user_group_id}` ([`edit_user_group` view](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/views/user_groups.py?L100-L167)): if reactivation is done via PATCH, add `deactivated` as an optional request parameter.\n- `POST /user_groups/create`: no input parameter; always `false`.\n\n[`zerver/openapi/curl_param_value_generators.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/openapi/curl_param_value_generators.py?L255-L276) `create_user_group_data`: no `deactivated` parameter needed.\n\n### 3c. Realm Import / Export\n\n| File | Lines | Required Change |\n|---|---|---|\n| [`zerver/lib/export.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/export.py?L801-L804) | 801\u2013804 | No code change \u2014 model-based export picks up new columns automatically. Verify fixtures after migration. |\n| [`zerver/lib/import_realm.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/import_realm.py?L746-L758) | 746\u2013758 | Old exports lack the `deactivated` key. **Add** `group.setdefault(\"deactivated\", False)` before bulk-create to maintain backward compatibility. |\n\n### 3d. Audit Logging \u2014 [`zerver/models/realm_audit_logs.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/models/realm_audit_logs.py?L97-L108)\n\n**Add new constants** after `USER_GROUP_GROUP_BASED_SETTING_CHANGED = 722`:\n```python\nUSER_GROUP_DEACTIVATED = 723\nUSER_GROUP_REACTIVATED = 724   # if reactivation is supported\n```\n\nThe `modified_user_group` FK on `RealmAuditLog` ([L222\u2013228](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/models/realm_audit_logs.py?L222-L228)) already handles linking audit entries to `NamedUserGroup` \u2014 no schema change needed there.\n\n### 3e. Markdown Rendering \u2014 Group Mentions\n\n**[`zerver/lib/mention.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/mention.py?L267-L276) \u2014 `MentionData.init_user_group_data` (L267\u2013276):**\n\n```python\n# Current \u2014 deactivated groups can be mentioned:\nfor group in NamedUserGroup.objects.filter(\n    realm_id=realm_id, name__in=user_group_names, is_system_group=False\n)\n\n# Required:\nfor group in NamedUserGroup.objects.filter(\n    realm_id=realm_id, name__in=user_group_names,\n    is_system_group=False, deactivated=False        # add this\n)\n```\n\nThe Markdown renderer in [`zerver/lib/markdown/__init__.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/markdown/__init__.py?L1948-L1979) (`UserGroupMentionPattern`) reads group data from `MentionData`. If a group is absent from `user_group_name_info` because it was filtered out as deactivated, the mention renders as plain text \u2014 this is the correct passive behavior and requires no change in the renderer itself.\n\n### 3f. URL Routing \u2014 [`zproject/urls.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zproject/urls.py?L399-L415)\n\nCurrent routes are unchanged unless a new endpoint is added. Two approaches:\n\n- **Option A (recommended):** `DELETE /user_groups/<id>` is repurposed to call `do_deactivate_user_group`. No new URL needed.\n- **Option B:** Keep `DELETE` as hard-delete; add `deactivated` as a PATCH parameter for soft-deactivation via `edit_user_group`.\n\nNo structural URL changes are strictly required under either option.\n\n---\n\n## 4. Test Coverage\n\n### 4a. Primary Tests \u2014 [`zerver/tests/test_user_groups.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/tests/test_user_groups.py)\n\nNew test cases required (based on `UserGroupTestCase` at L54):\n\n- `test_deactivate_user_group`: verify `deactivated=True`, correct audit log (`USER_GROUP_DEACTIVATED`), real-time event with `data={\"deactivated\": True}`.\n- `test_reactivate_user_group` (if supported).\n- `test_deactivated_group_excluded_or_flagged_in_serialization`.\n- `test_cannot_edit_deactivated_group`: `edit_user_group` raises error.\n- `test_cannot_add_members_to_deactivated_group`.\n- `test_cannot_add_subgroups_to_deactivated_group`.\n- `test_cannot_deactivate_system_group`.\n- `test_admin_can_read_deactivated_group`.\n\n### 4b. Transaction Tests \u2014 [`zerver/transaction_tests/test_user_groups.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/transaction_tests/test_user_groups.py)\n\nAdd a case for concurrent deactivation + member addition (race condition test).\n\n### 4c. Import/Export Tests \u2014 [`zerver/tests/test_import_export.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/tests/test_import_export.py?L506-L508)\n\n- Update line 507 assertion to check for `deactivated` key in exported `zerver_namedusergroup` records.\n- Add test for importing a pre-migration export (missing `deactivated`); verify default `False` applied.\n- Add round-trip test for a realm with a deactivated group.\n\n### 4d. Markdown Tests \u2014 [`zerver/tests/test_markdown.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/tests/test_markdown.py?L2829-L2834)\n\nAdd a case: `@*deactivated_group*` does **not** resolve to a mention (renders as plain text).\n\n### 4e. Event Schema Tests\n\nUpdate `check_user_group_add` test fixtures to include `deactivated: false`. Add a case asserting `check_user_group_update` passes when `data = {\"deactivated\": True}`.\n\n### 4f. Front-End Tests\n\n| File | Required Change |\n|---|---|\n| [`web/tests/lib/events.js`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/web/tests/lib/events.js?L806-L810) | Add `deactivated: false` to `user_group__add` fixture. |\n| [`web/tests/user_groups.test.js`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/web/tests/user_groups.test.js) | Update group objects in `initialize` calls; add test for `deactivated` field handling. |\n| [`web/tests/dispatch.test.js`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/web/tests/dispatch.test.js?L192-L201) | Update `user_group__add` event handler test. |\n| [`web/tests/markdown.test.js`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/web/tests/markdown.test.js) | Add test: deactivated group not resolved in markdown. |\n| [`web/tests/composebox_typeahead.test.js`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/web/tests/composebox_typeahead.test.js) | Deactivated groups must not appear in `@` mention typeahead. |\n\n---\n\n## Summary Table\n\n| File | Change Type |\n|---|---|\n| `zerver/models/groups.py` | Add `deactivated = BooleanField(default=False)` |\n| `zerver/migrations/0578_namedusergroup_deactivated.py` | Create (does not exist yet) |\n| `zerver/models/realm_audit_logs.py` | Add `USER_GROUP_DEACTIVATED = 723` (and `REACTIVATED = 724`) |\n| `zerver/lib/user_groups.py` | Extend `UserGroupDict`; update serializer; guard access function; fix raw SQL |\n| `zerver/actions/user_groups.py` | Add `do_deactivate_user_group`; add `deactivated` to create event; guard mutation functions |\n| `zerver/lib/event_schema.py` | Add `deactivated` to `group_type` (required) and `user_group_data_type` (optional) |\n| `zerver/lib/mention.py` | Add `deactivated=False` to `init_user_group_data` query |\n| `zerver/lib/message.py` | Add deactivated guard in `check_user_group_mention_allowed` |\n| `zproject/backends.py` | Skip deactivated groups in SSO group sync |\n| `zerver/views/user_groups.py` | Change `delete_user_group` to deactivate; guard mutation views |\n| `zproject/urls.py` | No new routes if using PATCH/DELETE repurpose approach |\n| `zerver/openapi/zulip.yaml` | Add `deactivated` to group schema object |\n| `zerver/lib/import_realm.py` | Default `deactivated=False` for old exports |\n| `zerver/lib/export.py` | No code change (automatic) |\n| `zerver/tests/test_user_groups.py` | 8+ new test cases |\n| `zerver/tests/test_import_export.py` | Update assertions; add compat tests |\n| `zerver/tests/test_markdown.py` | Add deactivated group mention suppression test |\n| `web/tests/lib/events.js` | Add `deactivated` to group fixture |\n| `web/tests/user_groups.test.js` | Handle `deactivated` field |\n| `web/tests/composebox_typeahead.test.js` | Suppress deactivated groups from typeahead |\n\n## Sources\n\n- [repo:^github.com/sg-evals/zulip--38053e9c$ NamedUserGroup file:.*.py](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20NamedUserGroup%20file:.%2A.py)\n- [github.com/sg-evals/zulip--38053e9c/zerver/models/groups.py@53e6fec](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/models/groups.py)\n- [github.com/sg-evals/zulip--38053e9c/zerver/actions/user_groups.py@53e6fec](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/actions/user_groups.py)\n- [github.com/sg-evals/zulip--38053e9c/zerver/lib/user_groups.py@53e6fec](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/lib/user_groups.py)\n- [github.com/sg-evals/zulip--38053e9c/zerver/views/user_groups.py@53e6fec](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/views/user_groups.py)\n- [github.com/sg-evals/zulip--38053e9c/zerver/lib/mention.py@53e6fec?L250-310](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/lib/mention.py?L250-310)\n- [repo:^github.com/sg-evals/zulip--38053e9c$ file:test.*user_group](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20file:test.%2Auser_group)\n- [repo:^github.com/sg-evals/zulip--38053e9c$ user_group file:test](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20user_group%20file:test)\n- [github.com/sg-evals/zulip--38053e9c/zerver/models/realm_audit_logs.py@53e6fec?L90-130](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/models/realm_audit_logs.py?L90-130)\n- [repo:^github.com/sg-evals/zulip--38053e9c$ user_group openapi zulip.yaml](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20user_group%20openapi%20zulip.yaml)\n- [github.com/sg-evals/zulip--38053e9c/zerver/lib/event_schema.py@53e6fec?L1810-1920](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/lib/event_schema.py?L1810-1920)\n- [github.com/sg-evals/zulip--38053e9c/zerver/tests/test_user_groups.py@53e6fec?L1-80](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/tests/test_user_groups.py?L1-80)\n- [repo:^github.com/sg-evals/zulip--38053e9c$ zerver_namedusergroup file:export.py](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20zerver_namedusergroup%20file:export.py)\n- [repo:^github.com/sg-evals/zulip--38053e9c$ check_user_group_mention_allowed file:message.py](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20check_user_group_mention_allowed%20file:message.py)\n- [github.com/sg-evals/zulip--38053e9c/zerver/lib/message.py@53e6fec?L1200-1230](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/lib/message.py?L1200-1230)\n- [repo:^github.com/sg-evals/zulip--38053e9c$ zproject/urls.py user_group](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20zproject%2Furls.py%20user_group)\n- [github.com/sg-evals/zulip--38053e9c/zproject/urls.py@53e6fec?L395-435](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zproject/urls.py?L395-435)\n- [github.com/sg-evals/zulip--38053e9c/zerver/lib/import_realm.py@53e6fec?L740-770](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/lib/import_realm.py?L740-770)\n- [github.com/sg-evals/zulip--38053e9c/zerver/lib/export.py@53e6fec?L795-820](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/lib/export.py?L795-820)\n\n\nGenerated files:\n- files/SCHEMA_IMPACT.json: /.api/agent-files/v1/deep-search/2d87afa5-11b2-4576-a393-e28d75a4a06f/files/SCHEMA_IMPACT.json\n- files/placeholder.svg: /.api/agent-files/v1/deep-search/2d87afa5-11b2-4576-a393-e28d75a4a06f/files/placeholder.svg\n- files/SCHEMA_IMPACT_MD.json: /.api/agent-files/v1/deep-search/2d87afa5-11b2-4576-a393-e28d75a4a06f/files/SCHEMA_IMPACT_MD.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "schema-evolution-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.8,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.1667,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 0.8333
+    },
+    "f1": {
+      "1": 0.2857,
+      "3": 0.4444,
+      "5": 0.7273,
+      "10": 0.625
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.786,
+      "10": 0.7924
+    },
+    "mrr": 1.0,
+    "map_score": 0.6287,
+    "file_recall": 0.8333,
+    "context_efficiency": 0.1923,
+    "n_retrieved": 26,
+    "n_ground_truth": 6,
+    "n_overlap": 5
+  },
+  "retrieved_paths_aligned": [
+    "zerver/models/groups.py",
+    "zerver/migrations/0577_merge_20240829_0153.py",
+    "zerver/actions/user_groups.py",
+    "zerver/lib/user_groups.py",
+    "zerver/views/user_groups.py",
+    "zerver/lib/mention.py",
+    "zerver/lib/message.py",
+    "zproject/backends.py",
+    "zerver/lib/event_schema.py",
+    "zerver/openapi/curl_param_value_generators.py",
+    "zerver/lib/export.py",
+    "zerver/lib/import_realm.py",
+    "zerver/models/realm_audit_logs.py",
+    "zerver/lib/markdown/__init__.py",
+    "zproject/urls.py",
+    "zerver/tests/test_user_groups.py",
+    "zerver/transaction_tests/test_user_groups.py",
+    "zerver/tests/test_import_export.py",
+    "zerver/tests/test_markdown.py",
+    "web/tests/lib/events.js",
+    "web/tests/user_groups.test.js",
+    "web/tests/dispatch.test.js",
+    "web/tests/markdown.test.js",
+    "web/tests/composebox_typeahead.test.js",
+    "zerver/migrations/0578_namedusergroup_deactivated.py",
+    "zerver/openapi/zulip.yaml"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "schema-evolution-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.8,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.1667,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 0.8333
+    },
+    "f1": {
+      "1": 0.2857,
+      "3": 0.4444,
+      "5": 0.7273,
+      "10": 0.625
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.786,
+      "10": 0.7924
+    },
+    "mrr": 1.0,
+    "map_score": 0.6287,
+    "file_recall": 0.8333,
+    "context_efficiency": 0.1923,
+    "n_retrieved": 26,
+    "n_ground_truth": 6,
+    "n_overlap": 5
+  },
+  "scoring": "aligned_suffix_v1"
+}

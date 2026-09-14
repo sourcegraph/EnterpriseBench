@@ -1,0 +1,118 @@
+# support_code_mapping: Map customer Vitest tests failing with stale module after Vite optimizeDeps refresh to the Vitest pool / Vite optimizeDeps cache boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "vitest-vite-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-vitest-vite-optimize-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "medium"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Map customer Vitest tests failing with stale module after Vite optimizeDeps refresh to the Vitest pool / Vite optimizeDeps cache boundary"
+prompt = """
+A customer reports that under Vitest watch mode their tests pass on
+the first run but fail intermittently on file save with errors like
+'TypeError: foo is not a function' for re-exported library symbols.
+Restarting Vitest fixes it until the next save.
+
+Your task:
+1. Find where Vitest's pool spawns worker threads and how it shares
+   Vite's transform cache.
+2. Find where Vite's optimizeDeps pre-bundles dependencies and how
+   it invalidates the cache on file change.
+3. Trace the cross-repo path: Vitest watcher file change -> Vite
+   moduleGraph invalidate -> optimizeDeps re-pre-bundle -> worker
+   pool module reload. Cite each file and the function responsible.
+4. Identify why a stale optimizeDeps bundle can survive a watcher
+   tick when the pre-bundled chunk's mtime trails the source change.
+"""
+
+[[repos]]
+url = "https://github.com/vitest-dev/vitest"
+rev = "v1.4.0"
+path = "vitest"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/vitejs/vite"
+rev = "v5.2.6"
+path = "vite"
+role = "upstream"
+
+[metadata]
+languages = ["typescript", "javascript"]
+total_loc = 350000
+dependency_depth = 2
+frameworks = ["vitest", "vite", "esbuild"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Stale-module regression is split between Vitest's worker pool and Vite's optimizeDeps cache. Cross-repo navigation is required to see why the worker reloads a pre-bundled chunk that has not been rebuilt."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "vitest/packages/vitest/src/runtime/runVmTests.ts"
+repo = "vitest"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "vitest/packages/vitest/src/node/pool.ts"
+repo = "vitest"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "vite/packages/vite/src/node/optimizer/index.ts"
+repo = "vite"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "vite/packages/vite/src/node/server/moduleGraph.ts"
+repo = "vite"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "vitest/packages/vitest/src/node/core.ts"
+repo = "vitest"
+confidence = 0.75
+
+[[ground_truth.sufficient_files]]
+path = "vite/packages/vite/src/node/optimizer/optimizer.ts"
+repo = "vite"
+confidence = 0.85

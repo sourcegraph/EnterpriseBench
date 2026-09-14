@@ -1,0 +1,122 @@
+# support_code_mapping: Map customer Spring Kafka listener acks lost during consumer rebalance to the KafkaListener / ConsumerRebalanceListener ack-mode boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "spring-kafka-clients-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-spring-kafka-rebalance-002"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 35
+session_type = "single"
+description = "Map customer Spring Kafka listener acks lost during consumer rebalance to the KafkaListener / ConsumerRebalanceListener ack-mode boundary"
+prompt = """
+A customer reports that their Spring Kafka listener occasionally
+double-processes messages whenever the consumer group rebalances. The
+logs show acks fired by the listener, but Kafka shows the offsets
+were not committed before the partition was revoked.
+
+Your task:
+1. Find where Spring Kafka's KafkaMessageListenerContainer wires its
+   ConsumerRebalanceListener and how it interacts with the configured
+   ack-mode (BATCH, RECORD, MANUAL_IMMEDIATE).
+2. Find where Apache Kafka's clients module enforces the
+   ConsumerRebalanceListener.onPartitionsRevoked contract and the
+   commit semantics around it.
+3. Trace the cross-repo path: Spring KafkaListener -> ListenerConsumer
+   poll loop -> rebalance event -> ConsumerCoordinator.invokeOnPartitionsRevoked
+   -> Spring's ack queue flush -> commit. Cite each file and the
+   function or attribute responsible.
+4. Identify why ack-mode BATCH defers commit until after the listener
+   batch returns, and why this can race with onPartitionsRevoked,
+   leaving commit-pending records double-processed after rebalance.
+"""
+
+[[repos]]
+url = "https://github.com/spring-projects/spring-kafka"
+rev = "v3.1.4"
+path = "spring-kafka"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/apache/kafka"
+rev = "3.6.1"
+path = "kafka"
+role = "upstream"
+
+[metadata]
+languages = ["java"]
+total_loc = 2500000
+dependency_depth = 2
+frameworks = ["spring-kafka", "kafka", "kafka-clients"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Rebalance ack-loss is split between Spring Kafka's ack-mode policy and Kafka's ConsumerCoordinator timing. Tracing the race requires reading both repos' rebalance flows."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "spring-kafka/spring-kafka/src/main/java/org/springframework/kafka/listener/KafkaMessageListenerContainer.java"
+repo = "spring-kafka"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "spring-kafka/spring-kafka/src/main/java/org/springframework/kafka/listener/ContainerProperties.java"
+repo = "spring-kafka"
+confidence = 0.8
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "kafka/clients/src/main/java/org/apache/kafka/clients/consumer/internals/ConsumerCoordinator.java"
+repo = "kafka"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "kafka/clients/src/main/java/org/apache/kafka/clients/consumer/KafkaConsumer.java"
+repo = "kafka"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "spring-kafka/spring-kafka/src/main/java/org/springframework/kafka/listener/AcknowledgingMessageListener.java"
+repo = "spring-kafka"
+confidence = 0.75
+
+[[ground_truth.sufficient_files]]
+path = "kafka/clients/src/main/java/org/apache/kafka/clients/consumer/ConsumerRebalanceListener.java"
+repo = "kafka"
+confidence = 0.7

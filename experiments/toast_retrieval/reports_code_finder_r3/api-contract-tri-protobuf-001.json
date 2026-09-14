@@ -1,0 +1,211 @@
+{
+  "task_id": "api-contract-tri-protobuf-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/protobuf--v25.1",
+    "github.com/sg-evals/grpc--v1.60.0",
+    "github.com/sg-evals/googleapis--common-protos-1_3_1"
+  ],
+  "retrieved_paths": [
+    "src/google/protobuf/timestamp.proto",
+    "src/google/protobuf/duration.proto",
+    "src/google/protobuf/struct.proto",
+    "src/google/protobuf/field_mask.proto",
+    "src/google/protobuf/any.proto",
+    "python/google/protobuf/internal/well_known_types.py",
+    "src/google/protobuf/json/internal/parser.cc",
+    "upb/json/encode.c",
+    "include/grpcpp/impl/proto_utils.h",
+    "src/proto/grpc/testing/xds/v3/typed_struct.proto",
+    "google/protobuf/struct.proto",
+    "google/logging/v2/log_entry.proto",
+    "google/cloud/audit/audit_log.proto",
+    "google/api/servicemanagement/v1/resources.proto",
+    "google/datastore/v1/entity.proto"
+  ],
+  "retrieved_paths_union": [
+    "src/google/protobuf/timestamp.proto",
+    "src/google/protobuf/duration.proto",
+    "src/google/protobuf/struct.proto",
+    "src/google/protobuf/field_mask.proto",
+    "src/google/protobuf/any.proto",
+    "python/google/protobuf/internal/well_known_types.py",
+    "src/google/protobuf/json/internal/parser.cc",
+    "upb/json/encode.c",
+    "include/grpcpp/impl/proto_utils.h",
+    "src/proto/grpc/testing/xds/v3/typed_struct.proto",
+    "google/protobuf/struct.proto",
+    "google/logging/v2/log_entry.proto",
+    "google/cloud/audit/audit_log.proto",
+    "google/api/servicemanagement/v1/resources.proto",
+    "google/datastore/v1/entity.proto"
+  ],
+  "required_files": [
+    "src/google/protobuf/timestamp.proto",
+    "src/core/ext/filters/message_size/message_size_filter.cc",
+    "google/api/httpbody.proto"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-tri-protobuf-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0667,
+    "n_retrieved": 15,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-tri-protobuf-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0667,
+    "n_retrieved": 15,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 30.9,
+  "response_chars": 4975,
+  "raw_response": "I could not write `/workspace/analysis/IMPACT_REPORT.md` because the available tools only supported repository search/read operations, not filesystem writes. Findings so far:\n\n- Protobuf WKT definitions:\n  - `src/google/protobuf/timestamp.proto` \u2014 RFC 3339 JSON string, UTC output, 0/3/6/9 fractional digits; valid range documented at lines 43\u201355 and JSON mapping at 106\u2013117.\n  - `src/google/protobuf/duration.proto` \u2014 signed seconds/nanoseconds and JSON string ending in `s`; lines 43\u201348, 92\u2013100.\n  - `src/google/protobuf/struct.proto` \u2014 `Struct` maps to JSON object, `Value` to JSON value, `ListValue` to JSON array; lines 43\u201395.\n  - `src/google/protobuf/field_mask.proto` \u2014 JSON is comma-separated lowerCamel paths; lines 180\u2013204.\n  - `src/google/protobuf/any.proto` \u2014 JSON uses embedded message representation plus `@type`; WKTs use an additional `value` field containing custom JSON; lines 100\u2013125. Type URLs require `/` and end with the fully qualified type name; lines 128\u2013134.\n  - Python runtime: `python/google/protobuf/internal/well_known_types.py`\n    - Timestamp JSON formatting/parsing: lines 75\u2013150.\n    - Duration formatting/parsing: lines 259\u2013328.\n    - Struct mapping/presence helpers: lines 459\u2013509.\n  - C++/upb JSON runtime:\n    - `src/google/protobuf/json/internal/parser.cc` \u2014 Timestamp parsing lines 774\u2013878; Duration lines 880\u2013931; FieldMask lines 934\u2013969.\n    - `upb/json/encode.c` \u2014 Timestamp lines 145\u2013186; Duration lines 188\u2013217; FieldMask lines 455\u2013472; Struct/ListValue lines 474\u2013521.\n  - No explicit v25.1 changelog entry identifying a WKT serialization behavior change was found in the searches. The checked v25.1 implementation follows the documented canonical JSON contract.\n\n- gRPC C++ serialization:\n  - `include/grpcpp/impl/proto_utils.h`\n    - `GenericSerialize`: lines 41\u201365; uses `ByteSizeLong`, cached-size array serialization for small messages, and `SerializeToZeroCopyStream` for larger messages.\n    - `GenericDeserialize`: lines 67\u201390; uses `ParseFromZeroCopyStream`.\n    - `SerializationTraits<MessageLite>` integration: lines 92\u2013112.\n  - This path is binary protobuf serialization and contains no Timestamp, Duration, Struct, FieldMask, or Any-specific special casing. WKT behavior is delegated to protobuf generated message implementations.\n  - `src/proto/grpc/testing/xds/v3/typed_struct.proto`, lines 21\u201352, imports `google/protobuf/struct.proto` and explicitly treats `Struct value` as a JSON representation of an opaque message. It distinguishes this from `Any`, whose value is protobuf binary.\n\n- googleapis consumers:\n  - `google/logging/v2/log_entry.proto`, lines 19\u201325 and 55\u201372:\n    - imports Any, Struct, Timestamp;\n    - `Any proto_payload` is binary protobuf payload;\n    - `Struct json_payload` is a JSON object;\n    - Timestamp is optional and omitted presence has service-defined receive-time semantics.\n  - `google/cloud/audit/audit_log.proto`, lines 69\u201383:\n    - Struct request/response fields represent JSON objects;\n    - when a represented object has a proto equivalent, its proto name is placed in `@type`, matching Any JSON conventions.\n  - `google/api/servicemanagement/v1/resources.proto`, lines 19\u201326 and 77\u201389:\n    - imports Any, FieldMask, Struct, Timestamp;\n    - Timestamp is used for operation start time.\n  - `google/datastore/v1/entity.proto`, lines 19\u201322:\n    - imports Struct and Timestamp.\n  - Additional search hits show broad dependencies on these WKTs in logging, genomics, appengine, runtimeconfig, storage transfer, bigtable, distribution, and service-control protos.\n\nContract chain and likely drift points:\n\n1. Protobuf defines canonical wire fields and custom JSON mappings.\n2. gRPC C++ core serializes messages using ordinary protobuf binary APIs; it does not reinterpret WKT JSON mappings.\n3. googleapis consumers rely on:\n   - binary `Any.value` containing serialized protobuf bytes;\n   - canonical WKT JSON when HTTP/JSON transcoding or dynamic JSON is used;\n   - Struct as a JSON object and `@type` metadata for proto-equivalent audit payloads;\n   - message presence semantics for optional Timestamp/Duration/Struct/Any fields;\n   - FieldMask lowerCamel comma-separated JSON encoding.\n4. A serialization error is therefore more likely if a caller:\n   - sends WKT JSON object forms where scalar custom forms are required (`Timestamp`, `Duration`, `FieldMask`);\n   - treats `Any.value` as JSON instead of binary protobuf;\n   - omits `@type` or fails to wrap custom-WKT Any JSON in `value`;\n   - uses a gRPC path expecting binary protobuf but supplies JSON;\n   - relies on presence of an empty WKT message, especially for googleapis fields whose omission has explicit semantics.\n5. No evidence was found of gRPC v1.60.0 special-casing WKTs or of a protobuf v25.1 contract change in the inspected files. The principal compatibility boundary is binary protobuf versus canonical protobuf JSON, particularly `Any` and `Struct` usage.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-tri-protobuf-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0667,
+    "n_retrieved": 15,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "src/google/protobuf/timestamp.proto",
+    "src/google/protobuf/duration.proto",
+    "src/google/protobuf/struct.proto",
+    "src/google/protobuf/field_mask.proto",
+    "src/google/protobuf/any.proto",
+    "python/google/protobuf/internal/well_known_types.py",
+    "src/google/protobuf/json/internal/parser.cc",
+    "upb/json/encode.c",
+    "include/grpcpp/impl/proto_utils.h",
+    "src/proto/grpc/testing/xds/v3/typed_struct.proto",
+    "google/protobuf/struct.proto",
+    "google/logging/v2/log_entry.proto",
+    "google/cloud/audit/audit_log.proto",
+    "google/api/servicemanagement/v1/resources.proto",
+    "google/datastore/v1/entity.proto"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-tri-protobuf-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0667,
+    "n_retrieved": 15,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

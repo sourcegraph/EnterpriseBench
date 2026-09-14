@@ -144,6 +144,22 @@ class TestCreateBackend:
         assert isinstance(backend, ClaudeCodeBackend)
         assert backend.model == "sonnet"
 
+    @patch(
+        "eb_verify.judge.backends.shutil.which",
+        return_value="/home/test/.local/bin/claude-3",
+    )
+    def test_cc_account_dispatch(self, which):
+        backend = create_backend("cc:haiku", account=3)
+
+        assert isinstance(backend, ClaudeCodeBackend)
+        assert backend.account == 3
+        assert backend.executable == "claude-3"
+        which.assert_called_once_with("claude-3")
+
+    def test_account_is_rejected_for_anthropic_api_backend(self):
+        with pytest.raises(ValueError, match="only supported.*cc"):
+            create_backend("claude-haiku-4-5-20251001", account=3)
+
     def test_unknown_provider_raises_valueerror(self):
         with pytest.raises(ValueError, match="Cannot determine provider"):
             create_backend("gpt-4o")
@@ -320,6 +336,10 @@ class TestClaudeCodeBackend:
         backend = ClaudeCodeBackend(model="claude-sonnet-4-6")
         assert backend.model == "sonnet"
 
+    def test_init_rejects_invalid_account(self):
+        with pytest.raises(ValueError, match="positive integer"):
+            ClaudeCodeBackend(model="haiku", account=0)
+
     @patch("eb_verify.judge.backends.shutil.which", return_value="/usr/bin/claude")
     def test_raw_call_success(self, _which):
         backend = ClaudeCodeBackend(model="haiku")
@@ -335,6 +355,30 @@ class TestClaudeCodeBackend:
         with patch("eb_verify.judge.backends.subprocess.run", return_value=completed):
             with pytest.raises(JudgeBackendError, match="claude CLI failed"):
                 backend._raw_call("sys", "user")
+
+    @patch("eb_verify.judge.backends.shutil.which", return_value="/usr/bin/claude")
+    def test_raw_call_nonzero_includes_stdout_when_stderr_is_empty(self, _which):
+        backend = ClaudeCodeBackend(model="haiku")
+        completed = subprocess.CompletedProcess(
+            [],
+            1,
+            stdout='{"is_error":true,"result":"usage limit reached"}',
+            stderr="",
+        )
+        with patch("eb_verify.judge.backends.subprocess.run", return_value=completed):
+            with pytest.raises(JudgeBackendError, match="usage limit reached"):
+                backend._raw_call("sys", "user")
+
+    @patch("eb_verify.judge.backends.shutil.which", return_value="/usr/bin/claude")
+    def test_raw_call_does_not_misclassify_generate_as_rate_limit(self, _which):
+        backend = ClaudeCodeBackend(model="haiku")
+        completed = subprocess.CompletedProcess(
+            [], 1, stdout="", stderr="failed to generate response"
+        )
+        with patch("eb_verify.judge.backends.subprocess.run", return_value=completed):
+            with pytest.raises(JudgeBackendError) as excinfo:
+                backend._raw_call("sys", "user")
+        assert excinfo.value.status_code is None
 
     @patch("eb_verify.judge.backends.shutil.which", return_value="/usr/bin/claude")
     def test_raw_call_timeout_raises(self, _which):
@@ -587,3 +631,18 @@ class TestLLMJudgeInitFailure:
     def test_unknown_model_init_raises_valueerror(self):
         with pytest.raises(ValueError, match="Cannot determine provider"):
             LLMJudge(model="gpt-4o")
+
+    @patch(
+        "eb_verify.judge.backends.shutil.which",
+        return_value="/home/test/.local/bin/claude-1",
+    )
+    def test_explicit_account_reaches_backend(self, _which):
+        judge = LLMJudge(model="cc:haiku", account=1)
+
+        assert judge.provenance == {
+            "backend": "claude_code_cli",
+            "provider": "anthropic",
+            "model": "haiku",
+            "account": 1,
+            "executable": "claude-1",
+        }

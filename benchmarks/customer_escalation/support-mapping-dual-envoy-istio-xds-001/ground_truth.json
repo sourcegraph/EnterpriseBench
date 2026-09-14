@@ -1,0 +1,71 @@
+{
+  "task_id": "support-mapping-dual-envoy-istio-xds-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/envoyproxy/envoy",
+      "rev": "v1.29.4",
+      "path": "envoy"
+    },
+    {
+      "url": "https://github.com/istio/istio",
+      "rev": "1.21.1",
+      "path": "istio"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "envoy/source/common/listener_manager/listener_manager_impl.cc",
+      "repo": "envoy",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "envoy/source/common/listener_manager/listener_impl.cc",
+      "repo": "envoy",
+      "confidence": 0.85,
+      "source": "deterministic"
+    },
+    {
+      "path": "istio/pilot/pkg/xds/ads.go",
+      "repo": "istio",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "istio/pilot/pkg/xds/lds.go",
+      "repo": "istio",
+      "confidence": 0.9,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "envoy/source/extensions/config_subscription/grpc/grpc_mux_impl.cc",
+      "repo": "envoy",
+      "confidence": 0.75
+    },
+    {
+      "path": "istio/pilot/pkg/xds/discovery.go",
+      "repo": "istio",
+      "confidence": 0.75
+    }
+  ],
+  "error_chain": [
+    "Istio Pilot's ConfigGenerator builds a snapshot per push event; ads.go pushes LDS+RDS+CDS+EDS to subscribed Envoys via DeltaAggregatedResources or AggregatedResources",
+    "lds.go computes listener resources per proxy and serializes them with a new version string even when content is unchanged, because the version is monotonic per push",
+    "Envoy's grpc_mux_impl receives the snapshot and routes each listener resource into ListenerManager::addOrUpdateListener",
+    "ListenerManager compares the listener config against the existing active listener; if Envoy considers them different (for example, by hash recompute mismatch), it triggers a drain via ConnectionHandler::drainListener",
+    "During drain, in-flight requests on idle connections are reset with 503 from the connection's onCloseSocket path until the new listener takes over"
+  ],
+  "trigger_conditions": [
+    "Istio Pilot uses full-snapshot ADS (not delta-xDS) so version is bumped on every push regardless of content",
+    "Envoy's ListenerManager re-evaluates listener identity on every LDS update; spurious version changes can trigger drain when hash comparison drifts",
+    "ConnectionHandler::drainListener resets idle connections with 503 during the drain window, visible as the customer's 503 spike"
+  ],
+  "expected_answer": {
+    "error_origin": "Envoy's ListenerManager triggering drainListener on Pilot's monotonic-version LDS push even when listener content is unchanged",
+    "bypass_reason": "Pilot pushes full snapshots with a new version per event; Envoy's listener identity check is not strictly content-hash based",
+    "correct_config": "Enable delta-xDS (PILOT_ENABLE_DELTA_XDS=true) so Pilot only pushes changed resources, or tune Pilot's PILOT_PUSH_THROTTLE / debounce so unchanged listener pushes do not reach Envoy"
+  }
+}

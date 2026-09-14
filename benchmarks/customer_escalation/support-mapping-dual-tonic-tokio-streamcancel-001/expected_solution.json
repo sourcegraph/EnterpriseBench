@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-tonic-tokio-streamcancel-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: tonic/tonic/src/codec/decode.rs, tonic/tonic/src/transport/channel/mod.rs, tokio/tokio/src/sync/mpsc/chan.rs, tokio/tokio/src/sync/mpsc/bounded.rs. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify tonic/tonic/src/codec/decode.rs as part of the error source",
+        "Must identify tonic/tonic/src/transport/channel/mod.rs as part of the error source",
+        "Must identify tokio/tokio/src/sync/mpsc/chan.rs as part of the error source",
+        "Must identify tokio/tokio/src/sync/mpsc/bounded.rs as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) Server emits Status::cancelled which becomes an HTTP/2 RST_STREAM or trailers frame; tonic's decode.rs translates trailers into either Ok(None) or Err(Status) -> (2) tonic's transport channel feeds decoded frames into a tokio mpsc::channel where the client's Streaming receiver awaits -> (3) tokio's mpsc channel in chan.rs only signals receiver close when ALL senders are dropped; if a clone of the sender lives in the h2 task, the receiver continues blocking -> (4) When the RST_STREAM arrives, tonic's transport task may not drop all sender clones synchronously, leaving Streaming::poll_next parked on the mpsc despite the wire cancel.",
+      "evaluation_criteria": [
+        "Must describe the step: Server emits Status::cancelled which becomes an HTTP/2 RST_STREAM or trailers fr...",
+        "Must describe the step: tonic's transport channel feeds decoded frames into a tokio mpsc::channel where ...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Server emits Status::cancelled mid-stream and the wire RST_STREAM races with tonic's transport task dropping its mpsc sender; (2) tokio's mpsc only closes when sender refcount hits zero; an outstanding clone (in a tracing span, a retry layer, etc.) keeps it alive; (3) tonic's Streaming::poll_next maps an open mpsc to Pending, even though the gRPC stream is logically cancelled.",
+      "evaluation_criteria": [
+        "Must identify the condition: Server emits Status::cancelled mid-stream and the wire RST_STREAM races with ton...",
+        "Must identify the condition: tokio's mpsc only closes when sender refcount hits zero; an outstanding clone (i...",
+        "Must identify the condition: tonic's Streaming::poll_next maps an open mpsc to Pending, even though the gRPC ...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

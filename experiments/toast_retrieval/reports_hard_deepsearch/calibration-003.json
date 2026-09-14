@@ -1,0 +1,169 @@
+{
+  "task_id": "calibration-003",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/requests--v2.32.3"
+  ],
+  "retrieved_paths": [
+    "src/requests/sessions.py",
+    "src/requests/adapters.py"
+  ],
+  "retrieved_paths_union": [
+    "src/requests/sessions.py",
+    "src/requests/adapters.py"
+  ],
+  "required_files": [
+    "src/requests/utils.py",
+    "src/requests/models.py"
+  ],
+  "ir_scores": {
+    "task_id": "calibration-003",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 2,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "ir_scores_union": {
+    "task_id": "calibration-003",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 2,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "elapsed_seconds": 31.7,
+  "response_chars": 3736,
+  "raw_response": "Here is a precise breakdown of all three questions:\n\n---\n\n## 1. Where the `Proxy-Authorization` header is removed\n\nThe removal happens in [`rebuild_proxies()`](r/github.com/sg-evals/requests--v2.32.3/-/blob/src/requests/sessions.py?L318-L319) in [`src/requests/sessions.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.32.3/-/blob/src/requests/sessions.py):\n\n```python\n# sessions.py, line 318\u2013319\nif \"Proxy-Authorization\" in headers:\n    del headers[\"Proxy-Authorization\"]\n```\n\nThis is an **unconditional delete** \u2014 it runs regardless of where the header came from or whether a proxy is even in use.\n\n---\n\n## 2. What logic decides to strip it\n\n`rebuild_proxies()` is called during redirect handling (in [`resolve_redirects()`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.32.3/-/blob/src/requests/sessions.py?L159)). The logic was introduced as a **security fix** (CVE addressed in 2.31.0) to prevent `Proxy-Authorization` headers from being forwarded through a CONNECT tunnel to the destination server.\n\nThe sequence is:\n1. Any existing `Proxy-Authorization` in the request headers is deleted unconditionally.\n2. The proxy URL is inspected for embedded credentials (`user:pass@proxy:8080`).\n3. If credentials are found **and the scheme is not HTTPS**, a new `Proxy-Authorization` is reconstructed from those URL credentials.\n\n```python\n# sessions.py, line 326\u2013329\n# urllib3 handles proxy authorization for us in the standard adapter.\n# Avoid appending this to TLS tunneled requests where it may be leaked.\nif not scheme.startswith(\"https\") and username and password:\n    headers[\"Proxy-Authorization\"] = _basic_auth_str(username, password)\n```\n\nFor **HTTPS targets**, `Proxy-Authorization` is intentionally never set in the request headers \u2014 it is handled separately by urllib3 at the socket level via [`proxy_headers()`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.32.3/-/blob/src/requests/adapters.py?L592-L611) in the HTTP adapter, which passes it out-of-band when establishing the CONNECT tunnel.\n\n---\n\n## 3. When the header is preserved vs. stripped\n\n| Scenario | Behavior |\n|---|---|\n| Header set manually by user, HTTPS target | **Stripped** \u2014 deleted by `rebuild_proxies`, never re-added (urllib3 handles auth separately) |\n| Header set manually by user, HTTP target | **Stripped then potentially replaced** \u2014 only if credentials are embedded in the proxy URL |\n| Credentials embedded in proxy URL (`http://user:pass@proxy`), HTTP target | **Reconstructed** by `rebuild_proxies` from the URL |\n| Credentials embedded in proxy URL (`http://user:pass@proxy`), HTTPS target | **Not set in headers** \u2014 passed to urllib3 via `proxy_headers()` in the adapter instead |\n\n---\n\n## Why your setup broke\n\nYour code sets `Proxy-Authorization` manually in the headers dict and uses an HTTPS target:\n\n```python\nheaders = {\"Proxy-Authorization\": \"Basic dXNlcjpwYXNz\"}\nrequests.get(\"https://example.com\", headers=headers, proxies={\"https\": \"http://proxy:8080\"})\n```\n\n`rebuild_proxies()` deletes it unconditionally (line 318\u2013319). Because the target is HTTPS, the re-add branch (`if not scheme.startswith(\"https\")`) is skipped. The header never makes it to the proxy.\n\n**Fix:** Embed credentials in the proxy URL instead of the headers:\n\n```python\nrequests.get(\n    \"https://example.com\",\n    proxies={\"https\": \"http://user:pass@proxy:8080\"}\n)\n```\n\nThis is the only supported path for HTTPS proxy auth \u2014 `proxy_headers()` in the adapter will extract the credentials and pass them to urllib3 for use during the CONNECT handshake, where they are sent to the proxy (not leaked to the destination server).\n\nLink: https://demo.sourcegraph.com/deepsearch/6fb4afb0-65ce-421f-976f-c2c31ef3b631",
+  "ir_scores_unaligned": {
+    "task_id": "calibration-003",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 2,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "src/requests/sessions.py",
+    "src/requests/adapters.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "calibration-003",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 2,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

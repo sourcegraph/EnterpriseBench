@@ -1,0 +1,29 @@
+{
+  "task_id": "dead-code-dual-django-wagtail-001",
+  "checkpoints": {
+    "dead_code_locations": {
+      "expected_solution": "Wagtail v5.2 retains compatibility shims for the old django.contrib.postgres.fields.JSONField even though Django 5.0 has removed those legacy lookups. The dead code centres on wagtail/fields.py where StreamField and RichTextField wrap the JSON column, and on wagtail/blocks/stream_block.py and wagtail/blocks/field_block.py where the StreamValue is serialised through Django's JSON tooling. Cross-reference against django/db/models/fields/json.py at django@5.0 (the only remaining JSONField implementation) shows that any branch in Wagtail testing for django.contrib.postgres internals — the form field shim, the postgres-specific lookup classes, and the form widget fallback — is unreachable at runtime. The answer must list at least these dead-code anchors, each carrying the dead_branch_condition (e.g., 'try: from django.contrib.postgres.fields import JSONField') and a removal_requires_migration boolean.",
+      "evaluation_criteria": [
+        "Answer must declare a non-empty `source_files` (or `files` / `error_source.files`) list including wagtail/fields.py and django/db/models/fields/json.py — the verifier's required_files anchors",
+        "Each dead_code_locations entry must populate `file`, `class_or_function`, `dead_branch_condition`, and `explanation` so the report is actionable for a Wagtail maintainer",
+        "Dead-branch evidence must reference the django.contrib.postgres import or lookup that no longer exists at django@5.0, not just say 'old compatibility code'"
+      ]
+    },
+    "dependency_trace": {
+      "expected_solution": "An ideal trace walks the StreamField initialisation chain in wagtail/fields.py through the StreamBlock and FieldBlock implementations in wagtail/blocks/stream_block.py and wagtail/blocks/field_block.py, then crosses into Django at django/db/models/fields/json.py to show the canonical JSONField that StreamField now stores into. The trace must explicitly note where the old postgres-specific code path branches off (and is now dead) versus the live django.db.models.JSONField path. Entries should appear in the agent's source_files list so the verifier can match them.",
+      "evaluation_criteria": [
+        "source_files must include wagtail/fields.py (entry point), wagtail/blocks/stream_block.py and wagtail/blocks/field_block.py (intermediate layers), and django/db/models/fields/json.py (canonical destination)",
+        "The trace must explicitly distinguish the live django.db.models.JSONField path from the dead django.contrib.postgres.fields.JSONField branch and explain why the postgres branch is unreachable at django@5.0",
+        "The trace must show the call relationship across the wagtail → django boundary, not list the files in isolation — e.g., StreamField.__init__ resolves to JSONField in django/db/models/fields/json.py"
+      ]
+    },
+    "removal_impact": {
+      "expected_solution": "For each dead-code entry the answer must set removal_requires_migration to true or false based on whether removing the shim alters stored DB representation. Removing import-time fallbacks (the try/except that swallows ImportError on django.contrib.postgres) is migration-free; removing form widget classes that are still referenced from migration files would require a Django migration to drop the model field options. The narrative must call out which of the two cases applies for each entry and cite the relevant file (wagtail/fields.py for the field declaration; wagtail/blocks/stream_block.py for the value serialisation).",
+      "evaluation_criteria": [
+        "Every dead_code_locations entry must populate removal_requires_migration (boolean) — leaving it null is the most common verifier failure",
+        "Migration analysis must distinguish between import-shims (no migration) and field-shape changes (migration required) and reference at least wagtail/fields.py for the field-level analysis",
+        "Required GT anchors must appear in source_files: wagtail/fields.py and django/db/models/fields/json.py — without these the removal_impact verifier scores 0"
+      ]
+    }
+  }
+}

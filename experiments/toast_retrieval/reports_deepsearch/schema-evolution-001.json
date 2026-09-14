@@ -1,0 +1,221 @@
+{
+  "task_id": "schema-evolution-001",
+  "policy": "deepsearch",
+  "suite": "feature_delivery",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/zulip--38053e9c"
+  ],
+  "retrieved_paths": [
+    "zerver/models/groups.py",
+    "zerver/lib/user_groups.py",
+    "zerver/lib/mention.py",
+    "zerver/lib/event_schema.py",
+    "zerver/actions/user_groups.py",
+    "zerver/lib/import_realm.py",
+    "zerver/models/realm_audit_logs.py",
+    "zerver/lib/export.py",
+    "zerver/openapi/python_examples.py",
+    "zerver/tests/test_user_groups.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_audit_log.py",
+    "zerver/tests/test_markdown.py",
+    "zerver/tests/test_import_export.py",
+    "zerver/views/user_groups.py",
+    "zerver/lib/markdown/__init__.py",
+    "zproject/urls.py",
+    "zerver/lib/events.py"
+  ],
+  "retrieved_paths_union": [
+    "zerver/models/groups.py",
+    "zerver/lib/user_groups.py",
+    "zerver/lib/mention.py",
+    "zerver/lib/event_schema.py",
+    "zerver/actions/user_groups.py",
+    "zerver/lib/import_realm.py",
+    "zerver/models/realm_audit_logs.py",
+    "zerver/lib/export.py",
+    "zerver/openapi/python_examples.py",
+    "zerver/tests/test_user_groups.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_audit_log.py",
+    "zerver/tests/test_markdown.py",
+    "zerver/tests/test_import_export.py",
+    "zerver/views/user_groups.py",
+    "zerver/lib/markdown/__init__.py",
+    "zproject/urls.py",
+    "zerver/lib/events.py"
+  ],
+  "required_files": [
+    "zerver/models/groups.py",
+    "zerver/actions/user_groups.py",
+    "zerver/views/user_groups.py",
+    "zerver/lib/events.py",
+    "zerver/lib/event_schema.py",
+    "zerver/lib/user_groups.py"
+  ],
+  "ir_scores": {
+    "task_id": "schema-evolution-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.1667,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.2857,
+      "3": 0.4444,
+      "5": 0.7273,
+      "10": 0.5
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.8304,
+      "10": 0.7409
+    },
+    "mrr": 1.0,
+    "map_score": 0.7028,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 18,
+    "n_ground_truth": 6,
+    "n_overlap": 6
+  },
+  "ir_scores_union": {
+    "task_id": "schema-evolution-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.1667,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.2857,
+      "3": 0.4444,
+      "5": 0.7273,
+      "10": 0.5
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.8304,
+      "10": 0.7409
+    },
+    "mrr": 1.0,
+    "map_score": 0.7028,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 18,
+    "n_ground_truth": 6,
+    "n_overlap": 6
+  },
+  "elapsed_seconds": 220.6,
+  "response_chars": 12673,
+  "raw_response": "---\ntitle: Impact analysis for adding deactivation to NamedUserGroup schema\nshare_url: https://demo.sourcegraph.com/deepsearch/5703e909-e6be-410d-8a54-16318c48c60b\nurl: https://demo.sourcegraph.com/deepsearch/2130\ncreated: 2026-08-17T21:09:05Z\nupdated: 2026-08-17T21:12:45Z\n---\n\n# # Schema Change: Add Deactivation Support to User Groups\n\n## Context\n\nWe've been getting requests from large organizations to be able to deactivate user groups without deleting them. Right now, deleting a group is permanent and breaks any references to it in stream permissions, message mentions, etc.\n\nThe plan is to add a `deactivated` boolean field to the `NamedUserGroup` model. The migration is already written (`zerver/migrations/0578_namedusergroup_deactivated.py`), but before we proceed I need a full impact analysis of what code needs to change.\n\n## What I Need\n\n1. **Schema change identification**: Confirm the migration and model change.\n\n2. **Direct code references**: Find all Python code that queries, creates, updates, or filters `NamedUserGroup` objects. This includes the actions layer, views, and utility functions. We need to make sure deactivated groups are excluded from active queries but still accessible for admin operations.\n\n3. **Indirect references**: This is the tricky part. The `NamedUserGroup` model touches:\n   - The real-time event system (events sent to clients when groups change)\n   - The API schema (OpenAPI spec in `zerver/openapi/`)\n   - Realm import/export\n   - Audit logging\n   - Markdown rendering (group mentions like `@*groupname*`)\n   - URL routing for group endpoints\n\n   I need to know every place that needs to learn about the `deactivated` state.\n\n4. **Test coverage**: Which test files exercise user group functionality and would need new test cases for deactivation scenarios?\n\nWrite your complete analysis to `/workspace/zulip/SCHEMA_IMPACT.md` with sections for each category above, including file paths and brief descriptions of required changes.\n\n\nSearch only these repositories: github.com/sg-evals/zulip--38053e9c\n\nThe full analysis is complete. Here is a summary of the key findings:\n\n---\n\n## Impact Analysis: `deactivated` on `NamedUserGroup`\n\nThe migration `0578_namedusergroup_deactivated.py` exists in the repo's file index but is not yet at HEAD. The model field still needs to be added to [`zerver/models/groups.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/models/groups.py?L35).\n\n### Most Critical Changes (in priority order)\n\n**1. Query layer \u2014 `zerver/lib/user_groups.py`**\n- [`access_user_group_by_id()`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/user_groups.py?L110-L126): does not filter deactivated groups \u2014 normal users will still be able to see/edit them.\n- [`user_groups_in_realm_serialized()`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/user_groups.py?L377-L435): `NamedUserGroup.objects.filter(realm=realm)` returns all groups. Either filter to active-only or add `deactivated` to `UserGroupDict` (line 47).\n- [`update_or_create_user_group_for_setting()`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/user_groups.py?L261-L292): deactivated groups can still be set as subgroups in permission settings.\n\n**2. Markdown mentions \u2014 `zerver/lib/mention.py`**\n- [`init_user_group_data()`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/mention.py?L267-L276) resolves `@*groupname*` without a `deactivated=False` filter \u2014 deactivated groups will still highlight as mentions.\n\n**3. Event system \u2014 `zerver/lib/event_schema.py`**\n- [`group_type`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/event_schema.py?L1810-L1821) (required keys for `op=add` events) and [`user_group_data_type`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/event_schema.py?L1861-L1869) (optional keys for `op=update` events) both need `deactivated` added.\n- [`do_send_create_user_group_event()`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/actions/user_groups.py?L168-L187) must include the field in the event payload.\n\n**4. Import \u2014 `zerver/lib/import_realm.py`**\n- [`bulk_import_named_user_groups()`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/import_realm.py?L746-L767) uses a **raw SQL INSERT** with an explicit column list \u2014 `deactivated` must be manually added to both the column list and value tuple, or imports of realms with deactivated groups will fail or silently reset the field.\n- Same issue in [`bulk_create_system_user_groups()`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/user_groups.py?L594-L631).\n\n**5. Audit log \u2014 `zerver/models/realm_audit_logs.py`**\n- New event types `USER_GROUP_DEACTIVATED = 723` and `USER_GROUP_REACTIVATED = 724` needed (codes 720\u2013722 are taken; 709\u2013719 are reserved per the inline comment at [line 105](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/models/realm_audit_logs.py?L105)).\n\n**6. Export** \u2014 `zerver/lib/export.py` requires **no code changes**; the ORM-based Config at [line 801](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/lib/export.py?L801-L807) will auto-export the new field.\n\n**7. OpenAPI** \u2014 `zerver/openapi/zulip.yaml` and [`python_examples.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/openapi/python_examples.py?L806) need the field added to schemas and examples.\n\n**8. Tests** \u2014 Primary files needing new deactivation cases: [`test_user_groups.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/tests/test_user_groups.py), [`test_events.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/tests/test_events.py?L1808), [`test_audit_log.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/tests/test_audit_log.py?L1105), [`test_markdown.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/tests/test_markdown.py?L2694), and [`test_import_export.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--38053e9c/-/blob/zerver/tests/test_import_export.py).\n\n## Sources\n\n- [github.com/sg-evals/zulip--38053e9c/zerver/models/groups.py@53e6fec](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/models/groups.py)\n- [github.com/sg-evals/zulip--38053e9c/zerver/actions/user_groups.py@53e6fec](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/actions/user_groups.py)\n- [github.com/sg-evals/zulip--38053e9c/zerver/views/user_groups.py@53e6fec](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/views/user_groups.py)\n- [github.com/sg-evals/zulip--38053e9c/zerver/lib/user_groups.py@53e6fec](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/lib/user_groups.py)\n- [github.com/sg-evals/zulip--38053e9c/zerver/lib/markdown/__init__.py@53e6fec?L1940-1990](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/lib/markdown/__init__.py?L1940-1990)\n- [github.com/sg-evals/zulip--38053e9c/zerver/models/realm_audit_logs.py@53e6fec?L90-230](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/models/realm_audit_logs.py?L90-230)\n- [github.com/sg-evals/zulip--38053e9c/zproject/urls.py@53e6fec?L185-220](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zproject/urls.py?L185-220)\n- [NamedUserGroup repo:^github.com/sg-evals/zulip--38053e9c$ file:zerver/lib/export.py OR file:zerver/lib/import_realm.py](/search?q=patterntype:keyword%20NamedUserGroup%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20file:zerver%2Flib%2Fexport.py%20OR%20file:zerver%2Flib%2Fimport_realm.py)\n- [github.com/sg-evals/zulip--38053e9c/zerver/lib/export.py@53e6fec?L795-830](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/lib/export.py?L795-830)\n- [github.com/sg-evals/zulip--38053e9c/zerver/lib/import_realm.py@53e6fec?L740-790](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/lib/import_realm.py?L740-790)\n- [github.com/sg-evals/zulip--38053e9c/zproject/urls.py@53e6fec?L395-430](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zproject/urls.py?L395-430)\n- [get_user_group MentionData repo:^github.com/sg-evals/zulip--38053e9c$](/search?q=patterntype:keyword%20get_user_group%20MentionData%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$)\n- [user-groups.yaml OR user_groups openapi repo:^github.com/sg-evals/zulip--38053e9c$ file:zerver/openapi](/search?q=patterntype:keyword%20user-groups.yaml%20OR%20user_groups%20openapi%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20file:zerver%2Fopenapi)\n- [github.com/sg-evals/zulip--38053e9c/zerver/lib/mention.py@53e6fec?L240-300](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/lib/mention.py?L240-300)\n- [github.com/sg-evals/zulip--38053e9c](/github.com/sg-evals/zulip--38053e9c)\n- [test_user_group_deactivat OR test_deactivate_user_group repo:^github.com/sg-evals/zulip--38053e9c$](/search?q=patterntype:keyword%20test_user_group_deactivat%20OR%20test_deactivate_user_group%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$)\n- [is_system_group repo:^github.com/sg-evals/zulip--38053e9c$ file:zulip.yaml patterntype:regex](/search?q=is_system_group%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20file:zulip.yaml%20patterntype:regex)\n- [is_system_group repo:^github.com/sg-evals/zulip--38053e9c$ file:zulip.yaml patterntype:keyword](/search?q=is_system_group%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20file:zulip.yaml%20patterntype:keyword)\n- [is_system_group repo:^github.com/sg-evals/zulip--38053e9c$ patterntype:keyword](/search?q=is_system_group%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20patterntype:keyword)\n- [NamedUserGroup OR user_group repo:^github.com/sg-evals/zulip--38053e9c$ file:zerver/tests/ patterntype:keyword](/search?q=NamedUserGroup%20OR%20user_group%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20file:zerver%2Ftests%2F%20patterntype:keyword)\n- [github.com/sg-evals/zulip--38053e9c/zerver/models/groups.py@53e6fec?L52-61](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/models/groups.py?L52-61)\n- [github.com/sg-evals/zulip--38053e9c/zerver/lib/events.py@53e6fec?L1-50](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/lib/events.py?L1-50)\n- [user_groups_in_realm_serialized repo:^github.com/sg-evals/zulip--38053e9c$ file:zerver/lib/events.py](/search?q=patterntype:keyword%20user_groups_in_realm_serialized%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20file:zerver%2Flib%2Fevents.py)\n- [test_events user_group \"op\" \"add\" repo:^github.com/sg-evals/zulip--38053e9c$ file:zerver/tests/test_events.py](/search?q=patterntype:keyword%20test_events%20user_group%20%22op%22%20%22add%22%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20file:zerver%2Ftests%2Ftest_events.py)\n- [github.com/sg-evals/zulip--38053e9c/zerver/tests/test_events.py@53e6fec?L1805-1880](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/tests/test_events.py?L1805-1880)\n- [check_user_group_add check_user_group_update repo:^github.com/sg-evals/zulip--38053e9c$ file:zerver/lib](/search?q=patterntype:keyword%20check_user_group_add%20check_user_group_update%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20file:zerver%2Flib)\n- [user_group_add_event user_group_update_event repo:^github.com/sg-evals/zulip--38053e9c$ file:zerver/lib/event_schema.py](/search?q=patterntype:keyword%20user_group_add_event%20user_group_update_event%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--38053e9c$%20file:zerver%2Flib%2Fevent_schema.py)\n- [github.com/sg-evals/zulip--38053e9c/zerver/lib/event_schema.py@53e6fec?L1780-1900](/github.com/sg-evals/zulip--38053e9c@53e6fec64cb2944576de2757358bdc78d68f6bc7/-/blob/zerver/lib/event_schema.py?L1780-1900)\n\n\nGenerated files:\n- files/SCHEMA_IMPACT.json: /.api/agent-files/v1/deep-search/5703e909-e6be-410d-8a54-16318c48c60b/files/SCHEMA_IMPACT.json\n- files/SCHEMA_IMPACT_md.csv: /.api/agent-files/v1/deep-search/5703e909-e6be-410d-8a54-16318c48c60b/files/SCHEMA_IMPACT_md.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "schema-evolution-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.1667,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.2857,
+      "3": 0.4444,
+      "5": 0.7273,
+      "10": 0.5
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.8304,
+      "10": 0.7409
+    },
+    "mrr": 1.0,
+    "map_score": 0.7028,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 18,
+    "n_ground_truth": 6,
+    "n_overlap": 6
+  },
+  "retrieved_paths_aligned": [
+    "zerver/models/groups.py",
+    "zerver/lib/user_groups.py",
+    "zerver/lib/mention.py",
+    "zerver/lib/event_schema.py",
+    "zerver/actions/user_groups.py",
+    "zerver/lib/import_realm.py",
+    "zerver/models/realm_audit_logs.py",
+    "zerver/lib/export.py",
+    "zerver/openapi/python_examples.py",
+    "zerver/tests/test_user_groups.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_audit_log.py",
+    "zerver/tests/test_markdown.py",
+    "zerver/tests/test_import_export.py",
+    "zerver/views/user_groups.py",
+    "zerver/lib/markdown/__init__.py",
+    "zproject/urls.py",
+    "zerver/lib/events.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "schema-evolution-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.1667,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.2857,
+      "3": 0.4444,
+      "5": 0.7273,
+      "10": 0.5
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.8304,
+      "10": 0.7409
+    },
+    "mrr": 1.0,
+    "map_score": 0.7028,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 18,
+    "n_ground_truth": 6,
+    "n_overlap": 6
+  },
+  "scoring": "aligned_suffix_v1"
+}

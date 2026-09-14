@@ -1,0 +1,194 @@
+{
+  "task_id": "api-contract-dual-hyper-reqwest-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/hyper--v1.0.0",
+    "github.com/sg-evals/reqwest--v0.11.22"
+  ],
+  "retrieved_paths": [
+    "src/body/mod.rs",
+    "src/body/incoming.rs",
+    "docs/ROADMAP.md",
+    "Cargo.toml",
+    "src/async_impl/body.rs",
+    "src/async_impl/client.rs",
+    "src/async_impl/response.rs",
+    "src/async_impl/decoder.rs",
+    "src/blocking/body.rs",
+    "src/async_impl/h3_client/pool.rs"
+  ],
+  "retrieved_paths_union": [
+    "src/body/mod.rs",
+    "src/body/incoming.rs",
+    "docs/ROADMAP.md",
+    "Cargo.toml",
+    "src/async_impl/body.rs",
+    "src/async_impl/client.rs",
+    "src/async_impl/response.rs",
+    "src/async_impl/decoder.rs",
+    "src/blocking/body.rs",
+    "src/async_impl/h3_client/pool.rs"
+  ],
+  "required_files": [
+    "hyper/src/body/mod.rs",
+    "reqwest/src/async_impl/client.rs"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8316
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8316
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 18.6,
+  "response_chars": 3774,
+  "raw_response": "I\u2019m unable to write `/workspace/analysis/IMPACT_REPORT.md` because the available tools only search/read repository contents and do not provide filesystem write access.\n\nRelevant findings:\n\n- [hyper--v1.0.0:src/body/mod.rs?L1-L34](/r/github.com/sg-evals/hyper--v1.0.0/-/blob/src/body/mod.rs?L1-L34) - Hyper 1.0 exports the `http_body::Body` trait, `Frame`, `SizeHint`, and concrete receive type `Incoming`; the old `hyper::Body` struct is absent.\n- [hyper--v1.0.0:src/body/incoming.rs?L170-L203](/r/github.com/sg-evals/hyper--v1.0.0/-/blob/src/body/incoming.rs?L170-L203) - `Incoming` implements `Body` using `poll_frame`, returning `Frame<Bytes>`.\n- [hyper--v1.0.0:docs/ROADMAP.md?L185-L198](/r/github.com/sg-evals/hyper--v1.0.0/-/blob/docs/ROADMAP.md?L185-L198) - Documents removal of the `Body` struct and renaming `HttpBody` to `Body`.\n- [reqwest--v0.11.22:Cargo.toml?L100-L104](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/Cargo.toml?L100-L104) - Reqwest expects Hyper `0.14.x` and `http-body 0.4`.\n- [reqwest--v0.11.22:src/async_impl/body.rs?L45-L45](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L45-L45) - `WrapHyper(hyper::Body)` depends on the removed concrete type.\n- [reqwest--v0.11.22:src/async_impl/body.rs?L111-L118](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L111-L118) - Response-body adapter accepts `hyper::Body`.\n- [reqwest--v0.11.22:src/async_impl/body.rs?L168-L173](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L168-L173) - `From<hyper::Body> for reqwest::Body`.\n- [reqwest--v0.11.22:src/async_impl/body.rs?L233-L252](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L233-L252) - Implements old `HttpBody::poll_data`.\n- [reqwest--v0.11.22:src/async_impl/body.rs?L330-L348](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L330-L348) - `WrapHyper` calls removed `poll_data` and `poll_trailers`.\n- [reqwest--v0.11.22:src/async_impl/client.rs?L1648-L1648](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/client.rs?L1648-L1648) - Hyper client alias uses the old high-level client API.\n- [reqwest--v0.11.22:src/async_impl/client.rs?L2188-L2194](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/client.rs?L2188-L2194) - Builds requests with `body.into_stream()` and calls `hyper.request`.\n- [reqwest--v0.11.22:src/async_impl/response.rs?L33-L41](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/response.rs?L33-L41) - Response constructor requires `Response<hyper::Body>`.\n- [reqwest--v0.11.22:src/async_impl/response.rs?L80-L84](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/response.rs?L80-L84) - Uses old `hyper::body::HttpBody::size_hint`.\n- [reqwest--v0.11.22:src/async_impl/response.rs?L258-L260](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/response.rs?L258-L260) - Calls removed `hyper::body::to_bytes`.\n- [reqwest--v0.11.22:src/async_impl/decoder.rs?L18-L20](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/decoder.rs?L18-L20) - Imports removed `hyper::body::HttpBody`.\n- [reqwest--v0.11.22:src/async_impl/decoder.rs?L260-L285](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/decoder.rs?L260-L285) - Decoder implements old `poll_data`/`poll_trailers` contract and uses old trait-qualified `size_hint`.\n- [reqwest--v0.11.22:src/blocking/body.rs?L135-L140](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/blocking/body.rs?L135-L140) - Uses removed `hyper::Body::channel` and `hyper::body::Sender`.\n- [reqwest--v0.11.22:src/async_impl/h3_client/pool.rs?L15-L17](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/h3_client/pool.rs?L15-L17) - Imports removed `hyper::Body` for HTTP/3 response adaptation.",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8316
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "hyper/src/body/mod.rs",
+    "src/body/incoming.rs",
+    "docs/ROADMAP.md",
+    "Cargo.toml",
+    "src/async_impl/body.rs",
+    "reqwest/src/async_impl/client.rs",
+    "src/async_impl/response.rs",
+    "src/async_impl/decoder.rs",
+    "src/blocking/body.rs",
+    "src/async_impl/h3_client/pool.rs"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8316
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

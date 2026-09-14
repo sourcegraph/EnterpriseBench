@@ -1,0 +1,136 @@
+# Imported from CodeScaleBench CCX-platform-238 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-platform-238"
+suite = "platform_engineering"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Kubernetes API Server Admission Controller Chain"
+
+[[repos]]
+url = "https://github.com/kubernetes/kubernetes"
+rev = "v1.32.0"
+path = "kubernetes"
+role = "primary"
+
+[metadata]
+languages = ["go"]
+csb_mirror = "sg-evals/kubernetes--v1.32.0"
+csb_commit = "v1.32.0"
+csb_family = "csb_org_platform"
+csb_category = "platform-knowledge"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_test composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/interfaces.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/handler.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/plugins.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/chain.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/accessors.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/interfaces.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic/webhook.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/mutating/plugin.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/mutating/dispatcher.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/mutating/reinvocationcontext.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating/plugin.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating/dispatcher.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/configuration/mutating_webhook_manager.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/configuration/validating_webhook_manager.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/request/admissionreview.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/errors/statuserror.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"

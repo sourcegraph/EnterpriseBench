@@ -1,0 +1,22 @@
+{
+  "task_id": "cal-dead-flask-legacy-002",
+  "checkpoints": {
+    "check_dead_code": {
+      "expected_solution": "Four dead symbols in pallets/flask@3.1.0: (1) src/flask/helpers.py::get_root_path — module-path helper duplicated by Werkzeug utilities and no longer called from inside the flask package; (2) src/flask/helpers.py::locked_cached_property — legacy thread-locking descriptor superseded by werkzeug.utils.cached_property and dropped from internal use; (3) src/flask/json/__init__.py::htmlsafe_dumps — pre-3.x HTML-escaping shim with no remaining call sites; (4) src/flask/json/__init__.py::htmlsafe_dump — file-stream variant of the same shim, also dead. Live anchors that must NOT be flagged include src/flask/app.py::Flask, src/flask/blueprints.py::Blueprint, src/flask/helpers.py::url_for / flash / send_file, src/flask/sessions.py::SecureCookieSessionInterface, src/flask/templating.py::render_template, and src/flask/globals.py::request. Verification: `grep -RIn` of each candidate across src/flask/, tests/, and docs/ shows the four dead symbols only at their definition sites.",
+      "evaluation_criteria": [
+        "Must identify all four dead symbols: get_root_path and locked_cached_property in src/flask/helpers.py, plus htmlsafe_dumps and htmlsafe_dump in src/flask/json/__init__.py",
+        "Must NOT flag live anchors as dead: Flask in src/flask/app.py, Blueprint in src/flask/blueprints.py, url_for/flash/send_file in src/flask/helpers.py, SecureCookieSessionInterface in src/flask/sessions.py, render_template in src/flask/templating.py, or request in src/flask/globals.py",
+        "Each claimed dead symbol must include evidence of zero internal callers — a concrete grep across src/flask/, tests/, and docs/ — not a vague 'legacy' label",
+        "Precision must be at least 0.8 — false positives on live exports are heavily penalised"
+      ]
+    },
+    "check_evidence": {
+      "expected_solution": "Every entry in answer.json's dead_code array must include a non-empty `evidence` field that explains *how* the agent established zero callers in flask@3.1.0. Acceptable evidence cites a concrete search — for example, `grep -RIn 'htmlsafe_dumps' src/ tests/ docs/` returning only the definition in src/flask/json/__init__.py, or noting that src/flask/helpers.py::locked_cached_property is unreferenced inside the flask package. Vague labels like 'unused', 'old', or 'deprecated' are not sufficient. The verifier passes when at least 50% of items carry concrete evidence; high-quality answers cite the specific search command and the directories searched.",
+      "evaluation_criteria": [
+        "At least 50% of dead_code entries must carry a non-empty evidence string (the verifier's pass threshold)",
+        "Evidence must describe the verification mechanism — e.g., grep across src/flask/, tests/, docs/ — not a vague label like 'unused' or 'deprecated'",
+        "Higher-quality answers reference the specific search command (grep / ripgrep / Sourcegraph) and explicitly note that the only match is the definition site at the pinned revision 3.1.0"
+      ]
+    }
+  }
+}

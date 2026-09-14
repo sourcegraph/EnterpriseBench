@@ -1,0 +1,187 @@
+{
+  "task_id": "support-mapping-dual-httpx-httpcore-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/httpx--0.27.0",
+    "github.com/sg-evals/httpcore--1.0.5"
+  ],
+  "retrieved_paths": [
+    "httpx/_config.py",
+    "httpx/_client.py",
+    "httpx/_transports/default.py",
+    "httpcore/_models.py",
+    "httpcore/_async/connection_pool.py",
+    "httpcore/_async/connection.py",
+    "httpcore/_async/http11.py"
+  ],
+  "retrieved_paths_union": [
+    "httpx/_config.py",
+    "httpx/_client.py",
+    "httpx/_transports/default.py",
+    "httpcore/_models.py",
+    "httpcore/_async/connection_pool.py",
+    "httpcore/_async/connection.py",
+    "httpcore/_async/http11.py"
+  ],
+  "required_files": [
+    "httpx/httpx/_config.py",
+    "httpx/httpx/_transports/default.py",
+    "httpcore/httpcore/_async/connection_pool.py",
+    "httpcore/httpcore/_async/http11.py"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-httpx-httpcore-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.75,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.6667,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.7366,
+      "10": 0.8667
+    },
+    "mrr": 1.0,
+    "map_score": 0.7095,
+    "file_recall": 1.0,
+    "context_efficiency": 0.5714,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-httpx-httpcore-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.75,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.6667,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.7366,
+      "10": 0.8667
+    },
+    "mrr": 1.0,
+    "map_score": 0.7095,
+    "file_recall": 1.0,
+    "context_efficiency": 0.5714,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "elapsed_seconds": 18.1,
+  "response_chars": 4357,
+  "raw_response": "The timeout is marshaled through HTTPX request extensions into HTTP Core; HTTP Core does not receive timeout values in `ConnectionPool` construction. In the stated versions, an explicit `httpx.Timeout(timeout=None)` should propagate `None` for all four operations, so a genuine ~5-second `ReadTimeout` indicates that the request was built with HTTPX\u2019s default timeout configuration instead of the explicit object\u2014typically due to a caller/version integration issue at HTTPX\u2019s request-building boundary.\n\nRelevant files:\n\n- [sg-evals/httpx--0.27.0:httpx/_config.py?L194-L260](/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_config.py?L194-L260) - `Timeout` fields (`connect`, `read`, `write`, `pool`), explicit `None` normalization, `as_dict()`, and validation requiring either a default or all four fields.\n- [sg-evals/httpx--0.27.0:httpx/_config.py?L367-L370](/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_config.py?L367-L370) - `DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)`, used when no client timeout is supplied.\n- [sg-evals/httpx--0.27.0:httpx/_client.py?L1576-L1626](/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_client.py?L1576-L1626) - `AsyncClient.stream()` builds the request, sends it with `stream=True`, and exposes the response iterator.\n- [sg-evals/httpx--0.27.0:httpx/_client.py?L1630-L1675](/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_client.py?L1630-L1675) - `AsyncClient.send()` preserves streaming and therefore timeout failures can occur later while iterating `resp.aiter_bytes()`.\n- [sg-evals/httpx--0.27.0:httpx/_transports/default.py?L89-L104](/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_transports/default.py?L89-L104) - `HTTPCORE_EXC_MAP`, including `httpcore.ReadTimeout -> httpx.ReadTimeout`.\n- [sg-evals/httpx--0.27.0:httpx/_transports/default.py?L354-L382](/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_transports/default.py?L354-L382) - `AsyncHTTPTransport.handle_async_request()` creates `httpcore.Request` and passes `request.extensions` unchanged; this is the HTTPX\u2192HTTP Core timeout marshaling boundary.\n- [sg-evals/httpx--0.27.0:httpx/_transports/default.py?L248-L255](/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_transports/default.py?L248-L255) - `AsyncResponseStream.__aiter__()` maps exceptions while response body chunks are consumed.\n- [sg-evals/httpcore--1.0.5:httpcore/_models.py?L321-L355](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_models.py?L321-L355) - `Request` stores the incoming `extensions`, including the timeout dictionary.\n- [sg-evals/httpcore--1.0.5:httpcore/_async/connection_pool.py?L43-L61](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/connection_pool.py?L43-L61) - `AsyncConnectionPool` constructor; notably, it has no timeout parameters.\n- [sg-evals/httpcore--1.0.5:httpcore/_async/connection_pool.py?L159-L197](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/connection_pool.py?L159-L197) - `handle_async_request()` extracts only `timeout[\"pool\"]` for connection acquisition, then forwards the unchanged request to the selected connection.\n- [sg-evals/httpcore--1.0.5:httpcore/_async/connection.py?L67-L106](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/connection.py?L67-L106) - connection dispatch and `_connect()`, which extracts `timeout[\"connect\"]` and passes it to the network backend.\n- [sg-evals/httpcore--1.0.5:httpcore/_async/http11.py?L179-L210](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http11.py?L179-L210) - HTTP/1.1 response headers/body paths extract `timeout[\"read\"]` for each read operation.\n- [sg-evals/httpcore--1.0.5:httpcore/_async/http11.py?L216-L226](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http11.py?L216-L226) - `_receive_event()` passes the read timeout to `AsyncNetworkStream.read()`, where backend timeout enforcement raises `httpcore.ReadTimeout`.\n- [sg-evals/httpcore--1.0.5:httpcore/_async/http11.py?L147-L168](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http11.py?L147-L168) - request header/body paths extract and apply `timeout[\"write\"]`.\n- [sg-evals/httpcore--1.0.5:httpcore/_async/connection_pool.py?L191-L198](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/connection_pool.py?L191-L198) - pool dispatch into `connection.handle_async_request()`, completing the pool\u2192connection path.",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-httpx-httpcore-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.3904
+    },
+    "mrr": 1.0,
+    "map_score": 0.25,
+    "file_recall": 0.25,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "httpx/httpx/_config.py",
+    "httpx/_client.py",
+    "httpx/httpx/_transports/default.py",
+    "httpcore/_models.py",
+    "httpcore/httpcore/_async/connection_pool.py",
+    "httpcore/_async/connection.py",
+    "httpcore/httpcore/_async/http11.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-httpx-httpcore-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.3904
+    },
+    "mrr": 1.0,
+    "map_score": 0.25,
+    "file_recall": 0.25,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 7,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

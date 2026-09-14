@@ -1,0 +1,125 @@
+# Incident Investigation: Django ORM connection leak under Celery prefork worker pool
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "django-celery-ecosystem"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "incident-investigation-dual-django-celery-001"
+suite = "incident_response"
+task_type = "incident_investigation"
+difficulty = "hard"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Investigate Django database connection pool exhaustion caused by Celery prefork worker lifecycle mismatch"
+prompt = """
+Production monitoring shows PostgreSQL connection count climbing steadily and
+eventually exhausting the pool (max_connections=100). The application uses Django
+with Celery for background task processing. The connection exhaustion correlates
+with Celery worker restarts (--max-tasks-per-child=1000).
+
+Key observations:
+- Django web server connections are stable (~20)
+- Celery worker connections grow linearly with task execution
+- After a worker child is recycled (max-tasks-per-child), its connections are NOT
+  returned to PostgreSQL for ~10 minutes (the TCP keepalive timeout)
+- Setting CONN_MAX_AGE=0 in Django fixes the leak but hurts performance
+
+The issue is a mismatch between Django's database connection lifecycle and
+Celery's prefork worker process lifecycle.
+
+Your task:
+1. Find where Django manages database connection lifecycle — trace from
+   django.db.connections through the connection handler to identify how
+   connections are created, cached per-thread, and closed. Focus on
+   close_old_connections() and CONN_MAX_AGE behavior.
+2. Find where Celery's prefork pool manages worker child processes — trace
+   through the pool implementation to identify how child processes are
+   forked, recycled (max-tasks-per-child), and what cleanup hooks are
+   called during child termination.
+3. Identify the mismatch: Django caches connections per-thread with
+   CONN_MAX_AGE, but Celery's prefork children are processes (not threads)
+   that may not trigger Django's connection cleanup on termination.
+4. Trace the connection leak: fork -> Django opens connection -> task executes ->
+   child recycle -> process exits -> connection left in TIME_WAIT.
+
+- Connection lifecycle in Django (file:function chain)
+- Worker lifecycle in Celery prefork pool (file:function chain)
+- Root cause: why connections leak on worker recycle
+- Correct mitigation configuration
+"""
+
+[[repos]]
+url = "https://github.com/django/django"
+rev = "5.0"
+path = "django"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/celery/celery"
+rev = "v5.3.6"
+path = "celery"
+role = "consumer"
+
+[metadata]
+languages = ["python"]
+total_loc = 500_000
+dependency_depth = 2
+frameworks = ["django", "celery"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "connection_lifecycle"
+weight = 0.35
+verifier = "checks/check_connection_lifecycle.sh"
+description = "Agent identifies Django connection management and CONN_MAX_AGE behavior"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "worker_lifecycle"
+weight = 0.35
+verifier = "checks/check_worker_lifecycle.sh"
+description = "Agent identifies Celery prefork worker child lifecycle and cleanup hooks"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "root_cause"
+weight = 0.30
+verifier = "checks/check_root_cause.sh"
+description = "Agent identifies the connection-process lifecycle mismatch as root cause"
+timeout_seconds = 60
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Tracing database connection lifecycle in Django and process lifecycle in Celery prefork pool requires cross-repo search to find connection close hooks and process termination handlers"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "django/db/utils.py"
+repo = "django"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "celery/concurrency/prefork.py"
+repo = "celery"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "django/db/backends/base/base.py"
+repo = "django"
+confidence = 0.85
+
+[[ground_truth.sufficient_files]]
+path = "celery/worker/consumer/consumer.py"
+repo = "celery"
+confidence = 0.80

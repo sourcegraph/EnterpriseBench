@@ -1,0 +1,182 @@
+{
+  "task_id": "error-prov-dual-netty-spring-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/netty--netty-4.1.100.Final",
+    "github.com/sg-evals/spring-framework--v6.0.11"
+  ],
+  "retrieved_paths": [
+    "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java",
+    "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+    "transport/src/main/java/io/netty/channel/ChannelInboundHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorServerHttpRequest.java",
+    "spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java"
+  ],
+  "retrieved_paths_union": [
+    "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java",
+    "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+    "transport/src/main/java/io/netty/channel/ChannelInboundHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorServerHttpRequest.java",
+    "spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java"
+  ],
+  "required_files": [
+    "netty/handler/src/main/java/io/netty/handler/codec/http/HttpServerCodec.java",
+    "spring-framework/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java"
+  ],
+  "ir_scores": {
+    "task_id": "error-prov-dual-netty-spring-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.2641
+    },
+    "mrr": 0.25,
+    "map_score": 0.125,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 6,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "error-prov-dual-netty-spring-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.2641
+    },
+    "mrr": 0.25,
+    "map_score": 0.125,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 6,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 246.1,
+  "response_chars": 14825,
+  "raw_response": "---\ntitle: Tracing Netty channel exceptions through Reactor Netty into Spring WebFlux 500 errors\nshare_url: https://demo.sourcegraph.com/deepsearch/afa1ad8d-c779-4f50-baa4-59172ed1e60b\nurl: https://demo.sourcegraph.com/deepsearch/2205\ncreated: 2026-08-18T01:48:38Z\nupdated: 2026-08-18T01:52:01Z\n---\n\n#         # error-prov-dual-netty-spring-001\n\n        **Suite:** customer_escalation | **Type:** error_provenance | **Difficulty:** expert\n        **Repos:** netty + spring-framework\n\n        ## Context\n\n        A Spring WebFlux application is experiencing intermittent connection\nreset errors. The errors originate in Netty's channel pipeline but\nsurface as generic 500 errors in Spring WebFlux.\n\nYour task:\n1. Find how Netty handles channel pipeline exceptions\n2. Find how Spring WebFlux wraps Netty's reactor-netty in its server\n3. Trace an exception from Netty's channel handler through reactor-netty\n   into Spring WebFlux's error handling\n4. Identify where error context is lost in the translation\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/netty--netty-4.1.100.Final, github.com/sg-evals/spring-framework--v6.0.11\n\nThe report is written. Here is the full analysis inline:\n\n---\n\n## Analysis: Connection Reset Error Provenance \u2014 Netty + Spring WebFlux\n\n### 1. Netty Channel Pipeline Exception Handling\n\nAll exceptions enter via [`DefaultChannelPipeline.fireExceptionCaught`](https://demo.sourcegraph.com/r/github.com/sg-evals/netty--netty-4.1.100.Final/-/blob/transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java?L905-L909), which delegates immediately to [`AbstractChannelHandlerContext.invokeExceptionCaught(head, cause)`](https://demo.sourcegraph.com/r/github.com/sg-evals/netty--netty-4.1.100.Final/-/blob/transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java?L321-L341).\n\nThe propagation is:\n\n```\nfireExceptionCaught(cause)  [DefaultChannelPipeline L906]\n  \u2192 invokeExceptionCaught(head, cause)  [AbstractChannelHandlerContext L321]\n      \u2192 (thread check, dispatch to event loop if needed)\n      \u2192 handler().exceptionCaught(ctx, cause)  [AbstractChannelHandlerContext L343]\n\nDefault handler (ChannelInboundHandlerAdapter):\n  exceptionCaught() is marked @Skip [L138]\n  \u2192 ctx.fireExceptionCaught(cause)   [L143]  // forwards to next\n\nIf no handler intercepts:\n  \u2192 TailContext.exceptionCaught()  [DefaultChannelPipeline L1290]\n      \u2192 onUnhandledInboundException(cause)  [L1150]\n          \u2192 logger.warn(...)\n          \u2192 ReferenceCountUtil.release(cause)   \u2190 EXCEPTION SILENTLY DROPPED\n```\n\nThe `@Skip` annotation on [`ChannelInboundHandlerAdapter.exceptionCaught`](https://demo.sourcegraph.com/r/github.com/sg-evals/netty--netty-4.1.100.Final/-/blob/transport/src/main/java/io/netty/channel/ChannelInboundHandlerAdapter.java?L138-L144) means `findContextInbound(MASK_EXCEPTION_CAUGHT)` skips every handler that does not override the method, so exceptions can leap past most of the pipeline to reach `TailContext`. At the tail, [`onUnhandledInboundException`](https://demo.sourcegraph.com/r/github.com/sg-evals/netty--netty-4.1.100.Final/-/blob/transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java?L1146-L1159) only logs a WARN and releases the cause \u2014 **no reactor stream signal, no channel close, exception gone**.\n\n---\n\n### 2. Spring WebFlux Wrapping of Reactor-Netty\n\nThe integration boundary is [`ReactorHttpHandlerAdapter`](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java) \u2014 a `BiFunction<HttpServerRequest, HttpServerResponse, Mono<Void>>` installed directly by reactor-netty's `HttpServer.handle(...)`.\n\nIts [`apply()` method](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java?L55-L67):\n\n```java\nreturn this.httpHandler.handle(request, response)\n    .doOnError(ex -> logger.trace(request.getLogPrefix() + \"Failed to complete: \" + ex.getMessage()))\n    .doOnSuccess(aVoid -> logger.trace(request.getLogPrefix() + \"Handling completed\"));\n```\n\n`doOnError` is a **side-effect only** \u2014 no wrapping, no metadata attached, no recovery. The raw `IOException` flows unchanged to `HttpWebHandlerAdapter`.\n\n[`ReactorServerHttpRequest.getBody()`](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorServerHttpRequest.java?L113-L116) exposes Netty channel errors via `request.receive().retain().map(bufferFactory::wrap)`. If the Netty tail's `ReferenceCountUtil.release` has already freed the `ByteBuf`, a secondary `IllegalReferenceCountException` surfaces here, masking the root cause.\n\n---\n\n### 3. Tracing an Exception End-to-End\n\n```\n[Netty I/O thread]\nOS: connection reset\n\u2192 DefaultChannelPipeline.fireExceptionCaught(IOException)         [L906]\n\u2192 invokeExceptionCaught(head, ex)                                 [L321]\n\u2192 reactor-netty's HttpTrafficHandler.exceptionCaught()            [out-of-scope]\n   IF intercepted \u2192 emits onError(IOException) on request Flux\n   IF NOT intercepted (@Skip bypass) \u2192 TailContext \u2192 DROPPED      [L1150]\n\n[Reactor event loop \u2014 assuming signal was emitted]\n\u2192 ReactorServerHttpRequest.getBody() Flux: onError(IOException)   [L114]\n\u2192 ReactorHttpHandlerAdapter.apply(): doOnError TRACE only         [L66]\n\u2192 HttpWebHandlerAdapter.handle(): .onErrorResume(handleUnresolvedError)  [L249]\n\u2192 handleUnresolvedError()                                         [L284]\n   response.setStatusCode(500) succeeds\n     \u2192 ERROR log \"500 Server Error\"                               [L293]\n     \u2192 return Mono.empty()  \u2190 500 written to a dead connection\n   OR response already committed:\n     \u2192 ERROR log + Mono.error(ex) \u2192 reactor-netty closes channel  [L308]\n```\n\n---\n\n### 4. Where Error Context Is Lost\n\n| # | Location | Nature | Consequence |\n|---|----------|--------|-------------|\n| **1** | [`DefaultChannelPipeline.onUnhandledInboundException` L1150](https://demo.sourcegraph.com/r/github.com/sg-evals/netty--netty-4.1.100.Final/-/blob/transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java?L1150) | Behavioral \u2014 exception discarded | Exception never reaches Spring at all if not intercepted |\n| **2** | [`ChannelInboundHandlerAdapter.exceptionCaught` @Skip L138](https://demo.sourcegraph.com/r/github.com/sg-evals/netty--netty-4.1.100.Final/-/blob/transport/src/main/java/io/netty/channel/ChannelInboundHandlerAdapter.java?L138) | Behavioral \u2014 handlers bypassed silently | Exceptions jump past non-overriding pipeline stages |\n| **3** | [`ReactorHttpHandlerAdapter.apply()` L66](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java?L66) | Missing enrichment | No channel ID, remote address, or handler name attached to Throwable |\n| **4** | [`HttpWebHandlerAdapter.isDisconnectedClientError()` L314](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java?L314) | Brittle string-match | Windows messages (`\"forcibly closed\"`) and non-English locales not recognized |\n| **5** | [`DISCONNECTED_CLIENT_EXCEPTIONS` L72](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java?L72) | Incomplete class set | `IOException` absent; only Servlet/SockJS class names listed |\n| **6** | [`ReactorServerHttpRequest.getBody()` L114](https://demo.sourcegraph.com/r/github.com/sg-evals/spring-framework--v6.0.11/-/blob/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorServerHttpRequest.java?L114) | Secondary error risk | Released `ByteBuf` causes misleading NPE masking the root cause |\n\nThe most actionable loss point is **#4/#5**: `isDisconnectedClientError` will not match a Netty-originated `IOException: Connection reset by peer` on Windows (wrong message string) and will not match it by class name either (only Servlet/SockJS names in the set). The result is that every client-initiated reset is logged at ERROR level as a 500, flooding logs and obscuring real server errors.\n\n---\n\n### 5. Migration Recommendations\n\n**Netty:** Add an explicit `exceptionCaught`-overriding handler at the end of your `ChannelInitializer` to enrich and forward exceptions before they reach `TailContext`:\n\n```java\npipeline.addLast(\"exceptionBridge\", new ChannelInboundHandlerAdapter() {\n    @Override\n    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {\n        // Annotate with channel metadata so Spring can log it\n        ctx.fireExceptionCaught(new IOException(\n            \"Channel \" + ctx.channel().id() + \" remote=\" + ctx.channel().remoteAddress(), cause));\n        ctx.close();\n    }\n});\n```\n\n**Spring WebFlux \u2014 fix `isDisconnectedClientError`** to cover Windows and cover bare `IOException`:\n\n```java\nif (cause instanceof IOException) {\n    String text = cause.getMessage() != null ? cause.getMessage().toLowerCase() : \"\";\n    return text.contains(\"broken pipe\") || text.contains(\"connection reset\")\n        || text.contains(\"forcibly closed\") || text.contains(\"connection aborted\");\n}\n```\n\n**Spring WebFlux \u2014 enrich in `ReactorHttpHandlerAdapter`** using `.onErrorMap` instead of `doOnError` so downstream handlers see a wrapped exception with request metadata:\n\n```java\nreturn this.httpHandler.handle(request, response)\n    .onErrorMap(IOException.class, ex ->\n        new ReactorNettyChannelException(request.getLogPrefix(), ex));\n```\n\n**Immediate diagnostic:** enable TRACE on `org.springframework.web.server.DisconnectedClient` and DEBUG on `HttpWebHandlerAdapter` to distinguish genuine 500s from connection resets without a code change.\n\n## Sources\n\n- [github.com/sg-evals/netty--netty-4.1.100.Final/transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java@35c5898?L895-935](/github.com/sg-evals/netty--netty-4.1.100.Final@35c5898b878efcd6e2b22361bca995a7d79adb1c/-/blob/transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java?L895-935)\n- [github.com/sg-evals/netty--netty-4.1.100.Final/transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java@35c5898?L305-360](/github.com/sg-evals/netty--netty-4.1.100.Final@35c5898b878efcd6e2b22361bca995a7d79adb1c/-/blob/transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java?L305-360)\n- [github.com/sg-evals/spring-framework--v6.0.11/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java@7521aa1](/github.com/sg-evals/spring-framework--v6.0.11@7521aa101577aaa5ceba36ab4d58940fc3e02ab3/-/blob/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java)\n- [github.com/sg-evals/spring-framework--v6.0.11/spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java@7521aa1?L270-340](/github.com/sg-evals/spring-framework--v6.0.11@7521aa101577aaa5ceba36ab4d58940fc3e02ab3/-/blob/spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java?L270-340)\n- [github.com/sg-evals/netty--netty-4.1.100.Final/transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java@35c5898?L1140-1200](/github.com/sg-evals/netty--netty-4.1.100.Final@35c5898b878efcd6e2b22361bca995a7d79adb1c/-/blob/transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java?L1140-1200)\n- [github.com/sg-evals/spring-framework--v6.0.11/spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java@7521aa1?L195-270](/github.com/sg-evals/spring-framework--v6.0.11@7521aa101577aaa5ceba36ab4d58940fc3e02ab3/-/blob/spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java?L195-270)\n- [github.com/sg-evals/netty--netty-4.1.100.Final/transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java@35c5898?L360-420](/github.com/sg-evals/netty--netty-4.1.100.Final@35c5898b878efcd6e2b22361bca995a7d79adb1c/-/blob/transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java?L360-420)\n- [repo:^github.com/sg-evals/spring-framework--v6.0.11$ isDisconnectedClientError DISCONNECTED_CLIENT_EXCEPTIONS](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fspring-framework--v6.0.11$%20isDisconnectedClientError%20DISCONNECTED_CLIENT_EXCEPTIONS)\n- [github.com/sg-evals/spring-framework--v6.0.11/spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java@7521aa1?L1-100](/github.com/sg-evals/spring-framework--v6.0.11@7521aa101577aaa5ceba36ab4d58940fc3e02ab3/-/blob/spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java?L1-100)\n- [github.com/sg-evals/netty--netty-4.1.100.Final/transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java@35c5898?L1270-1310](/github.com/sg-evals/netty--netty-4.1.100.Final@35c5898b878efcd6e2b22361bca995a7d79adb1c/-/blob/transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java?L1270-1310)\n- [github.com/sg-evals/netty--netty-4.1.100.Final/transport/src/main/java/io/netty/channel/ChannelInboundHandlerAdapter.java@35c5898?L128-155](/github.com/sg-evals/netty--netty-4.1.100.Final@35c5898b878efcd6e2b22361bca995a7d79adb1c/-/blob/transport/src/main/java/io/netty/channel/ChannelInboundHandlerAdapter.java?L128-155)\n- [github.com/sg-evals/spring-framework--v6.0.11/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorServerHttpRequest.java@7521aa1?L51-130](/github.com/sg-evals/spring-framework--v6.0.11@7521aa101577aaa5ceba36ab4d58940fc3e02ab3/-/blob/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorServerHttpRequest.java?L51-130)\n\n\nGenerated files:\n- files/IMPACT_REPORT.csv: /.api/agent-files/v1/deep-search/afa1ad8d-c779-4f50-baa4-59172ed1e60b/files/IMPACT_REPORT.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "error-prov-dual-netty-spring-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 6,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java",
+    "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+    "transport/src/main/java/io/netty/channel/ChannelInboundHandlerAdapter.java",
+    "spring-framework/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorServerHttpRequest.java",
+    "spring-web/src/main/java/org/springframework/web/server/adapter/HttpWebHandlerAdapter.java"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "error-prov-dual-netty-spring-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 6,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

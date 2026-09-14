@@ -1,0 +1,30 @@
+{
+  "task_id": "dead-code-001",
+  "checkpoints": {
+    "check_dead_code": {
+      "expected_solution": "Five entire files in packages/react-dom/src/legacy-events/ and packages/react-dom/src/client/ are dead at facebook/react@9fba65e: packages/react-dom/src/legacy-events/EventPluginRegistry.js, EventPluginUtils.js, accumulateInto.js, forEachAccumulated.js, and packages/react-dom/src/client/ReactDOMClientInjection.js — every importer was removed when React migrated to the modern event system rooted at packages/react-dom/src/events/. In addition, three event-pooling functions inside packages/react-dom/src/legacy-events/SyntheticEvent.js are dead (getPooled, destructor, addEventPoolingTo), the DispatchConfig export in packages/react-dom/src/legacy-events/ReactSyntheticEventType.js and the getRawEventName helper in packages/react-dom/src/legacy-events/TopLevelEventTypes.js have no live callers, and packages/react-dom/src/test-utils/ReactTestUtils.js still imports accumulateInto/forEachAccumulated without using them. Finally, the enableDeprecatedFlareAPI === true branch in packages/react-dom/src/client/ReactDOM.js is permanently unreachable. Live anchors that must NOT be flagged include packages/react-dom/src/legacy-events/SyntheticEvent.js::SyntheticEvent (still the base class), packages/react-dom/src/legacy-events/EventPluginRegistry.js::registrationNameDependencies (re-used by the modern system), packages/react-dom/src/events/DOMModernPluginEventSystem.js::listenToAllSupportedEvents, packages/react-dom/src/events/DOMEventProperties.js::getEventPriorityForPluginSystem, packages/react-dom/src/events/ReactDOMEventListener.js::dispatchEvent, packages/react-dom/src/events/plugins/ModernSimpleEventPlugin.js::extractEvents, and packages/react-dom/src/client/ReactDOM.js::render.",
+      "evaluation_criteria": [
+        "Must identify the five wholly-dead files: packages/react-dom/src/legacy-events/EventPluginRegistry.js, packages/react-dom/src/legacy-events/EventPluginUtils.js, packages/react-dom/src/legacy-events/accumulateInto.js, packages/react-dom/src/legacy-events/forEachAccumulated.js, and packages/react-dom/src/client/ReactDOMClientInjection.js",
+        "Must identify the three dead event-pooling functions inside packages/react-dom/src/legacy-events/SyntheticEvent.js: getPooled, destructor, and addEventPoolingTo",
+        "Must NOT flag live anchors: packages/react-dom/src/legacy-events/SyntheticEvent.js::SyntheticEvent (base class), packages/react-dom/src/legacy-events/EventPluginRegistry.js::registrationNameDependencies (still used by the modern system), or packages/react-dom/src/events/DOMModernPluginEventSystem.js::listenToAllSupportedEvents",
+        "Must achieve precision >= 0.9 and recall >= 0.6 across the union of the dead files, dead functions, and dead exports/branches"
+      ]
+    },
+    "check_feature_flags": {
+      "expected_solution": "The dead branch is gated by the enableDeprecatedFlareAPI feature flag, which is permanently off at this revision. The conditional code under enableDeprecatedFlareAPI in packages/react-dom/src/client/ReactDOM.js is unreachable — the answer must call the flag out by name in evidence so that check_feature_flags.sh can match it. No other flags are flagged at this revision.",
+      "evaluation_criteria": [
+        "At least one entry must mention the flag name 'enableDeprecatedFlareAPI' in its evidence/symbol/file fields — check_feature_flags.sh greps these three fields case-insensitively",
+        "Must locate the dead branch in packages/react-dom/src/client/ReactDOM.js and explain that the flag is permanently off rather than removed",
+        "Should describe the flag's effect (Flare event API never enabled in production) so a reviewer can distinguish 'permanently_off' from 'permanently_on'"
+      ]
+    },
+    "check_evidence": {
+      "expected_solution": "Every entry in dead_code_report.json must carry a non-empty evidence field that explains why the file/function/branch is unreachable. For wholly-dead files the evidence should cite the absent importer (e.g., grep for the module path under packages/ returns only the file itself). For dead functions inside live files (getPooled, destructor, addEventPoolingTo) the evidence should note zero call sites. For the enableDeprecatedFlareAPI branch the evidence should reference the flag's permanently-off status in packages/shared/ReactFeatureFlags.js. The verifier passes when at least 50% of items carry evidence; quality answers cite the search command and target tree.",
+      "evaluation_criteria": [
+        "At least 50% of dead_code_report.json items must carry a non-empty evidence string (the verifier's pass threshold)",
+        "Evidence for wholly-dead files must show absent importers — e.g., grep across packages/ for the module path, returning only the file's own definitions",
+        "Evidence for dead functions and branches must cite the verification mechanism (no call sites, flag permanently off in packages/shared/ReactFeatureFlags.js) rather than vague labels like 'legacy'"
+      ]
+    }
+  }
+}

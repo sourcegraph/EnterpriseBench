@@ -1,0 +1,70 @@
+{
+  "task_id": "support-mapping-dual-spring-kafka-rebalance-002",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/spring-projects/spring-kafka",
+      "rev": "v3.1.4",
+      "path": "spring-kafka"
+    },
+    {
+      "url": "https://github.com/apache/kafka",
+      "rev": "3.6.1",
+      "path": "kafka"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "spring-kafka/spring-kafka/src/main/java/org/springframework/kafka/listener/KafkaMessageListenerContainer.java",
+      "repo": "spring-kafka",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "spring-kafka/spring-kafka/src/main/java/org/springframework/kafka/listener/ContainerProperties.java",
+      "repo": "spring-kafka",
+      "confidence": 0.8,
+      "source": "deterministic"
+    },
+    {
+      "path": "kafka/clients/src/main/java/org/apache/kafka/clients/consumer/internals/ConsumerCoordinator.java",
+      "repo": "kafka",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "kafka/clients/src/main/java/org/apache/kafka/clients/consumer/KafkaConsumer.java",
+      "repo": "kafka",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "spring-kafka/spring-kafka/src/main/java/org/springframework/kafka/listener/AcknowledgingMessageListener.java",
+      "repo": "spring-kafka",
+      "confidence": 0.75
+    },
+    {
+      "path": "kafka/clients/src/main/java/org/apache/kafka/clients/consumer/ConsumerRebalanceListener.java",
+      "repo": "kafka",
+      "confidence": 0.7
+    }
+  ],
+  "error_chain": [
+    "Spring Kafka's ListenerConsumer poll loop in KafkaMessageListenerContainer accumulates pending acks based on ContainerProperties.ackMode (BATCH, RECORD, etc.)",
+    "Kafka's ConsumerCoordinator detects rebalance and invokes ConsumerRebalanceListener.onPartitionsRevoked before assigning new partitions",
+    "With ackMode=BATCH, Spring defers commit until after the listener batch returns; if rebalance fires mid-batch, the deferred acks are discarded when the partition is revoked",
+    "Kafka's ConsumerCoordinator commits any acked offsets in onPartitionsRevoked, but Spring's pending ack queue is unflushed, so those records appear unacked and are reprocessed by the new owner"
+  ],
+  "trigger_conditions": [
+    "ackMode is set to BATCH (default) and a consumer group rebalance fires while a batch is still being acked",
+    "Spring's pending-ack queue has not been flushed to KafkaConsumer.commitSync by the time onPartitionsRevoked runs",
+    "Kafka's ConsumerCoordinator commits only what it sees in its own in-memory offset map; Spring's queued acks never made it there"
+  ],
+  "expected_answer": {
+    "error_origin": "Spring Kafka's ackMode=BATCH deferring commit until end-of-batch, racing with Kafka's ConsumerCoordinator.onPartitionsRevoked",
+    "bypass_reason": "Kafka's ConsumerCoordinator commits only what KafkaConsumer knows about; Spring's deferred ack queue is invisible to it",
+    "correct_config": "Set ackMode=RECORD or MANUAL_IMMEDIATE so each ack is committed to Kafka before the next poll, eliminating the rebalance race window; alternatively, hook ConsumerRebalanceListener.onPartitionsRevoked to flush Spring's pending queue"
+  }
+}

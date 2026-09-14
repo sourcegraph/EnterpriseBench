@@ -1,0 +1,207 @@
+{
+  "task_id": "support-mapping-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.31.2"
+  ],
+  "retrieved_paths": [
+    "source/common/router/router.cc",
+    "source/common/http/utility.cc",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/router/upstream_request.cc",
+    "source/common/common/basic_resource_impl.h",
+    "source/common/upstream/resource_manager_impl.h",
+    "source/common/router/retry_state_impl.cc",
+    "api/envoy/config/cluster/v3/circuit_breaker.proto",
+    "docs/root/configuration/upstream/cluster_stats.rst",
+    "source/server/admin/clusters_handler.cc",
+    "docs/root/configuration/upstream/cluster_manager/cluster_runtime.rst",
+    "docs/root/faq/load_balancing/disable_circuit_breaking.rst",
+    "docs/root/intro/arch_overview/upstream/circuit_breaking.rst",
+    "docs/root/configuration/upstream/cluster_manager/cluster_stats.rst"
+  ],
+  "retrieved_paths_union": [
+    "source/common/router/router.cc",
+    "source/common/http/utility.cc",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/router/upstream_request.cc",
+    "source/common/common/basic_resource_impl.h",
+    "source/common/upstream/resource_manager_impl.h",
+    "source/common/router/retry_state_impl.cc",
+    "api/envoy/config/cluster/v3/circuit_breaker.proto",
+    "docs/root/configuration/upstream/cluster_stats.rst",
+    "source/server/admin/clusters_handler.cc",
+    "docs/root/configuration/upstream/cluster_manager/cluster_runtime.rst",
+    "docs/root/faq/load_balancing/disable_circuit_breaking.rst",
+    "docs/root/intro/arch_overview/upstream/circuit_breaking.rst",
+    "docs/root/configuration/upstream/cluster_manager/cluster_stats.rst"
+  ],
+  "required_files": [
+    "source/common/http/conn_pool_base.cc",
+    "source/common/http/conn_pool_base.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/upstream/conn_pool_map_impl.h"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.1952,
+      "10": 0.1952
+    },
+    "mrr": 0.3333,
+    "map_score": 0.0833,
+    "file_recall": 0.25,
+    "context_efficiency": 0.0714,
+    "n_retrieved": 14,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.1952,
+      "10": 0.1952
+    },
+    "mrr": 0.3333,
+    "map_score": 0.0833,
+    "file_recall": 0.25,
+    "context_efficiency": 0.0714,
+    "n_retrieved": 14,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 110.3,
+  "response_chars": 14935,
+  "raw_response": "---\ntitle: Diagnosing Envoy upstream overflow disconnects during peak traffic\nshare_url: https://demo.sourcegraph.com/deepsearch/4f0a1d22-c8ad-4ce3-a84f-48e9174b4189\nurl: https://demo.sourcegraph.com/deepsearch/2194\ncreated: 2026-08-18T01:42:04Z\nupdated: 2026-08-18T01:43:29Z\n---\n\n# # Support Ticket: Services failing to connect to backend\n\n**Priority:** High\n**Submitted by:** DevOps Team Lead\n**Product:** Internal API Gateway (Envoy-based)\n\n---\n\nHi support,\n\nWe've been seeing intermittent failures hitting our backend services through the proxy layer. During peak traffic windows (usually around 2-4pm), a bunch of requests start failing and our monitoring shows the error \"upstream connect error or disconnect/reset before headers. reset reason: overflow.\"\n\nIt seems like the proxy is refusing to send requests through even though the backend services themselves are healthy and responding fine when we curl them directly. The problem goes away after traffic dies down but comes back every day during peak hours.\n\nWe haven't changed any configuration recently. Our backends are running fine -- CPU and memory look normal. It's the proxy layer that seems to be dropping things on the floor.\n\nCan you help us figure out what part of the proxy codebase is responsible for this \"overflow\" reset and what controls the limits? We need to understand the code path so we can tune the right settings.\n\nAlso, please identify any related source files, documentation, or components that are relevant to understanding the full picture (e.g., configuration schemas, related circuit-breaking mechanisms, connection pool internals).\n\nThanks,\nJordan\n\n\nSearch only these repositories: github.com/sg-evals/envoy--v1.31.2\n\nNow I have a complete picture. Here is the full analysis.\n\n---\n\n## Root Cause: Circuit Breaker Overflow\n\nThe error message `upstream connect error or disconnect/reset before headers. reset reason: overflow` is generated by Envoy's **circuit breaking** system, not a backend failure. The backends are healthy \u2014 Envoy is refusing to forward requests because cluster-level resource limits have been hit.\n\n---\n\n## The Code Path (Step by Step)\n\n### 1. Error message is constructed in the router\n\nThe exact error string is assembled in [`source/common/router/router.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/router/router.cc?L1415-L1420), inside `Filter::onUpstreamReset`:\n\n```cpp\nconst std::string body =\n    absl::StrCat(\"upstream connect error or disconnect/reset before headers. \",\n                 (is_retry_ ? \"retried and the latest \" : \"\"),\n                 \"reset reason: \", Http::Utility::resetReasonToString(reset_reason), ...);\n```\n\nThe `reset_reason` here is `Http::StreamResetReason::Overflow`, which [`resetReasonToString`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/http/utility.cc?L1029-L1031) maps to the string `\"overflow\"`.\n\nThe router also [explicitly notes](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/router/router.cc?L1379-L1383) that this reset reason means a cluster-wide resource overflow from circuit breakers \u2014 **not** an upstream error \u2014 and deliberately skips outlier detection ejection to avoid making the situation worse.\n\n### 2. Overflow is triggered in the connection pool\n\n[`source/common/conn_pool/conn_pool_base.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/conn_pool/conn_pool_base.cc) has two overflow sites:\n\n**Pending requests overflow** (most likely cause at peak traffic \u2014 no ready connection available):\n```cpp\n// Line 282-287\nif (!host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {\n    ENVOY_LOG(debug, \"max pending streams overflow\");\n    onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Overflow, context);\n    host_->cluster().trafficStats()->upstream_rq_pending_overflow_.inc();\n    return nullptr;\n}\n```\n\n**Max requests (streams) overflow** (when a connection is available but the cluster's active request limit is hit):\n```cpp\n// Line 175-180\nif (enforceMaxRequests() && !host_->cluster().resourceManager(priority_).requests().canCreate()) {\n    ENVOY_LOG(debug, \"max streams overflow\");\n    onPoolFailure(..., ConnectionPool::PoolFailureReason::Overflow, context);\n    traffic_stats.upstream_rq_pending_overflow_.inc();\n    return;\n}\n```\n\nBoth paths set `PoolFailureReason::Overflow`, which is then translated to `Http::StreamResetReason::Overflow` in [`source/common/router/upstream_request.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/router/upstream_request.cc?L566-L585).\n\n### 3. The `canCreate()` check\n\n`canCreate()` is defined in [`source/common/common/basic_resource_impl.h`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/common/basic_resource_impl.h?L29):\n\n```cpp\nbool canCreate() override { return current_.load() < max(); }\n```\n\n`max()` comes from the cluster's `ResourceManagerImpl` ([`source/common/upstream/resource_manager_impl.h`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/upstream/resource_manager_impl.h?L74-L94)), which is initialized from the circuit breaker thresholds in the cluster config, with runtime override support via keys like `circuit_breakers.<cluster_name>.<priority>.max_pending_requests`.\n\n### 4. Retries are suppressed\n\n[`source/common/router/retry_state_impl.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/router/retry_state_impl.cc?L468-L471) explicitly blocks retries for overflow resets:\n\n```cpp\n// Never retry if the reset reason is overflow.\nif (reset_reason == Http::StreamResetReason::Overflow) {\n    return RetryDecision::NoRetry;\n}\n```\n\n---\n\n## The Relevant Circuit Breaker Thresholds\n\nAll thresholds are configured per-cluster, per-priority in [`api/envoy/config/cluster/v3/circuit_breaker.proto`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/api/envoy/config/cluster/v3/circuit_breaker.proto?L57-L99):\n\n| Field | Default | Meaning |\n|---|---|---|\n| `max_connections` | **1024** | Max upstream TCP connections across all hosts in a cluster |\n| `max_pending_requests` | **1024** | Max requests queued waiting for a connection |\n| `max_requests` | **1024** | Max parallel in-flight requests (HTTP/2+) |\n| `max_retries` | **3** | Max active retries |\n| `max_connection_pools` | unlimited | Max concurrent connection pools |\n\nGiven the symptom (fails at peak ~2-4pm, recovers when traffic drops), the two most likely culprits are:\n- **`max_pending_requests`** \u2014 requests pile up waiting for a free connection; when the queue hits 1024, overflow fires\n- **`max_connections`** \u2014 if the connection limit is also saturated, new connections can't be created to drain the pending queue\n\n---\n\n## Key Statistics to Check\n\nFrom [`docs/root/configuration/upstream/cluster_manager/cluster_stats.rst`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/docs/root/configuration/upstream/cluster_stats.rst?L60-L83):\n\n- `upstream_rq_pending_overflow` \u2014 increments every time a request is dropped due to pending/request circuit breaker overflow (this is the primary signal)\n- `upstream_cx_overflow` \u2014 increments every time the connection circuit breaker fires\n- `upstream_cx_pool_overflow` \u2014 connection pool count overflow\n\nCheck these via the Envoy admin endpoint (`/stats` or `/clusters`). The admin clusters endpoint also [reports live circuit breaker state](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/server/admin/clusters_handler.cc?L32-L38).\n\n---\n\n## How to Tune\n\n**In your cluster config**, under `circuit_breakers.thresholds`, raise the appropriate limits:\n\n```yaml\ncircuit_breakers:\n  thresholds:\n    - priority: DEFAULT\n      max_connections: 4096         # raise from default 1024\n      max_pending_requests: 4096    # raise from default 1024\n      max_requests: 4096            # raise from default 1024\n```\n\nYou can also override at runtime without a restart using the runtime key pattern `circuit_breakers.<cluster_name>.<priority>.max_pending_requests` (documented in [`docs/root/configuration/upstream/cluster_manager/cluster_runtime.rst`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/docs/root/configuration/upstream/cluster_manager/cluster_runtime.rst?L175-L182)).\n\nTo effectively disable circuit breaking during testing, see [`docs/root/faq/load_balancing/disable_circuit_breaking.rst`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/docs/root/faq/load_balancing/disable_circuit_breaking.rst) \u2014 set thresholds to `1000000000`.\n\n> **Important note from the implementation**: Worker threads share circuit breaker counters, but the implementation is [\"eventually consistent\"](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/upstream/resource_manager_impl.h?L65-L72) \u2014 limits may be transiently exceeded due to races across threads. So observed overflow at exactly the limit is expected.\n\n---\n\n## Relevant Files Summary\n\n| File | Purpose |\n|---|---|\n| [`source/common/conn_pool/conn_pool_base.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/conn_pool/conn_pool_base.cc?L175-L290) | Where overflow is detected and `PoolFailureReason::Overflow` is fired |\n| [`source/common/router/router.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/router/router.cc?L1372-L1428) | Where the error body is composed and `UpstreamOverflow` response flag is set |\n| [`source/common/router/upstream_request.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/router/upstream_request.cc?L566-L586) | Translates `PoolFailureReason::Overflow` \u2192 `StreamResetReason::Overflow` |\n| [`source/common/router/retry_state_impl.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/router/retry_state_impl.cc?L468-L471) | Suppresses retries on overflow |\n| [`source/common/upstream/resource_manager_impl.h`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/upstream/resource_manager_impl.h) | `ResourceManagerImpl` \u2014 enforces all circuit breaker limits |\n| [`source/common/common/basic_resource_impl.h`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/common/basic_resource_impl.h?L29) | `canCreate()` \u2014 the actual gate check (`current < max`) |\n| [`api/envoy/config/cluster/v3/circuit_breaker.proto`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/api/envoy/config/cluster/v3/circuit_breaker.proto) | Proto schema for all circuit breaker config fields and defaults |\n| [`docs/root/intro/arch_overview/upstream/circuit_breaking.rst`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/docs/root/intro/arch_overview/upstream/circuit_breaking.rst) | Architecture overview of all 5 circuit breaker types |\n| [`docs/root/configuration/upstream/cluster_manager/cluster_runtime.rst`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/docs/root/configuration/upstream/cluster_manager/cluster_runtime.rst?L171-L186) | Runtime override keys for live tuning without restart |\n| [`docs/root/faq/load_balancing/disable_circuit_breaking.rst`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/docs/root/faq/load_balancing/disable_circuit_breaking.rst) | How to raise limits to effectively disable circuit breaking |\n\n## Sources\n\n- [repo:^github.com/sg-evals/envoy--v1.31.2$ overflow reset_reason](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fenvoy--v1.31.2$%20overflow%20reset_reason)\n- [repo:^github.com/sg-evals/envoy--v1.31.2$ \"upstream connect error\" overflow](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fenvoy--v1.31.2$%20%22upstream%20connect%20error%22%20overflow)\n- [repo:^github.com/sg-evals/envoy--v1.31.2$ circuit_breakers max_pending_requests max_connections](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fenvoy--v1.31.2$%20circuit_breakers%20max_pending_requests%20max_connections)\n- [repo:^github.com/sg-evals/envoy--v1.31.2$ upstream_cx_overflow upstream_rq_pending_overflow](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fenvoy--v1.31.2$%20upstream_cx_overflow%20upstream_rq_pending_overflow)\n- [github.com/sg-evals/envoy--v1.31.2/source/common/conn_pool/conn_pool_base.cc@9fad78c?L100-200](/github.com/sg-evals/envoy--v1.31.2@9fad78c5ca13df58ab7b58c0918b8986c9f01efb/-/blob/source/common/conn_pool/conn_pool_base.cc?L100-200)\n- [github.com/sg-evals/envoy--v1.31.2/source/common/router/router.cc@9fad78c?L1370-1475](/github.com/sg-evals/envoy--v1.31.2@9fad78c5ca13df58ab7b58c0918b8986c9f01efb/-/blob/source/common/router/router.cc?L1370-1475)\n- [github.com/sg-evals/envoy--v1.31.2/source/common/conn_pool/conn_pool_base.cc@9fad78c?L240-310](/github.com/sg-evals/envoy--v1.31.2@9fad78c5ca13df58ab7b58c0918b8986c9f01efb/-/blob/source/common/conn_pool/conn_pool_base.cc?L240-310)\n- [github.com/sg-evals/envoy--v1.31.2/docs/root/intro/arch_overview/upstream/circuit_breaking.rst@9fad78c](/github.com/sg-evals/envoy--v1.31.2@9fad78c5ca13df58ab7b58c0918b8986c9f01efb/-/blob/docs/root/intro/arch_overview/upstream/circuit_breaking.rst)\n- [repo:^github.com/sg-evals/envoy--v1.31.2$ ResourceManagerImpl canCreate pendingRequests requests connections](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fenvoy--v1.31.2$%20ResourceManagerImpl%20canCreate%20pendingRequests%20requests%20connections)\n- [github.com/sg-evals/envoy--v1.31.2/source/common/upstream/resource_manager_impl.h@9fad78c](/github.com/sg-evals/envoy--v1.31.2@9fad78c5ca13df58ab7b58c0918b8986c9f01efb/-/blob/source/common/upstream/resource_manager_impl.h)\n- [repo:^github.com/sg-evals/envoy--v1.31.2$ BasicResourceLimitImpl canCreate](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fenvoy--v1.31.2$%20BasicResourceLimitImpl%20canCreate)\n- [github.com/sg-evals/envoy--v1.31.2/docs/root/faq/load_balancing/disable_circuit_breaking.rst@9fad78c](/github.com/sg-evals/envoy--v1.31.2@9fad78c5ca13df58ab7b58c0918b8986c9f01efb/-/blob/docs/root/faq/load_balancing/disable_circuit_breaking.rst)\n- [repo:^github.com/sg-evals/envoy--v1.31.2$ file:.proto CircuitBreakers Thresholds max_pending_requests](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fenvoy--v1.31.2$%20file:.proto%20CircuitBreakers%20Thresholds%20max_pending_requests)\n- [github.com/sg-evals/envoy--v1.31.2/api/envoy/config/cluster/v3/circuit_breaker.proto@9fad78c](/github.com/sg-evals/envoy--v1.31.2@9fad78c5ca13df58ab7b58c0918b8986c9f01efb/-/blob/api/envoy/config/cluster/v3/circuit_breaker.proto)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.1952,
+      "10": 0.1952
+    },
+    "mrr": 0.3333,
+    "map_score": 0.0833,
+    "file_recall": 0.25,
+    "context_efficiency": 0.0714,
+    "n_retrieved": 14,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "source/common/router/router.cc",
+    "source/common/http/utility.cc",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/router/upstream_request.cc",
+    "source/common/common/basic_resource_impl.h",
+    "source/common/upstream/resource_manager_impl.h",
+    "source/common/router/retry_state_impl.cc",
+    "api/envoy/config/cluster/v3/circuit_breaker.proto",
+    "docs/root/configuration/upstream/cluster_stats.rst",
+    "source/server/admin/clusters_handler.cc",
+    "docs/root/configuration/upstream/cluster_manager/cluster_runtime.rst",
+    "docs/root/faq/load_balancing/disable_circuit_breaking.rst",
+    "docs/root/intro/arch_overview/upstream/circuit_breaking.rst",
+    "docs/root/configuration/upstream/cluster_manager/cluster_stats.rst"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.1952,
+      "10": 0.1952
+    },
+    "mrr": 0.3333,
+    "map_score": 0.0833,
+    "file_recall": 0.25,
+    "context_efficiency": 0.0714,
+    "n_retrieved": 14,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

@@ -1,0 +1,123 @@
+# support_code_mapping: Map customer TypeScript decorator regression to the Babel plugin-proposal-decorators / SWC transform stage boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "js-transpiler-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-babel-swc-decorators-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 35
+session_type = "single"
+description = "Map customer TypeScript decorator regression to the Babel plugin-proposal-decorators / SWC transform stage boundary"
+prompt = """
+A customer reports that after switching their build pipeline from Babel
+to SWC for faster CI, their @injectable() class decorators on Nest.js
+providers stop firing. The classes still construct, but the DI metadata
+table never registers them, so resolution fails at runtime with
+'Cannot read properties of undefined (reading getMetadata)'.
+
+Your task:
+1. Find where Babel's plugin-proposal-decorators decides between the
+   stage-2 legacy form and the stage-3 (TC39) form, and how it interacts
+   with @babel/plugin-transform-typescript ordering.
+2. Find where SWC's TypeScript transform handles decorators -- which
+   stage it implements, and whether it applies decorators before or
+   after class-property emit.
+3. Trace the cross-repo path: babel preset-typescript ->    plugin-proposal-decorators (legacy=true) -> Reflect.metadata side
+   effect -> Nest's IoC registration. Then trace SWC's parallel path
+   and identify the divergence.
+4. Identify the configuration choice (babel-plugin order, swc.jsc.
+   transform.legacyDecorator + decoratorMetadata) that determines
+   whether DI metadata is emitted, and why the customer's swc config
+   produces no metadata at all.
+"""
+
+[[repos]]
+url = "https://github.com/babel/babel"
+rev = "v7.24.0"
+path = "babel"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/swc-project/swc"
+rev = "v1.4.6"
+path = "swc"
+role = "upstream"
+
+[metadata]
+languages = ["typescript", "javascript", "rust"]
+total_loc = 600000
+dependency_depth = 2
+frameworks = ["babel", "swc", "typescript"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Decorator semantics differ between Babel's plugin-proposal-decorators and SWC's transform stage; tracing why DI metadata vanishes requires reading both transformers' decorator/class emit code paths."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "babel/packages/babel-plugin-proposal-decorators/src/index.ts"
+repo = "babel"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "babel/packages/babel-plugin-transform-typescript/src/index.ts"
+repo = "babel"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "swc/crates/swc_ecma_transforms_proposal/src/decorators.rs"
+repo = "swc"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "swc/crates/swc_ecma_transforms_typescript/src/lib.rs"
+repo = "swc"
+confidence = 0.8
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "babel/packages/babel-helper-create-class-features-plugin/src/decorators.ts"
+repo = "babel"
+confidence = 0.75
+
+[[ground_truth.sufficient_files]]
+path = "swc/crates/swc/src/config/mod.rs"
+repo = "swc"
+confidence = 0.7

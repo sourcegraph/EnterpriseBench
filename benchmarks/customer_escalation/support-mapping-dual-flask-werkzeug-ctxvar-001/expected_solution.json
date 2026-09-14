@@ -1,0 +1,32 @@
+{
+  "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: flask/src/flask/globals.py, flask/src/flask/ctx.py, werkzeug/src/werkzeug/local.py. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify flask/src/flask/globals.py as part of the error source",
+        "Must identify flask/src/flask/ctx.py as part of the error source",
+        "Must identify werkzeug/src/werkzeug/local.py as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) Flask's globals.py defines `request` as a LocalProxy backed by werkzeug.local.Local with a contextvars-based storage strategy -> (2) Werkzeug's local.py replaced the threadlocal storage with contextvars.ContextVar so that async coroutines see a per-task logical context -> (3) Flask's ctx.py pushes a RequestContext onto the Local stack at the start of dispatching and pops it at request teardown -> (4) When the async view awaits asyncio.create_task(coro), the task captures the current context via copy_context, preserving the bound request proxy -> (5) When code instead schedules work onto a thread pool or uses a bare ensure_future without copying context, the spawned task evaluates ContextVar.get() in an empty context, raising RuntimeError from the LocalProxy access.",
+      "evaluation_criteria": [
+        "Must describe the step: Flask's globals.py defines `request` as a LocalProxy backed by werkzeug.local.Lo...",
+        "Must describe the step: Werkzeug's local.py replaced the threadlocal storage with contextvars.ContextVar...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Customer code awaits a coroutine via run_in_executor or thread-pool worker which does not propagate the active contextvars context; (2) Werkzeug's Local switched from threadlocal to ContextVar storage, so the regression appeared after the werkzeug 2.0+ upgrade; (3) Flask's RequestContext proxy raises RuntimeError when the underlying ContextVar.get() returns LookupError, masking the contextvars cause.",
+      "evaluation_criteria": [
+        "Must identify the condition: Customer code awaits a coroutine via run_in_executor or thread-pool worker which...",
+        "Must identify the condition: Werkzeug's Local switched from threadlocal to ContextVar storage, so the regress...",
+        "Must identify the condition: Flask's RequestContext proxy raises RuntimeError when the underlying ContextVar....",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

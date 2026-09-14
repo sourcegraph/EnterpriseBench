@@ -1,0 +1,71 @@
+{
+  "task_id": "support-mapping-dual-prisma-zod-codegen-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/prisma/prisma",
+      "rev": "5.12.0",
+      "path": "prisma"
+    },
+    {
+      "url": "https://github.com/colinhacks/zod",
+      "rev": "v3.23.0",
+      "path": "zod"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "prisma/packages/internals/src/engine-commands/getDmmf.ts",
+      "repo": "prisma",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "prisma/packages/generator-helper/src/dmmf.ts",
+      "repo": "prisma",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "zod/src/types.ts",
+      "repo": "zod",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "zod/src/helpers/parseUtil.ts",
+      "repo": "zod",
+      "confidence": 0.8,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "prisma/packages/generator-helper/src/byline.ts",
+      "repo": "prisma",
+      "confidence": 0.65
+    },
+    {
+      "path": "zod/src/external.ts",
+      "repo": "zod",
+      "confidence": 0.7
+    }
+  ],
+  "error_chain": [
+    "Prisma's prisma generate runs the engine to produce DMMF; the DMMF's Model.fields array preserves source-file declaration order",
+    "zod-prisma (third-party generator that consumes prisma's DMMF) walks fields in array order and emits z.object({...}) keys in that order",
+    "zod's z.object internally stores shape as a plain object whose key iteration order matches insertion (per ECMAScript 2015+ spec)",
+    "When zod-prisma emits a discriminated union via z.discriminatedUnion, the discriminator key resolution depends on shape iteration order; a reorder in schema.prisma can change which variant zod picks for ambiguous payloads",
+    "Different services that regenerated at different times (one before, one after the reorder) emit different zod schemas, leading to validation drift"
+  ],
+  "trigger_conditions": [
+    "Customer reordered fields in schema.prisma (perhaps to group related fields) and not all services regenerated zod schemas at the same time",
+    "zod's z.discriminatedUnion behavior depends on shape iteration order; reordering shape keys changes which variant matches an ambiguous input",
+    "Prisma's DMMF preserves source order, propagating the reorder into zod-prisma's emitted shape"
+  ],
+  "expected_answer": {
+    "error_origin": "Prisma's DMMF preserving schema.prisma source order, which zod-prisma maps directly into shape iteration order in zod's z.object",
+    "bypass_reason": "zod's discriminated-union resolution is shape-iteration-order dependent for ambiguous payloads; field reorder = different variant selection",
+    "correct_config": "Pin the field order in schema.prisma alphabetically (or by a documented convention) and regenerate all services from the same Prisma version, or replace z.discriminatedUnion with z.union plus an explicit discriminator check"
+  }
+}

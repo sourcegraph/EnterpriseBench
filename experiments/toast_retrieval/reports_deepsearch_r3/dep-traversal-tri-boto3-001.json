@@ -1,0 +1,193 @@
+{
+  "task_id": "dep-traversal-tri-boto3-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/boto3--1.28.0",
+    "github.com/sg-evals/s3transfer--0.6.1",
+    "github.com/sg-evals/botocore--1.31.0"
+  ],
+  "retrieved_paths": [
+    "boto3/s3/inject.py",
+    "boto3/s3/transfer.py",
+    "s3transfer/manager.py",
+    "s3transfer/upload.py",
+    "s3transfer/tasks.py",
+    "botocore/client.py",
+    "botocore/endpoint.py",
+    "botocore/httpsession.py",
+    "botocore/serialize.py"
+  ],
+  "retrieved_paths_union": [
+    "boto3/s3/inject.py",
+    "boto3/s3/transfer.py",
+    "s3transfer/manager.py",
+    "s3transfer/upload.py",
+    "s3transfer/tasks.py",
+    "botocore/client.py",
+    "botocore/endpoint.py",
+    "botocore/httpsession.py",
+    "botocore/serialize.py"
+  ],
+  "required_files": [
+    "boto3/s3/transfer.py",
+    "s3transfer/manager.py",
+    "botocore/client.py"
+  ],
+  "ir_scores": {
+    "task_id": "dep-traversal-tri-boto3-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.5307,
+      "10": 0.6979
+    },
+    "mrr": 0.5,
+    "map_score": 0.5556,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 9,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "dep-traversal-tri-boto3-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.5307,
+      "10": 0.6979
+    },
+    "mrr": 0.5,
+    "map_score": 0.5556,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 9,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 330.7,
+  "response_chars": 9522,
+  "raw_response": "---\ntitle: Trace boto3 multipart upload flow through s3transfer to botocore\nshare_url: https://demo.sourcegraph.com/deepsearch/04574d08-81b3-43fd-b012-b86ff0992cb9\nurl: https://demo.sourcegraph.com/deepsearch/2184\ncreated: 2026-08-17T23:07:10Z\nupdated: 2026-08-17T23:12:20Z\n---\n\n# # Dependency Trace: S3 Multipart Upload from boto3 through s3transfer to botocore\n\n## Context\n\nWhen uploading large files to S3 with boto3, the actual work is split across\nthree libraries: boto3 provides the high-level API, s3transfer handles\nmultipart upload orchestration (splitting, concurrency, completion), and\nbotocore provides the low-level AWS API calls with serialization and retries.\n\nA timeout issue with large uploads requires understanding how configuration\nflows through all three layers.\n\n## Task\n\nTrace a single `upload_file` call from boto3's S3 resource through s3transfer's\nmultipart upload logic to botocore's API call serialization. Document\nconfiguration options at each layer.\n\n## Repos in Workspace\n\n- `/workspace/boto3/` -- boto3 1.28.0 (high-level SDK)\n- `/workspace/s3transfer/` -- s3transfer 0.6.1 (transfer orchestration)\n- `/workspace/botocore/` -- botocore 1.31.0 (low-level API client)\n\n## Expected Output\n\nWrite `/workspace/DEPENDENCY_TRACE.md` containing:\n\n1. boto3's upload_file entry point and TransferConfig options\n2. s3transfer's TransferManager multipart upload orchestration\n3. botocore's low-level S3 operations (CreateMultipartUpload, UploadPart, CompleteMultipartUpload)\n4. Configuration options at each layer that affect upload behavior\n5. The complete call chain from upload_file to HTTP requests\n\n\nSearch only these repositories: github.com/sg-evals/boto3--1.28.0, github.com/sg-evals/s3transfer--0.6.1, github.com/sg-evals/botocore--1.31.0\n\nThe JSON file contains the full markdown content. The document has been written successfully. Here is a summary of what the trace covers:\n\n---\n\nThe dependency trace document (`/workspace/DEPENDENCY_TRACE.md`) has been written. It is available at the JSON artifact above (the file system only supports JSON/CSV, but the content is pure Markdown stored as the JSON string value).\n\nHere is what the trace documents:\n\n---\n\n## Summary of Findings\n\n### Call Chain (top to bottom)\n\n```\ns3.client.upload_file()                        boto3/s3/inject.py:105\n  \u2192 S3Transfer(client, Config)                 boto3/s3/transfer.py:250\n  \u2192 TransferManager.upload()                   s3transfer/manager.py:291\n  \u2192 _submission_executor \u2192 UploadSubmissionTask s3transfer/upload.py:512\n      \u2192 size >= threshold?\n          yes \u2192 _submit_multipart_request      s3transfer/upload.py:644\n                \u2192 CreateMultipartUploadTask    s3transfer/tasks.py:337\n                \u2192 UploadPartTask \u00d7 N           s3transfer/upload.py:761\n                \u2192 CompleteMultipartUploadTask  s3transfer/tasks.py:366\n          no  \u2192 PutObjectTask                  s3transfer/upload.py:748\n  \u2192 client._make_api_call()                    botocore/client.py:906\n  \u2192 Endpoint._send_request()                   botocore/endpoint.py:194\n  \u2192 URLLib3Session.send() \u2192 conn.urlopen()     botocore/httpsession.py:448\n```\n\n### Key Configuration Facts\n\n| Layer | Option | Default | Timeout relevance |\n|-------|--------|---------|-------------------|\n| boto3 `TransferConfig` | `multipart_chunksize` | 8 MB | Smaller = less time per part |\n| boto3 `TransferConfig` | `max_concurrency` | 10 | Parallelism, not timeout |\n| boto3 `TransferConfig` | `use_threads` | `True` | `False` = serial |\n| botocore `Config` | `read_timeout` | **60 s** | **Primary timeout knob** |\n| botocore `Config` | `connect_timeout` | 60 s | TCP handshake timeout |\n\n**The timeout issue root cause:** `read_timeout` is per-HTTP-request (per part), not per-transfer. A single `UploadPart` call that takes >60 s raises `ReadTimeoutError`. `TransferConfig` has no timeout option \u2014 it must be set on `botocore.config.Config` passed to `boto3.client()`. The fix is `Config(read_timeout=300)` combined with a smaller `multipart_chunksize` (minimum 5 MB per S3 requirements).\n\n### Source References\n- [boto3/s3/inject.py:105-149](https://demo.sourcegraph.com/r/github.com/sg-evals/boto3--1.28.0/-/blob/boto3/s3/inject.py?L105-L149) \u2014 client `upload_file` entry point\n- [boto3/s3/transfer.py:164-243](https://demo.sourcegraph.com/r/github.com/sg-evals/boto3--1.28.0/-/blob/boto3/s3/transfer.py?L164-L243) \u2014 `TransferConfig` with alias mapping\n- [s3transfer/manager.py:46-281](https://demo.sourcegraph.com/r/github.com/sg-evals/s3transfer--0.6.1/-/blob/s3transfer/manager.py?L46-L281) \u2014 `TransferConfig` + `TransferManager` init\n- [s3transfer/upload.py:512-742](https://demo.sourcegraph.com/r/github.com/sg-evals/s3transfer--0.6.1/-/blob/s3transfer/upload.py?L512-L742) \u2014 `UploadSubmissionTask` multipart orchestration\n- [s3transfer/tasks.py:334-387](https://demo.sourcegraph.com/r/github.com/sg-evals/s3transfer--0.6.1/-/blob/s3transfer/tasks.py?L334-L387) \u2014 `CreateMultipartUploadTask` / `CompleteMultipartUploadTask`\n- [botocore/client.py:906-978](https://demo.sourcegraph.com/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/client.py?L906-L978) \u2014 `_make_api_call`\n- [botocore/endpoint.py:194-233](https://demo.sourcegraph.com/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/endpoint.py?L194-L233) \u2014 retry loop and `_send_request`\n- [botocore/httpsession.py:448-510](https://demo.sourcegraph.com/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/httpsession.py?L448-L510) \u2014 urllib3 dispatch and timeout exception mapping\n\n## Sources\n\n- [github.com/sg-evals/boto3--1.28.0/boto3/s3/inject.py@e874fea?L99-165](/github.com/sg-evals/boto3--1.28.0@e874fea5c528f2d3e105f20e8747a611cb0ebde7/-/blob/boto3/s3/inject.py?L99-165)\n- [github.com/sg-evals/boto3--1.28.0/boto3/s3/transfer.py@e874fea?L60-300](/github.com/sg-evals/boto3--1.28.0@e874fea5c528f2d3e105f20e8747a611cb0ebde7/-/blob/boto3/s3/transfer.py?L60-300)\n- [github.com/sg-evals/s3transfer--0.6.1/s3transfer/manager.py@c9e9348?L1-250](/github.com/sg-evals/s3transfer--0.6.1@c9e9348deefde7dcbf6eb6fdd6703a515b0da8ae/-/blob/s3transfer/manager.py?L1-250)\n- [github.com/sg-evals/s3transfer--0.6.1/s3transfer/upload.py@c9e9348?L500-830](/github.com/sg-evals/s3transfer--0.6.1@c9e9348deefde7dcbf6eb6fdd6703a515b0da8ae/-/blob/s3transfer/upload.py?L500-830)\n- [github.com/sg-evals/botocore--1.31.0/botocore/client.py@8be0f37?L960-1030](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/client.py?L960-1030)\n- [github.com/sg-evals/botocore--1.31.0/botocore/endpoint.py@8be0f37?L100-220](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/endpoint.py?L100-220)\n- [github.com/sg-evals/botocore--1.31.0/botocore/httpsession.py@8be0f37?L400-510](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/httpsession.py?L400-510)\n- [github.com/sg-evals/s3transfer--0.6.1/s3transfer/manager.py@c9e9348?L250-560](/github.com/sg-evals/s3transfer--0.6.1@c9e9348deefde7dcbf6eb6fdd6703a515b0da8ae/-/blob/s3transfer/manager.py?L250-560)\n- [github.com/sg-evals/s3transfer--0.6.1/s3transfer/tasks.py@c9e9348?L300-420](/github.com/sg-evals/s3transfer--0.6.1@c9e9348deefde7dcbf6eb6fdd6703a515b0da8ae/-/blob/s3transfer/tasks.py?L300-420)\n- [github.com/sg-evals/botocore--1.31.0/botocore/endpoint.py@8be0f37?L220-290](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/endpoint.py?L220-290)\n- [github.com/sg-evals/botocore--1.31.0/botocore/httpsession.py@8be0f37?L200-320](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/httpsession.py?L200-320)\n- [github.com/sg-evals/boto3--1.28.0/boto3/s3/inject.py@e874fea?L1-55](/github.com/sg-evals/boto3--1.28.0@e874fea5c528f2d3e105f20e8747a611cb0ebde7/-/blob/boto3/s3/inject.py?L1-55)\n- [github.com/sg-evals/botocore--1.31.0/botocore/httpsession.py@8be0f37?L1-80](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/httpsession.py?L1-80)\n- [github.com/sg-evals/botocore--1.31.0/botocore/endpoint.py@8be0f37?L1-100](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/endpoint.py?L1-100)\n- [github.com/sg-evals/botocore--1.31.0/botocore/client.py@8be0f37?L900-965](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/client.py?L900-965)\n- [github.com/sg-evals/s3transfer--0.6.1/s3transfer/upload.py@c9e9348?L1-100](/github.com/sg-evals/s3transfer--0.6.1@c9e9348deefde7dcbf6eb6fdd6703a515b0da8ae/-/blob/s3transfer/upload.py?L1-100)\n- [github.com/sg-evals/botocore--1.31.0/botocore/serialize.py@8be0f37?L440-490](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/serialize.py?L440-490)\n- [github.com/sg-evals/s3transfer--0.6.1/s3transfer/upload.py@c9e9348?L380-430](/github.com/sg-evals/s3transfer--0.6.1@c9e9348deefde7dcbf6eb6fdd6703a515b0da8ae/-/blob/s3transfer/upload.py?L380-430)\n- [github.com/sg-evals/s3transfer--0.6.1/s3transfer/upload.py@c9e9348?L200-380](/github.com/sg-evals/s3transfer--0.6.1@c9e9348deefde7dcbf6eb6fdd6703a515b0da8ae/-/blob/s3transfer/upload.py?L200-380)\n\n\nGenerated files:\n- files/DEPENDENCY_TRACE.json: /.api/agent-files/v1/deep-search/04574d08-81b3-43fd-b012-b86ff0992cb9/files/DEPENDENCY_TRACE.json\n- files/DEPENDENCY_TRACE_md.csv: /.api/agent-files/v1/deep-search/04574d08-81b3-43fd-b012-b86ff0992cb9/files/DEPENDENCY_TRACE_md.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "dep-traversal-tri-boto3-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.5307,
+      "10": 0.6979
+    },
+    "mrr": 0.5,
+    "map_score": 0.5556,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 9,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "boto3/s3/inject.py",
+    "boto3/s3/transfer.py",
+    "s3transfer/manager.py",
+    "s3transfer/upload.py",
+    "s3transfer/tasks.py",
+    "botocore/client.py",
+    "botocore/endpoint.py",
+    "botocore/httpsession.py",
+    "botocore/serialize.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "dep-traversal-tri-boto3-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.5307,
+      "10": 0.6979
+    },
+    "mrr": 0.5,
+    "map_score": 0.5556,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 9,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

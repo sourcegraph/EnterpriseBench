@@ -1,0 +1,33 @@
+{
+  "task_id": "cal-err-click-flagval-002",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "Primary error source: src/click/core.py \u2014 Contains Option class where flag_value parameter is processed and default is resolved. Supporting: src/click/decorators.py \u2014 The option() decorator that passes flag_value and default to Option.__init__. Surface error: flag_value with default=True is order-sensitive.",
+      "evaluation_criteria": [
+        "Must identify src/click/core.py as part of the error source",
+        "Must identify src/click/decorators.py as part of the error source",
+        "Must reference the surface error message ('flag_value with default=True is order-sensitive') or its origin",
+        "Must reference a specific function, type, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Error propagation chain: (1) User defines option with flag_value=True and default=True \u2192 (2) click.option decorator in decorators.py passes params to Option.__init__ \u2192 (3) Option.__init__ in core.py processes flag_value and default \u2192 (4) The flag_value assignment overwrites or conflicts with default depending on order.",
+      "evaluation_criteria": [
+        "Must describe the step: 'User defines option with flag_value=True and default=True'",
+        "Must describe the propagation: 'The flag_value assignment overwrites or conflicts with default depending on orde'",
+        "Must include all intermediate steps in the correct order",
+        "Must reference the chain in causal order (source \u2192 surface)",
+        "Must cite at least one file from the propagation path (e.g. src/click/core.py)"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Option uses flag_value=True parameter; (2) Option also specifies default=True; (3) The flag_value processing in Option.__init__ has order-dependent behavior; (4) Using --no-verbose does not override when flag_value is processed after default.",
+      "evaluation_criteria": [
+        "Must identify the condition: 'Option uses flag_value=True parameter'",
+        "Must identify the condition: 'Option also specifies default=True'",
+        "Must identify the condition: 'The flag_value processing in Option.__init__ has order-dependent behavior'",
+        "Must explain the combined conditions necessary to reproduce the error"
+      ]
+    }
+  }
+}

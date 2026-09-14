@@ -34,11 +34,16 @@ from typing import Iterable
 PASSTHROUGH_FLAGS: tuple[str, ...] = (
     "--source",
     "--agent",
+    "--harness",
+    "--model",
     "--timeout",
     "--account",
+    "--judge-model",
+    "--judge-account",
     "--mode",
     "--dry-run",
     "--output-dir",
+    "--variant-label",
 )
 
 # argparse kwargs for each forwarding flag, used when a runner only needs to
@@ -47,11 +52,16 @@ PASSTHROUGH_FLAGS: tuple[str, ...] = (
 _FLAG_KWARGS: dict[str, dict[str, object]] = {
     "--source": {"type": str, "default": None},
     "--agent": {"type": str, "default": None},
+    "--harness": {"type": str, "default": None},
+    "--model": {"type": str, "default": None},
     "--timeout": {"type": int, "default": None},
     "--account": {"type": int, "default": None},
+    "--judge-model": {"type": str, "default": None},
+    "--judge-account": {"type": int, "default": None},
     "--mode": {"type": str, "default": None},
     "--dry-run": {"action": "store_true"},
     "--output-dir": {"type": str, "default": None},
+    "--variant-label": {"type": str, "default": None},
 }
 
 

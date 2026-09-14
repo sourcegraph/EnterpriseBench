@@ -1,0 +1,70 @@
+{
+  "task_id": "support-mapping-dual-celery-kombu-prefetch-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/celery/celery",
+      "rev": "v5.3.6",
+      "path": "celery"
+    },
+    {
+      "url": "https://github.com/celery/kombu",
+      "rev": "v5.3.5",
+      "path": "kombu"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "celery/celery/worker/consumer/consumer.py",
+      "repo": "celery",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "celery/celery/worker/consumer/tasks.py",
+      "repo": "celery",
+      "confidence": 0.8,
+      "source": "deterministic"
+    },
+    {
+      "path": "kombu/kombu/connection.py",
+      "repo": "kombu",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "kombu/kombu/messaging.py",
+      "repo": "kombu",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "kombu/kombu/transport/pyamqp.py",
+      "repo": "kombu",
+      "confidence": 0.7
+    },
+    {
+      "path": "celery/celery/worker/consumer/mingle.py",
+      "repo": "celery",
+      "confidence": 0.65
+    }
+  ],
+  "error_chain": [
+    "Celery's consumer.py opens a Kombu Connection and invokes tasks.Tasks.start which calls channel.basic_qos with the configured prefetch_count once at startup",
+    "Kombu's connection.py ensure() wrapper detects the broker drop and transparently re-creates the underlying transport, exposing a fresh channel object",
+    "kombu/messaging.py rebinds the consumer to the new channel but does not re-issue basic_qos, leaving the new channel at the AMQP default prefetch_count of 0 (unlimited)",
+    "RabbitMQ delivers a burst of unacked messages, but Celery's worker thread pool is already bounded; without prefetch backpressure the consumer state machine deadlocks on its own queue size accounting"
+  ],
+  "trigger_conditions": [
+    "The broker connection drops and Kombu's ensure() recreates the channel without re-applying basic_qos",
+    "Celery's consumer does not re-issue prefetch on reconnect because it treats the Kombu channel as a stable abstraction",
+    "RabbitMQ's default prefetch_count of 0 means unlimited, so the fresh channel ignores Celery's worker_prefetch_multiplier setting"
+  ],
+  "expected_answer": {
+    "error_origin": "kombu/messaging.py rebinding to a recovered channel without re-issuing basic_qos, leaving prefetch unlimited at the new channel",
+    "bypass_reason": "Celery's consumer.py only calls basic_qos at startup; it relies on Kombu to preserve channel-level QoS across reconnects, which Kombu does not do",
+    "correct_config": "Hook into Kombu's on_connection_revived signal in celery/worker/consumer/consumer.py to re-issue basic_qos with the configured prefetch_count, or pin the consumer to a Connection.ensure callback that restores QoS"
+  }
+}

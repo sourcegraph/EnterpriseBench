@@ -1,0 +1,43 @@
+{
+  "task_id": "incident-inv-dual-cortex-thanos-001",
+  "task_type": "incident_investigation",
+  "repos": [
+    {
+      "url": "https://github.com/cortexproject/cortex",
+      "rev": "v1.16.0",
+      "path": "cortex"
+    },
+    {
+      "url": "https://github.com/thanos-io/thanos",
+      "rev": "v0.32.0",
+      "path": "thanos"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "cortex/pkg/ring/ring.go",
+      "repo": "cortex",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "thanos/pkg/store/proxy.go",
+      "repo": "thanos",
+      "confidence": 0.9,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "cortex/pkg/ingester/ingester.go",
+      "repo": "cortex",
+      "confidence": 0.85
+    },
+    {
+      "path": "thanos/pkg/query/querier.go",
+      "repo": "thanos",
+      "confidence": 0.8
+    }
+  ],
+  "incident_type": "distributed_consistency"
+}

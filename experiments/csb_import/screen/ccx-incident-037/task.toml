@@ -1,0 +1,136 @@
+# Imported from CodeScaleBench CCX-incident-037 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-incident-037"
+suite = "incident_response"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Incident Debugging: etcd DialTimeout Configuration Across Kubernetes Ecosystem"
+
+[[repos]]
+url = "https://github.com/kubernetes/kubernetes"
+rev = "v1.32.0"
+path = "kubernetes"
+role = "primary"
+
+[metadata]
+languages = ["go"]
+csb_mirror = "sg-evals/kubernetes--v1.32.0"
+csb_commit = "v1.32.0"
+csb_family = "csb_org_incident"
+csb_category = "incident-debug"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_debug composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory/etcd3.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/apiserver/pkg/storage/etcd3/preflight/checks.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "client/v3/config.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "client/v3/client.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "client/v3/lease.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "client/v3/maintenance.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "client/v3/doc.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "client/pkg/transport/transport.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "client/pkg/transport/timeout_transport.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "server/etcdserver/server.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "server/etcdserver/api/rafthttp/transport.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "server/etcdserver/api/rafthttp/util.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "server/etcdmain/config.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "server/etcdmain/etcd.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "server/etcdmain/grpc_proxy.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "server/config/config.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"

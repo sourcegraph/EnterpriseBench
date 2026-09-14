@@ -1,0 +1,118 @@
+# Imported from CodeScaleBench CCX-migration-289 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-migration-289"
+suite = "technical_debt"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Bazel Starlark Evaluation and BUILD File Migration Inventory"
+
+[[repos]]
+url = "https://github.com/bazelbuild/bazel"
+rev = "8.0.0"
+path = "bazel"
+role = "primary"
+
+[metadata]
+languages = ["java"]
+csb_mirror = "sg-evals/bazel--8.0.0"
+csb_commit = "8.0.0"
+csb_family = "csb_org_migration"
+csb_category = "migration-inventory"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "src/main/java/net/starlark/java/eval/StarlarkThread.java"
+repo = "bazel"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/net/starlark/java/eval/Eval.java"
+repo = "bazel"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/google/devtools/build/lib/packages/PackageFactory.java"
+repo = "bazel"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/google/devtools/build/lib/packages/Package.java"
+repo = "bazel"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/google/devtools/build/lib/skyframe/BzlLoadFunction.java"
+repo = "bazel"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleClassFunctions.java"
+repo = "bazel"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/google/devtools/build/lib/packages/RuleClass.java"
+repo = "bazel"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/google/devtools/build/lib/packages/RuleFactory.java"
+repo = "bazel"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/google/devtools/build/lib/packages/MacroClass.java"
+repo = "bazel"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/google/devtools/build/lib/packages/MacroInstance.java"
+repo = "bazel"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/google/devtools/build/lib/packages/StarlarkNativeModule.java"
+repo = "bazel"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/google/devtools/build/lib/packages/BzlInitThreadContext.java"
+repo = "bazel"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/main/java/com/google/devtools/build/lib/skyframe/PackageFunction.java"
+repo = "bazel"
+confidence = 0.9
+source = "deterministic"

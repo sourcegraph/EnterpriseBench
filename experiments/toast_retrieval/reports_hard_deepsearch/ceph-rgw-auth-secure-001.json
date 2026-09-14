@@ -1,0 +1,177 @@
+{
+  "task_id": "ceph-rgw-auth-secure-001",
+  "policy": "deepsearch",
+  "suite": "security_operations",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/ceph--v19.2.0"
+  ],
+  "retrieved_paths": [
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_auth_keystone.cc"
+  ],
+  "retrieved_paths_union": [
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_auth_keystone.cc"
+  ],
+  "required_files": [
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_auth.h"
+  ],
+  "ir_scores": {
+    "task_id": "ceph-rgw-auth-secure-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 0.75,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.6667,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8319,
+      "10": 0.8319
+    },
+    "mrr": 1.0,
+    "map_score": 0.75,
+    "file_recall": 0.75,
+    "context_efficiency": 0.75,
+    "n_retrieved": 4,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "ceph-rgw-auth-secure-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 0.75,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.6667,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8319,
+      "10": 0.8319
+    },
+    "mrr": 1.0,
+    "map_score": 0.75,
+    "file_recall": 0.75,
+    "context_efficiency": 0.75,
+    "n_retrieved": 4,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 221.4,
+  "response_chars": 16423,
+  "raw_response": "---\ntitle: Security audit of Ceph RGW S3 authentication and signature verification\nshare_url: https://demo.sourcegraph.com/deepsearch/d6774a0f-d151-421c-a76c-729f3b226bf2\nurl: https://demo.sourcegraph.com/deepsearch/2201\ncreated: 2026-08-18T01:44:57Z\nupdated: 2026-08-18T01:47:43Z\n---\n\n# # Task: Security Audit of Ceph RADOS Gateway S3 Authentication\n\n## Context\n\nOur security team is conducting a quarterly audit of storage infrastructure. As the security engineer assigned to the Ceph deployment, you need to review the S3 authentication implementation in the RADOS Gateway (RGW) before we expose our object storage endpoints to external partners.\n\nThe codebase is available at `/workspace/ceph/`.\n\n## Objective\n\nPerform a security audit of the S3 authentication implementation in Ceph's RADOS Gateway (RGW) and create a findings report with remediation recommendations.\n\n## Steps\n\n1. Locate the S3 authentication implementation within the RGW source tree (look for AWS Signature V4 handling, the auth framework, and the S3 REST layer)\n2. Identify the request signing and verification flow\n3. Check for common S3 auth vulnerabilities:\n   - Signature version fallback (V2 vs V4)\n   - Timing attacks in signature comparison\n   - Request replay prevention (timestamp validation window)\n   - Secret key storage and access patterns\n4. Create `security_audit.md` in `/workspace/` documenting:\n   - Authentication flow overview (file paths and key functions)\n   - Each finding with severity, description, file location, and remediation\n   - At least 3 specific findings with code references\n   - Summary risk assessment\n\n## Success Criteria\n\n- security_audit.md exists\n- Contains specific file paths and function references from the RGW source\n- Identifies at least 3 security findings\n- Includes remediation recommendations\n\n\nSearch only these repositories: github.com/sg-evals/ceph--v19.2.0\n\nThe audit is complete. Here is the full `security_audit.md` report content \u2014 this serves as the `/workspace/security_audit.md` deliverable.\n\n---\n\n# Security Audit: Ceph RADOS Gateway (RGW) S3 Authentication\n\n**Audit Date:** 2026-08-18\n**Auditor:** Stephanie Jarmak, Security Engineering\n**Codebase:** [github.com/sg-evals/ceph--v19.2.0](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0)\n**Scope:** S3 authentication implementation in the RADOS Gateway (RGW)\n\n---\n\n## 1. Authentication Flow Overview\n\n### Key Source Files\n\n| File | Role |\n|------|------|\n| [`src/rgw/rgw_auth_s3.h`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_auth_s3.h) | Auth strategy definitions, `RGW_AUTH_GRACE` constant, `AWSEngine` declarations |\n| [`src/rgw/rgw_auth_s3.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_auth_s3.cc) | Signature V2/V4 computation, canonical request construction, time-skew check |\n| [`src/rgw/rgw_rest_s3.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_rest_s3.cc) | Entry point (`RGW_Auth_S3::authorize`), version dispatch, `LocalEngine::authenticate`, `STSEngine::authenticate` |\n| [`src/rgw/rgw_auth_keystone.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_auth_keystone.cc) | Keystone EC2Engine: secret cache look-up, remote signature verification |\n\n### Authentication Flow (V4 Header Path)\n\n```\nIncoming HTTP request\n        \u2502\n        \u25bc\nRGW_Auth_S3::authorize()               [rgw_rest_s3.cc:5055]\n        \u2502  Dispatches to auth strategy registry\n        \u25bc\nAWSAuthStrategy (template)             [rgw_auth_s3.h:161]\n        \u2502  Tries engines in configured order: sts \u2192 external \u2192 local\n        \u25bc\nAWSGeneralAbstractor::get_auth_data()  [rgw_rest_s3.cc:5545]\n        \u2502  discover_aws_flavour() detects V2 or V4\n        \u2502  \u2192 V4: get_auth_data_v4()    [rgw_rest_s3.cc:5716]\n        \u2502  \u2192 V2: get_auth_data_v2()    [rgw_rest_s3.cc:5978]\n        \u25bc\nparse_v4_credentials()                 [rgw_auth_s3.cc:538]\n        \u2502  Calls is_time_skew_ok()     [rgw_auth_s3.cc:265]\n        \u25bc\nget_v4_canon_req_hash() / get_v4_string_to_sign()\n        \u25bc\nAWSEngine::authenticate()              [rgw_rest_s3.cc:6118]\n        \u25bc\nLocalEngine::authenticate()            [rgw_rest_s3.cc:6270+]\n        \u2502  Retrieves secret key k.key from RADOS user store\n        \u2502  Calls get_v4_signature() \u2192 compares via std::string::compare()\n        \u25bc\nresult_t::grant() or result_t::reject()\n```\n\n---\n\n## 2. Security Findings\n\n---\n\n### Finding 1: Non-Constant-Time Signature Comparison (Timing Attack)\n\n**Severity: HIGH**\n\nAll three authentication engines perform signature comparison using `std::string::compare()`, which short-circuits on the first mismatched byte. On a low-latency network, an attacker can mount a timing oracle to recover the server-computed HMAC character by character.\n\n**Affected locations:**\n\n- [`rgw_rest_s3.cc:6308`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_rest_s3.cc?L6308) \u2014 `LocalEngine`:\n  ```cpp\n  auto compare = signature.compare(server_signature);\n  ```\n- [`rgw_rest_s3.cc:6443`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_rest_s3.cc?L6443) \u2014 `STSEngine`:\n  ```cpp\n  auto compare = signature.compare(server_signature);\n  ```\n- [`rgw_auth_keystone.cc:618`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_auth_keystone.cc?L618) \u2014 `EC2Engine` (cache hit):\n  ```cpp\n  if (sig.compare(server_signature) == 0) {\n  ```\n\n**Remediation:** Replace all three with `CRYPTO_memcmp()` (OpenSSL, already linked):\n```cpp\nif (CRYPTO_memcmp(signature.data(), server_signature.data(),\n                  std::min(signature.size(), server_signature.size())) != 0\n    || signature.size() != server_signature.size()) { return result_t::reject(...); }\n```\n\n---\n\n### Finding 2: AWS Signature Version 2 Unconditionally Accepted (HMAC-SHA1 Downgrade)\n\n**Severity: HIGH**\n\n[`AWSGeneralAbstractor::get_auth_data`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_rest_s3.cc?L5544) dispatches to `get_auth_data_v2()` for any request detected as V2, with no administrator opt-out:\n\n```cpp\n// rgw_rest_s3.cc:5556\nif (version == AwsVersion::V2) {\n    return get_auth_data_v2(s);\n```\n\nV2 uses HMAC-SHA1 ([`get_v2_signature` at `rgw_auth_s3.cc:1046`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_auth_s3.cc?L1046)) and a weaker canonical format that excludes query parameters and payload hashes. The [`AWSBrowserUploadAbstractor`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_rest_s3.cc?L6111) also falls back to V2 for browser POST uploads that do not advertise `AWS4-HMAC-SHA256`.\n\nAWS deprecated SigV2 in 2019. Accepting it creates a downgrade attack surface.\n\n**Remediation:** Introduce a `rgw_s3_require_sigv4` config flag and reject V2 requests at the external-facing cluster. Block V2 at the load balancer immediately as a tactical control.\n\n---\n\n### Finding 3: \u00b115-Minute Replay Window with No Nonce/Request Deduplication\n\n**Severity: MEDIUM**\n\n[`is_time_skew_ok()`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_auth_s3.cc?L265) enforces a hard-coded \u00b115-minute window:\n\n```cpp\n// rgw_auth_s3.h:30\nstatic constexpr auto RGW_AUTH_GRACE = std::chrono::minutes{15};\n\n// rgw_auth_s3.cc:270\nif (std::chrono::abs(cur_tp - req_tp) > RGW_AUTH_GRACE) {\n    return false;\n}\n```\n\nThere is no server-side nonce cache or request-ID deduplication anywhere in the auth path. A captured signed `PUT`/`DELETE` request can be replayed for the full 30-minute window (15 before + 15 after timestamp).\n\nAdditionally, V2 presigned URL `Expires` values ([`rgw_rest_s3.cc:6000`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_rest_s3.cc?L6000)) have no server-enforced upper bound \u2014 callers can set arbitrarily far-future expiry, unlike V4 presigned URLs which are capped at 7 days by [`parse_v4_query_string`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_auth_s3.cc?L309).\n\n**Remediation:**\n1. Implement a short-lived nonce cache keyed on `(access_key_id, date, signature)` with TTL = `2 \u00d7 RGW_AUTH_GRACE`.\n2. Cap V2 presigned URL `Expires` at 7 days server-side, matching V4 behavior.\n3. Consider reducing `RGW_AUTH_GRACE` to 5 minutes for the external-facing cluster.\n\n---\n\n### Finding 4: Signing Key Intermediates Logged in Plaintext at Debug Level\n\n**Severity: MEDIUM**\n\n[`get_v4_signing_key()`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_auth_s3.cc?L979) logs all four HMAC key derivation intermediates at `dout(10)` \u2014 without the `rgw::crypt_sanitize::log_content` wrapper used elsewhere:\n\n```cpp\n// rgw_auth_s3.cc:996\u2013999\nldpp_dout(dpp, 10) << \"date_k    = \" << date_k << dendl;\nldpp_dout(dpp, 10) << \"region_k  = \" << region_k << dendl;\nldpp_dout(dpp, 10) << \"service_k = \" << service_k << dendl;\nldpp_dout(dpp, 10) << \"signing_k = \" << signing_key << dendl;\n```\n\nAny deployment with `debug rgw = 10` or higher (common in troubleshooting) will emit per-request signing key material. An attacker with log read access can reconstruct the signing key for any authenticated user.\n\n**Remediation:** Remove these four log lines entirely. If debug-level key tracing is required, gate it behind a compile-time flag (`#ifdef RGW_DEBUG_SECRET_KEY`) and wrap output in `rgw::crypt_sanitize::log_content`.\n\n---\n\n### Finding 5: CORS OPTIONS Signature Bypass at Engine Level\n\n**Severity: LOW**\n\nBoth `LocalEngine` ([`rgw_rest_s3.cc:6298`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_rest_s3.cc?L6298)) and `EC2Engine` ([`rgw_auth_keystone.cc:714`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_auth_keystone.cc?L714)) skip signature verification for `RGW_OP_OPTIONS_CORS`. While this is correct per the CORS specification, the bypass is embedded deep inside authentication engine code without documentation, creating a maintenance risk where future changes to OPTIONS handling could inadvertently widen the bypass surface.\n\n**Remediation:** Add explicit RFC references in comments; move the bypass decision to a higher-level pre-auth policy layer so it is audited separately from signature verification logic.\n\n---\n\n## 3. Summary Risk Assessment\n\n| # | Finding | Severity | CVSS (est.) |\n|---|---------|----------|-------------|\n| 1 | Non-constant-time signature comparison | **HIGH** | 7.5 |\n| 2 | SigV2 / HMAC-SHA1 unconditionally accepted | **HIGH** | 8.1 |\n| 3 | 15-min replay window, no nonce deduplication | **MEDIUM** | 6.5 |\n| 4 | Signing key intermediates in debug logs | **MEDIUM** | 5.9 |\n| 5 | OPTIONS CORS auth bypass in engine code | **LOW** | 3.1 |\n\n**Overall Risk: HIGH.** The gateway must not be exposed to external partners until Findings 1 and 2 are resolved.\n\n**Pre-exposure blockers:**\n1. Replace `std::string::compare()` with `CRYPTO_memcmp()` at [`rgw_rest_s3.cc:6308`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_rest_s3.cc?L6308), [`6443`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_rest_s3.cc?L6443), and [`rgw_auth_keystone.cc:618`](https://demo.sourcegraph.com/r/github.com/sg-evals/ceph--v19.2.0/-/blob/src/rgw/rgw_auth_keystone.cc?L618).\n2. Block SigV2 at the load balancer for the external-facing cluster immediately.\n\n**Short-term (30 days):** Remove signing key intermediate log lines; cap V2 presigned URL expiry.\n\n**Medium-term (90 days):** Implement request nonce deduplication; refactor OPTIONS bypass to a policy layer.\n\n## Sources\n\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_auth_s3.cc@63be876?L1-100](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_auth_s3.cc?L1-100)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_auth_s3.h@63be876?L1-160](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_auth_s3.h?L1-160)\n- [repo:^github.com/sg-evals/ceph--v19.2.0$ s3_auth_use_keystone v2 signature](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fceph--v19.2.0$%20s3_auth_use_keystone%20v2%20signature)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_auth_s3.cc@63be876?L100-350](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_auth_s3.cc?L100-350)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_rest_s3.cc@63be876?L6090-6145](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_rest_s3.cc?L6090-6145)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_auth_s3.h@63be876?L160-350](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_auth_s3.h?L160-350)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_auth_s3.cc@63be876?L700-1050](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_auth_s3.cc?L700-1050)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_rest_s3.cc@63be876?L6410-6460](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_rest_s3.cc?L6410-6460)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_auth_s3.cc@63be876?L1050-1200](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_auth_s3.cc?L1050-1200)\n- [repo:^github.com/sg-evals/ceph--v19.2.0$ file:rgw_auth_s3 RGW_AUTH_GRACE timestamp skew](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fceph--v19.2.0$%20file:rgw_auth_s3%20RGW_AUTH_GRACE%20timestamp%20skew)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_auth_s3.cc@63be876?L1200-1350](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_auth_s3.cc?L1200-1350)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_auth_s3.cc@63be876?L400-620](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_auth_s3.cc?L400-620)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_auth_keystone.cc@63be876?L580-730](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_auth_keystone.cc?L580-730)\n- [repo:^github.com/sg-evals/ceph--v19.2.0$ file:rgw signature.compare server_signature](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fceph--v19.2.0$%20file:rgw%20signature.compare%20server_signature)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_rest_s3.cc@63be876?L6270-6340](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_rest_s3.cc?L6270-6340)\n- [repo:^github.com/sg-evals/ceph--v19.2.0$ file:rgw rgw_s3_auth_use_keystone rgw_s3_auth_use_rados secret_key](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fceph--v19.2.0$%20file:rgw%20rgw_s3_auth_use_keystone%20rgw_s3_auth_use_rados%20secret_key)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_rest_s3.cc@63be876?L5050-5080](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_rest_s3.cc?L5050-5080)\n- [repo:^github.com/sg-evals/ceph--v19.2.0$ file:rgw_rest_s3 get_auth_data_v2 get_auth_data_v4 AWS4_HMAC_SHA256_STR](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fceph--v19.2.0$%20file:rgw_rest_s3%20get_auth_data_v2%20get_auth_data_v4%20AWS4_HMAC_SHA256_STR)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_rest_s3.cc@63be876?L5960-6060](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_rest_s3.cc?L5960-6060)\n- [repo:^github.com/sg-evals/ceph--v19.2.0$ file:rgw_rest_s3.cc AWSGeneralAbstractor get_auth_data AWS4_HMAC_SHA256](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fceph--v19.2.0$%20file:rgw_rest_s3.cc%20AWSGeneralAbstractor%20get_auth_data%20AWS4_HMAC_SHA256)\n- [github.com/sg-evals/ceph--v19.2.0/src/rgw/rgw_rest_s3.cc@63be876?L5544-5600](/github.com/sg-evals/ceph--v19.2.0@63be876077818c01441bb83d4dd351f6bd05a1ab/-/blob/src/rgw/rgw_rest_s3.cc?L5544-5600)\n\n\nGenerated files:\n- files/security_audit_content.json: /.api/agent-files/v1/deep-search/d6774a0f-d151-421c-a76c-729f3b226bf2/files/security_audit_content.json\n- files/security_audit.csv: /.api/agent-files/v1/deep-search/d6774a0f-d151-421c-a76c-729f3b226bf2/files/security_audit.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "ceph-rgw-auth-secure-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 0.75,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.6667,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8319,
+      "10": 0.8319
+    },
+    "mrr": 1.0,
+    "map_score": 0.75,
+    "file_recall": 0.75,
+    "context_efficiency": 0.75,
+    "n_retrieved": 4,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "src/rgw/rgw_auth_s3.h",
+    "src/rgw/rgw_auth_s3.cc",
+    "src/rgw/rgw_rest_s3.cc",
+    "src/rgw/rgw_auth_keystone.cc"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "ceph-rgw-auth-secure-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 0.75,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.6667,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8319,
+      "10": 0.8319
+    },
+    "mrr": 1.0,
+    "map_score": 0.75,
+    "file_recall": 0.75,
+    "context_efficiency": 0.75,
+    "n_retrieved": 4,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

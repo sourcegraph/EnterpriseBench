@@ -1,0 +1,102 @@
+# config_drift: Trace Jaeger collector configuration drift with OpenTelemetr
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "cncf-observability-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "config-drift-dual-jaeger-otel-001"
+suite = "platform_engineering"
+task_type = "config_drift"
+difficulty = "hard"
+estimated_duration_minutes = 35
+session_type = "single"
+description = "Trace Jaeger collector configuration drift with OpenTelemetry Collector migration"
+prompt = """
+Jaeger is migrating its backend to use the OpenTelemetry Collector as
+its core processing engine. During the migration, configuration formats
+between Jaeger's legacy config and OTel Collector config can drift.
+
+Your task:
+1. Find Jaeger's legacy collector configuration format and flags
+2. Find OpenTelemetry Collector's configuration schema for tracing
+3. Identify configuration parameters that exist in one but not the other
+4. Document the configuration migration path from Jaeger to OTel format
+
+Write your analysis to /workspace/analysis/IMPACT_REPORT.md
+"""
+
+[[repos]]
+url = "https://github.com/jaegertracing/jaeger"
+rev = "v1.51.0"
+path = "jaeger"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/open-telemetry/opentelemetry-collector"
+rev = "v0.89.0"
+path = "otel-collector"
+role = "dependency"
+
+[metadata]
+languages = ["go"]
+total_loc = 200_000
+dependency_depth = 2
+frameworks = ["jaeger", "opentelemetry"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "jaeger_config"
+weight = 0.30
+verifier = "checks/check_jaeger_config.sh"
+description = "Agent identifies Jaeger collector configuration"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "otel_config"
+weight = 0.35
+verifier = "checks/check_otel_config.sh"
+description = "Agent finds OTel Collector config schema"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "drift_points"
+weight = 0.35
+verifier = "checks/check_drift_points.sh"
+description = "Agent documents configuration drift"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = ["migration_guide"]
+
+[tool_access]
+expected_mcp_benefit = "medium"
+mcp_benefit_rationale = "Configuration format comparison across repos benefits from targeted search"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "jaeger/cmd/collector/app/flags.go"
+repo = "jaeger"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "otel-collector/service/service.go"
+repo = "otel-collector"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "jaeger/cmd/collector/app/handler/grpc_handler.go"
+repo = "jaeger"
+confidence = 0.8
+
+[[ground_truth.sufficient_files]]
+path = "otel-collector/receiver/otlpreceiver/factory.go"
+repo = "otel-collector"
+confidence = 0.8

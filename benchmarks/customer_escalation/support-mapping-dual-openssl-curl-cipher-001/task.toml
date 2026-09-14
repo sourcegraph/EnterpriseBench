@@ -1,0 +1,122 @@
+# support_code_mapping: Map customer curl HTTPS handshake failure after openssl 3.0 upgrade to the libcurl ossl backend / openssl provider security-level boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "curl-openssl-tls-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-openssl-curl-cipher-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 35
+session_type = "single"
+description = "Map customer curl HTTPS handshake failure after openssl 3.0 upgrade to the libcurl ossl backend / openssl provider security-level boundary"
+prompt = """
+A customer reports that after their distro upgraded openssl from
+1.1.1 to 3.0, curl HTTPS calls to a partner endpoint suddenly fail
+with 'no cipher match' even though the partner supports modern
+ciphers. openssl s_client succeeds against the same host. The
+customer's curl was rebuilt against the new openssl.
+
+Your task:
+1. Find where libcurl's openssl backend (vtls/openssl.c) constructs
+   the SSL_CTX and applies cipher and protocol version constraints.
+2. Find where openssl 3.0's provider model evaluates the security
+   level (default 1 in 1.1.1, default 2 in 3.0) and which ciphers
+   it filters.
+3. Trace the cross-repo path: curl handle -> Curl_ossl_connect ->
+   SSL_CTX_set_cipher_list -> openssl provider init -> security    level check -> cipher_filter callbacks. Cite each file and the
+   function or attribute responsible.
+4. Identify why openssl 3.0's default security level rejects RSA
+   key exchange ciphers and SHA1 signatures that 1.1.1 accepted,
+   and how libcurl's backend does not surface the level mismatch
+   except as 'no cipher match'.
+"""
+
+[[repos]]
+url = "https://github.com/curl/curl"
+rev = "curl-8_6_0"
+path = "curl"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/openssl/openssl"
+rev = "openssl-3.0.13"
+path = "openssl"
+role = "upstream"
+
+[metadata]
+languages = ["c", "cpp"]
+total_loc = 2500000
+dependency_depth = 2
+frameworks = ["curl", "libcurl", "openssl"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "TLS handshake regression is split between libcurl's openssl backend and openssl 3.0's provider model. Cross-repo navigation is required to see why the security level rejects ciphers libcurl asks for."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "curl/lib/vtls/openssl.c"
+repo = "curl"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "curl/lib/vtls/openssl.h"
+repo = "curl"
+confidence = 0.75
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "openssl/ssl/ssl_ciph.c"
+repo = "openssl"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "openssl/ssl/t1_lib.c"
+repo = "openssl"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "curl/lib/vtls/vtls.c"
+repo = "curl"
+confidence = 0.7
+
+[[ground_truth.sufficient_files]]
+path = "openssl/providers/defltprov.c"
+repo = "openssl"
+confidence = 0.75

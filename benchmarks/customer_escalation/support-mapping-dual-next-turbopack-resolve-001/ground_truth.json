@@ -1,0 +1,70 @@
+{
+  "task_id": "support-mapping-dual-next-turbopack-resolve-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/vercel/next.js",
+      "rev": "v14.1.4",
+      "path": "next.js"
+    },
+    {
+      "url": "https://github.com/vercel/turbo",
+      "rev": "v1.13.2",
+      "path": "turbo"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "next.js/packages/next/src/build/webpack-config.ts",
+      "repo": "next.js",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "next.js/packages/next/src/server/lib/turbopack-warning.ts",
+      "repo": "next.js",
+      "confidence": 0.75,
+      "source": "deterministic"
+    },
+    {
+      "path": "turbo/crates/turbopack-ecmascript/src/references/esm/mod.rs",
+      "repo": "turbo",
+      "confidence": 0.85,
+      "source": "deterministic"
+    },
+    {
+      "path": "turbo/crates/turbopack-resolve/src/resolve.rs",
+      "repo": "turbo",
+      "confidence": 0.9,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "next.js/packages/next/src/build/load-jsconfig.ts",
+      "repo": "next.js",
+      "confidence": 0.7
+    },
+    {
+      "path": "turbo/crates/turbopack-resolve/src/resolve_options_context.rs",
+      "repo": "turbo",
+      "confidence": 0.7
+    }
+  ],
+  "error_chain": [
+    "Next.js's webpack-config.ts injects an enhanced-resolve alias for transpilePackages so pnpm-symlinked workspace packages are visible to Webpack's resolver",
+    "Turbopack uses its own Rust resolver in turbopack-resolve/resolve.rs with a resolve_options_context that does not honor transpilePackages by default",
+    "When pnpm symlinks @internal/ui under apps/<app>/node_modules pointing to .pnpm/<store>/node_modules/@internal/ui, Webpack follows the symlink and loads the package",
+    "Turbopack's resolver, lacking the transpilePackages bridge, treats .pnpm-style nested links as outside the workspace root and refuses to load them, raising 'Module not found'"
+  ],
+  "trigger_conditions": [
+    "The customer uses pnpm with workspaces and consumes a workspace package via transpilePackages in next.config.js",
+    "Turbopack does not apply transpilePackages aliases (Next 14 limitation) so the resolver does not bridge the symlinked store",
+    "Webpack's enhanced-resolve follows pnpm symlinks transparently while Turbopack's default resolver does not"
+  ],
+  "expected_answer": {
+    "error_origin": "turbopack-resolve/src/resolve.rs not honoring transpilePackages aliases that Next.js's webpack-config.ts applies for workspace packages",
+    "bypass_reason": "Turbopack's resolve_options_context does not bridge pnpm-symlinked workspace packages the way Webpack's enhanced-resolve does",
+    "correct_config": "Pin the workspace package via experimental.turbo.resolveAlias in next.config.js, or move the package to a normal dependency until Turbopack adopts transpilePackages parity"
+  }
+}

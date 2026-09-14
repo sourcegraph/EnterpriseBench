@@ -1,0 +1,122 @@
+# support_code_mapping: Map customer gRPC reflection API regression after protobuf v3->v4 bump to the grpc-cpp ServerReflection / protobuf DescriptorPool boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "grpc-protobuf-cpp-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-grpc-protobuf-reflection-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 35
+session_type = "single"
+description = "Map customer gRPC reflection API regression after protobuf v3->v4 bump to the grpc-cpp ServerReflection / protobuf DescriptorPool boundary"
+prompt = """
+A customer reports that after upgrading protobuf from 3.21 to 4.25
+their grpc-cpp service's reflection API returns empty descriptors
+for messages that previously worked. grpcurl -msg-template fails
+with 'message not found in registry'. The .proto files are
+unchanged.
+
+Your task:
+1. Find where grpc-cpp's ServerReflection service implements
+   FileContainingSymbol and how it queries the descriptor pool.
+2. Find where protobuf's DescriptorPool holds generated descriptors
+   and how the v4 API change to message_factory affects descriptor
+   visibility.
+3. Trace the cross-repo path: grpc::reflection::v1alpha::ServerReflection
+   -> grpc-cpp ProtoServerReflection -> protobuf DescriptorPool
+   ::generated_pool -> generated_message_table lookup. Cite each
+   file and the function or attribute responsible.
+4. Identify why protobuf v4 split the generated descriptor pool
+   per shared library, causing grpc-cpp's reflection lookup to miss
+   descriptors compiled into a different .so.
+"""
+
+[[repos]]
+url = "https://github.com/grpc/grpc"
+rev = "v1.62.0"
+path = "grpc"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/protocolbuffers/protobuf"
+rev = "v25.2"
+path = "protobuf"
+role = "upstream"
+
+[metadata]
+languages = ["cpp"]
+total_loc = 2800000
+dependency_depth = 2
+frameworks = ["grpc", "protobuf"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Reflection regression is split between grpc-cpp's reflection service and protobuf's descriptor pool. The empty-descriptor bug requires cross-repo navigation across the language interop boundary."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "grpc/src/cpp/ext/proto_server_reflection.cc"
+repo = "grpc"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "grpc/src/cpp/ext/proto_server_reflection.h"
+repo = "grpc"
+confidence = 0.8
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "protobuf/src/google/protobuf/descriptor.cc"
+repo = "protobuf"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "protobuf/src/google/protobuf/descriptor.h"
+repo = "protobuf"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "grpc/src/cpp/ext/proto_server_reflection_plugin.cc"
+repo = "grpc"
+confidence = 0.75
+
+[[ground_truth.sufficient_files]]
+path = "protobuf/src/google/protobuf/message.cc"
+repo = "protobuf"
+confidence = 0.7

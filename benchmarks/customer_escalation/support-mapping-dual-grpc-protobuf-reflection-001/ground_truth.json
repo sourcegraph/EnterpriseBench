@@ -1,0 +1,70 @@
+{
+  "task_id": "support-mapping-dual-grpc-protobuf-reflection-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/grpc/grpc",
+      "rev": "v1.62.0",
+      "path": "grpc"
+    },
+    {
+      "url": "https://github.com/protocolbuffers/protobuf",
+      "rev": "v25.2",
+      "path": "protobuf"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "grpc/src/cpp/ext/proto_server_reflection.cc",
+      "repo": "grpc",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "grpc/src/cpp/ext/proto_server_reflection.h",
+      "repo": "grpc",
+      "confidence": 0.8,
+      "source": "deterministic"
+    },
+    {
+      "path": "protobuf/src/google/protobuf/descriptor.cc",
+      "repo": "protobuf",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "protobuf/src/google/protobuf/descriptor.h",
+      "repo": "protobuf",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "grpc/src/cpp/ext/proto_server_reflection_plugin.cc",
+      "repo": "grpc",
+      "confidence": 0.75
+    },
+    {
+      "path": "protobuf/src/google/protobuf/message.cc",
+      "repo": "protobuf",
+      "confidence": 0.7
+    }
+  ],
+  "error_chain": [
+    "grpc-cpp's ProtoServerReflection in proto_server_reflection.cc queries DescriptorPool::generated_pool() to enumerate registered files and symbols",
+    "protobuf v4 changed how generated descriptors register: each .pb.cc registers into the generated_pool via a static initializer, but the pool is now sharded per ABI version",
+    "If the customer's binary links proto-generated code from two .so's compiled with different protobuf headers, only one .so's descriptors land in the pool grpc-cpp queries",
+    "ProtoServerReflection::FileContainingSymbol looks up by symbol name in DescriptorPool::FindFileContainingSymbol; missing entries return nullptr, surfaced to the client as 'message not found'"
+  ],
+  "trigger_conditions": [
+    "Customer's binary links protobuf-generated code from multiple shared libraries built against different protobuf header versions",
+    "protobuf v4's descriptor pool sharding leaves only one .so's descriptors visible to generated_pool",
+    "grpc-cpp's reflection service depends on a unified generated_pool and silently returns nullptr on miss"
+  ],
+  "expected_answer": {
+    "error_origin": "protobuf v4's per-ABI descriptor pool sharding leaving descriptors compiled into a different .so invisible to grpc-cpp's reflection lookup",
+    "bypass_reason": "grpc-cpp's ProtoServerReflection assumes a single unified generated_pool; protobuf v4 broke that assumption when ABI versions diverge across linked libraries",
+    "correct_config": "Rebuild all linked libraries against the same protobuf version, or register descriptors into a custom DescriptorPool passed to ProtoServerReflection::SetServiceList, or pin protobuf to a single shared library across the binary"
+  }
+}

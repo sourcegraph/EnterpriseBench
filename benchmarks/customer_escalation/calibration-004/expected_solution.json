@@ -1,0 +1,33 @@
+{
+  "task_id": "cal-err-flask-endpoint-004",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "Primary error source: src/flask/app.py \u2014 Contains wsgi_app/full_dispatch_request where open_session is called before URL matching sets endpoint. Supporting: src/flask/sessions.py \u2014 SessionInterface.open_session definition and SecureCookieSessionInterface implementation. Surface error: request.endpoint is None in SessionInterface.open_session.",
+      "evaluation_criteria": [
+        "Must identify src/flask/app.py as part of the error source",
+        "Must identify src/flask/sessions.py as part of the error source",
+        "Must reference the surface error message ('request.endpoint is None in SessionInterface.open_session') or its origin",
+        "Must reference a specific function, type, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Error propagation chain: (1) WSGI request arrives at Flask.wsgi_app() \u2192 (2) Flask creates request context and pushes it \u2192 (3) open_session() is called during request context push \u2192 (4) URL matching (which sets request.endpoint) happens AFTER session is opened \u2192 (5) Therefore request.endpoint is None inside open_session.",
+      "evaluation_criteria": [
+        "Must describe the step: 'WSGI request arrives at Flask.wsgi_app()'",
+        "Must describe the propagation: 'Therefore request.endpoint is None inside open_session'",
+        "Must include all intermediate steps in the correct order",
+        "Must reference the chain in causal order (source \u2192 surface)",
+        "Must cite at least one file from the propagation path (e.g. src/flask/app.py)"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Custom SessionInterface.open_session accesses request.endpoint; (2) open_session is called during request context push in app.py; (3) URL rule matching happens later in full_dispatch_request; (4) Endpoint is not available until after URL dispatch.",
+      "evaluation_criteria": [
+        "Must identify the condition: 'Custom SessionInterface.open_session accesses request.endpoint'",
+        "Must identify the condition: 'open_session is called during request context push in app.py'",
+        "Must identify the condition: 'URL rule matching happens later in full_dispatch_request'",
+        "Must explain the combined conditions necessary to reproduce the error"
+      ]
+    }
+  }
+}

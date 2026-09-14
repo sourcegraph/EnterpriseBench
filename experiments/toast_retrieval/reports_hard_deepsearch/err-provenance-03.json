@@ -1,0 +1,184 @@
+{
+  "task_id": "err-provenance-03",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/kubernetes--v1.32.0"
+  ],
+  "retrieved_paths": [
+    "pkg/registry/core/rest/storage_core.go",
+    "staging/src/k8s.io/apiserver/pkg/server/hooks.go",
+    "staging/src/k8s.io/apiserver/pkg/server/config.go",
+    "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle/admission.go",
+    "pkg/registry/core/service/ipallocator/ipallocator.go"
+  ],
+  "retrieved_paths_union": [
+    "pkg/registry/core/rest/storage_core.go",
+    "staging/src/k8s.io/apiserver/pkg/server/hooks.go",
+    "staging/src/k8s.io/apiserver/pkg/server/config.go",
+    "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle/admission.go",
+    "pkg/registry/core/service/ipallocator/ipallocator.go"
+  ],
+  "required_files": [
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip_test.go"
+  ],
+  "ir_scores": {
+    "task_id": "err-provenance-03",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2372,
+      "10": 0.2372
+    },
+    "mrr": 0.2,
+    "map_score": 0.1,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 7,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "err-provenance-03",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2372,
+      "10": 0.2372
+    },
+    "mrr": 0.2,
+    "map_score": 0.1,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 7,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 126.3,
+  "response_chars": 16886,
+  "raw_response": "---\ntitle: kube-apiserver fails readyz after upgrade to v1.33 during rolling upgrades\nshare_url: https://demo.sourcegraph.com/deepsearch/65adefdb-0f63-4946-bc80-31933d1de791\nurl: https://demo.sourcegraph.com/deepsearch/2193\ncreated: 2026-08-18T01:41:50Z\nupdated: 2026-08-18T01:43:08Z\n---\n\n# # Support Ticket: kube-apiserver fails readyz after upgrade to v1.33\n\n**Priority:** Critical\n**Submitted by:** Cluster Operations Lead\n**Product:** Kubernetes (control plane)\n\n---\n\nWe're performing a rolling upgrade from v1.32 to v1.33 and the apiserver on the upgraded nodes is failing its readiness check. The logs show:\n\n```\nPostStartHook \"start-service-ip-repair-controllers\" failed: unable to perform initial IP and Port allocation check\n```\n\nFollowed by:\n```\nipaddresses.networking.k8s.io \"10.211.95.185\" is forbidden: not yet ready to handle request\n```\n\nAnd then the readyz endpoint reports:\n```\ninformer-sync,poststarthook/start-service-ip-repair-controllers check failed: readyz\n```\n\nThis only happens during the upgrade window \u2014 once all nodes are on v1.33, it stabilizes. But during the rolling upgrade, the mixed-version period causes the apiserver to be unavailable.\n\nWe need to understand:\n1. Where the \"unable to perform initial IP and Port allocation check\" error is generated in the source code\n2. The full error propagation chain from the PostStartHook through to the readyz failure\n3. What race condition between the repair controller and API readiness causes this during upgrades\n\nThe repository is available under `/workspace/kubernetes/`.\n\nThanks,\nMorgan\n\n\nSearch only these repositories: github.com/sg-evals/kubernetes--v1.32.0\n\nI now have a complete picture of the entire failure chain. Let me put it all together.\n\n---\n\nHere is a precise, source-referenced analysis of the three questions.\n\n---\n\n## 1. Where is \"unable to perform initial IP and Port allocation check\" generated?\n\nThe error originates in the `PostStartHook` function registered under the name `\"start-service-ip-repair-controllers\"`, in [`pkg/registry/core/rest/storage_core.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/pkg/registry/core/rest/storage_core.go?L500-L538).\n\n```go\n// storage_core.go L500\u2013538\nfunc (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {\n    return \"start-service-ip-repair-controllers\", func(context genericapiserver.PostStartHookContext) error {\n        wg := sync.WaitGroup{}\n        wg.Add(2)\n        runner := async.NewRunner(\n            func(stopCh chan struct{}) { p.startServiceClusterIPRepair(wg.Done, stopCh) },\n            func(stopCh chan struct{}) { p.startServiceNodePortsRepair(wg.Done, stopCh) },\n        )\n        runner.Start()\n        // ...\n        done := make(chan struct{})\n        go func() {\n            defer close(done)\n            wg.Wait()    // waits for BOTH repair loops to call onFirstSuccess\n        }()\n        select {\n        case <-done:\n        case <-time.After(time.Minute):  // <-- 1-minute hard deadline\n            return goerrors.New(\"unable to perform initial IP and Port allocation check\")\n        }\n        return nil\n    }, nil\n}\n```\n\nThe hook fires both repair controllers concurrently and waits for each to call its `onFirstSuccess` callback (passed as `wg.Done`). If either loop does not complete its first successful reconciliation within **one minute**, the hook returns this error.\n\n---\n\n## 2. Full error propagation chain\n\n**Step 1 \u2014 Hook registration creates a health-gate.**\n\nIn [`staging/src/k8s.io/apiserver/pkg/server/hooks.go:AddPostStartHook`](https://demo.sourcegraph.com/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/staging/src/k8s.io/apiserver/pkg/server/hooks.go?L82-L115), when the hook is registered a `done` channel is created and a `postStartHookHealthz` checker (named `\"poststarthook/start-service-ip-repair-controllers\"`) is added to the boot-sequence health checks via `AddBootSequenceHealthChecks`. This registers the checker on healthz, livez, **and** readyz.\n\n```go\n// hooks.go L106\u2013112\ndone := make(chan struct{})\nif err := s.AddBootSequenceHealthChecks(postStartHookHealthz{name: \"poststarthook/\" + name, done: done}); err != nil {\n    return err\n}\ns.postStartHooks[name] = postStartHookEntry{hook: hook, ..., done: done}\n```\n\n**Step 2 \u2014 The health checker blocks until `done` is closed.**\n\n[`postStartHookHealthz.Check`](https://demo.sourcegraph.com/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/staging/src/k8s.io/apiserver/pkg/server/hooks.go?L239-L246) returns `errHookNotFinished` until the `done` channel is closed. `done` is only closed after `runPostStartHook` completes without error (L206). If the hook **errors**, it calls `klog.Fatalf` (L203\u2013205), which crashes the server. If the hook is merely **slow** (not yet returned), the health check returns `errHookNotFinished`, failing readyz.\n\n```go\n// hooks.go L239-L246\nfunc (h postStartHookHealthz) Check(req *http.Request) error {\n    select {\n    case <-h.done:\n        return nil\n    default:\n        return errHookNotFinished   // readyz check fails\n    }\n}\n```\n\n**Step 3 \u2014 `informer-sync` also appears in the readyz failure.**\n\nSeparately, `NewInformerSyncHealthz` is added to readyz in [`staging/src/k8s.io/apiserver/pkg/server/config.go:904`](https://demo.sourcegraph.com/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/staging/src/k8s.io/apiserver/pkg/server/config.go?L903-L907). It reports `\"informer-sync\"` and fails until all informers (including the `IPAddresses` informer) have synced. If the informers have not synced yet, *both* `informer-sync` and `poststarthook/start-service-ip-repair-controllers` fail simultaneously \u2014 exactly matching the log output you observed.\n\n**Step 4 \u2014 The readyz handler aggregates all failed checks.**\n\nIn [`staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go?L247-L271), the HTTP handler iterates all registered checks, collects failures, and writes them to the response \u2014 producing the `informer-sync,poststarthook/start-service-ip-repair-controllers check failed: readyz` output.\n\n---\n\n## 3. The race condition during rolling upgrade\n\nWhen `MultiCIDRServiceAllocator` is enabled (the v1.33 path), `startServiceClusterIPRepair` is wired to [`RepairIPAddress.RunUntil`](https://demo.sourcegraph.com/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/pkg/registry/core/service/ipallocator/controller/repairip.go?L194-L236) instead of the old `Repair.RunUntil`. This path has **two extra blocking prerequisites** before it can call `onFirstSuccess()`:\n\n```go\n// repairip.go L203\u2013228\n// 1. Wait for informer caches to sync\nif !cache.WaitForNamedCacheSync(\"ipallocator-repair-controller\", stopCh,\n    r.ipAddressSynced, r.servicesSynced, r.serviceCIDRSynced) {\n    return  // silently exits WITHOUT calling onFirstSuccess \u2014 wg.Done is never called\n}\n\n// 2. Wait for the default ServiceCIDR object to exist\nerr := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(context.Context) (bool, error) {\n    _, err := r.serviceCIDRLister.Get(defaultservicecidr.DefaultServiceCIDRName)\n    ...\n})\n\n// 3. Run the first full reconciliation pass\nif err := r.runOnce(); err != nil {\n    return  // also silently exits WITHOUT calling onFirstSuccess\n}\nonFirstSuccess()\n```\n\nDuring a **rolling upgrade**, v1.33 apiservers activate `MultiCIDRServiceAllocator` and start making `IPAddresses` API calls (e.g. creating `ipaddresses.networking.k8s.io \"10.211.95.185\"`). However, the v1.32 apiservers still in the pool **do not serve the `networking.k8s.io/v1beta1` IPAddresses API**. The result:\n\n- The `RepairIPAddress` controller attempts to create/verify `IPAddress` objects via the API server using the loopback client.\n- If that request is routed to (or internally rejected by) a v1.32 node that doesn't know the resource, the API returns a Forbidden/not-ready error: `ipaddresses.networking.k8s.io \"10.211.95.185\" is forbidden: not yet ready to handle request`.\n- This is an admission-layer rejection \u2014 the \"not yet ready\" message comes from an admission plugin whose informers have not synced on the older node (the `NamespaceLifecycle` or similar plugin), as seen in [`staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle/admission.go:111`](https://demo.sourcegraph.com/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle/admission.go?L110-L113).\n- `doRunOnce` (called by `runOnce` with retry-on-conflict) gets this error back from the `IPAddresses().Create(...)` or `IPAddresses().Delete(...)` call at [`repairip.go:363`](https://demo.sourcegraph.com/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/pkg/registry/core/service/ipallocator/controller/repairip.go?L363-L365), and returns it.\n- `runOnce` retries via `retry.RetryOnConflict`, but the Forbidden error is not a conflict, so it propagates up.\n- `RunUntil` returns without calling `onFirstSuccess()`, so `wg.Done` is **never called** for the ClusterIP repair loop.\n- The PostStartHook's `wg.Wait()` never unblocks, and after 60 seconds the hook returns `\"unable to perform initial IP and Port allocation check\"`.\n- `runPostStartHook` receives this error and calls `klog.Fatalf`, crashing the v1.33 apiserver. Prior to returning the fatal error, the `postStartHookHealthz.Check` for this hook has been returning `errHookNotFinished` the entire time, so readyz was continuously failing.\n\n**In summary:** the `RepairIPAddress` controller \u2014 only used when `MultiCIDRServiceAllocator` is on \u2014 requires the `IPAddresses` API to be fully available before it can complete its first reconciliation loop. During a mixed v1.32/v1.33 cluster, that API may not yet be served or its admission handlers may not be warmed up, causing API calls to fail with \"not yet ready\". These failures prevent `onFirstSuccess` from ever being called, which causes the PostStartHook to time out after 60 seconds and ultimately crashes the upgraded apiserver.\n\n## Sources\n\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ \"unable to perform initial IP and Port allocation check\"](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20%22unable%20to%20perform%20initial%20IP%20and%20Port%20allocation%20check%22)\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ \"start-service-ip-repair-controllers\" PostStartHook](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20%22start-service-ip-repair-controllers%22%20PostStartHook)\n- [github.com/sg-evals/kubernetes--v1.32.0/pkg/registry/core/rest/storage_core.go@d17b464?L497-560](/github.com/sg-evals/kubernetes--v1.32.0@d17b464c6fcd3273e4b1f695890bf0af7d5b272d/-/blob/pkg/registry/core/rest/storage_core.go?L497-560)\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ PostStartHook readyz informer-sync poststarthook check failed](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20PostStartHook%20readyz%20informer-sync%20poststarthook%20check%20failed)\n- [github.com/sg-evals/kubernetes--v1.32.0/staging/src/k8s.io/apiserver/pkg/server/hooks.go@d17b464?L200-280](/github.com/sg-evals/kubernetes--v1.32.0@d17b464c6fcd3273e4b1f695890bf0af7d5b272d/-/blob/staging/src/k8s.io/apiserver/pkg/server/hooks.go?L200-280)\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ startServiceClusterIPRepair startServiceNodePortsRepair](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20startServiceClusterIPRepair%20startServiceNodePortsRepair)\n- [github.com/sg-evals/kubernetes--v1.32.0/pkg/registry/core/rest/storage_core.go@d17b464?L100-170](/github.com/sg-evals/kubernetes--v1.32.0@d17b464c6fcd3273e4b1f695890bf0af7d5b272d/-/blob/pkg/registry/core/rest/storage_core.go?L100-170)\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ service ip repair controller MultiCIDRServiceAllocator IPAddress](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20service%20ip%20repair%20controller%20MultiCIDRServiceAllocator%20IPAddress)\n- [github.com/sg-evals/kubernetes--v1.32.0/pkg/registry/core/service/ipallocator/controller/repairip.go@d17b464?L1-130](/github.com/sg-evals/kubernetes--v1.32.0@d17b464c6fcd3273e4b1f695890bf0af7d5b272d/-/blob/pkg/registry/core/service/ipallocator/controller/repairip.go?L1-130)\n- [github.com/sg-evals/kubernetes--v1.32.0/staging/src/k8s.io/apiserver/pkg/server/hooks.go@d17b464?L120-205](/github.com/sg-evals/kubernetes--v1.32.0@d17b464c6fcd3273e4b1f695890bf0af7d5b272d/-/blob/staging/src/k8s.io/apiserver/pkg/server/hooks.go?L120-205)\n- [github.com/sg-evals/kubernetes--v1.32.0/pkg/registry/core/service/ipallocator/controller/repairip.go@d17b464?L130-260](/github.com/sg-evals/kubernetes--v1.32.0@d17b464c6fcd3273e4b1f695890bf0af7d5b272d/-/blob/pkg/registry/core/service/ipallocator/controller/repairip.go?L130-260)\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ \"not yet ready to handle request\"](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20%22not%20yet%20ready%20to%20handle%20request%22)\n- [github.com/sg-evals/kubernetes--v1.32.0/pkg/registry/core/service/ipallocator/controller/repairip.go@d17b464?L260-350](/github.com/sg-evals/kubernetes--v1.32.0@d17b464c6fcd3273e4b1f695890bf0af7d5b272d/-/blob/pkg/registry/core/service/ipallocator/controller/repairip.go?L260-350)\n- [github.com/sg-evals/kubernetes--v1.32.0/pkg/registry/core/service/ipallocator/controller/repairip.go@d17b464?L350-430](/github.com/sg-evals/kubernetes--v1.32.0@d17b464c6fcd3273e4b1f695890bf0af7d5b272d/-/blob/pkg/registry/core/service/ipallocator/controller/repairip.go?L350-430)\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ ipallocator ready WaitForReady informer synced forbidden admission](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20ipallocator%20ready%20WaitForReady%20informer%20synced%20forbidden%20admission)\n- [github.com/sg-evals/kubernetes--v1.32.0/pkg/registry/core/service/ipallocator/ipallocator.go@d17b464?L1-100](/github.com/sg-evals/kubernetes--v1.32.0@d17b464c6fcd3273e4b1f695890bf0af7d5b272d/-/blob/pkg/registry/core/service/ipallocator/ipallocator.go?L1-100)\n- [github.com/sg-evals/kubernetes--v1.32.0/pkg/registry/core/service/ipallocator/ipallocator.go@d17b464?L100-200](/github.com/sg-evals/kubernetes--v1.32.0@d17b464c6fcd3273e4b1f695890bf0af7d5b272d/-/blob/pkg/registry/core/service/ipallocator/ipallocator.go?L100-200)\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ ErrNotReady ipallocator](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20ErrNotReady%20ipallocator)\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ postStartHookHealthz done chan struct](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20postStartHookHealthz%20done%20chan%20struct)\n- [github.com/sg-evals/kubernetes--v1.32.0/staging/src/k8s.io/apiserver/pkg/server/hooks.go@d17b464?L55-120](/github.com/sg-evals/kubernetes--v1.32.0@d17b464c6fcd3273e4b1f695890bf0af7d5b272d/-/blob/staging/src/k8s.io/apiserver/pkg/server/hooks.go?L55-120)\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ AddBootSequenceHealthChecks](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20AddBootSequenceHealthChecks)\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ \"informer-sync\" healthz NewInformerSyncHealthz](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20%22informer-sync%22%20healthz%20NewInformerSyncHealthz)\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ \"informer-sync\" healthz check](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20%22informer-sync%22%20healthz%20check)\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ NewInformerSyncHealthz informer-sync](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20NewInformerSyncHealthz%20informer-sync)\n- [github.com/sg-evals/kubernetes--v1.32.0/staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go@d17b464?L95-135](/github.com/sg-evals/kubernetes--v1.32.0@d17b464c6fcd3273e4b1f695890bf0af7d5b272d/-/blob/staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go?L95-135)\n- [repo:^github.com/sg-evals/kubernetes--v1.32.0$ NewInformerSyncHealthz AddReadyzChecks kube-apiserver](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fkubernetes--v1.32.0$%20NewInformerSyncHealthz%20AddReadyzChecks%20kube-apiserver)\n- [github.com/sg-evals/kubernetes--v1.32.0/staging/src/k8s.io/apiserver/pkg/server/config.go@d17b464?L895-920](/github.com/sg-evals/kubernetes--v1.32.0@d17b464c6fcd3273e4b1f695890bf0af7d5b272d/-/blob/staging/src/k8s.io/apiserver/pkg/server/config.go?L895-920)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "err-provenance-03",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2372,
+      "10": 0.2372
+    },
+    "mrr": 0.2,
+    "map_score": 0.1,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 7,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "pkg/registry/core/rest/storage_core.go",
+    "staging/src/k8s.io/apiserver/pkg/server/hooks.go",
+    "staging/src/k8s.io/apiserver/pkg/server/config.go",
+    "staging/src/k8s.io/apiserver/pkg/server/healthz/healthz.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle/admission.go",
+    "pkg/registry/core/service/ipallocator/ipallocator.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "err-provenance-03",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2372,
+      "10": 0.2372
+    },
+    "mrr": 0.2,
+    "map_score": 0.1,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 7,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

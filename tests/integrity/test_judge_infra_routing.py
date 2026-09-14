@@ -13,8 +13,6 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "orchestration"))
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "infra"))
@@ -80,6 +78,43 @@ class TestJudgeOutageRouting:
         err = scores.get("verifier_infra_error")
         assert err is not None, "malformed GT must not pass through un-capped grep"
         assert err["reason"] == "malformed_expected_solution"
+
+    def test_missing_scored_checkpoint_ground_truth_flags_infra(
+        self, tmp_path: Path
+    ) -> None:
+        expected = json.loads(_valid_expected())
+        expected["checkpoints"] = {
+            "some_other_checkpoint": {
+                "expected_solution": "not cp1",
+                "evaluation_criteria": [],
+            }
+        }
+        _write_expected(tmp_path, json.dumps(expected))
+
+        with patch.object(run_task, "_docker_exec") as docker_exec:
+            scores = _apply_llm_judge(_uncapped_scores(), tmp_path, "cid", {})
+
+        err = scores.get("verifier_infra_error")
+        assert err is not None
+        assert err["reason"] == "incomplete_expected_solution"
+        assert err["missing_checkpoints"] == ["cp1"]
+        docker_exec.assert_not_called()
+
+    def test_empty_checkpoint_expected_solution_flags_infra(
+        self, tmp_path: Path
+    ) -> None:
+        expected = json.loads(_valid_expected())
+        expected["checkpoints"]["cp1"]["expected_solution"] = " "
+        _write_expected(tmp_path, json.dumps(expected))
+
+        with patch.object(run_task, "_docker_exec") as docker_exec:
+            scores = _apply_llm_judge(_uncapped_scores(), tmp_path, "cid", {})
+
+        err = scores.get("verifier_infra_error")
+        assert err is not None
+        assert err["reason"] == "incomplete_expected_solution"
+        assert err["invalid_checkpoints"] == ["cp1"]
+        docker_exec.assert_not_called()
 
     def test_judge_init_failure_flags_infra(self, tmp_path: Path) -> None:
         _write_expected(tmp_path, _valid_expected())
@@ -157,6 +192,33 @@ class TestJudgeOutageRouting:
         assert "verifier_infra_error" not in scores
         assert scores["task_score"] == 0.0  # grep 1.0 capped to judge 0.0
 
+    def test_explicit_judge_configuration_is_persisted(self, tmp_path: Path) -> None:
+        _write_expected(tmp_path, _valid_expected())
+        judge = MagicMock()
+        judge.provenance = {
+            "backend": "claude_code_cli",
+            "provider": "anthropic",
+            "model": "haiku",
+            "account": 3,
+            "executable": "claude-3",
+        }
+        judge.evaluate_checkpoint.return_value = MagicMock(score=1.0, reasoning="ok")
+
+        with _agent_output_present(), patch(
+            "eb_verify.judge.LLMJudge", return_value=judge
+        ) as judge_type:
+            scores = _apply_llm_judge(
+                _uncapped_scores(),
+                tmp_path,
+                "cid",
+                {},
+                judge_model="cc:haiku",
+                judge_account=3,
+            )
+
+        judge_type.assert_called_once_with(model="cc:haiku", account=3)
+        assert scores["judge_provenance"] == judge.provenance
+
 
 class TestRouteHelper:
     def test_route_sets_phase_and_failure_class(self) -> None:
@@ -168,6 +230,9 @@ class TestRouteHelper:
         _route_verifier_infra_error(result, scores)
         assert result.phase == "verifier_infra_error"
         assert result.failure_class == "verifier_infra_error"
+        assert result.status == run_task.RUN_STATUS_INVALID
+        assert result.success is False
+        assert scores["task_score"] is None
 
     def test_route_noop_when_clean(self) -> None:
         result = TaskRunResult(task_id="t")

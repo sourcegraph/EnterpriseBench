@@ -1,0 +1,32 @@
+{
+  "task_id": "incident-investigation-dual-django-celery-001",
+  "checkpoints": {
+    "connection_lifecycle": {
+      "expected_solution": "Agent must identify Django's connection management: django.db.connections is a ConnectionHandler that stores per-thread DB connections in thread-local storage. The request_started and request_finished signals invoke close_old_connections to enforce CONN_MAX_AGE — the maximum lifetime of a persistent DB connection — but those signals only fire inside Django's HTTP request lifecycle. Outside HTTP request handling (e.g. inside Celery task workers), nothing closes old connections, so they accumulate until the database refuses new ones.",
+      "evaluation_criteria": [
+        "Names django/db/utils.py (and ConnectionHandler / django.db.connections) as the connection registry",
+        "Identifies CONN_MAX_AGE as the lifetime knob",
+        "Explains close_old_connections is wired to request_started / request_finished signals",
+        "Notes that connections are held in thread-local storage"
+      ]
+    },
+    "worker_lifecycle": {
+      "expected_solution": "Agent must identify Celery's prefork worker lifecycle: celery/concurrency/prefork.py forks child worker processes (via billiard) at startup. Each child handles tasks in its own process; max-tasks-per-child controls when a child is recycled. Lifecycle hooks worker_process_init (fired once per child after fork) and worker_process_shutdown (fired before recycle/exit) are the only places to manage long-lived per-process resources like DB connections — Django's HTTP request signals never fire inside a worker.",
+      "evaluation_criteria": [
+        "Names celery/concurrency/prefork.py as the prefork pool implementation",
+        "Identifies fork / billiard as the child-process mechanism",
+        "Names max-tasks-per-child as the recycle knob",
+        "Names worker_process_init and/or worker_process_shutdown as the relevant lifecycle hooks"
+      ]
+    },
+    "root_cause": {
+      "expected_solution": "Agent must identify the connection-process lifecycle mismatch: Django's close_old_connections runs only on HTTP request boundaries. In Celery prefork workers there are no HTTP requests, so each forked child opens DB connections via django.db.connections and never closes them. With max-tasks-per-child unset (or large), connections accumulate indefinitely per child. Across many workers and many tasks the database connection pool is exhausted, causing OperationalError 'too many connections' on subsequent task DB access.",
+      "evaluation_criteria": [
+        "Identifies the absence of request_started/request_finished signals inside Celery workers",
+        "Connects this to connections never being closed via close_old_connections",
+        "Names the resulting database connection pool exhaustion as the user-visible failure",
+        "Mentions a remediation hook point (worker_process_init/shutdown signal handler that calls close_old_connections, or setting max-tasks-per-child low enough to recycle workers)"
+      ]
+    }
+  }
+}

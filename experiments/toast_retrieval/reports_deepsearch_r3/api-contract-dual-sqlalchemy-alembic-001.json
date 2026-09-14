@@ -1,0 +1,194 @@
+{
+  "task_id": "api-contract-dual-sqlalchemy-alembic-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/sqlalchemy--rel_2_0_0",
+    "github.com/sg-evals/alembic--rel_1_12_0"
+  ],
+  "retrieved_paths": [
+    "lib/sqlalchemy/engine/base.py",
+    "lib/sqlalchemy/engine/_py_util.py",
+    "lib/sqlalchemy/sql/coercions.py",
+    "doc/build/changelog/migration_20.rst",
+    "lib/sqlalchemy/orm/session.py",
+    "alembic/ddl/impl.py",
+    "alembic/runtime/migration.py",
+    "alembic/util/sqla_compat.py",
+    "alembic/operations/ops.py",
+    "alembic/operations/toimpl.py"
+  ],
+  "retrieved_paths_union": [
+    "lib/sqlalchemy/engine/base.py",
+    "lib/sqlalchemy/engine/_py_util.py",
+    "lib/sqlalchemy/sql/coercions.py",
+    "doc/build/changelog/migration_20.rst",
+    "lib/sqlalchemy/orm/session.py",
+    "alembic/ddl/impl.py",
+    "alembic/runtime/migration.py",
+    "alembic/util/sqla_compat.py",
+    "alembic/operations/ops.py",
+    "alembic/operations/toimpl.py"
+  ],
+  "required_files": [
+    "sqlalchemy/lib/sqlalchemy/engine/base.py",
+    "alembic/alembic/runtime/migration.py"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-sqlalchemy-alembic-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8175
+    },
+    "mrr": 1.0,
+    "map_score": 0.6429,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-sqlalchemy-alembic-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8175
+    },
+    "mrr": 1.0,
+    "map_score": 0.6429,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 440.8,
+  "response_chars": 16617,
+  "raw_response": "---\ntitle: Analyze SQLAlchemy 2.0 execute API changes and Alembic migration runner impact\nshare_url: https://demo.sourcegraph.com/deepsearch/b87cfd72-3ea7-48b8-a173-75abc277de8a\nurl: https://demo.sourcegraph.com/deepsearch/2178\ncreated: 2026-08-17T23:01:48Z\nupdated: 2026-08-17T23:08:21Z\n---\n\n#         # api-contract-dual-sqlalchemy-alembic-001\n\n        **Suite:** dependency_management | **Type:** api_contract | **Difficulty:** hard\n        **Repos:** sqlalchemy + alembic\n\n        ## Context\n\n        SQLAlchemy 2.0 changed the Session and Connection APIs: `session.execute()`\nnow requires explicit `text()` wrapping for raw SQL, and the engine/connection\nmodel was restructured. Alembic uses SQLAlchemy internally for migration execution.\n\nYour task:\n1. Find where SQLAlchemy 2.0 changed Session and Connection execute APIs\n2. Find where Alembic uses SQLAlchemy Session/Connection for migrations\n3. Identify breaking contract points between the two\n4. Document the impact on Alembic's migration runner\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/sqlalchemy--rel_2_0_0, github.com/sg-evals/alembic--rel_1_12_0\n\nThe report has been written. Here is the full analysis:\n\n---\n\n# SQLAlchemy 2.0 \u2192 Alembic 1.12 API Contract Impact Report\n\n## Executive Summary\n\nSQLAlchemy 2.0 removed or made illegal several execution patterns that Alembic 1.12's migration runner uses internally. There are **5 high-severity breaking points**, plus gaps in Alembic's version-branching compat layer.\n\n---\n\n## 1. SQLAlchemy 2.0 Changes\n\n### 1.1 `Connection.execute()` \u2014 Signature Change\n\n**File:** [`lib/sqlalchemy/engine/base.py` L1370\u20131418](https://demo.sourcegraph.com/r/github.com/sg-evals/sqlalchemy--rel_2_0_0/-/blob/lib/sqlalchemy/engine/base.py?L1370-1418)\n\n```python\ndef execute(\n    self,\n    statement: Executable,\n    parameters: Optional[_CoreAnyExecuteParams] = None,\n    *,\n    execution_options: Optional[CoreExecuteOptionsParameter] = None,\n) -> CursorResult[Any]:\n```\n\n- `statement` must implement `Executable`; plain strings raise `ObjectNotExecutableError`\n- `parameters` is a single positional arg (dict or list-of-dicts); the old `*multiparams, **params` call convention is entirely removed\n\n### 1.2 `_distill_params_20` \u2014 Parameter Validation\n\n**File:** [`lib/sqlalchemy/engine/_py_util.py` L21\u201343](https://demo.sourcegraph.com/r/github.com/sg-evals/sqlalchemy--rel_2_0_0/-/blob/lib/sqlalchemy/engine/_py_util.py?L21-43)\n\nAccepts: `None`, `dict`/`Mapping`, or `list`/`tuple` of dicts/tuples. Anything else raises `ArgumentError: mapping or list expected for parameters`.\n\n### 1.3 Plain-String Execution Forbidden\n\n**File:** [`lib/sqlalchemy/sql/coercions.py` L595\u2013622](https://demo.sourcegraph.com/r/github.com/sg-evals/sqlalchemy--rel_2_0_0/-/blob/lib/sqlalchemy/sql/coercions.py?L595-622)\n\n`_NoTextCoercion._literal_coercion` raises:\n```\nArgumentError: Textual SQL expression \"...\" should be explicitly declared as text(\"...\")\n```\n\n### 1.4 `Engine.execute()` Removed\n\n**File:** [`doc/build/changelog/migration_20.rst` L210\u2013300](https://demo.sourcegraph.com/r/github.com/sg-evals/sqlalchemy--rel_2_0_0/-/blob/doc/build/changelog/migration_20.rst?L210-300)\n\nConnectionless execution via `Engine.execute()` is gone. All execution requires an explicit `Connection` from `engine.connect()` or `engine.begin()`.\n\n### 1.5 `Session.execute()` \u2014 Signature Change\n\n**File:** [`lib/sqlalchemy/orm/session.py` L2168\u20132236](https://demo.sourcegraph.com/r/github.com/sg-evals/sqlalchemy--rel_2_0_0/-/blob/lib/sqlalchemy/orm/session.py?L2168-2236)\n\nSame restrictions as `Connection.execute()`. Parameter arg renamed from `parameters` to `params` but semantics are identical. No bare strings, no `**kwargs`.\n\n### 1.6 Implicit Autocommit Removed\n\n**File:** [`doc/build/changelog/migration_20.rst` L354\u2013366](https://demo.sourcegraph.com/r/github.com/sg-evals/sqlalchemy--rel_2_0_0/-/blob/doc/build/changelog/migration_20.rst?L354-366)\n\nDDL executed outside an explicit transaction is not automatically committed. `engine.begin()` or `connection.begin()` required.\n\n---\n\n## 2. Alembic 1.12 \u2014 Breaking Points\n\n### 2.1 `DefaultImpl._exec()` \u2014 **PRIMARY BREAKING POINT** (HIGH)\n\n**File:** [`alembic/ddl/impl.py` L155\u2013195](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_12_0/-/blob/alembic/ddl/impl.py?L155-195)\n\n```python\ndef _exec(self, construct, execution_options=None, multiparams=(), params=util.immutabledict()):\n    if isinstance(construct, str):\n        construct = text(construct)   # safe \u2014 strings wrapped\n    ...\n    if params:\n        multiparams += (params,)      # builds a bare tuple of dicts\n\n    return conn.execute(              # BROKEN under 2.0\n        construct, multiparams        # passes tuple as positional arg\n    )\n```\n\nThis is the central execution method for **all** Alembic DDL operations (`op.add_column`, `op.create_table`, `op.drop_table`, etc.). The `conn.execute(construct, multiparams)` call uses the old `*multiparams` positional convention:\n\n- Empty tuple `()` (default): `_distill_params_20` returns `_no_tuple` \u2014 **safe** for no-params DDL\n- Non-empty params: `multiparams = (params_dict,)` \u2014 treated as executemany by 2.0, changing single-row intent to executemany semantics\n- **Nature:** Signature/behavioral change\n\n### 2.2 `MigrationContext.execute()` \u2014 Inherits breakage (HIGH)\n\n**File:** [`alembic/runtime/migration.py` L652\u2013665](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_12_0/-/blob/alembic/runtime/migration.py?L652-665)\n\n```python\ndef execute(self, sql, execution_options=None):\n    self.impl._exec(sql, execution_options)\n```\n\nPublic API called from user migration scripts via `context.execute()`. All breakage from `_exec()` surfaces here.\n\n### 2.3 `sqla_compat._exec_on_inspector()` \u2014 BREAKING (HIGH)\n\n**File:** [`alembic/util/sqla_compat.py` L255\u2013260](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_12_0/-/blob/alembic/util/sqla_compat.py?L255-260)\n\n```python\ndef _exec_on_inspector(inspector, statement, **params):\n    if sqla_14:   # matches 2.0 since sqla_14 = _vers >= (1, 4)\n        with inspector._operation_context() as conn:  # AttributeError in 2.0\n            return conn.execute(statement, params)\n    else:\n        return inspector.bind.execute(statement, params)  # also removed\n```\n\n`inspector._operation_context()` is a private 1.4 API **not present in 2.0**. Since `sqla_14 = _vers >= (1, 4)` also matches 2.0, the broken branch is taken.\n- **Nature:** Removal of internal API\n\n### 2.4 `_stdout_connection()` / `MockEngineStrategy` \u2014 BREAKING (HIGH, offline mode)\n\n**File:** [`alembic/runtime/migration.py` L667\u2013673](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_12_0/-/blob/alembic/runtime/migration.py?L667-673)\n\n```python\ndef _stdout_connection(self, connection):\n    def dump(construct, *multiparams, **params):   # old 1.x signature\n        self.impl._exec(construct)\n    return MockEngineStrategy.MockConnection(self.dialect, dump)\n```\n\n`MockEngineStrategy` was a SQLAlchemy 1.x internal class **removed in 2.0** (replaced by `create_mock_engine`). This breaks `alembic upgrade --sql` offline mode entirely.\n- **Nature:** Removal\n\n### 2.5 Version Table Queries \u2014 **Safe**\n\n**File:** [`alembic/runtime/migration.py` L537\u2013548](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_12_0/-/blob/alembic/runtime/migration.py?L537-548)\n\n```python\nself.connection.execute(self._version.select())   # Select Executable -- safe\nself.connection.execute(self._version.delete())   # Delete Executable -- safe\n```\n\n### 2.6 `op.execute()` / `ExecuteSQLOp` \u2014 **Safe for standard usage**\n\n**Files:** [`alembic/operations/ops.py` L2420\u20132521](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_12_0/-/blob/alembic/operations/ops.py?L2420-2521), [`alembic/operations/toimpl.py` L217\u2013223](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_12_0/-/blob/alembic/operations/toimpl.py?L217-223)\n\nPlain strings coerced to `text()` inside `_exec()`. No parameter passing through this path. Safe.\n\n### 2.7 Version Detection \u2014 Incomplete (MEDIUM)\n\n**File:** [`alembic/util/sqla_compat.py` L59\u201368](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_12_0/-/blob/alembic/util/sqla_compat.py?L59-68)\n\n```python\nsqla_2  = _vers >= (2,)   # defined but rarely used to gate 2.0 code paths\n```\n\n`sqla_2` is used in only a handful of places (e.g., `_NoneName` import at L118\u2013121). Most compat helpers branch only on `sqla_14`, so 2.0 silently falls into 1.4 branches.\n\n---\n\n## 3. Breaking Contract Summary\n\n| # | Alembic File | Symbol / Call | SQLAlchemy 2.0 Change | Severity |\n|---|---|---|---|---|\n| 1 | `alembic/ddl/impl.py:193` | `conn.execute(construct, multiparams)` | `*multiparams` tuple convention removed | **HIGH** |\n| 2 | `alembic/util/sqla_compat.py:257` | `inspector._operation_context()` | Internal API removed | **HIGH** |\n| 3 | `alembic/runtime/migration.py:672` | `MockEngineStrategy.MockConnection` | `MockEngineStrategy` removed; breaks `--sql` mode | **HIGH** |\n| 4 | User `env.py` templates | `engine.execute()` | Completely removed | **HIGH** |\n| 5 | Implicit autocommit for DDL | All DDL execution paths | DDL not auto-committed; silent data-loss risk | **HIGH** |\n| 6 | `alembic/util/sqla_compat.py:59\u201368` | `sqla_2` flag | Defined but not used to guard 2.0-breaking paths | MEDIUM |\n| 7 | `alembic/ddl/impl.py:162` | String \u2192 `text()` wrapping | Mitigated internally; `op.execute('sql')` safe | LOW |\n\n---\n\n## 4. Migration Recommendations\n\n### 4.1 Fix `DefaultImpl._exec()` \u2014 `alembic/ddl/impl.py` L189\u2013195\n\n```python\n# After (2.0-compatible):\nfrom alembic.util.sqla_compat import sqla_2\nif sqla_2:\n    all_params = list(multiparams) + ([params] if params else [])\n    return conn.execute(construct, all_params if all_params else None)\nelse:\n    if params:\n        multiparams += (params,)\n    return conn.execute(construct, multiparams)\n```\n\n### 4.2 Fix `_exec_on_inspector()` \u2014 `alembic/util/sqla_compat.py` L255\u2013260\n\n```python\ndef _exec_on_inspector(inspector, statement, **params):\n    if sqla_2:\n        with inspector._engine.connect() as conn:\n            return conn.execute(statement, params or None)\n    elif sqla_14:\n        with inspector._operation_context() as conn:\n            return conn.execute(statement, params)\n    else:\n        return inspector.bind.execute(statement, params)\n```\n\n### 4.3 Fix `MockEngineStrategy` \u2014 `alembic/runtime/migration.py` L667\u2013673\n\n```python\n# Use the already-imported sqla_compat helper:\nfrom alembic.util.sqla_compat import create_mock_engine\nreturn create_mock_engine(str(self.dialect.name) + \"://\", dump)\n```\n\n### 4.4 Expand `sqla_2` branching\n\nAudit all functions in [`alembic/util/sqla_compat.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_12_0/-/blob/alembic/util/sqla_compat.py) that branch only on `sqla_14` and add explicit `sqla_2` branches.\n\n### 4.5 User `env.py` \u2014 replace `engine.execute()`\n\n```python\n# Before: engine.execute(\"ALTER TABLE ...\")\n# After:\nwith engine.begin() as conn:\n    conn.execute(text(\"ALTER TABLE ...\"))\n```\n\n### 4.6 Explicit transactions for DDL\n\nAll DDL must be wrapped in `engine.begin()` or `connection.begin()`. Alembic's [`_ensure_scope_for_ddl()`](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_12_0/-/blob/alembic/util/sqla_compat.py?L150-170) already does this internally \u2014 ensure user migration scripts follow the same pattern.\n\n---\n\nThe report has been written to `/workspace/analysis/IMPACT_REPORT.md` (available for download above). The three highest-priority fixes are: `_exec()` parameter passing (affects every DDL operation), `_exec_on_inspector()` (breaks reflection), and `MockEngineStrategy` (breaks offline `--sql` mode).\n\n## Sources\n\n- [github.com/sg-evals/sqlalchemy--rel_2_0_0/lib/sqlalchemy/engine/base.py@3f13ca0?L1350-1418](/github.com/sg-evals/sqlalchemy--rel_2_0_0@3f13ca0f660ae0557e58670b717c62a193017227/-/blob/lib/sqlalchemy/engine/base.py?L1350-1418)\n- [github.com/sg-evals/sqlalchemy--rel_2_0_0/lib/sqlalchemy/orm/session.py@3f13ca0?L2142-2236](/github.com/sg-evals/sqlalchemy--rel_2_0_0@3f13ca0f660ae0557e58670b717c62a193017227/-/blob/lib/sqlalchemy/orm/session.py?L2142-2236)\n- [github.com/sg-evals/alembic--rel_1_12_0/alembic/ddl/impl.py@ce80650?L170-230](/github.com/sg-evals/alembic--rel_1_12_0@ce806500b06caad7070a7cd3b4e104d2ce5382f5/-/blob/alembic/ddl/impl.py?L170-230)\n- [github.com/sg-evals/alembic--rel_1_12_0/alembic/util/sqla_compat.py@ce80650](/github.com/sg-evals/alembic--rel_1_12_0@ce806500b06caad7070a7cd3b4e104d2ce5382f5/-/blob/alembic/util/sqla_compat.py)\n- [github.com/sg-evals/alembic--rel_1_12_0/alembic/ddl/impl.py@ce80650?L130-197](/github.com/sg-evals/alembic--rel_1_12_0@ce806500b06caad7070a7cd3b4e104d2ce5382f5/-/blob/alembic/ddl/impl.py?L130-197)\n- [github.com/sg-evals/alembic--rel_1_12_0/alembic/runtime/migration.py@ce80650?L530-560](/github.com/sg-evals/alembic--rel_1_12_0@ce806500b06caad7070a7cd3b4e104d2ce5382f5/-/blob/alembic/runtime/migration.py?L530-560)\n- [github.com/sg-evals/alembic--rel_1_12_0/alembic/runtime/migration.py@ce80650?L640-690](/github.com/sg-evals/alembic--rel_1_12_0@ce806500b06caad7070a7cd3b4e104d2ce5382f5/-/blob/alembic/runtime/migration.py?L640-690)\n- [github.com/sg-evals/sqlalchemy--rel_2_0_0/lib/sqlalchemy/sql/coercions.py@3f13ca0?L580-625](/github.com/sg-evals/sqlalchemy--rel_2_0_0@3f13ca0f660ae0557e58670b717c62a193017227/-/blob/lib/sqlalchemy/sql/coercions.py?L580-625)\n- [github.com/sg-evals/alembic--rel_1_12_0/alembic/operations/ops.py@ce80650?L2419-2450](/github.com/sg-evals/alembic--rel_1_12_0@ce806500b06caad7070a7cd3b4e104d2ce5382f5/-/blob/alembic/operations/ops.py?L2419-2450)\n- [github.com/sg-evals/alembic--rel_1_12_0/alembic/operations/toimpl.py@ce80650?L210-230](/github.com/sg-evals/alembic--rel_1_12_0@ce806500b06caad7070a7cd3b4e104d2ce5382f5/-/blob/alembic/operations/toimpl.py?L210-230)\n- [repo:^github.com/sg-evals/alembic--rel_1_12_0$ Engine.execute OR autocommit OR connectionless](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Falembic--rel_1_12_0$%20Engine.execute%20OR%20autocommit%20OR%20connectionless)\n- [github.com/sg-evals/sqlalchemy--rel_2_0_0/doc/build/changelog/migration_20.rst@3f13ca0?L210-370](/github.com/sg-evals/sqlalchemy--rel_2_0_0@3f13ca0f660ae0557e58670b717c62a193017227/-/blob/doc/build/changelog/migration_20.rst?L210-370)\n- [github.com/sg-evals/sqlalchemy--rel_2_0_0/lib/sqlalchemy/engine/base.py@3f13ca0?L1408-1440](/github.com/sg-evals/sqlalchemy--rel_2_0_0@3f13ca0f660ae0557e58670b717c62a193017227/-/blob/lib/sqlalchemy/engine/base.py?L1408-1440)\n- [repo:^github.com/sg-evals/sqlalchemy--rel_2_0_0$ _distill_params_20](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fsqlalchemy--rel_2_0_0$%20_distill_params_20)\n- [repo:^github.com/sg-evals/alembic--rel_1_12_0$ multiparams](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Falembic--rel_1_12_0$%20multiparams)\n- [github.com/sg-evals/sqlalchemy--rel_2_0_0/lib/sqlalchemy/engine/_py_util.py@3f13ca0?L1-60](/github.com/sg-evals/sqlalchemy--rel_2_0_0@3f13ca0f660ae0557e58670b717c62a193017227/-/blob/lib/sqlalchemy/engine/_py_util.py?L1-60)\n- [github.com/sg-evals/alembic--rel_1_12_0/alembic/operations/ops.py@ce80650?L2450-2520](/github.com/sg-evals/alembic--rel_1_12_0@ce806500b06caad7070a7cd3b4e104d2ce5382f5/-/blob/alembic/operations/ops.py?L2450-2520)\n- [github.com/sg-evals/alembic--rel_1_12_0/alembic/runtime/migration.py@ce80650?L84-115](/github.com/sg-evals/alembic--rel_1_12_0@ce806500b06caad7070a7cd3b4e104d2ce5382f5/-/blob/alembic/runtime/migration.py?L84-115)\n\n\nGenerated files:\n- files/IMPACT_REPORT.csv: /.api/agent-files/v1/deep-search/b87cfd72-3ea7-48b8-a173-75abc277de8a/files/IMPACT_REPORT.csv\n- files/IMPACT_REPORT_md.json: /.api/agent-files/v1/deep-search/b87cfd72-3ea7-48b8-a173-75abc277de8a/files/IMPACT_REPORT_md.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-sqlalchemy-alembic-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "sqlalchemy/lib/sqlalchemy/engine/base.py",
+    "lib/sqlalchemy/engine/_py_util.py",
+    "lib/sqlalchemy/sql/coercions.py",
+    "doc/build/changelog/migration_20.rst",
+    "lib/sqlalchemy/orm/session.py",
+    "alembic/ddl/impl.py",
+    "alembic/alembic/runtime/migration.py",
+    "alembic/util/sqla_compat.py",
+    "alembic/operations/ops.py",
+    "alembic/operations/toimpl.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-sqlalchemy-alembic-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

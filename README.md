@@ -155,17 +155,24 @@ Four atomic multi-repo patterns: **propagate**, **investigate**, **enforce**, **
 
 ## Running Tasks
 
-Tasks are executed in Docker sandboxes with repos cloned into `/workspace/{repo-name}/`. Each task can run in three tool-access modes:
+Tasks are executed in Docker sandboxes with repos cloned into `/workspace/{repo-name}/`. Claude Code supports all tool-access modes below. Codex and OpenCode support baseline, Sourcegraph MCP, Code Finder, and Sourcegraph `sgx` CLI single-session runs.
 
-| Mode       | Description                                               |
-| ---------- | --------------------------------------------------------- |
-| `baseline` | Agent uses only local tools (grep, find, etc.)            |
-| `mcp_only` | Agent uses Sourcegraph MCP for code search and navigation |
-| `hybrid`   | Agent has access to both local tools and MCP              |
+| Mode              | Description                                                        |
+| ----------------- | ------------------------------------------------------------------ |
+| `baseline`        | Agent uses only local tools (grep, find, etc.)                     |
+| `mcp_only`        | Agent uses direct Sourcegraph MCP tools                            |
+| `mcp_code_finder` | Agent must use Code Finder exactly once per repo; direct tools off |
+| `mcp_assisted`    | Agent bootstraps with Code Finder, then may use targeted MCP tools |
+| `hybrid`          | Agent has access to both local tools and MCP                       |
+| `cli`             | Agent has local tools plus the Sourcegraph `sgx` command           |
 
 ```bash
 # Run a single task
-python scripts/orchestration/run_task.py --task api-contract-grpc-metadata-001 --mode baseline
+python3 scripts/run_benchmark.py \
+  benchmarks/dependency_management/api-contract-grpc-metadata-001/task.toml \
+  --harness claude \
+  --agent "claude -p" \
+  --mode baseline
 
 # Validate task mix against PRD targets
 python scripts/validation/task_mix_validator.py
@@ -174,6 +181,7 @@ python scripts/validation/task_mix_validator.py
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) — system design and verification flow
+- [Agent Harnesses](docs/AGENT_HARNESSES.md) — Codex and OpenCode setup, model matrix, and run commands
 - [Task Type PRD](docs/TASK_TYPE_PRD.md) — detailed definitions for all 10 task types
 - [Task Authoring Guide](docs/TASK_AUTHORING_GUIDE.md) — how to add new tasks
 - [Convergence Report](docs/CONVERGENCE_REPORT.md) — architecture decisions from structured debate

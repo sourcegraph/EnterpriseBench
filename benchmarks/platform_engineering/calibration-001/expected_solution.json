@@ -1,0 +1,30 @@
+{
+  "task_id": "cal-drift-flask-config-001",
+  "checkpoints": {
+    "identify_drift_points": {
+      "expected_solution": "Two drift points exist in Flask's layered config system. (1) SECRET_KEY: when Config.from_object loads a default-settings module that sets SECRET_KEY and Config.from_envvar later loads an env file that does NOT redefine SECRET_KEY, the previous from_object value persists — there is no implicit reset, so absence of a key in the env file means 'keep prior value', not 'use default'. (2) SESSION_COOKIE_SECURE: from_envvar (which delegates to from_pyfile) interprets the env file as a Python module, so a literal 'SESSION_COOKIE_SECURE=true' line in a non-.py env file is parsed as a string 'true' rather than the boolean True, leaving the default value effectively masked by a string-typed override that breaks downstream comparisons. The Config class lives in src/flask/config.py and from_object/from_envvar/from_pyfile are the relevant methods; Flask.__init__ in src/flask/app.py wires the default config dict into the Config instance.",
+      "evaluation_criteria": [
+        "Must identify src/flask/config.py as the file containing the Config class with from_object, from_envvar, from_pyfile methods",
+        "Must identify SECRET_KEY as a drift point and explain that absence in the env file leaves the from_object value in place (not the default)",
+        "Must identify SESSION_COOKIE_SECURE as a drift point and explain the boolean-vs-string typing problem from from_envvar/from_pyfile interpretation",
+        "Must reference src/flask/app.py as the place where Flask initializes the default config dict"
+      ]
+    },
+    "determine_expected_values": {
+      "expected_solution": "Expected override chain: default_config (set in Flask.__init__) -> from_object (loads attributes from a class/module, only uppercase names) -> from_envvar (resolves a path from an environment variable, then delegates to from_pyfile) -> direct dict assignment app.config['KEY'] = value. Each later layer overrides the previous; a key absent from a later layer leaves the prior layer's value untouched. SECRET_KEY's expected behavior is 'from_envvar overrides from_object when explicitly set, otherwise from_object value persists'. SESSION_COOKIE_SECURE's expected behavior is that the boolean True from default_config is replaced by a real boolean from from_envvar, but the from_pyfile path executes the env file as Python and only assigns true booleans for variables that evaluate as True in Python.",
+      "evaluation_criteria": [
+        "Must state the override chain order: default_config -> from_object -> from_envvar -> direct assignment",
+        "Must explain that absence of a key in a later layer means the prior value is preserved (not reset to default)",
+        "Must explain that from_envvar delegates to from_pyfile and executes the file as Python, affecting how non-string types are interpreted"
+      ]
+    },
+    "validate_corrected_config": {
+      "expected_solution": "Correct usage: (1) For SECRET_KEY, ensure the env-pointed file explicitly sets SECRET_KEY = '...' so from_envvar overrides from_object; do not rely on 'absence implies default'. (2) For SESSION_COOKIE_SECURE, the env file must use Python literals (SESSION_COOKIE_SECURE = True), not shell-style assignments, because from_pyfile uses exec() under the hood — alternatively, use Config.from_prefixed_env or explicit type coercion in app code. The fix is to either tighten the env loading by using a typed loader (e.g., python-decouple) or to cast values inside from_envvar with explicit type hints from a schema. The override_chain is default_config -> from_object -> from_envvar -> direct.",
+      "evaluation_criteria": [
+        "Must produce both an override_chain and a fix description in the answer (so check_config_valid awards full credit)",
+        "Must explain the practical correction (env files are Python, must use Python literals; or use a typed loader)",
+        "Must confirm the override chain matches the documented Config method ordering in src/flask/config.py"
+      ]
+    }
+  }
+}

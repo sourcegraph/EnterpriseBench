@@ -73,10 +73,26 @@ def _write_task(tmp_path: Path, instruction: str, checkpoints_gt: dict) -> Path:
 
 
 class TestDeriveArtifactCandidates:
-    def test_answer_json_is_always_first_candidate(self, tmp_path: Path) -> None:
+    def test_answer_json_is_default_candidate(self, tmp_path: Path) -> None:
         (tmp_path / "instruction.md").write_text("Do the task.")
         candidates = _derive_artifact_candidates(tmp_path)
         assert candidates[0] == ANSWER_ARTIFACT_PATH
+
+    def test_checker_graded_path_is_first_candidate(self, tmp_path: Path) -> None:
+        (tmp_path / "instruction.md").write_text(
+            "Write findings to `/workspace/LEGACY_REPORT.md`."
+        )
+        checks = tmp_path / "checks"
+        checks.mkdir()
+        (checks / "check_report.sh").write_text(
+            'REPORT="$WORKSPACE/react/dead_code_report.json"\n'
+        )
+
+        candidates = _derive_artifact_candidates(tmp_path)
+
+        assert candidates[0] == "/workspace/react/dead_code_report.json"
+        assert "/workspace/LEGACY_REPORT.md" in candidates
+        assert ANSWER_ARTIFACT_PATH in candidates
 
     def test_extracts_task_declared_output_path(self, tmp_path: Path) -> None:
         # The path the old hardcoded list would have MISSED.
@@ -199,6 +215,79 @@ class TestArtifactFoundAtDerivedPathAppliesCap:
         assert cp["grep_score"] == 1.0
         assert cp["score"] == 0.5  # min(grep, judge)
 
+
+# --------------------------------------------------------------------------
+# Checkpoint identity — scored name (verifier script) vs expected_solution key
+# (task.toml [[checkpoints]].name). They are routinely different strings.
+# --------------------------------------------------------------------------
+
+
+class TestCheckpointNameAliasing:
+    """A checkpoint scored as ``root_cause`` (from checks/check_root_cause.sh)
+    must find ground truth authored under ``root_cause_identification``.
+
+    Before the fix, every task whose verifier script was not named after its
+    checkpoint was voided as ``incomplete_expected_solution`` -- a verifier
+    infra error that discards a real agent run."""
+
+    _TASK_DATA = {
+        "task": {},
+        "checkpoints": [
+            {
+                "name": "root_cause_identification",
+                "verifier": "checks/check_root_cause.sh",
+                "weight": 1.0,
+            }
+        ],
+    }
+
+    def _scores(self) -> dict:
+        return {
+            "task_score": 1.0,
+            "checkpoints": [
+                {"name": "root_cause", "score": 1.0, "weight": 1.0, "passed": True}
+            ],
+        }
+
+    def test_alias_resolves_and_cap_is_applied(self, tmp_path: Path) -> None:
+        task_dir = _write_task(
+            tmp_path,
+            "## Output\nWrite to `/workspace/INCIDENT_REPORT.md`.\n",
+            {
+                "root_cause_identification": {
+                    "expected_solution": "expected",
+                    "evaluation_criteria": ["c"],
+                }
+            },
+        )
+        side = _docker_exec_for({"/workspace/INCIDENT_REPORT.md": "report body"})
+        fake_judge = MagicMock()
+        fake_judge.evaluate_checkpoint.return_value = MagicMock(
+            score=0.5, reasoning="partial"
+        )
+        with patch.object(run_task, "_docker_exec", side_effect=side), patch(
+            "eb_verify.judge.LLMJudge", return_value=fake_judge
+        ):
+            out = _apply_llm_judge(self._scores(), task_dir, "cid", self._TASK_DATA)
+
+        assert "verifier_infra_error" not in out
+        assert out["checkpoints"][0]["score"] == 0.5
+
+    def test_genuinely_absent_ground_truth_still_routes_to_infra_error(
+        self, tmp_path: Path
+    ) -> None:
+        # The alias must not become a way to pass a task that has no GT for a
+        # scored checkpoint at all.
+        task_dir = _write_task(
+            tmp_path,
+            "## Output\nWrite to `/workspace/INCIDENT_REPORT.md`.\n",
+            {"some_other_checkpoint": {"expected_solution": "x", "evaluation_criteria": []}},
+        )
+        with patch.object(run_task, "_docker_exec", side_effect=_docker_exec_for({})):
+            out = _apply_llm_judge(self._scores(), task_dir, "cid", self._TASK_DATA)
+
+        assert out["verifier_infra_error"]["reason"] == "incomplete_expected_solution"
+        assert out["verifier_infra_error"]["missing_checkpoints"] == ["root_cause"]
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))

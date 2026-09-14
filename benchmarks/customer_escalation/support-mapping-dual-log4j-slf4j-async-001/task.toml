@@ -1,0 +1,121 @@
+# support_code_mapping: Map customer async log lines lost under high load to the slf4j Logger / log4j2 AsyncAppender disruptor binding boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "java-logging-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-log4j-slf4j-async-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 35
+session_type = "single"
+description = "Map customer async log lines lost under high load to the slf4j Logger / log4j2 AsyncAppender disruptor binding boundary"
+prompt = """
+A customer reports that under sustained burst load their service
+loses 1-2% of log lines that were written via the slf4j Logger API.
+Logs from synchronous critical paths show fine; only the async
+channels (driven by log4j2 AsyncAppender) are dropping. Their config
+uses log4j-slf4j-impl as the binding.
+
+Your task:
+1. Find where slf4j routes a Logger.info() call through its binding
+   API to a log4j2 implementation.
+2. Find where log4j2 AsyncAppender wraps an LMAX Disruptor ring buffer
+   and its overflow / blocking policy.
+3. Trace the cross-repo path: slf4j LoggerFactory -> log4j-slf4j-impl
+   Log4jLogger -> log4j2 AsyncAppender -> Disruptor publish -> ring
+   buffer overflow policy. Cite each file and the function or
+   attribute responsible.
+4. Identify why the default Disruptor ring-buffer-full policy is
+   non-blocking with a configurable async-queue-full-policy that
+   silently drops events under burst load.
+"""
+
+[[repos]]
+url = "https://github.com/qos-ch/slf4j"
+rev = "v_2.0.13"
+path = "slf4j"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/apache/logging-log4j2"
+rev = "rel/2.23.1"
+path = "log4j2"
+role = "upstream"
+
+[metadata]
+languages = ["java"]
+total_loc = 350000
+dependency_depth = 2
+frameworks = ["slf4j", "log4j2", "disruptor"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Async log loss is split between slf4j's binding indirection and log4j2's AsyncAppender ring-buffer policy. Tracing the chain requires reading both repos."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "slf4j/slf4j-api/src/main/java/org/slf4j/LoggerFactory.java"
+repo = "slf4j"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "slf4j/slf4j-api/src/main/java/org/slf4j/Logger.java"
+repo = "slf4j"
+confidence = 0.8
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "log4j2/log4j-core/src/main/java/org/apache/logging/log4j/core/appender/AsyncAppender.java"
+repo = "log4j2"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "log4j2/log4j-core/src/main/java/org/apache/logging/log4j/core/async/AsyncLoggerConfigDisruptor.java"
+repo = "log4j2"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "slf4j/slf4j-api/src/main/java/org/slf4j/spi/LocationAwareLogger.java"
+repo = "slf4j"
+confidence = 0.7
+
+[[ground_truth.sufficient_files]]
+path = "log4j2/log4j-core/src/main/java/org/apache/logging/log4j/core/async/AsyncQueueFullPolicy.java"
+repo = "log4j2"
+confidence = 0.85

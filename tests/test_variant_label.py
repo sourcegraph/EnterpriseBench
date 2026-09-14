@@ -33,7 +33,7 @@ from cost_tracker import (  # noqa: E402
     aggregate_report,
     comparison_attempts,
 )
-from analyze_scores import load_all_results, parse_result  # noqa: E402
+from analyze_scores import analyze, load_all_results, parse_result  # noqa: E402
 from run_benchmark import _mode_output_dir, collect_passthrough_args  # noqa: E402
 from run_sweep import _check_one_item  # noqa: E402
 from runner_cli import PASSTHROUGH_FLAGS  # noqa: E402
@@ -144,6 +144,7 @@ def _write_results_json(
         "success": True,
         "scores": {
             "task_score": task_score,
+            "score_contract_version": 2,
             "all_passed": True,
             "checkpoints_passed": 1,
             "checkpoints_total": 2,
@@ -482,3 +483,47 @@ class TestAnalyzeScoresLabel:
         assert len(results) == 2
         labels = {r.variant_label for r in results}
         assert labels == {None, "p3"}
+
+    def test_excluded_labeled_result_does_not_block_headline_contract_check(
+        self, tmp_path: Path
+    ):
+        runs = tmp_path / "runs"
+        unlabeled = _write_results_json(
+            runs / "task-a" / "mcp_only" / "results.json"
+        )
+        labeled = _write_results_json(
+            runs / "task-a" / "mcp_only--p3" / "results.json",
+            variant_label="p3",
+        )
+        data = json.loads(labeled.read_text())
+        data["scores"].pop("score_contract_version")
+        labeled.write_text(json.dumps(data))
+
+        results = load_all_results([runs], tmp_path / "benchmarks")
+
+        assert [result.source_path for result in results] == [str(unlabeled)]
+
+    def test_analysis_reports_variants_without_mixing_headline_modes(
+        self, tmp_path: Path
+    ):
+        runs = tmp_path / "runs"
+        _write_results_json(
+            runs / "task-a" / "baseline" / "results.json",
+            mode="baseline",
+            task_score=0.25,
+        )
+        _write_results_json(
+            runs / "task-a" / "baseline--codex" / "results.json",
+            mode="baseline",
+            variant_label="codex",
+            task_score=0.75,
+        )
+
+        report = analyze(
+            [runs],
+            tmp_path / "benchmarks",
+            include_variant_labeled=True,
+        )
+
+        assert report["by_mode"]["baseline"]["mean"] == 0.25
+        assert report["by_variant"]["codex"]["mean"] == 0.75

@@ -1,0 +1,132 @@
+# Config Drift: tokio runtime configuration defaults vs hyper server builder defaults
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "tokio-hyper-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "config-drift-dual-tokio-hyper-001"
+suite = "platform_engineering"
+task_type = "config_drift"
+difficulty = "hard"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Detect configuration drift between tokio runtime thread pool defaults and hyper server connection handling assumptions"
+prompt = """
+A platform team reports that their hyper-based HTTP server occasionally drops
+connections under high concurrency. The server uses tokio's multi-threaded
+runtime with default settings and hyper v1.x's hyper::server::conn::http1::Builder
+with default connection settings (the legacy Server::bind() / Http::new()
+high-level APIs were removed in hyper 1.0 in favor of this service-based
+per-connection builder model).
+
+Investigation reveals a configuration drift: tokio's default worker thread
+count (equal to CPU cores) combined with hyper's default connection-level
+settings create a scenario where the accept loop can starve worker threads
+under load.
+
+Your task:
+1. Find where tokio configures its multi-threaded runtime defaults — trace
+   through Runtime::new() and Builder::new_multi_thread() to identify default
+   worker thread count, blocking thread pool size, and task scheduling behavior.
+2. Find where hyper v1.x configures its HTTP server connection handling — trace
+   through hyper::server::conn::http1::Builder (and http2::Builder for HTTP/2)
+   to identify default keep-alive timeouts, connection limits, and how the
+   service-based serve_connection model spawns tasks per connection on the
+   tokio runtime.
+3. Identify the drift points where tokio's thread pool defaults conflict with
+   hyper's connection spawning model — particularly around how many connections
+   hyper will accept vs how many tokio worker threads are available to process
+   them, and how blocking operations in request handlers interact with the
+   tokio thread pool.
+4. Document each drift point with source files from both repos.
+
+Document in your answer (use these JSON fields):
+{
+  "drift_points": [
+    {
+      "config_key": "<configuration parameter>",
+      "tokio_default": "<default value from tokio>",
+      "tokio_source_file": "<path in tokio repo>",
+      "hyper_assumption": "<what hyper assumes/configures>",
+      "hyper_source_file": "<path in hyper repo>",
+      "impact": "<potential impact of this drift>"
+    }
+  ]
+}
+"""
+
+[[repos]]
+url = "https://github.com/tokio-rs/tokio"
+rev = "tokio-1.29.1"
+path = "tokio"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/hyperium/hyper"
+rev = "v1.0.0-rc.4"
+path = "hyper"
+role = "consumer"
+
+[metadata]
+languages = ["rust"]
+total_loc = 200_000
+dependency_depth = 2
+frameworks = ["tokio", "hyper"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "config_valid"
+weight = 0.20
+verifier = "checks/check_config_valid.sh"
+description = "Agent produces valid drift report JSON"
+timeout_seconds = 60
+
+[[checkpoints]]
+name = "drift_points"
+weight = 0.45
+verifier = "checks/check_drift_points.sh"
+description = "Agent identifies drift points between tokio and hyper defaults"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "expected_values"
+weight = 0.35
+verifier = "checks/check_expected_values.sh"
+description = "Agent documents correct default values from both repos"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = ["config"]
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Tracing runtime configuration defaults from tokio's thread pool through hyper's server connection handling requires cross-repo search to match task spawning patterns with thread pool configuration"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "tokio/src/runtime/builder.rs"
+repo = "tokio"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/server/conn/http1.rs"
+repo = "hyper"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "tokio/src/runtime/config.rs"
+repo = "tokio"
+confidence = 0.85
+
+[[ground_truth.sufficient_files]]
+path = "src/server/conn/http2.rs"
+repo = "hyper"
+confidence = 0.80

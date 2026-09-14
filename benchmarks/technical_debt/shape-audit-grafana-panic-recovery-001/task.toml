@@ -1,0 +1,111 @@
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+repo_set_id = "grafana-nav"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "shape-audit-grafana-panic-recovery-001"
+suite = "technical_debt"
+difficulty = "hard"
+estimated_duration_minutes = 15
+session_type = "single"
+task_type = "refactor_orchestration"
+description = "Panic-recovery inventory across the service layer"
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/grafana/grafana"
+rev = "v10.2.0"
+path = "grafana"
+role = "primary"
+
+[metadata]
+languages = ["go"]
+frameworks = []
+multi_repo_pattern = "investigate"
+retrieval_categories = ["syntactic_pattern", "cross_file"]
+
+[[checkpoints]]
+name = "source_files"
+weight = 1.00
+verifier = "checks/check_source_files.sh"
+description = "Agent lists exactly the source files that qualify"
+timeout_seconds = 60
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "unknown"
+mcp_benefit_rationale = "Authored to measure primitive choice, not to presuppose it; no arm is expected to win a priori."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "pkg/services/alerting/engine.go"
+repo = "grafana"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/anonymous/anonimpl/client.go"
+repo = "grafana"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/authn/authnimpl/sync/user_sync.go"
+repo = "grafana"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/authn/clients/api_key.go"
+repo = "grafana"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/live/pipeline/models.go"
+repo = "grafana"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/ngalert/api/hcl/hcl.go"
+repo = "grafana"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/ngalert/eval/eval.go"
+repo = "grafana"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/query/query.go"
+repo = "grafana"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/signingkeys/signingkeystore/store.go"
+repo = "grafana"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/supportbundles/supportbundlesimpl/service.go"
+repo = "grafana"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/supportbundles/supportbundlesimpl/service_bundle.go"
+repo = "grafana"
+confidence = 1.0
+source = "deterministic"

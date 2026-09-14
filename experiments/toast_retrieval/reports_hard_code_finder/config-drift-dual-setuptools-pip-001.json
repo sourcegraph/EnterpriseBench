@@ -1,0 +1,209 @@
+{
+  "task_id": "config-drift-dual-setuptools-pip-001",
+  "policy": "code_finder",
+  "suite": "platform_engineering",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/setuptools--v67.0.0",
+    "github.com/sg-evals/pip--23.0"
+  ],
+  "retrieved_paths": [
+    "docs/pkg_resources.rst",
+    "docs/references/keywords.rst",
+    "docs/userguide/development_mode.rst",
+    "pkg_resources/__init__.py",
+    "setuptools/config/_apply_pyprojecttoml.py",
+    "setuptools/dist.py",
+    "src/pip/_vendor/README.rst",
+    "src/pip/_vendor/pkg_resources/__init__.py",
+    "src/pip/_internal/metadata/__init__.py",
+    "src/pip/_internal/metadata/pkg_resources.py",
+    "src/pip/_internal/metadata/importlib/_envs.py",
+    "src/pip/_internal/metadata/base.py",
+    "src/pip/_internal/operations/install/wheel.py",
+    "src/pip/_internal/req/req_uninstall.py",
+    "src/pip/_vendor/pygments/plugin.py"
+  ],
+  "retrieved_paths_union": [
+    "docs/pkg_resources.rst",
+    "docs/references/keywords.rst",
+    "docs/userguide/development_mode.rst",
+    "pkg_resources/__init__.py",
+    "setuptools/config/_apply_pyprojecttoml.py",
+    "setuptools/dist.py",
+    "src/pip/_vendor/README.rst",
+    "src/pip/_vendor/pkg_resources/__init__.py",
+    "src/pip/_internal/metadata/__init__.py",
+    "src/pip/_internal/metadata/pkg_resources.py",
+    "src/pip/_internal/metadata/importlib/_envs.py",
+    "src/pip/_internal/metadata/base.py",
+    "src/pip/_internal/operations/install/wheel.py",
+    "src/pip/_internal/req/req_uninstall.py",
+    "src/pip/_vendor/pygments/plugin.py"
+  ],
+  "required_files": [
+    "setuptools/pkg_resources/__init__.py",
+    "pip/src/pip/_vendor/pkg_resources/__init__.py"
+  ],
+  "ir_scores": {
+    "task_id": "config-drift-dual-setuptools-pip-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.4575
+    },
+    "mrr": 0.25,
+    "map_score": 0.25,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1333,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "config-drift-dual-setuptools-pip-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.4575
+    },
+    "mrr": 0.25,
+    "map_score": 0.25,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1333,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 29.5,
+  "response_chars": 5849,
+  "raw_response": "I could not write `/workspace/analysis/IMPACT_REPORT.md` because the available search tools only expose repository search/read APIs, not filesystem write access. Findings so far:\n\n- **Setuptools migration guidance**\n  - `docs/pkg_resources.rst:5-19` \u2014 explicitly discourages `pkg_resources`; recommends `importlib.resources`, `importlib.metadata`, and backports.\n  - `docs/references/keywords.rst:389-398` \u2014 `namespace_packages` is deprecated in favor of PEP 420 implicit namespaces.\n  - `docs/userguide/development_mode.rst:145-155` \u2014 recommends `importlib.resources`/`importlib.metadata`; warns that `pkgutil` and `pkg_resources` namespaces may not work in editable mode.\n  - `pkg_resources/__init__.py:2432-2468,2470-2491` \u2014 `EntryPoint.resolve()` replaces the old `_load`; `EntryPoint.load(require=...)` warns about deprecated parameters and separates `require()` from resolution.\n  - `CHANGES.rst:4801-4812` \u2014 documents the `EntryPoint._load` \u2192 `resolve` migration and deprecation of `load(require=False)`.\n  - `setuptools/config/_apply_pyprojecttoml.py:252-266` and `setuptools/dist.py:899-912` \u2014 setuptools itself uses `importlib.metadata.entry_points()` for command/plugin discovery.\n\n- **Pip vendoring and backend selection**\n  - `src/pip/_vendor/README.rst:101-104` \u2014 setuptools is stripped down to `pkg_resources`; pip patches it to use `pip._vendor` dependencies and `platformdirs`.\n  - `pyproject.toml:37-53` \u2014 vendoring rewrites `pkg_resources.extern` imports and removes the original vendored dependency tree.\n  - `src/pip/_vendor/pkg_resources/__init__.py:553-590` \u2014 vendored `WorkingSet`.\n  - `src/pip/_vendor/pkg_resources/__init__.py:1967-1989` \u2014 vendored `find_distributions()` and `find_eggs_in_zip()`.\n  - `src/pip/_vendor/pkg_resources/__init__.py:2173-2205` \u2014 legacy namespace handler registration and `_handle_ns`.\n  - `src/pip/_internal/metadata/__init__.py:29-65` \u2014 pip selects `importlib.metadata` on Python 3.11+ by default, but uses the `pkg_resources` backend otherwise or when overridden.\n  - `src/pip/_internal/metadata/pkg_resources.py:8-16,71-93,163-189,191-216` \u2014 pip\u2019s legacy metadata adapter directly wraps vendored `pkg_resources.Distribution`, `DistInfoDistribution`, `PathMetadata`, `yield_lines`, `get_entry_map`, and `requires`.\n  - `src/pip/_internal/metadata/importlib/_envs.py:110-146` \u2014 egg discovery still directly calls vendored `find_distributions` and `find_eggs_in_zip`; comments explicitly identify this as old behavior intended for deprecation.\n  - `src/pip/_internal/metadata/base.py:286-292` \u2014 retains a compatibility copy of `pkg_resources.to_filename()`.\n\n- **Pip features depending on legacy behavior**\n  - **Metadata resolution/dependency handling:** `src/pip/_internal/metadata/pkg_resources.py:71-93,163-216`; relies on `Distribution`, `DistInfoDistribution`, `PathMetadata`, `requires`, extras, and legacy metadata filenames (`PKG-INFO` vs `METADATA`).\n  - **Egg and zipped-egg discovery:** `src/pip/_internal/metadata/importlib/_envs.py:110-146`; depends on `find_distributions` and `find_eggs_in_zip`.\n  - **Entry-point discovery and script generation:** `src/pip/_internal/metadata/pkg_resources.py:185-189`, `src/pip/_internal/operations/install/wheel.py:118-126`; parses legacy `get_entry_map()` output and generates `console_scripts`/`gui_scripts`.\n  - **Uninstallation:** `src/pip/_internal/req/req_uninstall.py:568-580`; iterates entry points to remove installed scripts.\n  - **Pygments plugin loading:** `src/pip/_vendor/pygments/plugin.py:1-10,47-65`; falls back to vendored `pkg_resources.iter_entry_points`.\n  - **Namespace package handling:** vendored `register_namespace_handler`/`_handle_ns` at `src/pip/_vendor/pkg_resources/__init__.py:2169-2205`; this is precisely the legacy mechanism setuptools recommends replacing with PEP 420.\n\n- **Documented drift**\n  - Setuptools\u2019 intended path is to replace resource access and metadata discovery with `importlib.resources`/`importlib.metadata`, replace `EntryPoint._load` usage with `resolve()` plus explicit `require()`, and replace `pkg_resources` namespace packages with PEP 420.\n  - Pip 23.0 has begun migration: `NEWS.rst:289-291` records the metadata migration, and `NEWS.rst:607-613` records changed name normalization caused by moving to `importlib.metadata`.\n  - Nevertheless, pip still ships a separately frozen, patched copy of `pkg_resources`, uses it as the default backend on Python versions below 3.11, retains egg discovery and namespace handling, and has compatibility code copied from `pkg_resources`.\n  - Consequently, updates or behavioral changes in setuptools\u2019 current `pkg_resources` are not automatically reflected in pip\u2019s vendored implementation. Pip\u2019s legacy paths may preserve deprecated egg semantics, entry-point parsing, namespace behavior, and setuptools-specific name normalization after setuptools has directed consumers toward standard-library APIs.\n\n- **Migration recommendations**\n  1. Complete pip\u2019s `importlib.metadata` backend migration and make it the default across supported Python versions.\n  2. Replace egg discovery with standards-based `.dist-info`/wheel metadata discovery; isolate or remove `find_distributions`/`find_eggs_in_zip`.\n  3. Replace `get_entry_map()`/legacy `EntryPoint` parsing with `importlib.metadata.EntryPoints` and explicit `.load()` semantics appropriate to the modern API.\n  4. Remove pip\u2019s dependency on vendored namespace handlers; support PEP 420 implicit namespaces and treat legacy `pkg_resources` namespaces as compatibility-only.\n  5. Replace resource APIs with `importlib.resources`.\n  6. Until removal is complete, pin and test the vendored copy independently, especially around entry-point names containing colons, extras, egg metadata, namespace packages, and distribution-name normalization.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "config-drift-dual-setuptools-pip-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.4575
+    },
+    "mrr": 0.25,
+    "map_score": 0.25,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1333,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "docs/pkg_resources.rst",
+    "docs/references/keywords.rst",
+    "docs/userguide/development_mode.rst",
+    "setuptools/pkg_resources/__init__.py",
+    "setuptools/config/_apply_pyprojecttoml.py",
+    "setuptools/dist.py",
+    "src/pip/_vendor/README.rst",
+    "pip/src/pip/_vendor/pkg_resources/__init__.py",
+    "src/pip/_internal/metadata/__init__.py",
+    "src/pip/_internal/metadata/pkg_resources.py",
+    "src/pip/_internal/metadata/importlib/_envs.py",
+    "src/pip/_internal/metadata/base.py",
+    "src/pip/_internal/operations/install/wheel.py",
+    "src/pip/_internal/req/req_uninstall.py",
+    "src/pip/_vendor/pygments/plugin.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "config-drift-dual-setuptools-pip-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.4575
+    },
+    "mrr": 0.25,
+    "map_score": 0.25,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1333,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

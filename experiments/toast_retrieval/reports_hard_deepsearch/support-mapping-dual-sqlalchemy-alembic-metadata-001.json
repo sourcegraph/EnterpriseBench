@@ -1,0 +1,184 @@
+{
+  "task_id": "support-mapping-dual-sqlalchemy-alembic-metadata-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/sqlalchemy--rel_2_0_29",
+    "github.com/sg-evals/alembic--rel_1_13_1"
+  ],
+  "retrieved_paths": [
+    "alembic/templates/generic/env.py",
+    "lib/sqlalchemy/orm/decl_api.py",
+    "lib/sqlalchemy/orm/decl_base.py",
+    "alembic/autogenerate/api.py",
+    "alembic/autogenerate/compare.py",
+    "alembic/command.py"
+  ],
+  "retrieved_paths_union": [
+    "alembic/templates/generic/env.py",
+    "lib/sqlalchemy/orm/decl_api.py",
+    "lib/sqlalchemy/orm/decl_base.py",
+    "alembic/autogenerate/api.py",
+    "alembic/autogenerate/compare.py",
+    "alembic/command.py"
+  ],
+  "required_files": [
+    "alembic/alembic/autogenerate/compare.py",
+    "alembic/alembic/runtime/environment.py",
+    "sqlalchemy/lib/sqlalchemy/orm/decl_api.py",
+    "sqlalchemy/lib/sqlalchemy/sql/schema.py"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-sqlalchemy-alembic-metadata-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.3973,
+      "10": 0.3973
+    },
+    "mrr": 0.5,
+    "map_score": 0.225,
+    "file_recall": 0.5,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 6,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-sqlalchemy-alembic-metadata-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.3973,
+      "10": 0.3973
+    },
+    "mrr": 0.5,
+    "map_score": 0.225,
+    "file_recall": 0.5,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 6,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 110.3,
+  "response_chars": 12989,
+  "raw_response": "---\ntitle: Fixing empty Alembic autogenerate after SQLAlchemy 2.0 model refactor\nshare_url: https://demo.sourcegraph.com/deepsearch/2c00e811-c13a-4c4e-b53a-694fdd428083\nurl: https://demo.sourcegraph.com/deepsearch/2219\ncreated: 2026-08-18T01:57:51Z\nupdated: 2026-08-18T01:59:35Z\n---\n\n# # Map customer Alembic autogenerate producing empty migrations after SQLAlchemy 2.x model refactor to the Alembic env.py / SQLAlchemy MetaData boundary\n\nA customer reports that after upgrading SQLAlchemy from 1.4 to 2.0\nand refactoring their models into separate modules, alembic\nrevision --autogenerate produces empty migrations. The models clearly\ndiffer from the database schema, but Alembic detects no changes.\n\nYour task:\n1. Find where Alembic's env.py imports the customer's MetaData and\n   passes target_metadata to context.configure.\n2. Find where SQLAlchemy 2.0's DeclarativeBase registers tables on a\n   shared MetaData, and how splitting models across modules can\n   create multiple unrelated MetaData instances.\n3. Trace the cross-repo path: alembic command -> env.py import ->\n   SQLAlchemy DeclarativeBase.metadata -> MetaData.tables -> Alembic\n   autogenerate compare_metadata. Cite each file and the function\n   responsible.\n4. Identify why the customer's split-module refactor (each file\n   declares its own DeclarativeBase) produces multiple MetaData\n   instances, and only the one referenced in env.py is compared.\n\n\nSearch only these repositories: github.com/sg-evals/sqlalchemy--rel_2_0_29, github.com/sg-evals/alembic--rel_1_13_1\n\nI now have a complete picture of the entire chain. Here is the full analysis:\n\n---\n\n## Root Cause: Multiple `MetaData` Instances from Split `DeclarativeBase` Declarations\n\n### 1. Where `env.py` wires `target_metadata` into Alembic\n\nThe template [`alembic/templates/generic/env.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_13_1/-/blob/alembic/templates/generic/env.py?L17-L21) is the canonical starting point. The user is expected to populate `target_metadata` by importing their model's `Base`:\n\n```python\n# from myapp import mymodel\n# target_metadata = mymodel.Base.metadata\ntarget_metadata = None  # placeholder \u2014 must be replaced by the customer\n```\n\nThis value is then passed to `context.configure()` in both offline mode ([L42-L46](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_13_1/-/blob/alembic/templates/generic/env.py?L42-L46)) and online mode ([L67-L68](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_13_1/-/blob/alembic/templates/generic/env.py?L67-L68)):\n\n```python\ncontext.configure(connection=connection, target_metadata=target_metadata)\n```\n\n---\n\n### 2. How `DeclarativeBase` creates its own private `MetaData`\n\nIn SQLAlchemy 2.0, [`DeclarativeBase`](https://demo.sourcegraph.com/r/github.com/sg-evals/sqlalchemy--rel_2_0_29/-/blob/lib/sqlalchemy/orm/decl_api.py?L628-L695) uses `__init_subclass__` (via `DeclarativeAttributeIntercept` metaclass) to call `_setup_declarative_base()` the moment a user writes `class Base(DeclarativeBase)`.\n\n**`_setup_declarative_base()`** ([`decl_api.py` L522-L557](https://demo.sourcegraph.com/r/github.com/sg-evals/sqlalchemy--rel_2_0_29/-/blob/lib/sqlalchemy/orm/decl_api.py?L522-L557)):\n\n```python\ndef _setup_declarative_base(cls):\n    if \"metadata\" in cls.__dict__:\n        metadata = cls.__dict__[\"metadata\"]\n    else:\n        metadata = None                       # no metadata provided\n\n    reg = cls.__dict__.get(\"registry\", None)\n    if reg is None:\n        reg = registry(metadata=metadata, ...)  # creates a NEW registry\n        cls.registry = reg\n\n    cls._sa_registry = reg\n    if \"metadata\" not in cls.__dict__:\n        cls.metadata = cls.registry.metadata  # assigns the registry's MetaData\n```\n\n**`registry.__init__()`** ([`decl_api.py` L1147-L1213](https://demo.sourcegraph.com/r/github.com/sg-evals/sqlalchemy--rel_2_0_29/-/blob/lib/sqlalchemy/orm/decl_api.py?L1147-L1213)):\n\n```python\ndef __init__(self, metadata=None, ...):\n    lcl_metadata = metadata or MetaData()  # \u2190 NEW MetaData() if none supplied\n    self.metadata = lcl_metadata\n```\n\n**Key point:** Every `class Base(DeclarativeBase): pass` statement that does NOT supply a `metadata=` or `registry=` class variable triggers `registry(metadata=None)`, which calls `MetaData()` \u2014 creating a **brand-new, isolated `MetaData` instance** with no knowledge of any other base's tables.\n\n---\n\n### 3. How each model's `Table` is registered on its `DeclarativeBase`'s `MetaData`\n\nWhen a mapped class is processed, [`_ClassScanMapperConfig`](https://demo.sourcegraph.com/r/github.com/sg-evals/sqlalchemy--rel_2_0_29/-/blob/lib/sqlalchemy/orm/decl_base.py?L558-L579) calls `_setup_table()`. Inside [`_setup_table()`](https://demo.sourcegraph.com/r/github.com/sg-evals/sqlalchemy--rel_2_0_29/-/blob/lib/sqlalchemy/orm/decl_base.py?L1678-L1733), the `Table` object is constructed with:\n\n```python\ntable = table_cls(\n    tablename,\n    self._metadata_for_cls(manager),  # \u2190 the registry's MetaData\n    *sorted_columns,\n    ...\n)\n```\n\n`_metadata_for_cls(manager)` resolves to the `MetaData` belonging to the `registry` of whichever `DeclarativeBase` subclass owns that model. The table is therefore **only registered in that specific `MetaData`'s `.tables` dict**.\n\n---\n\n### 4. The full autogenerate chain\n\n```\nalembic revision --autogenerate\n        \u2502\n        \u25bc\ncommand.revision()                              [command.py L194-L236]\n  \u2514\u2500 creates RevisionContext\n  \u2514\u2500 sets fn=retrieve_migrations (calls run_autogenerate)\n  \u2514\u2500 script_directory.run_env()  \u2190 executes env.py\n        \u2502\n        \u25bc\nenv.py runs                                     [templates/generic/env.py]\n  \u2514\u2500 target_metadata = SomeBase.metadata        [L20-L21]  \u2190 THE KEY LINE\n  \u2514\u2500 context.configure(target_metadata=...)     [L67-L68]\n  \u2514\u2500 context.run_migrations()\n        \u2502\n        \u25bc\nretrieve_migrations() \u2192 RevisionContext.run_autogenerate()  [api.py L567-L619]\n  \u2514\u2500 AutogenContext.__init__()                  [api.py L332-L389]\n        \u2514\u2500 self.metadata = opts[\"target_metadata\"]  [api.py L352-L354]\n        \u2502\n        \u25bc\ncompare._populate_migration_script()            [compare.py L59-L66]\n  \u2514\u2500 _produce_net_changes()                     [compare.py L72-L100]\n        \u2514\u2500 _autogen_for_tables()                [compare.py L103-L143]\n              \u2514\u2500 autogen_context.sorted_tables  [api.py L469-L483]\n                    \u2514\u2500 self.metadata.sorted_tables  \u2190 iterates MetaData.tables\n              \u2514\u2500 _compare_tables(conn_table_names, metadata_table_names, ...)\n```\n\n**`AutogenContext.sorted_tables`** ([`api.py` L469-L483](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_13_1/-/blob/alembic/autogenerate/api.py?L469-L483)):\n\n```python\n@util.memoized_property\ndef sorted_tables(self):\n    result = []\n    for m in util.to_list(self.metadata):\n        result.extend(m.sorted_tables)      # \u2190 only the MetaData(s) assigned here\n    return result\n```\n\n**`_autogen_for_tables()`** ([`compare.py` L133-L135](https://demo.sourcegraph.com/r/github.com/sg-evals/alembic--rel_1_13_1/-/blob/alembic/autogenerate/compare.py?L133-L135)) then builds `metadata_table_names` exclusively from those tables:\n\n```python\nmetadata_table_names = OrderedSet(\n    [(table.schema, table.name) for table in autogen_context.sorted_tables]\n)\n```\n\nOnly tables present in `autogen_context.sorted_tables` are diffed against the live DB. Any table on a different `MetaData` instance is simply **invisible**.\n\n---\n\n### 5. Why split-module `DeclarativeBase` causes empty migrations\n\nWith SQLAlchemy 1.4's `declarative_base()`, it was common to have one shared base. After upgrading and splitting models, the pattern that breaks things looks like this:\n\n```python\n# models/users.py\nclass Base(DeclarativeBase): pass   # \u2190 creates MetaData A\nclass User(Base): ...               # Table registered in MetaData A\n\n# models/orders.py\nclass Base(DeclarativeBase): pass   # \u2190 creates MetaData B (SEPARATE!)\nclass Order(Base): ...              # Table registered in MetaData B\n\n# migrations/env.py\nfrom models.users import Base\ntarget_metadata = Base.metadata     # \u2190 only MetaData A is passed\n```\n\nBecause each `class Base(DeclarativeBase)` call goes through `_setup_declarative_base()` \u2192 `registry(metadata=None)` \u2192 `MetaData()`, **MetaData A and MetaData B are completely independent objects**. MetaData B's tables (`Order`, etc.) are **never registered in MetaData A** and are therefore not in `autogen_context.sorted_tables`. Alembic compares MetaData A against the DB, sees no difference for tables it knows about, and generates an empty migration.\n\n---\n\n### Fix\n\nDeclare a **single shared `Base`** in one module and import it everywhere:\n\n```python\n# models/base.py\nfrom sqlalchemy.orm import DeclarativeBase\nclass Base(DeclarativeBase): pass   # one MetaData, one registry\n\n# models/users.py\nfrom models.base import Base\nclass User(Base): ...               # registered in the shared MetaData\n\n# models/orders.py\nfrom models.base import Base\nclass Order(Base): ...              # same shared MetaData\n\n# migrations/env.py\nfrom models.base import Base\ntarget_metadata = Base.metadata     # all tables are here\n```\n\nAlternatively, pass an explicit shared `MetaData` instance to each base via the `metadata` class variable ([`decl_api.py` L523-L526](https://demo.sourcegraph.com/r/github.com/sg-evals/sqlalchemy--rel_2_0_29/-/blob/lib/sqlalchemy/orm/decl_api.py?L523-L526)), or pass a shared `registry` instance via the `registry` class variable ([`decl_api.py` L533-L551](https://demo.sourcegraph.com/r/github.com/sg-evals/sqlalchemy--rel_2_0_29/-/blob/lib/sqlalchemy/orm/decl_api.py?L533-L551)), so all `DeclarativeBase` subclasses share one `MetaData.tables` collection.\n\n## Sources\n\n- [github.com/sg-evals/alembic--rel_1_13_1/alembic/templates/generic/env.py@f14ef75](/github.com/sg-evals/alembic--rel_1_13_1@f14ef753e1cac9760fb8fa25524493d86d3daefb/-/blob/alembic/templates/generic/env.py)\n- [github.com/sg-evals/alembic--rel_1_13_1/alembic/autogenerate/api.py@f14ef75?L1-120](/github.com/sg-evals/alembic--rel_1_13_1@f14ef753e1cac9760fb8fa25524493d86d3daefb/-/blob/alembic/autogenerate/api.py?L1-120)\n- [github.com/sg-evals/sqlalchemy--rel_2_0_29/lib/sqlalchemy/orm/decl_api.py@416b75d?L522-700](/github.com/sg-evals/sqlalchemy--rel_2_0_29@416b75dcd149ae06e8cd824fbd021ca5da95a214/-/blob/lib/sqlalchemy/orm/decl_api.py?L522-700)\n- [github.com/sg-evals/sqlalchemy--rel_2_0_29/lib/sqlalchemy/orm/decl_api.py@416b75d?L1147-1220](/github.com/sg-evals/sqlalchemy--rel_2_0_29@416b75dcd149ae06e8cd824fbd021ca5da95a214/-/blob/lib/sqlalchemy/orm/decl_api.py?L1147-1220)\n- [github.com/sg-evals/alembic--rel_1_13_1/alembic/autogenerate/api.py@f14ef75?L120-200](/github.com/sg-evals/alembic--rel_1_13_1@f14ef753e1cac9760fb8fa25524493d86d3daefb/-/blob/alembic/autogenerate/api.py?L120-200)\n- [github.com/sg-evals/sqlalchemy--rel_2_0_29/lib/sqlalchemy/orm/decl_base.py@416b75d?L1678-1740](/github.com/sg-evals/sqlalchemy--rel_2_0_29@416b75dcd149ae06e8cd824fbd021ca5da95a214/-/blob/lib/sqlalchemy/orm/decl_base.py?L1678-1740)\n- [github.com/sg-evals/alembic--rel_1_13_1/alembic/command.py@f14ef75?L176-247](/github.com/sg-evals/alembic--rel_1_13_1@f14ef753e1cac9760fb8fa25524493d86d3daefb/-/blob/alembic/command.py?L176-247)\n- [github.com/sg-evals/alembic--rel_1_13_1/alembic/autogenerate/api.py@f14ef75?L567-640](/github.com/sg-evals/alembic--rel_1_13_1@f14ef753e1cac9760fb8fa25524493d86d3daefb/-/blob/alembic/autogenerate/api.py?L567-640)\n- [github.com/sg-evals/alembic--rel_1_13_1/alembic/autogenerate/compare.py@f14ef75?L1-120](/github.com/sg-evals/alembic--rel_1_13_1@f14ef753e1cac9760fb8fa25524493d86d3daefb/-/blob/alembic/autogenerate/compare.py?L1-120)\n- [github.com/sg-evals/sqlalchemy--rel_2_0_29/lib/sqlalchemy/orm/decl_base.py@416b75d?L558-600](/github.com/sg-evals/sqlalchemy--rel_2_0_29@416b75dcd149ae06e8cd824fbd021ca5da95a214/-/blob/lib/sqlalchemy/orm/decl_base.py?L558-600)\n- [github.com/sg-evals/alembic--rel_1_13_1/alembic/autogenerate/compare.py@f14ef75?L120-200](/github.com/sg-evals/alembic--rel_1_13_1@f14ef753e1cac9760fb8fa25524493d86d3daefb/-/blob/alembic/autogenerate/compare.py?L120-200)\n- [github.com/sg-evals/alembic--rel_1_13_1/alembic/autogenerate/api.py@f14ef75?L200-310](/github.com/sg-evals/alembic--rel_1_13_1@f14ef753e1cac9760fb8fa25524493d86d3daefb/-/blob/alembic/autogenerate/api.py?L200-310)\n- [github.com/sg-evals/alembic--rel_1_13_1/alembic/autogenerate/api.py@f14ef75?L310-440](/github.com/sg-evals/alembic--rel_1_13_1@f14ef753e1cac9760fb8fa25524493d86d3daefb/-/blob/alembic/autogenerate/api.py?L310-440)\n- [repo:^github.com/sg-evals/alembic--rel_1_13_1$ sorted_tables](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Falembic--rel_1_13_1$%20sorted_tables)\n- [github.com/sg-evals/sqlalchemy--rel_2_0_29/lib/sqlalchemy/orm/decl_api.py@416b75d?L700-760](/github.com/sg-evals/sqlalchemy--rel_2_0_29@416b75dcd149ae06e8cd824fbd021ca5da95a214/-/blob/lib/sqlalchemy/orm/decl_api.py?L700-760)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-sqlalchemy-alembic-metadata-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.2463,
+      "10": 0.2463
+    },
+    "mrr": 0.5,
+    "map_score": 0.125,
+    "file_recall": 0.25,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 6,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "alembic/templates/generic/env.py",
+    "sqlalchemy/lib/sqlalchemy/orm/decl_api.py",
+    "lib/sqlalchemy/orm/decl_base.py",
+    "alembic/autogenerate/api.py",
+    "alembic/alembic/autogenerate/compare.py",
+    "alembic/command.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-sqlalchemy-alembic-metadata-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.2463,
+      "10": 0.2463
+    },
+    "mrr": 0.5,
+    "map_score": 0.125,
+    "file_recall": 0.25,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 6,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

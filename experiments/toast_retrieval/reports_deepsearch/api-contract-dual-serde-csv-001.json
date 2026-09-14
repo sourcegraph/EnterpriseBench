@@ -1,0 +1,182 @@
+{
+  "task_id": "api-contract-dual-serde-csv-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/serde--v1.0.193",
+    "github.com/sg-evals/rust-csv--1.3.0"
+  ],
+  "retrieved_paths": [
+    "serde/src/de/mod.rs",
+    "serde_derive/src/de.rs",
+    "src/deserializer.rs",
+    "serde/src/private/de.rs",
+    "serde_derive/src/internals/attr.rs",
+    "Cargo.toml"
+  ],
+  "retrieved_paths_union": [
+    "serde/src/de/mod.rs",
+    "serde_derive/src/de.rs",
+    "src/deserializer.rs",
+    "serde/src/private/de.rs",
+    "serde_derive/src/internals/attr.rs",
+    "Cargo.toml"
+  ],
+  "required_files": [
+    "serde/serde/src/de/mod.rs",
+    "csv/src/deserializer.rs"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-serde-csv-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.8,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.9197,
+      "5": 0.9197,
+      "10": 0.9197
+    },
+    "mrr": 1.0,
+    "map_score": 0.8333,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 6,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-serde-csv-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.8,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.9197,
+      "5": 0.9197,
+      "10": 0.9197
+    },
+    "mrr": 1.0,
+    "map_score": 0.8333,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 6,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 232.4,
+  "response_chars": 12476,
+  "raw_response": "---\ntitle: Trace serde\u2013csv deserialization contract break after version alignment\nshare_url: https://demo.sourcegraph.com/deepsearch/772a5fca-539a-4f69-acfd-b1b64d2a7b5a\nurl: https://demo.sourcegraph.com/deepsearch/2137\ncreated: 2026-08-17T21:16:23Z\nupdated: 2026-08-17T21:19:44Z\n---\n\n#         # api-contract-dual-serde-csv-001\n\n        **Suite:** dependency_management | **Type:** api_contract | **Difficulty:** hard\n        **Repos:** serde + csv\n\n        ## Context\n\n        The csv crate depends on serde to convert parsed CSV rows into typed\nRust values. A user reports that after aligning their serde version with\ncsv 1.3.0's requirements, one category of struct definition that used to\ndeserialize cleanly now produces different output for the same CSV input,\neven though the CSV text itself has not changed.\n\nYour task:\n1. Investigate how serde exposes the contract that a data format (such as\n   csv) must implement in order to deserialize into arbitrary Rust types.\n2. Find where csv implements that contract for its own record types, and\n   trace how a single CSV row becomes a deserialized value.\n3. Identify which category of struct definition is affected by the version\n   change, and pinpoint the exact code on each side of the contract that\n   is responsible.\n4. Explain why the change alters the output for the affected struct shapes,\n   and describe the affected use cases.\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, or\n          altered output for the same input)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/serde--v1.0.193, github.com/sg-evals/rust-csv--1.3.0\n\nThe report has been written. Here is the full analysis:\n\n---\n\n## Impact Report: csv 1.3.0 + serde v1.0.193 \u2014 Struct Deserialization Contract Break\n\n### The Serde Contract\n\nThe serde `Deserializer` trait ([`serde/src/de/mod.rs:1108-1122`](https://demo.sourcegraph.com/r/github.com/sg-evals/serde--v1.0.193/-/blob/serde/src/de/mod.rs?L1108-1122)) requires format implementors to provide two methods whose distinction matters here:\n\n- `deserialize_struct(name, fields, visitor)` \u2014 called by normal named-field structs; the format receives the struct's field list as a hint.\n- `deserialize_map(visitor)` \u2014 called when the type is map-like or when `#[serde(flatten)]` is present.\n\n### The Code-Generation Change in serde_derive\n\nIn [`serde_derive/src/de.rs:1027-1049`](https://demo.sourcegraph.com/r/github.com/sg-evals/serde--v1.0.193/-/blob/serde_derive/src/de.rs?L1027-1049), the dispatch generated by `#[derive(Deserialize)]` branches on `has_flatten()`:\n\n```rust\n// Normal struct \u2014 calls deserialize_struct\nStructForm::Struct => {\n    _serde::Deserializer::deserialize_struct(__deserializer, #type_name, FIELDS, #visitor_expr)\n}\n\n// Struct with ANY #[serde(flatten)] field \u2014 calls deserialize_map instead\nStructForm::Struct if cattrs.has_flatten() => {\n    _serde::Deserializer::deserialize_map(__deserializer, #visitor_expr)\n}\n```\n\nAdditionally, at [`serde_derive/src/de.rs:966-967`](https://demo.sourcegraph.com/r/github.com/sg-evals/serde--v1.0.193/-/blob/serde_derive/src/de.rs?L966-967), `visit_seq` is **not generated** for any struct with a flattened field:\n```rust\n_ if cattrs.has_flatten() => None,\n```\n\nThe generated `__Visitor` for a flattened struct implements only `visit_map`.\n\n### How csv Implements the Contract\n\nIn [`src/deserializer.rs:507-529`](https://demo.sourcegraph.com/r/github.com/sg-evals/rust-csv--1.3.0/-/blob/src/deserializer.rs?L507-529), csv implements **both methods identically**:\n\n```rust\nfn deserialize_map<V>(self, visitor: V) -> ... {\n    if !self.has_headers() { visitor.visit_seq(self) } else { visitor.visit_map(self) }\n}\n\nfn deserialize_struct<V>(self, _name, _fields, visitor: V) -> ... {\n    if !self.has_headers() { visitor.visit_seq(self) } else { visitor.visit_map(self) }\n}\n```\n\nThe `_fields` hint is intentionally discarded. The path taken is determined purely by whether a header row is available, not by which method is called.\n\n### The Affected Category: Structs with `#[serde(flatten)]`\n\nFor a type like:\n```rust\n#[derive(Deserialize)]\nstruct Row {\n    label: String,\n    #[serde(flatten)]\n    coords: Inner,  // Inner { x: f64, y: f64 }\n}\n```\n\nThe problem has two layers:\n\n**Without headers:** csv calls `visitor.visit_seq(self)`. The generated `__Visitor` has no `visit_seq`. The default returns `Err(invalid_type: sequence, expected struct Row)`. **Always fails.**\n\n**With headers:** csv calls `visitor.visit_map(self)`. The unrecognized fields (`x`, `y`) fall into the `__other` arm ([`serde_derive/src/de.rs:2535-2548`](https://demo.sourcegraph.com/r/github.com/sg-evals/serde--v1.0.193/-/blob/serde_derive/src/de.rs?L2535-2548)), which calls `MapAccess::next_value` on the csv iterator and stores each value as `Content::String` in a `__collect` buffer. `FlatMapDeserializer` ([`serde/src/private/de.rs:2590`](https://demo.sourcegraph.com/r/github.com/sg-evals/serde--v1.0.193/-/blob/serde/src/private/de.rs?L2590)) then re-deserializes `Inner` from this buffer. Values that csv would have emitted as typed (`visit_u64`, `visit_f64`) are now re-delivered as `visit_str`. Standard primitive types survive because their `Deserialize` impls accept strings, but third-party types that only accept native typed visits will fail.\n\n### Key Code Locations\n\n**serde v1.0.193:**\n\n| File | Lines | Symbol |\n|---|---|---|\n| [`serde/src/de/mod.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/serde--v1.0.193/-/blob/serde/src/de/mod.rs?L1108-1122) | 1108-1122 | `deserialize_map` / `deserialize_struct` trait methods |\n| [`serde_derive/src/de.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/serde--v1.0.193/-/blob/serde_derive/src/de.rs?L963-988) | 963-988 | `visit_seq` suppressed when `has_flatten()` |\n| [`serde_derive/src/de.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/serde--v1.0.193/-/blob/serde_derive/src/de.rs?L1027-1049) | 1027-1049 | dispatch to `deserialize_map` when `has_flatten()` |\n| [`serde_derive/src/de.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/serde--v1.0.193/-/blob/serde_derive/src/de.rs?L2535-2601) | 2535-2601 | `__other` arm + `FlatMapDeserializer` re-deserialization |\n| [`serde/src/private/de.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/serde--v1.0.193/-/blob/serde/src/private/de.rs?L2589-2680) | 2589-2680 | `FlatMapDeserializer` + `FlatStructAccess` |\n| [`serde_derive/src/internals/attr.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/serde--v1.0.193/-/blob/serde_derive/src/internals/attr.rs?L658-664) | 658-664 | `has_flatten` flag |\n\n**csv 1.3.0:**\n\n| File | Lines | Symbol |\n|---|---|---|\n| [`src/deserializer.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/rust-csv--1.3.0/-/blob/src/deserializer.rs?L507-529) | 507-529 | `deserialize_map` + `deserialize_struct` (identical) |\n| [`src/deserializer.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/rust-csv--1.3.0/-/blob/src/deserializer.rs?L610-650) | 610-650 | `SeqAccess` / `MapAccess` impls |\n\n### Migration Recommendations\n\n1. **Remove `#[serde(flatten)]` from CSV row structs** (recommended). Inline all fields directly and map to nested types after deserialization.\n2. **Manual `Deserialize` impl**: Implement `visit_seq` and `visit_map` by hand; call `deserialize_struct` explicitly.\n3. **Two-pass approach**: Deserialize to `HashMap<String, String>` first, then use `serde::de::value::MapDeserializer` to convert to the typed struct.\n4. **Pin serde** to a version before flatten changed the dispatch, if you need to preserve existing behaviour short-term.\n\n## Sources\n\n- [github.com/sg-evals/serde--v1.0.193](/github.com/sg-evals/serde--v1.0.193)\n- [github.com/sg-evals/rust-csv--1.3.0](/github.com/sg-evals/rust-csv--1.3.0)\n- [github.com/sg-evals/serde--v1.0.193](/github.com/sg-evals/serde--v1.0.193)\n- [github.com/sg-evals/rust-csv--1.3.0](/github.com/sg-evals/rust-csv--1.3.0)\n- [github.com/sg-evals/serde--v1.0.193](/github.com/sg-evals/serde--v1.0.193)\n- [github.com/sg-evals/rust-csv--1.3.0/src/deserializer.rs@94a4b63](/github.com/sg-evals/rust-csv--1.3.0@94a4b635df9cffa7f11ed12c3562be1b74cd22f9/-/blob/src/deserializer.rs)\n- [github.com/sg-evals/serde--v1.0.193/serde/src/de/mod.rs@085efc4?L1-150](/github.com/sg-evals/serde--v1.0.193@085efc4a5baf7e6fcdae49291804cb8535ffa71c/-/blob/serde/src/de/mod.rs?L1-150)\n- [github.com/sg-evals/rust-csv--1.3.0/Cargo.toml@94a4b63](/github.com/sg-evals/rust-csv--1.3.0@94a4b635df9cffa7f11ed12c3562be1b74cd22f9/-/blob/Cargo.toml)\n- [repo:^github.com/sg-evals/serde--v1.0.193$ fn deserialize_struct](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fserde--v1.0.193$%20fn%20deserialize_struct)\n- [github.com/sg-evals/serde--v1.0.193/serde/src/de/mod.rs@085efc4?L1500-1700](/github.com/sg-evals/serde--v1.0.193@085efc4a5baf7e6fcdae49291804cb8535ffa71c/-/blob/serde/src/de/mod.rs?L1500-1700)\n- [github.com/sg-evals/serde--v1.0.193/serde_derive/src/de.rs@085efc4?L900-1100](/github.com/sg-evals/serde--v1.0.193@085efc4a5baf7e6fcdae49291804cb8535ffa71c/-/blob/serde_derive/src/de.rs?L900-1100)\n- [github.com/sg-evals/serde--v1.0.193/serde/src/de/mod.rs@085efc4?L1050-1200](/github.com/sg-evals/serde--v1.0.193@085efc4a5baf7e6fcdae49291804cb8535ffa71c/-/blob/serde/src/de/mod.rs?L1050-1200)\n- [github.com/sg-evals/serde--v1.0.193/serde_derive/src/de.rs@085efc4?L2450-2600](/github.com/sg-evals/serde--v1.0.193@085efc4a5baf7e6fcdae49291804cb8535ffa71c/-/blob/serde_derive/src/de.rs?L2450-2600)\n- [github.com/sg-evals/serde--v1.0.193/serde_derive/src/de.rs@085efc4?L1-80](/github.com/sg-evals/serde--v1.0.193@085efc4a5baf7e6fcdae49291804cb8535ffa71c/-/blob/serde_derive/src/de.rs?L1-80)\n- [repo:^github.com/sg-evals/serde--v1.0.193$ has_flatten](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fserde--v1.0.193$%20has_flatten)\n- [repo:^github.com/sg-evals/serde--v1.0.193$ FlatMapDeserializer](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fserde--v1.0.193$%20FlatMapDeserializer)\n- [github.com/sg-evals/serde--v1.0.193/serde/src/private/de.rs@085efc4?L2589-2750](/github.com/sg-evals/serde--v1.0.193@085efc4a5baf7e6fcdae49291804cb8535ffa71c/-/blob/serde/src/private/de.rs?L2589-2750)\n- [github.com/sg-evals/serde--v1.0.193/serde/src/de/mod.rs@085efc4?L700-800](/github.com/sg-evals/serde--v1.0.193@085efc4a5baf7e6fcdae49291804cb8535ffa71c/-/blob/serde/src/de/mod.rs?L700-800)\n- [github.com/sg-evals/serde--v1.0.193/serde_derive/src/de.rs@085efc4?L450-600](/github.com/sg-evals/serde--v1.0.193@085efc4a5baf7e6fcdae49291804cb8535ffa71c/-/blob/serde_derive/src/de.rs?L450-600)\n- [type:commit repo:github.com/sg-evals/serde--v1.0.193 count:20 timeout:114s](/search?q=type:commit%20repo:github.com%2Fsg-evals%2Fserde--v1.0.193%20count:20%20timeout:114s)\n- [type:commit repo:github.com/sg-evals/rust-csv--1.3.0 count:5 timeout:114s](/search?q=type:commit%20repo:github.com%2Fsg-evals%2Frust-csv--1.3.0%20count:5%20timeout:114s)\n- [repo:^github.com/sg-evals/serde--v1.0.193$ serde_derive/src/internals/attr.rs flatten](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fserde--v1.0.193$%20serde_derive%2Fsrc%2Finternals%2Fattr.rs%20flatten)\n- [github.com/sg-evals/serde--v1.0.193/serde_derive/src/de.rs@085efc4?L1020-1050](/github.com/sg-evals/serde--v1.0.193@085efc4a5baf7e6fcdae49291804cb8535ffa71c/-/blob/serde_derive/src/de.rs?L1020-1050)\n- [github.com/sg-evals/serde--v1.0.193/serde/src/private/de.rs@085efc4?L2750-2850](/github.com/sg-evals/serde--v1.0.193@085efc4a5baf7e6fcdae49291804cb8535ffa71c/-/blob/serde/src/private/de.rs?L2750-2850)\n\n\nGenerated files:\n- files/IMPACT_REPORT_content.json: /.api/agent-files/v1/deep-search/772a5fca-539a-4f69-acfd-b1b64d2a7b5a/files/IMPACT_REPORT_content.json\n- files/IMPACT_REPORT.csv: /.api/agent-files/v1/deep-search/772a5fca-539a-4f69-acfd-b1b64d2a7b5a/files/IMPACT_REPORT.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-serde-csv-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.3066
+    },
+    "mrr": 0.3333,
+    "map_score": 0.1667,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 6,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "serde/serde/src/de/mod.rs",
+    "serde_derive/src/de.rs",
+    "csv/src/deserializer.rs",
+    "serde/src/private/de.rs",
+    "serde_derive/src/internals/attr.rs",
+    "Cargo.toml"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-serde-csv-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.3066
+    },
+    "mrr": 0.3333,
+    "map_score": 0.1667,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 6,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

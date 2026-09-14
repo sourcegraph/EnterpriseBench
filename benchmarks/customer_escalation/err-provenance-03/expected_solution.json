@@ -1,0 +1,33 @@
+{
+  "task_id": "error-trace-k8s-poststarthook-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "Primary error source: pkg/registry/core/service/ipallocator/controller/repairip.go \u2014 Contains the RepairIPAddress controller that fails during startup. The 'unable to perform initial IP and Port allocation check' error originates here.. Supporting: pkg/registry/core/service/ipallocator/controller/repairip_test.go \u2014 Test for the repair controller, updated in fix PR.. Surface error: PostStartHook \"start-service-ip-repair-controllers\" failed: unable to perform initial IP and Port allocation check.",
+      "evaluation_criteria": [
+        "Must identify pkg/registry/core/service/ipallocator/controller/repairip.go as part of the error source",
+        "Must identify pkg/registry/core/service/ipallocator/controller/repairip_test.go as part of the error source",
+        "Must reference the surface error message ('PostStartHook \"start-service-ip-repair-controllers\" failed: unable to perform in') or its origin",
+        "Must reference a specific function, type, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Error propagation chain: (1) kube-apiserver starts during v1.32->v1.33 upgrade \u2192 (2) PostStartHook 'start-service-ip-repair-controllers' registered \u2192 (3) RepairIPAddress controller tries to create IPAddress objects \u2192 (4) API server rejects with 'not yet ready to handle request' (admission not ready) \u2192 (5) PostStartHook fails, readyz check fails \u2192 (6) kube-apiserver reports unhealthy.",
+      "evaluation_criteria": [
+        "Must describe the step: 'kube-apiserver starts during v1.32->v1.33 upgrade'",
+        "Must describe the propagation: 'kube-apiserver reports unhealthy'",
+        "Must include all intermediate steps in the correct order",
+        "Must reference the chain in causal order (source \u2192 surface)",
+        "Must cite at least one file from the propagation path (e.g. pkg/registry/core/service/ipallocator/controller/repairip.go)"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Kubernetes cluster upgrade from v1.32 to v1.33; (2) MultiCIDRServiceAllocator enabled by default in v1.33; (3) Race between PostStartHook and API readiness during startup.",
+      "evaluation_criteria": [
+        "Must identify the condition: 'Kubernetes cluster upgrade from v1.32 to v1.33'",
+        "Must identify the condition: 'MultiCIDRServiceAllocator enabled by default in v1.33'",
+        "Must identify the condition: 'Race between PostStartHook and API readiness during startup'",
+        "Must explain the combined conditions necessary to reproduce the error"
+      ]
+    }
+  }
+}

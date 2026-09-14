@@ -1,0 +1,172 @@
+{
+  "task_id": "calibration-008",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/click--8.2.1"
+  ],
+  "retrieved_paths": [
+    "src/click/testing.py",
+    "src/click/types.py",
+    "src/click/_compat.py"
+  ],
+  "retrieved_paths_union": [
+    "src/click/testing.py",
+    "src/click/types.py",
+    "src/click/_compat.py"
+  ],
+  "required_files": [
+    "src/click/testing.py",
+    "src/click/utils.py"
+  ],
+  "ir_scores": {
+    "task_id": "calibration-008",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 3,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "calibration-008",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 3,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 110.4,
+  "response_chars": 11422,
+  "raw_response": "---\ntitle: CliRunner.invoke closes stdin stream causing ValueError\nshare_url: https://demo.sourcegraph.com/deepsearch/57cee919-4f57-4f6a-b029-4c9b7aef083e\nurl: https://demo.sourcegraph.com/deepsearch/2188\ncreated: 2026-08-18T01:41:16Z\nupdated: 2026-08-18T01:42:45Z\n---\n\n# # Support Ticket: CliRunner.invoke raises ValueError on closed file\n\n**Priority:** Medium\n**Submitted by:** Test Engineer\n**Product:** Click-based CLI test suite\n\n---\n\nHi support,\n\nWhen using `CliRunner.invoke()` with certain commands that read from stdin, we get a `ValueError: I/O operation on closed file` error. This happens intermittently:\n\n```python\nrunner = CliRunner()\nresult = runner.invoke(my_cli, input=\"some data\\n\")\n# Raises ValueError: I/O operation on closed file\n```\n\nIt seems like the BytesIO/StringIO stream created for `input` is getting closed prematurely during invocation. The issue appears when the command tries to read from stdin after initial processing.\n\nWe need to know:\n1. Where in Click source the CliRunner creates and manages the input stream\n2. What code path leads to the stream being closed during invoke()\n3. The interaction between CliRunner's stream handling and Click's internal I/O\n\nThe repository is available at `/workspace/click/`.\n\n\nSearch only these repositories: github.com/sg-evals/click--8.2.1\n\nI now have a thorough understanding of the full call path. Here is a complete analysis of all three questions.\n\n---\n\n## Analysis: `CliRunner.invoke` and the Premature Stream Close\n\n### 1. Where CliRunner creates and manages the input stream\n\nThe input stream lifecycle starts in [`isolation()`](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L275-L421) in `testing.py`:\n\n**Step 1 \u2014 `make_input_stream()` creates the `BytesIO`** ([L127\u2013L144](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L127-L144)):\n```python\ndef make_input_stream(input, charset):\n    if hasattr(input, \"read\"):          # already a stream \u2192 use as-is\n        rv = _find_binary_reader(input)\n        ...\n    if input is None:\n        input = b\"\"\n    elif isinstance(input, str):\n        input = input.encode(charset)   # encode the string\n    return io.BytesIO(input)            # wrap in BytesIO\n```\nWhen you pass `input=\"some data\\n\"`, the string is encoded and wrapped in a plain `io.BytesIO`.\n\n**Step 2 \u2014 Optionally wrapped in `EchoingStdin`** ([L322\u2013L325](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L322-L325)):\n```python\nif self.echo_stdin:\n    bytes_input = echo_input = EchoingStdin(bytes_input, stream_mixer.stdout)\n```\n\n**Step 3 \u2014 Wrapped in `_NamedTextIOWrapper` and assigned to `sys.stdin`** ([L327\u2013L334](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L327-L334)):\n```python\nsys.stdin = text_input = _NamedTextIOWrapper(\n    bytes_input, encoding=self.charset, name=\"<stdin>\", mode=\"r\"\n)\n```\n`_NamedTextIOWrapper` is a subclass of `io.TextIOWrapper`. This is the critical point \u2014 `TextIOWrapper` **owns** its underlying buffer and will close it when the wrapper itself is closed or garbage-collected.\n\n---\n\n### 2. The code path that causes the premature close\n\nThe problem is a **layered ownership chain** involving `io.TextIOWrapper` closing its underlying buffer.\n\n#### Primary path: `File` type converting `-` to stdin\n\nWhen a Click command uses a `File`-typed parameter with `\"-\"` (stdin):\n\n**a.** [`types.py` `File.convert()`](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/types.py?L795-L808) calls `open_stream(value, ...)`.\n\n**b.** [`_compat.py` `open_stream()`](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/_compat.py?L383-L390) detects `\"-\"` and calls `get_binary_stdin()` or `get_text_stdin()`, returning `should_close = False`.\n\n**c.** Because `should_close` is `False`, `File.convert()` registers `f.flush` (not `f.close`) on the context close callback ([L807\u2013L808](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/types.py?L804-L808)). So far, so good.\n\n**d.** However, `get_text_stdin()` ([L337\u2013L341](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/_compat.py?L337-L341)) calls `_force_correct_text_reader()`, which may wrap `sys.stdin`'s buffer in a **new** `_NonClosingTextIOWrapper`. That wrapper has a `__del__` method that calls `self.detach()` \u2014 but the underlying `_NamedTextIOWrapper` (which is a plain `io.TextIOWrapper`) does **not** suppress buffer closure.\n\n#### Root cause: `_NamedTextIOWrapper` closes its buffer on GC or detach\n\n`_NamedTextIOWrapper` inherits from `io.TextIOWrapper` without overriding `close()` or `__del__`. CPython's `io.TextIOWrapper.close()` closes the underlying binary buffer along with itself. So if anything causes the `_NamedTextIOWrapper` assigned to `sys.stdin` to be closed (e.g., garbage collection of a temporary wrapper created around it, or a second `TextIOWrapper` wrapping the same `BytesIO` being closed), the `BytesIO` is marked closed.\n\nThe specific trigger sequence:\n1. `make_input_stream(\"some data\\n\")` \u2192 `bytes_input = io.BytesIO(b\"some data\\n\")`\n2. `sys.stdin = _NamedTextIOWrapper(bytes_input, ...)` \u2014 `TextIOWrapper` takes ownership of `bytes_input`\n3. Command reads stdin partially; Click's `get_binary_stdin()` calls `_find_binary_reader(sys.stdin)` which returns `sys.stdin.buffer` \u2014 the same underlying `BytesIO`\n4. If the command or Click internals wrap this in another `TextIOWrapper` that gets closed (e.g., goes out of scope), `BytesIO.close()` is called\n5. Subsequent reads on `sys.stdin` or `.buffer` raise `ValueError: I/O operation on closed file`\n\n---\n\n### 3. Interaction between CliRunner stream handling and Click's internal I/O\n\nHere is the full chain:\n\n```\nrunner.invoke(my_cli, input=\"some data\\n\")\n  \u2514\u2500\u2500 isolation(input=\"some data\\n\")\n        \u2514\u2500\u2500 make_input_stream()  \u2192  io.BytesIO(b\"some data\\n\")   [L144]\n              \u2514\u2500\u2500 [optionally] EchoingStdin(BytesIO, ...)        [L323]\n                    \u2514\u2500\u2500 _NamedTextIOWrapper(BytesIO, ...)         [L327]\n                          \u2514\u2500\u2500 sys.stdin  \u2190 assigned here\n```\n\nWhen the command runs and accesses stdin via Click's internal helpers:\n\n```\ncli.main()\n  \u2514\u2500\u2500 Click File param w/ value=\"-\"\n        \u2514\u2500\u2500 open_stream(\"-\", mode=\"rb\")                          [_compat.py L383-389]\n              \u2514\u2500\u2500 get_binary_stdin()                             [L316-320]\n                    \u2514\u2500\u2500 _find_binary_reader(sys.stdin)\n                          \u2514\u2500\u2500 sys.stdin.buffer  \u2192  same BytesIO\n```\n\nThe `isolation()` context manager's `finally` block ([L404\u2013L421](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L404-L421)) only restores `sys.stdin = old_stdin` \u2014 it does **not** call `.close()` on the `_NamedTextIOWrapper`. But because `_NamedTextIOWrapper` is a `TextIOWrapper`, Python's GC may close the underlying `BytesIO` after the reference to the wrapper is dropped, and that can race with the command still reading.\n\nThe key design tension: `_NamedTextIOWrapper` does **not** suppress the default `TextIOWrapper` buffer-close behavior (unlike `_NonClosingTextIOWrapper` in `_compat.py` which overrides `__del__` to call `self.detach()` instead). This means the `BytesIO` created by `make_input_stream` can be closed underneath the command if the wrapper gets collected or explicitly closed during the invocation.\n\n---\n\n### Summary table\n\n| Component | File | Key Lines | Role |\n|---|---|---|---|\n| `make_input_stream` | [`testing.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L127-L144) | 127\u2013144 | Creates `BytesIO` from string input |\n| `EchoingStdin` | [`testing.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L26-L57) | 26\u201357 | Optional echo wrapper; proxies to `BytesIO` |\n| `_NamedTextIOWrapper` | [`testing.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L103-L124) | 103\u2013124 | `TextIOWrapper` subclass; **owns and can close** the `BytesIO` |\n| `isolation()` | [`testing.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/testing.py?L275-L421) | 309, 327 | Assigns mocked `sys.stdin`; does not protect buffer from close |\n| `open_stream(\"-\")` | [`_compat.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/_compat.py?L383-L390) | 383\u2013390 | Returns `get_binary_stdin()` \u2192 `sys.stdin.buffer` (same `BytesIO`) |\n| `File.convert()` | [`types.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/types.py?L795-L808) | 795\u2013808 | Registers flush (not close) for stdin \u2014 but intermediate wrappers may still close the buffer |\n| `_NonClosingTextIOWrapper` | [`_compat.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/_compat.py?L56-L79) | 71\u201375 | **Has** GC-safe `detach()` in `__del__` \u2014 `_NamedTextIOWrapper` does **not** |\n\n## Sources\n\n- [github.com/sg-evals/click--8.2.1/src/click/testing.py@29f1b4b?L103-160](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/testing.py?L103-160)\n- [github.com/sg-evals/click--8.2.1/src/click/testing.py@29f1b4b?L270-430](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/testing.py?L270-430)\n- [github.com/sg-evals/click--8.2.1/src/click/testing.py@29f1b4b?L430-540](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/testing.py?L430-540)\n- [github.com/sg-evals/click--8.2.1/src/click/testing.py@29f1b4b?L1-102](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/testing.py?L1-102)\n- [repo:^github.com/sg-evals/click--8.2.1$ close_on_exit OR keep_open OR should_close](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fclick--8.2.1$%20close_on_exit%20OR%20keep_open%20OR%20should_close)\n- [repo:^github.com/sg-evals/click--8.2.1$ open_stream stdin close](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fclick--8.2.1$%20open_stream%20stdin%20close)\n- [github.com/sg-evals/click--8.2.1/src/click/_compat.py@29f1b4b?L370-450](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/_compat.py?L370-450)\n- [github.com/sg-evals/click--8.2.1/src/click/types.py@29f1b4b?L780-815](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/types.py?L780-815)\n- [github.com/sg-evals/click--8.2.1/src/click/_compat.py@29f1b4b?L290-370](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/_compat.py?L290-370)\n- [github.com/sg-evals/click--8.2.1/src/click/_compat.py@29f1b4b?L560-620](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/_compat.py?L560-620)\n- [repo:^github.com/sg-evals/click--8.2.1$ _make_cached_stream_func TextIOWrapper close buffer](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fclick--8.2.1$%20_make_cached_stream_func%20TextIOWrapper%20close%20buffer)\n- [github.com/sg-evals/click--8.2.1/src/click/_compat.py@29f1b4b?L56-110](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/_compat.py?L56-110)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "calibration-008",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 3,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "src/click/testing.py",
+    "src/click/types.py",
+    "src/click/_compat.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "calibration-008",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 3,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

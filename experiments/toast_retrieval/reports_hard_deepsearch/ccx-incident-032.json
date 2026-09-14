@@ -1,0 +1,184 @@
+{
+  "task_id": "ccx-incident-032",
+  "policy": "deepsearch",
+  "suite": "incident_response",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.31.2"
+  ],
+  "retrieved_paths": [
+    "source/common/http/utility.cc",
+    "envoy/http/stream_reset_handler.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/router/upstream_request.cc",
+    "source/common/router/router.cc",
+    "api/envoy/config/cluster/v3/circuit_breaker.proto"
+  ],
+  "retrieved_paths_union": [
+    "source/common/http/utility.cc",
+    "envoy/http/stream_reset_handler.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/router/upstream_request.cc",
+    "source/common/router/router.cc",
+    "api/envoy/config/cluster/v3/circuit_breaker.proto"
+  ],
+  "required_files": [
+    "source/common/http/utility.cc",
+    "envoy/http/stream_reset_handler.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/conn_pool/conn_pool_base.h",
+    "source/common/router/upstream_request.cc"
+  ],
+  "ir_scores": {
+    "task_id": "ccx-incident-032",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.6,
+      "5": 0.8,
+      "10": 0.8
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.75,
+      "5": 0.8,
+      "10": 0.5333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8688,
+      "10": 0.8688
+    },
+    "mrr": 1.0,
+    "map_score": 0.8,
+    "file_recall": 0.8,
+    "context_efficiency": 0.6667,
+    "n_retrieved": 6,
+    "n_ground_truth": 5,
+    "n_overlap": 4
+  },
+  "ir_scores_union": {
+    "task_id": "ccx-incident-032",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.6,
+      "5": 0.8,
+      "10": 0.8
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.75,
+      "5": 0.8,
+      "10": 0.5333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8688,
+      "10": 0.8688
+    },
+    "mrr": 1.0,
+    "map_score": 0.8,
+    "file_recall": 0.8,
+    "context_efficiency": 0.6667,
+    "n_retrieved": 6,
+    "n_ground_truth": 5,
+    "n_overlap": 4
+  },
+  "elapsed_seconds": 43.0,
+  "response_chars": 2008,
+  "raw_response": "The answer has been written to `/workspace/answer.json`. Here is a summary of the findings:\n\n---\n\n**1. `overflow` reset reason string**\n\nDefined in [`source/common/http/utility.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/http/utility.cc?L1030-L1031) \u2014 `Utility::resetReasonToString` returns `\"overflow\"` for `StreamResetReason::Overflow`. The `Overflow` enum value itself is declared in [`envoy/http/stream_reset_handler.h`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/envoy/http/stream_reset_handler.h?L33).\n\n**2. Connection pool overflow trigger**\n\n[`source/common/conn_pool/conn_pool_base.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/conn_pool/conn_pool_base.cc?L137-L179) \u2014 When `connections().canCreate()` or `pendingRequests().canCreate()` fails (circuit breaker thresholds exceeded), it calls `onPoolFailure(..., PoolFailureReason::Overflow, ...)` and increments `upstream_cx_overflow_` / `upstream_rq_pending_overflow_`. This is mapped to `Http::StreamResetReason::Overflow` in [`source/common/router/upstream_request.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/router/upstream_request.cc?L568-L570), then surfaced as the error message in [`source/common/router/router.cc`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/router/router.cc?L1416-L1420).\n\n**3. Circuit breaker protobuf configuration**\n\n[`api/envoy/config/cluster/v3/circuit_breaker.proto`](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.31.2/-/blob/api/envoy/config/cluster/v3/circuit_breaker.proto) \u2014 `CircuitBreakers.Thresholds` message defines `max_connections` and `max_pending_requests` fields.\n\nGenerated files:\n- files/answer.json: /.api/agent-files/v1/deep-search/6153ba4f-a528-46a7-8acc-4e955ec9e79b/files/answer.json\n\nLink: https://demo.sourcegraph.com/deepsearch/6153ba4f-a528-46a7-8acc-4e955ec9e79b",
+  "ir_scores_unaligned": {
+    "task_id": "ccx-incident-032",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.6,
+      "5": 0.8,
+      "10": 0.8
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.75,
+      "5": 0.8,
+      "10": 0.5333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8688,
+      "10": 0.8688
+    },
+    "mrr": 1.0,
+    "map_score": 0.8,
+    "file_recall": 0.8,
+    "context_efficiency": 0.6667,
+    "n_retrieved": 6,
+    "n_ground_truth": 5,
+    "n_overlap": 4
+  },
+  "retrieved_paths_aligned": [
+    "source/common/http/utility.cc",
+    "envoy/http/stream_reset_handler.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/router/upstream_request.cc",
+    "source/common/router/router.cc",
+    "api/envoy/config/cluster/v3/circuit_breaker.proto"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "ccx-incident-032",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.6,
+      "5": 0.8,
+      "10": 0.8
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.75,
+      "5": 0.8,
+      "10": 0.5333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8688,
+      "10": 0.8688
+    },
+    "mrr": 1.0,
+    "map_score": 0.8,
+    "file_recall": 0.8,
+    "context_efficiency": 0.6667,
+    "n_retrieved": 6,
+    "n_ground_truth": 5,
+    "n_overlap": 4
+  },
+  "scoring": "aligned_suffix_v1"
+}

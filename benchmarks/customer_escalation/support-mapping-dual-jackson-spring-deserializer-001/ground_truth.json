@@ -1,0 +1,71 @@
+{
+  "task_id": "support-mapping-dual-jackson-spring-deserializer-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/spring-projects/spring-boot",
+      "rev": "v3.2.4",
+      "path": "spring-boot"
+    },
+    {
+      "url": "https://github.com/FasterXML/jackson-databind",
+      "rev": "jackson-databind-2.16.2",
+      "path": "jackson-databind"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "spring-boot/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java",
+      "repo": "spring-boot",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "spring-boot/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/Jackson2ObjectMapperBuilderCustomizer.java",
+      "repo": "spring-boot",
+      "confidence": 0.8,
+      "source": "deterministic"
+    },
+    {
+      "path": "jackson-databind/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+      "repo": "jackson-databind",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "jackson-databind/src/main/java/com/fasterxml/jackson/databind/deser/BeanDeserializerFactory.java",
+      "repo": "jackson-databind",
+      "confidence": 0.9,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "spring-boot/spring-boot-project/spring-boot/src/main/java/org/springframework/boot/jackson/JsonComponentModule.java",
+      "repo": "spring-boot",
+      "confidence": 0.85
+    },
+    {
+      "path": "jackson-databind/src/main/java/com/fasterxml/jackson/databind/module/SimpleModule.java",
+      "repo": "jackson-databind",
+      "confidence": 0.8
+    }
+  ],
+  "error_chain": [
+    "Spring Boot's JacksonAutoConfiguration creates the primary ObjectMapper bean and discovers @JsonComponent via JsonComponentModule, registering each as a SimpleModule on the bean",
+    "Jackson's ObjectMapper applies registered modules in registration order; SimpleModule.setupModule writes deserializers into the deserializer cache",
+    "BeanDeserializerFactory consults the cache when resolving the deserializer for a property; if the property type matches, the module's deserializer wins over the default",
+    "When a second ObjectMapper bean is created (cache, RabbitMQ, etc.) without invoking JacksonAutoConfiguration's customizer chain, the @JsonComponent module is never registered on it",
+    "Spring MVC's MappingJackson2HttpMessageConverter is wired to the primary ObjectMapper, but if the customer's controller is configured with a different converter or sub-context, the wrong ObjectMapper deserializes the body"
+  ],
+  "trigger_conditions": [
+    "Customer has multiple ObjectMapper beans in the context, only the primary one wired by JacksonAutoConfiguration includes JsonComponentModule",
+    "@JsonComponent registration is one-shot at the primary ObjectMapper; manually constructed ObjectMapper instances bypass it",
+    "Jackson's BeanDeserializerFactory falls back to default deserializers silently when the module is not registered"
+  ],
+  "expected_answer": {
+    "error_origin": "Spring Boot's JsonComponentModule registering only on the primary ObjectMapper; secondary ObjectMappers fall back to Jackson's BeanDeserializerFactory defaults",
+    "bypass_reason": "Jackson's deserializer resolution checks registered modules first; without the module the default deserializer wins silently",
+    "correct_config": "Inject the primary ObjectMapper into all message converters, or register the deserializer module manually on every ObjectMapper bean via Jackson2ObjectMapperBuilder.modulesToInstall"
+  }
+}

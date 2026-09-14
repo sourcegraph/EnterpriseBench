@@ -1,0 +1,214 @@
+{
+  "task_id": "api-contract-tri-envoy-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.28.0",
+    "github.com/sg-evals/istio--1.20.0",
+    "github.com/sg-evals/go-control-plane--v0.12.0"
+  ],
+  "retrieved_paths": [
+    "source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.cc",
+    "source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.cc",
+    "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.cc",
+    "source/extensions/config_subscription/grpc/xds_mux/subscription_state.h",
+    "pilot/pkg/xds/ads.go",
+    "pilot/pkg/xds/xdsgen.go",
+    "pilot/pkg/xds/discovery.go",
+    "pilot/pkg/xds/cds.go",
+    "pilot/pkg/xds/eds.go",
+    "pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/rds.go",
+    "pkg/cache/v3/simple.go",
+    "pkg/cache/v3/snapshot.go",
+    "pkg/server/sotw/v3/ads.go",
+    "pkg/server/sotw/v3/xds.go",
+    "pkg/resource/v3/resource.go"
+  ],
+  "retrieved_paths_union": [
+    "source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.cc",
+    "source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.cc",
+    "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.cc",
+    "source/extensions/config_subscription/grpc/xds_mux/subscription_state.h",
+    "pilot/pkg/xds/ads.go",
+    "pilot/pkg/xds/xdsgen.go",
+    "pilot/pkg/xds/discovery.go",
+    "pilot/pkg/xds/cds.go",
+    "pilot/pkg/xds/eds.go",
+    "pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/rds.go",
+    "pkg/cache/v3/simple.go",
+    "pkg/cache/v3/snapshot.go",
+    "pkg/server/sotw/v3/ads.go",
+    "pkg/server/sotw/v3/xds.go",
+    "pkg/resource/v3/resource.go"
+  ],
+  "required_files": [
+    "source/common/config/grpc_subscription_impl.cc",
+    "pilot/pkg/xds/ads.go",
+    "pkg/server/v3/server.go"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-tri-envoy-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.1815,
+      "10": 0.1815
+    },
+    "mrr": 0.2,
+    "map_score": 0.0667,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0625,
+    "n_retrieved": 16,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-tri-envoy-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.1815,
+      "10": 0.1815
+    },
+    "mrr": 0.2,
+    "map_score": 0.0667,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0625,
+    "n_retrieved": 16,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 220.5,
+  "response_chars": 10283,
+  "raw_response": "---\ntitle: Verify xDS contract compliance across Envoy, Istio pilot, and go-control-plane\nshare_url: https://demo.sourcegraph.com/deepsearch/c9d3506a-bd6d-4fbb-b666-5c63f279b7f7\nurl: https://demo.sourcegraph.com/deepsearch/2240\ncreated: 2026-08-18T02:13:55Z\nupdated: 2026-08-18T02:17:21Z\n---\n\n# # Verify xDS API contract compliance across Envoy proxy, Istio pilot, and go-control-plane\n\nYour service mesh team runs Istio with Envoy sidecars. After upgrading to Istio\n1.20 with Envoy v1.28, some services experience intermittent 503 errors during\nconfiguration pushes. The xDS (discovery service) API is the contract between\nIstio's pilot (control plane) and Envoy (data plane), with go-control-plane\nproviding the reference server implementation.\n\nThe issue may be caused by xDS API version drift \u2014 Envoy v1.28 may expect\nxDS v3 resource types that Istio 1.20's pilot sends in a slightly different\nformat, or go-control-plane's snapshot cache may not handle certain edge cases\nthat Envoy's xDS client requires.\n\nYour task:\n\n1. Find where Envoy implements the xDS client \u2014 locate the ADS (Aggregated\n   Discovery Service) client, the resource type URL handling, and the config\n   subscription logic. Identify how Envoy validates incoming xDS responses\n   and handles version/nonce tracking.\n2. Find where Istio pilot generates xDS responses \u2014 locate the xDS server,\n   the config generation pipeline, and the resource serialization code.\n   Identify how pilot constructs CDS, EDS, LDS, and RDS responses.\n3. Find where go-control-plane implements the xDS server framework \u2014 locate\n   the snapshot cache, the ADS stream handler, and the resource versioning\n   logic. Identify how it handles type URL registration and resource ordering.\n4. Map contract compliance: where do the three implementations diverge in\n   xDS protocol handling (version negotiation, resource ordering, type URL\n   formats, incremental vs state-of-the-world).\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md with:\n\n- Envoy xDS client implementation (file paths)\n- Istio pilot xDS server implementation (file paths)\n- go-control-plane framework implementation (file paths)\n- Contract divergence points\n\n\nSearch only these repositories: github.com/sg-evals/envoy--v1.28.0, github.com/sg-evals/istio--1.20.0, github.com/sg-evals/go-control-plane--v0.12.0\n\nThe full analysis is written to the file above. Here is the structured summary:\n\n---\n\n## Analysis Summary\n\n### Envoy v1.28 xDS Client \u2014 Key Files\n\nThe client is implemented in the `source/extensions/config_subscription/grpc/xds_mux/` directory:\n\n- [**`sotw_subscription_state.cc`**](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.28.0/-/blob/source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.cc) \u2014 SotW response handling, type URL validation, version/nonce tracking. `last_good_version_info_` and `last_good_nonce_` are updated per-type **only after** a successful `onConfigUpdate()`.\n- [**`delta_subscription_state.cc`**](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.28.0/-/blob/source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.cc) \u2014 Delta response handling, `initial_resource_versions` population on stream start, wildcard/ambiguous state machines.\n- [**`grpc_mux_impl.cc`**](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.28.0/-/blob/source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.cc) \u2014 Multiplexed ADS mux routing responses by type URL.\n- [**`subscription_state.h`**](https://demo.sourcegraph.com/r/github.com/sg-evals/envoy--v1.28.0/-/blob/source/extensions/config_subscription/grpc/xds_mux/subscription_state.h) \u2014 Base contract: ACK/NACK construction, nonce propagation.\n\nHard validation: any `Any.type_url` in a response that mismatches `message.type_url` throws `EnvoyException` immediately, rejecting the entire response.\n\n---\n\n### Istio 1.20 Pilot xDS Server \u2014 Key Files\n\n- [**`pilot/pkg/xds/ads.go`**](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.20.0/-/blob/pilot/pkg/xds/ads.go) \u2014 `StreamAggregatedResources` entry point, `Connection` lifecycle, `processRequest()`.\n- [**`pilot/pkg/xds/xdsgen.go`**](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.20.0/-/blob/pilot/pkg/xds/xdsgen.go) \u2014 Core push pipeline: generator dispatch, `DiscoveryResponse` construction. Uses `req.Push.PushVersion` as version \u2014 a **global counter shared across all resource types**.\n- [**`pilot/pkg/xds/discovery.go`**](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.20.0/-/blob/pilot/pkg/xds/discovery.go?L529-L565) \u2014 `InitGenerators()` registers CDS/LDS/RDS/EDS/ECDS generators by type URL.\n- [**`pilot/pkg/xds/cds.go`**](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.20.0/-/blob/pilot/pkg/xds/cds.go), [**`eds.go`**](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.20.0/-/blob/pilot/pkg/xds/eds.go), [**`lds.go`**](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.20.0/-/blob/pilot/pkg/xds/lds.go), [**`rds.go`**](https://demo.sourcegraph.com/r/github.com/sg-evals/istio--1.20.0/-/blob/pilot/pkg/xds/rds.go) \u2014 Per-type generators.\n\n---\n\n### go-control-plane v0.12.0 \u2014 Key Files\n\n- [**`pkg/cache/v3/simple.go`**](https://demo.sourcegraph.com/r/github.com/sg-evals/go-control-plane--v0.12.0/-/blob/pkg/cache/v3/simple.go) \u2014 `SnapshotCache`, watch/version comparison, ADS superset check.\n- [**`pkg/cache/v3/snapshot.go`**](https://demo.sourcegraph.com/r/github.com/sg-evals/go-control-plane--v0.12.0/-/blob/pkg/cache/v3/snapshot.go) \u2014 `Snapshot` structure, `Consistent()` validation, `ConstructVersionMap()` for delta.\n- [**`pkg/server/sotw/v3/ads.go`**](https://demo.sourcegraph.com/r/github.com/sg-evals/go-control-plane--v0.12.0/-/blob/pkg/server/sotw/v3/ads.go) \u2014 Ordered ADS control loop with multiplexed channel.\n- [**`pkg/server/sotw/v3/xds.go`**](https://demo.sourcegraph.com/r/github.com/sg-evals/go-control-plane--v0.12.0/-/blob/pkg/server/sotw/v3/xds.go) \u2014 Default (unordered) stream handler using `reflect.Select`.\n- [**`pkg/resource/v3/resource.go`**](https://demo.sourcegraph.com/r/github.com/sg-evals/go-control-plane--v0.12.0/-/blob/pkg/resource/v3/resource.go) \u2014 All xDS v3 type URL constants.\n\n---\n\n### Contract Divergence Points (Most Likely Causes of 503s)\n\n| Divergence | Risk | Root Cause |\n|---|---|---|\n| **ADS resource ordering not enforced in Istio push queue** | **High** | Istio's async push queue can deliver LDS before CDS; Envoy finds unknown clusters and generates 503s during the push window |\n| **Delta stream incomplete in Istio but Envoy v1.28 prefers it** | **High** | If Envoy connects via `DeltaAggregatedResources` and Istio's handler is incomplete, the stream errors and Envoy falls back with disruption |\n| **Deterministic nonce reuse under rapid pushes** | **Medium** | `nonce(req.Push.LedgerVersion)` can repeat; Istio may mistake a stale ACK for current, suppressing a needed re-push |\n| **Global push version breaks per-type heartbeat detection** | **Medium** | Every push resends all unchanged EDS/CDS resources as non-heartbeats, causing unnecessary endpoint churn |\n| **go-control-plane ADS silent superset withholding** | **Low** | Not in Istio's direct path, but pattern exposes a spec gap with deleted named resources |\n\n## Sources\n\n- [github.com/sg-evals/envoy--v1.28.0/source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.cc@3e8b0ef](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.cc)\n- [github.com/sg-evals/envoy--v1.28.0/source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.cc@3e8b0ef?L1-100](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.cc?L1-100)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/xdsgen.go@88e571c](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/xdsgen.go)\n- [github.com/sg-evals/go-control-plane--v0.12.0/pkg/server/sotw/v3/ads.go@c828f72](/github.com/sg-evals/go-control-plane--v0.12.0@c828f72ee97c609994221bf35e214bf5c1417b81/-/blob/pkg/server/sotw/v3/ads.go)\n- [github.com/sg-evals/go-control-plane--v0.12.0/pkg/resource/v3/resource.go@c828f72](/github.com/sg-evals/go-control-plane--v0.12.0@c828f72ee97c609994221bf35e214bf5c1417b81/-/blob/pkg/resource/v3/resource.go)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/ads.go@88e571c?L1-120](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/ads.go?L1-120)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/discovery.go@88e571c?L529-570](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/discovery.go?L529-570)\n- [github.com/sg-evals/go-control-plane--v0.12.0/pkg/cache/v3/simple.go@c828f72?L440-530](/github.com/sg-evals/go-control-plane--v0.12.0@c828f72ee97c609994221bf35e214bf5c1417b81/-/blob/pkg/cache/v3/simple.go?L440-530)\n- [github.com/sg-evals/go-control-plane--v0.12.0/pkg/server/sotw/v3/xds.go@c828f72](/github.com/sg-evals/go-control-plane--v0.12.0@c828f72ee97c609994221bf35e214bf5c1417b81/-/blob/pkg/server/sotw/v3/xds.go)\n- [github.com/sg-evals/istio--1.20.0/pilot/pkg/xds/ads.go@88e571c?L150-310](/github.com/sg-evals/istio--1.20.0@88e571c31a2483185321bc3bc5ecfbf64b7455a0/-/blob/pilot/pkg/xds/ads.go?L150-310)\n- [github.com/sg-evals/go-control-plane--v0.12.0/pkg/cache/v3/snapshot.go@c828f72](/github.com/sg-evals/go-control-plane--v0.12.0@c828f72ee97c609994221bf35e214bf5c1417b81/-/blob/pkg/cache/v3/snapshot.go)\n- [github.com/sg-evals/envoy--v1.28.0/source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.cc@3e8b0ef?L150-280](/github.com/sg-evals/envoy--v1.28.0@3e8b0efb2f060bf594552aace8fc918a9307e64b/-/blob/source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.cc?L150-280)\n\n\nGenerated files:\n- files/analysis_report_content.json: /.api/agent-files/v1/deep-search/c9d3506a-bd6d-4fbb-b666-5c63f279b7f7/files/analysis_report_content.json\n- files/IMPACT_REPORT.csv: /.api/agent-files/v1/deep-search/c9d3506a-bd6d-4fbb-b666-5c63f279b7f7/files/IMPACT_REPORT.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-tri-envoy-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.1815,
+      "10": 0.1815
+    },
+    "mrr": 0.2,
+    "map_score": 0.0667,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0625,
+    "n_retrieved": 16,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "source/extensions/config_subscription/grpc/xds_mux/sotw_subscription_state.cc",
+    "source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.cc",
+    "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.cc",
+    "source/extensions/config_subscription/grpc/xds_mux/subscription_state.h",
+    "pilot/pkg/xds/ads.go",
+    "pilot/pkg/xds/xdsgen.go",
+    "pilot/pkg/xds/discovery.go",
+    "pilot/pkg/xds/cds.go",
+    "pilot/pkg/xds/eds.go",
+    "pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/rds.go",
+    "pkg/cache/v3/simple.go",
+    "pkg/cache/v3/snapshot.go",
+    "pkg/server/sotw/v3/ads.go",
+    "pkg/server/sotw/v3/xds.go",
+    "pkg/resource/v3/resource.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-tri-envoy-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.1815,
+      "10": 0.1815
+    },
+    "mrr": 0.2,
+    "map_score": 0.0667,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0625,
+    "n_retrieved": 16,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

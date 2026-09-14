@@ -1,0 +1,208 @@
+{
+  "task_id": "config-drift-tri-kustomize-001",
+  "policy": "deepsearch",
+  "suite": "platform_engineering",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/kustomize--kustomize_v5.3.0",
+    "github.com/sg-evals/argo-cd--v2.9.0",
+    "github.com/sg-evals/flux2--v2.2.0"
+  ],
+  "retrieved_paths": [
+    "kyaml/openapi/openapi.go",
+    "kyaml/yaml/walk/associative_sequence.go",
+    "kyaml/yaml/rnode.go",
+    "util/argo/normalizers/diff_normalizer.go",
+    "internal/build/build.go",
+    "api/resource/resource.go",
+    "util/argo/diff/diff.go",
+    "util/argo/normalizers/knowntypes_normalizer.go",
+    "util/argo/resource_tracking.go",
+    "pkg/manifestgen/kustomization/kustomization.go",
+    "controller/state.go",
+    "util/argo/diff/normalize.go",
+    "controller/sync.go",
+    "fluxcd/pkg/kustomize.Build"
+  ],
+  "retrieved_paths_union": [
+    "kyaml/openapi/openapi.go",
+    "kyaml/yaml/walk/associative_sequence.go",
+    "kyaml/yaml/rnode.go",
+    "util/argo/normalizers/diff_normalizer.go",
+    "internal/build/build.go",
+    "api/resource/resource.go",
+    "util/argo/diff/diff.go",
+    "util/argo/normalizers/knowntypes_normalizer.go",
+    "util/argo/resource_tracking.go",
+    "pkg/manifestgen/kustomization/kustomization.go",
+    "controller/state.go",
+    "util/argo/diff/normalize.go",
+    "controller/sync.go",
+    "fluxcd/pkg/kustomize.Build"
+  ],
+  "required_files": [
+    "api/types/kustomization.go",
+    "util/argo/normalizers/diff_normalizer.go",
+    "internal/controller/kustomization_controller.go"
+  ],
+  "ir_scores": {
+    "task_id": "config-drift-tri-kustomize-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2021,
+      "10": 0.2021
+    },
+    "mrr": 0.25,
+    "map_score": 0.0833,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0714,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "config-drift-tri-kustomize-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2021,
+      "10": 0.2021
+    },
+    "mrr": 0.25,
+    "map_score": 0.0833,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0714,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 220.5,
+  "response_chars": 14046,
+  "raw_response": "---\ntitle: Investigating strategic merge patch drift across Kustomize, Argo CD, and Flux\nshare_url: https://demo.sourcegraph.com/deepsearch/63352080-ac33-48ef-94fe-cab3c1874f97\nurl: https://demo.sourcegraph.com/deepsearch/2246\ncreated: 2026-08-18T02:18:27Z\nupdated: 2026-08-18T02:21:56Z\n---\n\n# # Detect configuration drift in strategic merge patch handling across Kustomize, ArgoCD, and Flux\n\nYour platform team uses a GitOps stack: Kustomize for overlay management, ArgoCD\nfor application delivery, and Flux for HelmRelease reconciliation. After upgrading\nall three tools, you notice that strategic merge patches applied via Kustomize\noverlays are being handled differently by ArgoCD's sync engine and Flux's\nKustomize controller.\n\nSpecifically, list-type strategic merge patches (e.g., container env vars, volume\nmounts) produce different merge results depending on which tool processes them.\nArgoCD's resource tracking and diff normalization may strip or reorder fields that\nKustomize preserves, while Flux's Kustomize controller may apply patches in a\ndifferent order than standalone Kustomize.\n\nYour task:\n\n1. Find where Kustomize implements strategic merge patch logic \u2014 locate the patch\n   transformer and the strategic merge patch library it delegates to. Identify how\n   list merge keys (e.g., `name` for containers, `mountPath` for volumeMounts) are\n   resolved.\n2. Find where ArgoCD normalizes resources during sync diff \u2014 locate the diff/\n   normalizer and the resource tracking annotation logic. Identify how ArgoCD's\n   normalizer handles list-type fields differently from raw Kustomize output.\n3. Find where Flux's kustomize-controller applies overlays \u2014 locate the build logic\n   and identify any differences in how it invokes the Kustomize API vs the standalone\n   `kustomize build` CLI.\n4. Document all drift points where the three tools diverge in merge behavior.\n\nWrite your analysis to /workspace/DRIFT_REPORT.json with:\n{\n\"drift_points\": [\n{\n\"config_key\": \"<merge behavior or config parameter>\",\n\"kustomize_behavior\": \"<behavior in kustomize>\",\n\"kustomize_source_file\": \"<path in kustomize repo>\",\n\"argocd_behavior\": \"<behavior in argo-cd>\",\n\"argocd_source_file\": \"<path in argo-cd repo>\",\n\"flux_behavior\": \"<behavior in flux2>\",\n\"flux_source_file\": \"<path in flux2 repo>\",\n\"impact\": \"<potential impact of this drift>\"\n}\n]\n}\n\n\nSearch only these repositories: github.com/sg-evals/kustomize--kustomize_v5.3.0, github.com/sg-evals/argo-cd--v2.9.0, github.com/sg-evals/flux2--v2.2.0\n\nThe report is written to `/workspace/DRIFT_REPORT.json`. Here is a summary of all 7 drift points identified from direct code inspection:\n\n---\n\n## Drift Analysis: Kustomize v5.3.0 / ArgoCD v2.9.0 / Flux v2.2.0\n\n### 1. List merge key resolution strategy\n\n**Root cause of all list-type drift.**\n\n- **Kustomize** ([`kyaml/openapi/openapi.go:538`](https://demo.sourcegraph.com/r/github.com/sg-evals/kustomize--kustomize_v5.3.0/-/blob/kyaml/openapi/openapi.go?L538-L558), [`associative_sequence.go:260`](https://demo.sourcegraph.com/r/github.com/sg-evals/kustomize--kustomize_v5.3.0/-/blob/kyaml/yaml/walk/associative_sequence.go?L260-L305)): Reads `x-kubernetes-patch-strategy` + `x-kubernetes-patch-merge-key` (or `x-kubernetes-list-map-keys` for multi-key) from its **bundled OpenAPI schema**. Falls back to scanning for a `name` field ([`rnode.go:923`](https://demo.sourcegraph.com/r/github.com/sg-evals/kustomize--kustomize_v5.3.0/-/blob/kyaml/yaml/rnode.go?L923)). Correctly resolves `containers[name]` and `volumeMounts[mountPath]` via schema.\n- **ArgoCD** ([`diff_normalizer.go:116`](https://demo.sourcegraph.com/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/util/argo/normalizers/diff_normalizer.go?L116-L134)): Does **not** re-run strategic merge patch logic. For `ignoreDifferences`, it applies a **JSON Pointer remove patch** on the entire path (e.g. `/spec/template/spec/containers`) \u2014 it cannot selectively ignore a single container by name key.\n- **Flux** ([`build.go:382`](https://demo.sourcegraph.com/r/github.com/sg-evals/flux2--v2.2.0/-/blob/internal/build/build.go?L382)): Delegates to its own pinned `fluxcd/pkg/kustomize.Build`, which wraps `krusty`. Uses the same Kustomize Go API but its version may be pinned differently. No list-field post-processing; key resolution is left entirely to the Kustomize library.\n\n**Impact:** Stale or divergent bundled OpenAPI schemas across tools cause `volumeMounts` (key: `mountPath`) to fall back to the `name` key, mis-merging entries with the same `name` but different `mountPath`.\n\n---\n\n### 2. Patch application order\n\n- **Kustomize**: Applies patches sequentially in `kustomization.yaml` order via [`ApplySmPatch`](https://demo.sourcegraph.com/r/github.com/sg-evals/kustomize--kustomize_v5.3.0/-/blob/api/resource/resource.go?L479-L500).\n- **Flux** ([`build.go:357`](https://demo.sourcegraph.com/r/github.com/sg-evals/flux2--v2.2.0/-/blob/internal/build/build.go?L357-L373)): Auto-generates the `kustomization.yaml` from the Flux Kustomization CR via `gen.WriteFile`. Patch order is determined by the CR's `spec.patches` field ordering, which may differ from a hand-authored file.\n- **ArgoCD**: Receives pre-built YAML; does not control patch order. Its pre-diff normalization in [`preDiffNormalize`](https://demo.sourcegraph.com/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/util/argo/diff/diff.go?L344-L379) only strips tracking metadata.\n\n**Impact:** Two patches targeting the same list element key applied in different order produce different scalar field values in the merged result.\n\n---\n\n### 3. knownTypes list normalization / quantity re-marshaling\n\n- **Kustomize**: No post-build normalization. Emits exact YAML as authored.\n- **ArgoCD** ([`knowntypes_normalizer.go:80`](https://demo.sourcegraph.com/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/util/argo/normalizers/knowntypes_normalizer.go?L80-L158)): Re-marshals list fields (including `spec.template.spec.containers`) through typed Go structs (e.g. `v1.PodSpec`). This canonicalizes `resource.Quantity` values (`1000m` \u2192 `1`, `1024Mi` \u2192 `1Gi`), reorders struct fields, and drops zero-value fields. Applied to both live and desired state, so it can mask real drift.\n- **Flux**: No equivalent normalization. Raw Kustomize output is applied directly.\n\n**Impact:** Quantities authored as `1000m` in Kustomize/Flux-applied resources are normalized to `1` by ArgoCD's diff, masking persistent drift. The cluster holds the un-normalized value but ArgoCD reports in-sync.\n\n---\n\n### 4. Resource tracking annotation injection\n\n- **Kustomize**: Injects nothing. Pure output.\n- **ArgoCD** ([`resource_tracking.go:136`](https://demo.sourcegraph.com/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/util/argo/resource_tracking.go?L136-L171)): Injects `argocd.argoproj.io/tracking-id` annotation (format: `<app>:<group>/<kind>:<ns>/<name>`) and/or `argocd.argoproj.io/app-name` label depending on `trackingMethod`.\n- **Flux** ([`build.go:411`](https://demo.sourcegraph.com/r/github.com/sg-evals/flux2--v2.2.0/-/blob/internal/build/build.go?L411-L420)): Injects `kustomize.toolkit.fluxcd.io/name` and `kustomize.toolkit.fluxcd.io/namespace` owner labels on every resource.\n\n**Impact:** Co-managed resources get competing label sets. ArgoCD's `Normalize()` ([`resource_tracking.go:201`](https://demo.sourcegraph.com/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/util/argo/resource_tracking.go?L201-L241)) strips only its own tracking fields; Flux's labels remain as spurious diff noise, causing persistent OutOfSync in ArgoCD.\n\n---\n\n### 5. Plugin and load restriction configuration\n\n- **Kustomize CLI**: Configurable via flags; defaults to `LoadRestrictionsRootOnly`.\n- **Flux** ([`kustomization.go:188`](https://demo.sourcegraph.com/r/github.com/sg-evals/flux2--v2.2.0/-/blob/pkg/manifestgen/kustomization/kustomization.go?L188-L194)): Uses `LoadRestrictionsNone` + `DisabledPluginConfig()`. Cross-root resource references succeed silently.\n- **ArgoCD**: Uses safe/restricted defaults; alpha plugins disabled.\n\n**Impact:** A patch referencing a resource outside the kustomization root succeeds in Flux but fails in standalone kustomize or ArgoCD, producing unbuildable desired state in ArgoCD.\n\n---\n\n### 6. Post-build variable substitution\n\n- **Kustomize/ArgoCD**: No post-build substitution phase.\n- **Flux** ([`build.go:387`](https://demo.sourcegraph.com/r/github.com/sg-evals/flux2--v2.2.0/-/blob/internal/build/build.go?L387-L406)): Applies `SubstituteVariables` **after** strategic merge patching. `${VAR}` placeholders in patched list fields (e.g. env var values) are resolved to actual values.\n\n**Impact:** ArgoCD and kustomize produce YAML with literal `${VAR}` strings; Flux produces resolved values. ArgoCD always reports drift on these fields.\n\n---\n\n### 7. Structured merge diff vs. client-side diff at apply time\n\n- **Kustomize**: Purely client-side, uses bundled schema.\n- **ArgoCD** ([`state.go:575`](https://demo.sourcegraph.com/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/controller/state.go?L575-L577)): Default is client-side diff. Structured merge diff (server-side apply semantics) enabled only with `ServerSideApply=true` sync option.\n- **Flux**: Always applies via server-side apply (SSA) using live API server schema.\n\n**Impact:** For CRDs with list-map-keys not yet in Kustomize's bundled schema: Kustomize falls back to `name` key, Flux's SSA uses the correct CRD keys from the API server, ArgoCD's client-side diff uses the stale bundled schema. All three compute different merge results for the same patch \u2014 the highest-severity drift scenario.\n\n## Sources\n\n- [github.com/sg-evals/kustomize--kustomize_v5.3.0/api/resource/resource.go@736d5ae?L470-510](/github.com/sg-evals/kustomize--kustomize_v5.3.0@736d5aee46951ccd0d91cb1475e97fe5759aabce/-/blob/api/resource/resource.go?L470-510)\n- [github.com/sg-evals/kustomize--kustomize_v5.3.0/kyaml/yaml/walk/associative_sequence.go@736d5ae?L240-310](/github.com/sg-evals/kustomize--kustomize_v5.3.0@736d5aee46951ccd0d91cb1475e97fe5759aabce/-/blob/kyaml/yaml/walk/associative_sequence.go?L240-310)\n- [github.com/sg-evals/kustomize--kustomize_v5.3.0/kyaml/openapi/openapi.go@736d5ae?L530-580](/github.com/sg-evals/kustomize--kustomize_v5.3.0@736d5aee46951ccd0d91cb1475e97fe5759aabce/-/blob/kyaml/openapi/openapi.go?L530-580)\n- [github.com/sg-evals/argo-cd--v2.9.0/util/argo/diff/diff.go@b2fc444?L240-400](/github.com/sg-evals/argo-cd--v2.9.0@b2fc44492fbf7c5d7138ddb5c79e1366243f3852/-/blob/util/argo/diff/diff.go?L240-400)\n- [github.com/sg-evals/argo-cd--v2.9.0/util/argo/normalizers/knowntypes_normalizer.go@b2fc444?L1-160](/github.com/sg-evals/argo-cd--v2.9.0@b2fc44492fbf7c5d7138ddb5c79e1366243f3852/-/blob/util/argo/normalizers/knowntypes_normalizer.go?L1-160)\n- [github.com/sg-evals/flux2--v2.2.0/internal/build/build.go@c28a9d2?L239-420](/github.com/sg-evals/flux2--v2.2.0@c28a9d29d8a456db6574e9b7020914f7b4aba07c/-/blob/internal/build/build.go?L239-420)\n- [github.com/sg-evals/argo-cd--v2.9.0/util/argo/diff/normalize.go@b2fc444](/github.com/sg-evals/argo-cd--v2.9.0@b2fc44492fbf7c5d7138ddb5c79e1366243f3852/-/blob/util/argo/diff/normalize.go)\n- [github.com/sg-evals/argo-cd--v2.9.0/util/argo/resource_tracking.go@b2fc444?L117-245](/github.com/sg-evals/argo-cd--v2.9.0@b2fc44492fbf7c5d7138ddb5c79e1366243f3852/-/blob/util/argo/resource_tracking.go?L117-245)\n- [github.com/sg-evals/kustomize--kustomize_v5.3.0/kyaml/yaml/rnode.go@736d5ae?L910-960](/github.com/sg-evals/kustomize--kustomize_v5.3.0@736d5aee46951ccd0d91cb1475e97fe5759aabce/-/blob/kyaml/yaml/rnode.go?L910-960)\n- [github.com/sg-evals/flux2--v2.2.0/pkg/manifestgen/kustomization/kustomization.go@c28a9d2?L130-210](/github.com/sg-evals/flux2--v2.2.0@c28a9d29d8a456db6574e9b7020914f7b4aba07c/-/blob/pkg/manifestgen/kustomization/kustomization.go?L130-210)\n- [repo:^github.com/sg-evals/argo-cd--v2.9.0$ ignoreDifferences JQPathExpressions JSONPointers](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fargo-cd--v2.9.0$%20ignoreDifferences%20JQPathExpressions%20JSONPointers)\n- [repo:^github.com/sg-evals/flux2--v2.2.0$ krusty Options PluginConfig LoadRestrictions](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fflux2--v2.2.0$%20krusty%20Options%20PluginConfig%20LoadRestrictions)\n- [repo:^github.com/sg-evals/argo-cd--v2.9.0$ StructuredMergeDiff WithStructuredMergeDiff](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fargo-cd--v2.9.0$%20StructuredMergeDiff%20WithStructuredMergeDiff)\n- [github.com/sg-evals/argo-cd--v2.9.0/util/argo/normalizers/diff_normalizer.go@b2fc444?L90-135](/github.com/sg-evals/argo-cd--v2.9.0@b2fc44492fbf7c5d7138ddb5c79e1366243f3852/-/blob/util/argo/normalizers/diff_normalizer.go?L90-135)\n- [repo:^github.com/sg-evals/flux2--v2.2.0$ kustomize Build fluxcd/pkg/kustomize](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fflux2--v2.2.0$%20kustomize%20Build%20fluxcd%2Fpkg%2Fkustomize)\n- [repo:^github.com/sg-evals/flux2--v2.2.0$ kustomize.Build Build fs dirPath fluxcd/pkg/kustomize](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fflux2--v2.2.0$%20kustomize.Build%20Build%20fs%20dirPath%20fluxcd%2Fpkg%2Fkustomize)\n- [repo:^github.com/sg-evals/kustomize--kustomize_v5.3.0$ kubernetesPatchStrategyExtensionKey kubernetesMergeKeyMapList](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fkustomize--kustomize_v5.3.0$%20kubernetesPatchStrategyExtensionKey%20kubernetesMergeKeyMapList)\n- [repo:^github.com/sg-evals/kustomize--kustomize_v5.3.0$ kubernetesMergeKeyExtensionKey x-kubernetes-patch-merge-key](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fkustomize--kustomize_v5.3.0$%20kubernetesMergeKeyExtensionKey%20x-kubernetes-patch-merge-key)\n- [github.com/sg-evals/argo-cd--v2.9.0/controller/sync.go@b2fc444?L373-415](/github.com/sg-evals/argo-cd--v2.9.0@b2fc44492fbf7c5d7138ddb5c79e1366243f3852/-/blob/controller/sync.go?L373-415)\n\n\nGenerated files:\n- files/DRIFT_REPORT.json: /.api/agent-files/v1/deep-search/63352080-ac33-48ef-94fe-cab3c1874f97/files/DRIFT_REPORT.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "config-drift-tri-kustomize-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2021,
+      "10": 0.2021
+    },
+    "mrr": 0.25,
+    "map_score": 0.0833,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0714,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "kyaml/openapi/openapi.go",
+    "kyaml/yaml/walk/associative_sequence.go",
+    "kyaml/yaml/rnode.go",
+    "util/argo/normalizers/diff_normalizer.go",
+    "internal/build/build.go",
+    "api/resource/resource.go",
+    "util/argo/diff/diff.go",
+    "util/argo/normalizers/knowntypes_normalizer.go",
+    "util/argo/resource_tracking.go",
+    "pkg/manifestgen/kustomization/kustomization.go",
+    "controller/state.go",
+    "util/argo/diff/normalize.go",
+    "controller/sync.go",
+    "fluxcd/pkg/kustomize.Build"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "config-drift-tri-kustomize-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2021,
+      "10": 0.2021
+    },
+    "mrr": 0.25,
+    "map_score": 0.0833,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0714,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

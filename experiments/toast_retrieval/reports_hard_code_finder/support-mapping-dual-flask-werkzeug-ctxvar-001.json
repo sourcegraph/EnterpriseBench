@@ -1,0 +1,186 @@
+{
+  "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/flask--2.3.3",
+    "github.com/sg-evals/werkzeug--2.3.7"
+  ],
+  "retrieved_paths": [
+    "src/flask/globals.py",
+    "src/flask/ctx.py",
+    "src/werkzeug/local.py",
+    "CHANGES.rst",
+    "docs/local.rst",
+    "tests/test_local.py",
+    "docs/async-await.rst"
+  ],
+  "retrieved_paths_union": [
+    "src/flask/globals.py",
+    "src/flask/ctx.py",
+    "src/werkzeug/local.py",
+    "CHANGES.rst",
+    "docs/local.rst",
+    "tests/test_local.py",
+    "docs/async-await.rst"
+  ],
+  "required_files": [
+    "flask/src/flask/globals.py",
+    "flask/src/flask/ctx.py",
+    "werkzeug/src/werkzeug/local.py"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.4286,
+    "n_retrieved": 7,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.4286,
+    "n_retrieved": 7,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 14.3,
+  "response_chars": 3683,
+  "raw_response": "The boundary is Flask\u2019s `request` `LocalProxy` over `_cv_request`; Flask binds that `ContextVar` during `RequestContext.push()`. Werkzeug 2.0+ stores locals in `ContextVar`s, so visibility follows Python context propagation rather than thread-local state.\n\nRelevant files:\n\n- [sg-evals/flask--2.3.3:src/flask/globals.py?L55-L72](/r/github.com/sg-evals/flask--2.3.3/-/blob/src/flask/globals.py?L55-L72) - Defines `_cv_request` and exposes `request = LocalProxy(_cv_request, \"request\", unbound_message=...)`.\n- [sg-evals/flask--2.3.3:src/flask/ctx.py?L231-L265](/r/github.com/sg-evals/flask--2.3.3/-/blob/src/flask/ctx.py?L231-L265) - `AppContext.push()` binds `_cv_app`; `pop()` resets it.\n- [sg-evals/flask--2.3.3:src/flask/ctx.py?L280-L346](/r/github.com/sg-evals/flask--2.3.3/-/blob/src/flask/ctx.py?L280-L346) - `RequestContext` owns the request object and context tokens.\n- [sg-evals/flask--2.3.3:src/flask/ctx.py?L358-L385](/r/github.com/sg-evals/flask--2.3.3/-/blob/src/flask/ctx.py?L358-L385) - `RequestContext.push()` ensures an app context, then executes `_cv_request.set(self)`, making Flask\u2019s request proxy available.\n- [sg-evals/werkzeug--2.3.7:src/werkzeug/local.py?L40-L50](/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/src/werkzeug/local.py?L40-L50) - Documents `Local`\u2019s switch to `ContextVar` storage in Werkzeug 2.0.\n- [sg-evals/werkzeug--2.3.7:src/werkzeug/local.py?L104-L143](/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/src/werkzeug/local.py?L104-L143) - `LocalStack` is backed by a `ContextVar`; `push()` reads with `.get()`, copies, and sets the stack.\n- [sg-evals/werkzeug--2.3.7:src/werkzeug/local.py?L467-L521](/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/src/werkzeug/local.py?L467-L521) - `LocalProxy` builds `_get_current_object`; for a `ContextVar`, it calls `local.get()`, converts `LookupError` into `RuntimeError`, then resolves the requested attribute.\n- [sg-evals/werkzeug--2.3.7:CHANGES.rst?L690-L696](/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/CHANGES.rst?L690-L696) - Records the `Local` transition from `threading.local` to `ContextVar`.\n- [sg-evals/werkzeug--2.3.7:docs/local.rst?L11-L23](/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/docs/local.rst?L11-L23) - Explains that context locals are scoped to threads, asyncio tasks, or greenlets, and that `ContextVar` replaced thread-local storage.\n- [sg-evals/werkzeug--2.3.7:docs/local.rst?L29-L43](/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/docs/local.rst?L29-L43) - Shows the `ContextVar` \u2192 `LocalProxy` pattern and states that an unset variable raises `RuntimeError`.\n- [sg-evals/werkzeug--2.3.7:tests/test_local.py?L121-L133](/r/github.com/sg-evals/werkzeug--2.3.7/-/blob/tests/test_local.py?L121-L133) - Asyncio test demonstrating task-local stack copies with `ensure_future`.\n- [sg-evals/flask--2.3.3:docs/async-await.rst?L42-L73](/r/github.com/sg-evals/flask--2.3.3/-/blob/docs/async-await.rst?L42-L73) - Flask\u2019s async-view execution model and warning that spawned tasks may be cancelled under WSGI.\n\nChain: Flask request handling pushes `RequestContext` \u2192 `_cv_request.set(self)` \u2192 `request` proxy invokes `ContextVar.get()` \u2192 missing task context raises Flask\u2019s \u201cWorking outside of request context.\u201d A normal `asyncio.create_task(coro)` captures the currently running task\u2019s context (equivalent to using a copied context), so the child generally sees the request context. A coroutine scheduled from a thread-pool worker has that worker thread\u2019s current context instead; if it has no copied request context, `ensure_future(coro)` cannot recover the parent task\u2019s context, and Werkzeug\u2019s `ContextVar.get()` reaches the unbound `LocalProxy` path, producing the Flask runtime error.",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.4286,
+    "n_retrieved": 7,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "flask/src/flask/globals.py",
+    "flask/src/flask/ctx.py",
+    "werkzeug/src/werkzeug/local.py",
+    "CHANGES.rst",
+    "docs/local.rst",
+    "tests/test_local.py",
+    "docs/async-await.rst"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-flask-werkzeug-ctxvar-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 1.0,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.4286,
+    "n_retrieved": 7,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

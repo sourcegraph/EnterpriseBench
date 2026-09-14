@@ -1,0 +1,33 @@
+{
+  "task_id": "cal-err-flask-blueprint-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "Primary error source: src/flask/blueprints.py \u2014 Contains Blueprint.register_blueprint and the register method that handles URL prefix merging for nested blueprints. Supporting: src/flask/sansio/scaffold.py \u2014 Base class Scaffold defines the url_prefix property and _merge_blueprint_params helper. Surface error: Nested Blueprint url_prefix is ignored during registration.",
+      "evaluation_criteria": [
+        "Must identify src/flask/blueprints.py as part of the error source",
+        "Must identify src/flask/sansio/scaffold.py as part of the error source",
+        "Must reference the surface error message ('Nested Blueprint url_prefix is ignored during registration') or its origin",
+        "Must reference a specific function, type, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Error propagation chain: (1) User calls api_bp.register_blueprint(users_bp) \u2192 (2) Blueprint.register() is called with the nested blueprint \u2192 (3) URL prefix from nested blueprint is merged in blueprints.py \u2192 (4) If url_prefix passed to register_blueprint is None, nested bp prefix may be dropped.",
+      "evaluation_criteria": [
+        "Must describe the step: 'User calls api_bp.register_blueprint(users_bp)'",
+        "Must describe the propagation: 'If url_prefix passed to register_blueprint is None, nested bp prefix may be drop'",
+        "Must include all intermediate steps in the correct order",
+        "Must reference the chain in causal order (source \u2192 surface)",
+        "Must cite at least one file from the propagation path (e.g. src/flask/blueprints.py)"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Nested blueprint has url_prefix set at construction time; (2) Parent blueprint calls register_blueprint without explicit url_prefix override; (3) The prefix merging logic in register() does not correctly concatenate prefixes.",
+      "evaluation_criteria": [
+        "Must identify the condition: 'Nested blueprint has url_prefix set at construction time'",
+        "Must identify the condition: 'Parent blueprint calls register_blueprint without explicit url_prefix override'",
+        "Must identify the condition: 'The prefix merging logic in register() does not correctly concatenate prefixes'",
+        "Must explain the combined conditions necessary to reproduce the error"
+      ]
+    }
+  }
+}

@@ -1,0 +1,122 @@
+# Support Code Mapping: Spring Boot Kafka consumer deserialization error to Spring Kafka error handler
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "spring-kafka-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-spring-kafka-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Map customer Kafka deserialization error to Spring Kafka ErrorHandler and Spring Boot auto-configuration chain"
+prompt = """
+A customer reports that their Spring Boot Kafka consumer silently drops messages
+when the Kafka topic contains records with an unexpected schema. The consumer
+logs show:
+
+    org.apache.kafka.common.errors.SerializationException: Error deserializing
+    key/value for partition topic-orders-0 at offset 1523.
+
+The consumer continues processing subsequent messages but the failed messages
+are never retried and never sent to a dead letter topic, despite the customer
+configuring `spring.kafka.consumer.properties.spring.deserializer.value.delegate.class`.
+
+The customer expects that deserialization failures would be routed to the
+configured DeadLetterPublishingRecoverer, but this only works for exceptions
+thrown AFTER deserialization succeeds.
+
+Your task:
+1. Find where Spring Kafka handles deserialization errors — trace from the
+   KafkaMessageListenerContainer through the ErrorHandler chain and identify
+   where SerializationException is caught vs where it bypasses the error handler.
+2. Find where Spring Boot auto-configures Kafka consumer error handling — trace
+   from KafkaAutoConfiguration through ConcurrentKafkaListenerContainerFactory
+   setup and identify which ErrorHandler is installed by default.
+3. Map the full code path: Kafka client throws SerializationException -> Spring
+   Kafka container catches it -> error handler decision -> why dead letter topic
+   is skipped for deserialization errors. Document each file and function.
+4. Identify the correct configuration to handle deserialization errors
+   (ErrorHandlingDeserializer wrapper) and trace where it integrates.
+
+- Full code path from exception to handling decision
+- Why DeadLetterPublishingRecoverer is bypassed for deserialization errors
+- Correct configuration approach and its integration point
+"""
+
+[[repos]]
+url = "https://github.com/spring-projects/spring-kafka"
+rev = "v3.0.9"
+path = "spring-kafka"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/spring-projects/spring-boot"
+rev = "v3.1.2"
+path = "spring-boot"
+role = "consumer"
+
+[metadata]
+languages = ["java"]
+total_loc = 800_000
+dependency_depth = 2
+frameworks = ["spring-kafka", "spring-boot", "kafka"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.40
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the error handling path in Spring Kafka container"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.30
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full code path from deserialization to error handler"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.30
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the correct ErrorHandlingDeserializer configuration"
+timeout_seconds = 60
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Tracing Kafka error handling across Spring Kafka listener container and Spring Boot auto-configuration requires cross-repo search for ErrorHandler implementations and factory bean wiring"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "spring-kafka/src/main/java/org/springframework/kafka/listener/KafkaMessageListenerContainer.java"
+repo = "spring-kafka"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfiguration.java"
+repo = "spring-boot"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "spring-kafka/src/main/java/org/springframework/kafka/listener/DefaultErrorHandler.java"
+repo = "spring-kafka"
+confidence = 0.85
+
+[[ground_truth.sufficient_files]]
+path = "spring-kafka/src/main/java/org/springframework/kafka/support/serializer/ErrorHandlingDeserializer.java"
+repo = "spring-kafka"
+confidence = 0.80

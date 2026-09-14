@@ -1,0 +1,32 @@
+{
+  "task_id": "monorepo-boundary-pnpm-sha256-007",
+  "checkpoints": {
+    "identify_affected_packages": {
+      "expected_solution": "Two coordinated v10.0.0 changes (PRs #8530 and #8557): (a) `@pnpm/crypto.hash` adds SHA256-based pnpmfile checksum verification — the change lands in the new `index` source under crypto/hash/src/; and (b) `@pnpm/dependency-path` escapes `#` in directory names (`packages/dependency-path/src/index.ts`, with test in `packages/dependency-path/test/index.ts`). The data-shape changes cascade through four sibling packages: (1) `@pnpm/pnpmfile` (`hooks/pnpmfile/src/requireHooks.ts`, `hooks/pnpmfile/package.json`, `hooks/pnpmfile/tsconfig.json`) consumes the new hash for checksum verification; (2) `@pnpm/dependency-path` itself for the escaping change; (3) the `pnpm` CLI (`pnpm/test/hooks.ts`, `pnpm/package.json`, `pnpm/tsconfig.json`); (4) `@pnpm/core` (`pkg-manager/core/test/install/fromRepo.ts`) for repo-based installs that exercise the new path format.",
+      "evaluation_criteria": [
+        "Must identify @pnpm/crypto.hash as a source-of-change package and reference the new index source added under crypto/hash/src/",
+        "Must identify @pnpm/dependency-path as a source-of-change package with packages/dependency-path/src/index.ts",
+        "Must identify @pnpm/pnpmfile as the primary downstream consumer of the new checksum (cite hooks/pnpmfile/src/requireHooks.ts)",
+        "Should mention the pnpm CLI test pnpm/test/hooks.ts and pkg-manager/core/test/install/fromRepo.ts as additional test coverage"
+      ]
+    },
+    "classify_change_impact": {
+      "expected_solution": "Overall semver = **major** (v10.0.0). Both changes shift observable contracts: the SHA256 checksum format breaks any consumer that compared old hashes, and the `#`-escaping in dependency paths changes filesystem layout for packages whose names or scopes contain `#` characters. Per-package: `@pnpm/crypto.hash` = major (return value semantics change — algorithm shift); `@pnpm/dependency-path` = major (string output format change for affected names); `@pnpm/pnpmfile` = major (checksum verification semantics flip; existing pnpmfile signatures invalidated); `pnpm` CLI = major (hooks behavior change observable end-to-end); `@pnpm/core` = major (install path changes for affected packages).",
+      "evaluation_criteria": [
+        "Must classify overall semver as `major` and cite v10.0.0 as the gating release",
+        "Must classify @pnpm/crypto.hash as major with reasoning about hash algorithm change",
+        "Must classify @pnpm/dependency-path as major because the dep-path string format changes for `#`-containing names",
+        "Should note that pnpmfile consumers have to regenerate their checksums after upgrading"
+      ]
+    },
+    "identify_boundary_violations": {
+      "expected_solution": "Concrete violations: (1) the new `index` source added under crypto/hash/src/ — algorithm and pnpmfile-checksum entry-point change; (2) `packages/dependency-path/src/index.ts` — escape-`#` logic in path encoder; (3) `packages/dependency-path/test/index.ts` — updated expectations; (4) `hooks/pnpmfile/src/requireHooks.ts` — pnpmfile loader integrates the new checksum check before invoking hooks; (5) `hooks/pnpmfile/package.json` and `hooks/pnpmfile/tsconfig.json` — dependency on `@pnpm/crypto.hash` declared/upgraded; (6) `pnpm/test/hooks.ts` — CLI-level hooks coverage exercising the new behavior; (7) `pnpm/package.json` and `pnpm/tsconfig.json` — bundled deps and TS path mapping updated; (8) `pkg-manager/core/test/install/fromRepo.ts` — covers the cross-cutting install path with the escaped dep-path format. PR file counts: #8530=9 files, #8557=4 files.",
+      "evaluation_criteria": [
+        "Must reference the new index source under crypto/hash/src/ and cite packages/dependency-path/src/index.ts as the two source-change locations",
+        "Must cite hooks/pnpmfile/src/requireHooks.ts as the primary consumer of the new checksum",
+        "Must cite at least one CLI/integration test among pnpm/test/hooks.ts and pkg-manager/core/test/install/fromRepo.ts",
+        "Should mention dependency-bumping artifacts hooks/pnpmfile/package.json and pnpm/package.json"
+      ]
+    }
+  }
+}

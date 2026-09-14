@@ -1,0 +1,120 @@
+# support_code_mapping: Map customer Celery worker stalling after broker reconnect to the Kombu connection-retry / channel-prefetch reset boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "celery-kombu-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-celery-kombu-prefetch-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 35
+session_type = "single"
+description = "Map customer Celery worker stalling after broker reconnect to the Kombu connection-retry / channel-prefetch reset boundary"
+prompt = """
+A customer reports that their Celery worker stops consuming new tasks
+after the RabbitMQ broker briefly disconnects. The worker logs the
+reconnect, but no further task callbacks fire even though the queue
+has thousands of waiting messages.
+
+Your task:
+1. Find where Celery's worker consumer wraps a Kombu Connection and
+   subscribes to queues with a configured prefetch_count.
+2. Find where Kombu re-establishes a channel after a broker drop and
+   identify whether basic_qos is reapplied to the new channel.
+3. Trace the cross-repo path: celery worker.consumer.Consumer ->
+   kombu.connection.Connection.ensure -> channel re-creation -> prefetch
+   reset. Cite each file and the function or attribute responsible.
+4. Identify why a fresh AMQP channel without basic_qos defaults to
+   prefetch=0 (unlimited), which combined with the RabbitMQ broker's
+   semantics can leave the consumer effectively idle waiting for
+   already-delivered messages to ack.
+"""
+
+[[repos]]
+url = "https://github.com/celery/celery"
+rev = "v5.3.6"
+path = "celery"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/celery/kombu"
+rev = "v5.3.5"
+path = "kombu"
+role = "upstream"
+
+[metadata]
+languages = ["python"]
+total_loc = 180000
+dependency_depth = 2
+frameworks = ["celery", "kombu", "amqp"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Celery's consumer logic and Kombu's channel-recovery logic both touch the basic_qos call but neither is responsible alone. Cross-repo navigation is required to see why prefetch is silently reset to 0 after reconnect."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "celery/celery/worker/consumer/consumer.py"
+repo = "celery"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "celery/celery/worker/consumer/tasks.py"
+repo = "celery"
+confidence = 0.8
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "kombu/kombu/connection.py"
+repo = "kombu"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "kombu/kombu/messaging.py"
+repo = "kombu"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "kombu/kombu/transport/pyamqp.py"
+repo = "kombu"
+confidence = 0.7
+
+[[ground_truth.sufficient_files]]
+path = "celery/celery/worker/consumer/mingle.py"
+repo = "celery"
+confidence = 0.65

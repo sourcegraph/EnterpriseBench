@@ -1,0 +1,194 @@
+{
+  "task_id": "api-contract-dual-jackson-spring-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/jackson-databind--jackson-databind-2.15.0",
+    "github.com/sg-evals/spring-boot--v3.1.0"
+  ],
+  "retrieved_paths": [
+    "src/main/java/com/fasterxml/jackson/databind/DeserializationFeature.java",
+    "src/main/java/com/fasterxml/jackson/databind/SerializationFeature.java",
+    "src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+    "src/main/java/com/fasterxml/jackson/databind/DeserializationContext.java",
+    "src/main/java/com/fasterxml/jackson/databind/SerializerProvider.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonProperties.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/http/JacksonHttpMessageConvertersConfiguration.java",
+    "spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/spring-mvc.adoc",
+    "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfigurationTests.java"
+  ],
+  "retrieved_paths_union": [
+    "src/main/java/com/fasterxml/jackson/databind/DeserializationFeature.java",
+    "src/main/java/com/fasterxml/jackson/databind/SerializationFeature.java",
+    "src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+    "src/main/java/com/fasterxml/jackson/databind/DeserializationContext.java",
+    "src/main/java/com/fasterxml/jackson/databind/SerializerProvider.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonProperties.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/http/JacksonHttpMessageConvertersConfiguration.java",
+    "spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/spring-mvc.adoc",
+    "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfigurationTests.java"
+  ],
+  "required_files": [
+    "jackson-databind/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+    "spring-boot/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-jackson-spring-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.525
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-jackson-spring-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.525
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 30.0,
+  "response_chars": 4190,
+  "raw_response": "I could not write `/workspace/analysis/IMPACT_REPORT.md` because the available tools only support repository search/read operations, not filesystem writes. Findings so far:\n\n- Jackson 2.15.0:\n  - `src/main/java/com/fasterxml/jackson/databind/DeserializationFeature.java:107-121` \u2014 `FAIL_ON_UNKNOWN_PROPERTIES`, enabled by Jackson default.\n  - `src/main/java/com/fasterxml/jackson/databind/SerializationFeature.java:176-200` \u2014 `WRITE_DATES_AS_TIMESTAMPS`, enabled by Jackson default.\n  - `src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java:377-387` \u2014 `DEFAULT_BASE`, including `StdDateFormat`.\n  - `src/main/java/com/fasterxml/jackson/databind/DeserializationContext.java:1131-1134,1855-1858` \u2014 unknown fields are skipped when the feature is disabled and rejected when enabled.\n  - `src/main/java/com/fasterxml/jackson/databind/SerializerProvider.java:1206-1212` \u2014 dates serialize as numeric timestamps when `WRITE_DATES_AS_TIMESTAMPS` is enabled, otherwise via the configured date format.\n  - `src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java:2403-2417` \u2014 `setDateFormat(DateFormat)` configures serialization and deserialization date formatting.\n\n- Spring Boot 3.1.0:\n  - `spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java:86-132` \u2014 `JacksonAutoConfiguration` creates the primary auto-configured `ObjectMapper` through `Jackson2ObjectMapperBuilder`.\n  - Same file `:148-235` \u2014 builder and `StandardJackson2ObjectMapperBuilderCustomizer`; Boot explicitly disables `WRITE_DATES_AS_TIMESTAMPS` and applies configured feature maps.\n  - Same file `:242-263` \u2014 `spring.jackson.date-format` supports a `DateFormat` class or pattern.\n  - `spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonProperties.java:43-110,117-179` \u2014 `spring.jackson` properties, including date format, serialization, and deserialization feature maps.\n  - `spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/http/JacksonHttpMessageConvertersConfiguration.java:37-54` \u2014 MVC\u2019s `MappingJackson2HttpMessageConverter` receives the auto-configured mapper.\n  - `spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/spring-mvc.adoc:52-109` \u2014 documents Boot\u2019s customized defaults: unknown properties disabled, date timestamps disabled; documents property and customizer migration mechanisms.\n  - `spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfigurationTests.java:207-210,276-288` \u2014 verifies Jackson\u2019s unknown-property default is true but Boot\u2019s mapper disables it.\n\nImpact and migration:\n\n- A Jackson version change alone can alter raw `ObjectMapper` behavior because feature defaults are enum constants collected into mapper configuration.\n- In Boot applications, Boot deliberately overrides these two raw Jackson defaults: unknown JSON properties are ignored, and dates are textual rather than timestamps.\n- REST request handling uses the shared mapper through `MappingJackson2HttpMessageConverter`; therefore deserialization feature changes determine whether an unknown field becomes a 400 or is silently skipped, while serialization settings determine response date text.\n- To restore strict unknown-field rejection:\n  - `spring.jackson.deserialization.fail-on-unknown-properties=true`\n  - or a `Jackson2ObjectMapperBuilderCustomizer` calling `featuresToEnable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)`.\n- To use/restore a specific date representation:\n  - Set `spring.jackson.date-format=...` and, if needed, `spring.jackson.time-zone=...`.\n  - For timestamp output, set `spring.jackson.serialization.write-dates-as-timestamps=true`.\n  - For stable textual output, keep `write-dates-as-timestamps=false` and specify an explicit date pattern or `DateFormat`.\n- Defining a primary custom `ObjectMapper` or a `Jackson2ObjectMapperBuilder` replaces/disables Boot\u2019s automatic mapper customization, so custom beans must explicitly reproduce required Boot settings.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-jackson-spring-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.3066
+    },
+    "mrr": 0.3333,
+    "map_score": 0.1667,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "src/main/java/com/fasterxml/jackson/databind/DeserializationFeature.java",
+    "src/main/java/com/fasterxml/jackson/databind/SerializationFeature.java",
+    "jackson-databind/src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java",
+    "src/main/java/com/fasterxml/jackson/databind/DeserializationContext.java",
+    "src/main/java/com/fasterxml/jackson/databind/SerializerProvider.java",
+    "spring-boot/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/jackson/JacksonProperties.java",
+    "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/http/JacksonHttpMessageConvertersConfiguration.java",
+    "spring-boot-project/spring-boot-docs/src/docs/asciidoc/howto/spring-mvc.adoc",
+    "spring-boot-project/spring-boot-autoconfigure/src/test/java/org/springframework/boot/autoconfigure/jackson/JacksonAutoConfigurationTests.java"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-jackson-spring-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.3066
+    },
+    "mrr": 0.3333,
+    "map_score": 0.1667,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

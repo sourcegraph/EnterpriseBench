@@ -1,0 +1,179 @@
+{
+  "task_id": "err-provenance-dual-grafana-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/grafana--v10.2.0",
+    "github.com/sg-evals/prometheus--v2.48.0"
+  ],
+  "retrieved_paths": [
+    "pkg/services/datasourceproxy/datasourceproxy.go",
+    "pkg/api/pluginproxy/ds_proxy.go",
+    "pkg/util/proxyutil/reverse_proxy.go",
+    "web/api/v1/api.go",
+    "promql/engine.go"
+  ],
+  "retrieved_paths_union": [
+    "pkg/services/datasourceproxy/datasourceproxy.go",
+    "pkg/api/pluginproxy/ds_proxy.go",
+    "pkg/util/proxyutil/reverse_proxy.go",
+    "web/api/v1/api.go",
+    "promql/engine.go"
+  ],
+  "required_files": [
+    "pkg/api/datasource_proxy.go",
+    "web/api/v1/api.go"
+  ],
+  "ir_scores": {
+    "task_id": "err-provenance-dual-grafana-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.2641
+    },
+    "mrr": 0.25,
+    "map_score": 0.125,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2,
+    "n_retrieved": 5,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "err-provenance-dual-grafana-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.2641
+    },
+    "mrr": 0.25,
+    "map_score": 0.125,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2,
+    "n_retrieved": 5,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 28.7,
+  "response_chars": 3436,
+  "raw_response": "I could not write `/workspace/ERROR_PROVENANCE.md` because file-writing tools were unavailable. Findings so far:\n\n- **Grafana dashboard/proxy entry:** `pkg/services/datasourceproxy/datasourceproxy.go`\n  - `ProxyDataSourceRequest` parses the datasource ID and calls `ProxyDatasourceRequestWithID` (`L58-L65`).\n  - `ProxyDatasourceRequestWithID` loads datasource metadata and calls `proxyDatasourceRequest` (`L87-L96`).\n  - `proxyDatasourceRequest` validates the request, creates `pluginproxy.DataSourceProxy`, and calls `HandleRequest` (`L110-L136`).\n- **Grafana outbound request:** `pkg/api/pluginproxy/ds_proxy.go`\n  - `HandleRequest` builds a `httputil.ReverseProxy`, installs the datasource transport and response modifier, then invokes `ServeHTTP` (`L87-L159`).\n  - `director` rewrites the request to the configured Prometheus URL and constructs the upstream path, including `/api/v1/query_range` (`L169-L215`).\n  - The default HTTP client has a 30-second timeout (`L80-L85`).\n- **Grafana error translation:** `pkg/util/proxyutil/reverse_proxy.go`\n  - `NewReverseProxy` installs `errorHandler` as the reverse proxy error handler (`L26-L65`).\n  - `errorHandler` maps client cancellation to 499, transport timeout errors to 504, and all other proxy errors to 502 Bad Gateway (`L118-L143`).\n  - It logs the original Go error but writes only the status code; it does not serialize the upstream response body or error text.\n  - `modifyResponse` only removes selected headers and records status metadata; it does not alter or preserve a descriptive error body (`L98-L110`).\n- **Prometheus query API:** `web/api/v1/api.go`\n  - `queryRange` parses range parameters, optionally applies the request\u2019s `timeout` parameter, creates a range query, executes it, and converts execution errors with `returnAPIError` (`L505-L568`).\n  - `returnAPIError` recognizes `promql.ErrQueryTimeout` and returns `errorTimeout` (`L622-L646`).\n  - `respondError` emits JSON containing `apiErr.err.Error()` and maps `errorTimeout` to HTTP 503 Service Unavailable (`L1737-L1775`).\n- **PromQL timeout origin:** `promql/engine.go`\n  - `EngineOpts.Timeout` is stored in the engine (`L280-L324`, `L403-L414`).\n  - `Engine.exec` wraps execution in `context.WithTimeout(ctx, ng.timeout)` (`L578-L592`).\n  - `contextDone`/`contextErr` translate `context.DeadlineExceeded` into `promql.ErrQueryTimeout` (`L239-L255`).\n  - `ErrQueryTimeout.Error()` produces text such as `query timed out in query execution` (`L87-L101`).\n  - Query execution returns the engine error through `q.Exec` (`L230-L236`).\n\n**Full propagation:** PromQL engine deadline \u2192 `ErrQueryTimeout` \u2192 `returnAPIError` classifies it as `errorTimeout` \u2192 Prometheus returns HTTP 503 with a JSON error body \u2192 Grafana\u2019s reverse proxy receives the upstream response. If the upstream response is successfully received, `httputil.ReverseProxy` generally forwards its status/body; if the Grafana-side request/transport context expires first, `errorHandler` discards the underlying error/body and emits only 504 (or 502 for a non-timeout transport error). The reported generic `{\"message\":\"Bad Gateway\",\"status\":\"bad-gateway\"}` therefore indicates Grafana handled a proxy-level error rather than forwarding Prometheus\u2019s 503 JSON. The timeout message is lost because `errorHandler` writes only the gateway status and never copies the upstream Prometheus error body.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "err-provenance-dual-grafana-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.2641
+    },
+    "mrr": 0.25,
+    "map_score": 0.125,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2,
+    "n_retrieved": 5,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "pkg/services/datasourceproxy/datasourceproxy.go",
+    "pkg/api/pluginproxy/ds_proxy.go",
+    "pkg/util/proxyutil/reverse_proxy.go",
+    "web/api/v1/api.go",
+    "promql/engine.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "err-provenance-dual-grafana-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.2641
+    },
+    "mrr": 0.25,
+    "map_score": 0.125,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2,
+    "n_retrieved": 5,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

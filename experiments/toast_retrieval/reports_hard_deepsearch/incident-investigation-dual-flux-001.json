@@ -1,0 +1,198 @@
+{
+  "task_id": "incident-investigation-dual-flux-001",
+  "policy": "deepsearch",
+  "suite": "incident_response",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/flux2--v2.2.0",
+    "github.com/sg-evals/helm-controller--v0.37.0"
+  ],
+  "retrieved_paths": [
+    "api/v2beta2/condition_types.go",
+    "internal/reconcile/release.go",
+    "internal/reconcile/atomic_release.go",
+    "cmd/flux/get_helmrelease.go",
+    "cmd/flux/get.go",
+    "internal/controller/helmrelease_controller.go",
+    "api/v2beta1/helmrelease_types.go",
+    "api/v2beta2/helmrelease_types.go",
+    "internal/reconcile/state.go",
+    "cmd/flux/reconcile.go",
+    "internal/features/features.go"
+  ],
+  "retrieved_paths_union": [
+    "api/v2beta2/condition_types.go",
+    "internal/reconcile/release.go",
+    "internal/reconcile/atomic_release.go",
+    "cmd/flux/get_helmrelease.go",
+    "cmd/flux/get.go",
+    "internal/controller/helmrelease_controller.go",
+    "api/v2beta1/helmrelease_types.go",
+    "api/v2beta2/helmrelease_types.go",
+    "internal/reconcile/state.go",
+    "cmd/flux/reconcile.go",
+    "internal/features/features.go"
+  ],
+  "required_files": [
+    "internal/controller/helmrelease_controller.go",
+    "internal/reconcile/release.go",
+    "cmd/flux/get_helmrelease.go"
+  ],
+  "ir_scores": {
+    "task_id": "incident-investigation-dual-flux-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4982,
+      "10": 0.6653
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2727,
+    "n_retrieved": 11,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "incident-investigation-dual-flux-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4982,
+      "10": 0.6653
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2727,
+    "n_retrieved": 11,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 234.2,
+  "response_chars": 8913,
+  "raw_response": "---\ntitle: HelmRelease not ready after Flux upgrade due to helm-controller status condition change\nshare_url: https://demo.sourcegraph.com/deepsearch/edd898aa-3efb-486c-83df-8680dceb01d5\nurl: https://demo.sourcegraph.com/deepsearch/2229\ncreated: 2026-08-18T02:04:40Z\nupdated: 2026-08-18T02:05:57Z\n---\n\n# # Incident: HelmRelease Stuck in Not-Ready State After Flux Upgrade\n\n## Alert\n\nAfter upgrading Flux from v2.1 to v2.2, several HelmRelease resources are stuck in a \"not ready\" state despite the underlying Helm releases being successfully deployed.\n\n## Symptoms\n\n- `flux get helmreleases` shows the affected releases as `Ready: False` while `helm list` shows them deployed successfully\n- helm-controller logs show successful reconciliation, yet the HelmRelease status still reports not ready\n- The issue affects only HelmReleases that were in-progress during the upgrade\n- New HelmReleases created after the upgrade work correctly\n- kustomize-controller and other consumers that gate on HelmRelease readiness are blocked because they read the same stale status\n\n## Investigation So Far\n\nThe team has identified the general area:\n\n1. Flux v2.2 ships helm-controller v0.37, which changed the HelmRelease status condition API (the v2beta2 condition types)\n2. helm-controller's reconciler writes and re-reads status conditions in the new format after a release completes\n3. The Flux CLI reads those same status conditions to render the Ready column operators see\n4. HelmReleases that were in-progress during the upgrade retain old-format conditions\n5. The new reconciler does not handle the transition from old to new condition format\n6. The stale condition causes an infinite reconciliation loop\n\n## Environment\n\nTwo repos are checked out in the workspace:\n\n- `/workspace/flux2/` (Flux v2.2.0) \u2014 the Flux CLI: how operators observe and trigger HelmRelease reconciliation\n- `/workspace/helm-controller/` (helm-controller v0.37.0) \u2014 the controller that reconciles HelmRelease resources and owns their status\n- Focus on Go code in both repos\n\n## What I Need\n\n1. **Root Cause**: In helm-controller, find where the reconciler reads and writes HelmRelease status conditions and the v2beta2 type/API surface that defines them. In flux2, find where the CLI reads those status conditions to report readiness to the operator.\n\n2. **Error Chain**: Trace the failure: an operator observes not-ready through the flux CLI -> helm-controller's reconciler cannot parse the old-format condition left on an in-progress HelmRelease -> treats the release as not ready -> triggers re-reconciliation -> the stale condition persists -> infinite loop.\n\n3. **Affected Resources**: Which components and Kubernetes resources are affected \u2014 the flux CLI readout, the helm-controller reconciler, and the resources downstream of them?\n\n4. **Remediation**: How should the status condition transition be handled?\n\n## Output\n\nWrite your findings to `/workspace/flux2/INCIDENT_REPORT.md`.\n\n\nSearch only these repositories: github.com/sg-evals/flux2--v2.2.0, github.com/sg-evals/helm-controller--v0.37.0\n\n**Error:** An error occurred while processing your question.\n\n## Sources\n\n- [github.com/sg-evals/helm-controller--v0.37.0/api/v2beta2/condition_types.go@95d72c4](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/api/v2beta2/condition_types.go)\n- [github.com/sg-evals/helm-controller--v0.37.0/internal/reconcile/release.go@95d72c4?L1-200](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/internal/reconcile/release.go?L1-200)\n- [github.com/sg-evals/helm-controller--v0.37.0/internal/reconcile/atomic_release.go@95d72c4?L500-600](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/internal/reconcile/atomic_release.go?L500-600)\n- [github.com/sg-evals/flux2--v2.2.0/cmd/flux/get_helmrelease.go@c28a9d2](/github.com/sg-evals/flux2--v2.2.0@c28a9d29d8a456db6574e9b7020914f7b4aba07c/-/blob/cmd/flux/get_helmrelease.go)\n- [github.com/sg-evals/flux2--v2.2.0/cmd/flux/get.go@c28a9d2?L90-130](/github.com/sg-evals/flux2--v2.2.0@c28a9d29d8a456db6574e9b7020914f7b4aba07c/-/blob/cmd/flux/get.go?L90-130)\n- [github.com/sg-evals/helm-controller--v0.37.0/internal/controller/helmrelease_controller.go@95d72c4?L140-310](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/internal/controller/helmrelease_controller.go?L140-310)\n- [github.com/sg-evals/helm-controller--v0.37.0/internal/reconcile/atomic_release.go@95d72c4?L1-120](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/internal/reconcile/atomic_release.go?L1-120)\n- [github.com/sg-evals/helm-controller--v0.37.0/api/v2beta1/helmrelease_types.go@95d72c4?L955-980](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/api/v2beta1/helmrelease_types.go?L955-980)\n- [github.com/sg-evals/helm-controller--v0.37.0/api/v2beta2/helmrelease_types.go@95d72c4?L930-960](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/api/v2beta2/helmrelease_types.go?L930-960)\n- [github.com/sg-evals/helm-controller--v0.37.0/internal/reconcile/atomic_release.go@95d72c4?L120-350](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/internal/reconcile/atomic_release.go?L120-350)\n- [github.com/sg-evals/helm-controller--v0.37.0/api/v2beta2/helmrelease_types.go@95d72c4?L1220-1260](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/api/v2beta2/helmrelease_types.go?L1220-1260)\n- [github.com/sg-evals/helm-controller--v0.37.0/internal/reconcile/atomic_release.go@95d72c4?L350-510](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/internal/reconcile/atomic_release.go?L350-510)\n- [repo:^github.com/sg-evals/helm-controller--v0.37.0$ ReconciliationSucceeded ReconciliationFailed condition Ready](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fhelm-controller--v0.37.0$%20ReconciliationSucceeded%20ReconciliationFailed%20condition%20Ready)\n- [repo:^github.com/sg-evals/helm-controller--v0.37.0$ DetermineReleaseState file:state.go](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fhelm-controller--v0.37.0$%20DetermineReleaseState%20file:state.go)\n- [github.com/sg-evals/helm-controller--v0.37.0/internal/reconcile/state.go@95d72c4](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/internal/reconcile/state.go)\n- [repo:^github.com/sg-evals/helm-controller--v0.37.0$ History.Len History.Latest Status.History](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fhelm-controller--v0.37.0$%20History.Len%20History.Latest%20Status.History)\n- [repo:^github.com/sg-evals/helm-controller--v0.37.0$ checkDependencies dependsOn IsReady](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fhelm-controller--v0.37.0$%20checkDependencies%20dependsOn%20IsReady)\n- [github.com/sg-evals/helm-controller--v0.37.0/internal/controller/helmrelease_controller.go@95d72c4?L520-575](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/internal/controller/helmrelease_controller.go?L520-575)\n- [github.com/sg-evals/helm-controller--v0.37.0/internal/controller/helmrelease_controller.go@95d72c4?L310-430](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/internal/controller/helmrelease_controller.go?L310-430)\n- [github.com/sg-evals/helm-controller--v0.37.0/internal/controller/helmrelease_controller.go@95d72c4?L552-680](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/internal/controller/helmrelease_controller.go?L552-680)\n- [repo:^github.com/sg-evals/flux2--v2.2.0$ reconcile helmrelease annotate trigger](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fflux2--v2.2.0$%20reconcile%20helmrelease%20annotate%20trigger)\n- [github.com/sg-evals/flux2--v2.2.0/cmd/flux/reconcile.go@c28a9d2?L50-140](/github.com/sg-evals/flux2--v2.2.0@c28a9d29d8a456db6574e9b7020914f7b4aba07c/-/blob/cmd/flux/reconcile.go?L50-140)\n- [github.com/sg-evals/helm-controller--v0.37.0/api/v2beta1/helmrelease_types.go@95d72c4?L1155-1180](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/api/v2beta1/helmrelease_types.go?L1155-1180)\n- [repo:^github.com/sg-evals/helm-controller--v0.37.0$ AdoptLegacyReleases features](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fhelm-controller--v0.37.0$%20AdoptLegacyReleases%20features)\n- [github.com/sg-evals/helm-controller--v0.37.0/internal/features/features.go@95d72c4](/github.com/sg-evals/helm-controller--v0.37.0@95d72c4052a16661c8203e5d932c262b382ac4c6/-/blob/internal/features/features.go)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "incident-investigation-dual-flux-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4982,
+      "10": 0.6653
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2727,
+    "n_retrieved": 11,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "api/v2beta2/condition_types.go",
+    "internal/reconcile/release.go",
+    "internal/reconcile/atomic_release.go",
+    "cmd/flux/get_helmrelease.go",
+    "cmd/flux/get.go",
+    "internal/controller/helmrelease_controller.go",
+    "api/v2beta1/helmrelease_types.go",
+    "api/v2beta2/helmrelease_types.go",
+    "internal/reconcile/state.go",
+    "cmd/flux/reconcile.go",
+    "internal/features/features.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "incident-investigation-dual-flux-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4982,
+      "10": 0.6653
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2727,
+    "n_retrieved": 11,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

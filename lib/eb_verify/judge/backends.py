@@ -22,6 +22,17 @@ class JudgeBackendError(Exception):
         self.status_code = status_code
 
 
+def _is_rate_limit_diagnostic(message: str) -> bool:
+    lowered = message.lower()
+    return (
+        "429" in lowered
+        or "usage limit" in lowered
+        or "rate limit" in lowered
+        or "rate-limit" in lowered
+        or "rate limited" in lowered
+    )
+
+
 def _parse_json(raw: str) -> dict:
     """Extract and parse JSON from the model's text response."""
     text = raw.strip()
@@ -51,6 +62,14 @@ class AnthropicBackend:
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
+
+    @property
+    def provenance(self) -> dict[str, object]:
+        return {
+            "backend": "anthropic_api",
+            "provider": "anthropic",
+            "model": self.model,
+        }
 
     def call(self, system_prompt: str, user_prompt: str) -> dict:
         last_err: Exception | None = None
@@ -144,11 +163,50 @@ class ClaudeCodeBackend:
         "claude-opus-4-6": "opus",
     }
 
-    def __init__(self, model: str = "haiku", **_kwargs: object):
+    def __init__(
+        self,
+        model: str = "haiku",
+        *,
+        account: int | None = None,
+        **_kwargs: object,
+    ):
+        if isinstance(account, bool) or (
+            account is not None and (not isinstance(account, int) or account <= 0)
+        ):
+            raise ValueError("Claude judge account must be a positive integer")
         self.model = self._ALIAS_MAP.get(model, model)
-        self._claude_bin = shutil.which("claude")
+        self.account = account
+        self.executable = f"claude-{account}" if account is not None else "claude"
+        self._claude_bin = shutil.which(self.executable)
         if self._claude_bin is None:
-            raise JudgeBackendError("claude CLI not found on PATH")
+            raise JudgeBackendError(f"{self.executable} CLI not found on PATH")
+        self._cli_version = self._read_cli_version()
+
+    def _read_cli_version(self) -> str | None:
+        try:
+            result = subprocess.run(
+                [self._claude_bin, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        version = result.stdout.strip()
+        return version if result.returncode == 0 and version else None
+
+    @property
+    def provenance(self) -> dict[str, object]:
+        provenance: dict[str, object] = {
+            "backend": "claude_code_cli",
+            "provider": "anthropic",
+            "model": self.model,
+            "account": self.account,
+            "executable": self.executable,
+        }
+        if self._cli_version is not None:
+            provenance["cli_version"] = self._cli_version
+        return provenance
 
     def call(self, system_prompt: str, user_prompt: str) -> dict:
         last_err: Exception | None = None
@@ -187,8 +245,11 @@ class ClaudeCodeBackend:
             raise JudgeBackendError("claude CLI timed out after 120s")
 
         if result.returncode != 0:
+            diagnostic = (result.stderr.strip() or result.stdout.strip())[:500]
+            status_code = 429 if _is_rate_limit_diagnostic(diagnostic) else None
             raise JudgeBackendError(
-                f"claude CLI failed (rc={result.returncode}): {result.stderr[:500]}"
+                f"claude CLI failed (rc={result.returncode}): {diagnostic}",
+                status_code=status_code,
             )
         try:
             envelope = json.loads(result.stdout)
@@ -196,8 +257,8 @@ class ClaudeCodeBackend:
             raise JudgeBackendError(f"Failed to parse claude CLI output: {exc}")
 
         if envelope.get("is_error"):
-            error_msg = envelope.get("result", "unknown error")
-            if "rate" in error_msg.lower() or "429" in error_msg:
+            error_msg = str(envelope.get("result", "unknown error"))
+            if _is_rate_limit_diagnostic(error_msg):
                 raise JudgeBackendError(error_msg, status_code=429)
             raise JudgeBackendError(f"claude CLI error: {error_msg}")
 
@@ -215,14 +276,21 @@ _CLAUDE_CODE_ALIASES = {"claude-code", "cc"}
 
 
 def create_backend(
-    model: str, temperature: float = 0.0, max_tokens: int = 4096
+    model: str,
+    temperature: float = 0.0,
+    max_tokens: int = 4096,
+    account: int | None = None,
 ) -> AnthropicBackend | ClaudeCodeBackend:
     """Create the appropriate backend based on model identifier."""
     name = model.lower()
     if name in _CLAUDE_CODE_ALIASES or name.startswith("cc:"):
         sub_model = name.split(":", 1)[1] if ":" in name else "haiku"
-        return ClaudeCodeBackend(model=sub_model)
+        return ClaudeCodeBackend(model=sub_model, account=account)
     if name.startswith("claude"):
+        if account is not None:
+            raise ValueError(
+                "Claude judge account selection is only supported by cc:* models"
+            )
         return AnthropicBackend(
             model=model, temperature=temperature, max_tokens=max_tokens
         )

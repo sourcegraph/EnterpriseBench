@@ -1,0 +1,206 @@
+{
+  "task_id": "error-prov-dual-netty-spring-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/netty--netty-4.1.100.Final",
+    "github.com/sg-evals/spring-framework--v6.0.11"
+  ],
+  "retrieved_paths": [
+    "transport/src/main/java/io/netty/channel/ChannelHandler.java",
+    "transport/src/main/java/io/netty/channel/ChannelHandlerAdapter.java",
+    "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+    "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java",
+    "transport/src/main/java/io/netty/bootstrap/ServerBootstrap.java",
+    "handler/src/main/java/io/netty/handler/ssl/SslHandler.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorNetty2HttpHandlerAdapter.java",
+    "spring-web/testFixtures/.../ReactorHttpServer.java",
+    "framework-docs/.../reactive-spring.adoc",
+    "spring-web/src/main/java/org/springframework/web/server/handler/ExceptionHandlingWebHandler.java",
+    "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+    "spring-webflux/src/main/java/org/springframework/web/reactive/DispatcherHandler.java",
+    "spring-webflux/src/main/java/org/springframework/web/reactive/DispatchExceptionHandler.java"
+  ],
+  "retrieved_paths_union": [
+    "transport/src/main/java/io/netty/channel/ChannelHandler.java",
+    "transport/src/main/java/io/netty/channel/ChannelHandlerAdapter.java",
+    "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+    "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java",
+    "transport/src/main/java/io/netty/bootstrap/ServerBootstrap.java",
+    "handler/src/main/java/io/netty/handler/ssl/SslHandler.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorNetty2HttpHandlerAdapter.java",
+    "spring-web/testFixtures/.../ReactorHttpServer.java",
+    "framework-docs/.../reactive-spring.adoc",
+    "spring-web/src/main/java/org/springframework/web/server/handler/ExceptionHandlingWebHandler.java",
+    "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+    "spring-webflux/src/main/java/org/springframework/web/reactive/DispatcherHandler.java",
+    "spring-webflux/src/main/java/org/springframework/web/reactive/DispatchExceptionHandler.java"
+  ],
+  "required_files": [
+    "netty/handler/src/main/java/io/netty/handler/codec/http/HttpServerCodec.java",
+    "spring-framework/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java"
+  ],
+  "ir_scores": {
+    "task_id": "error-prov-dual-netty-spring-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.2044
+    },
+    "mrr": 0.1429,
+    "map_score": 0.0714,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0714,
+    "n_retrieved": 14,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "error-prov-dual-netty-spring-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.2044
+    },
+    "mrr": 0.1429,
+    "map_score": 0.0714,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0714,
+    "n_retrieved": 14,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 27.0,
+  "response_chars": 5352,
+  "raw_response": "I could not write `/workspace/analysis/IMPACT_REPORT.md` because the available search tools do not provide filesystem-write access. Findings so far:\n\n- **Netty exception propagation**\n  - `transport/src/main/java/io/netty/channel/ChannelHandler.java:197-198` \u2014 `exceptionCaught(ChannelHandlerContext, Throwable)`.\n  - `transport/src/main/java/io/netty/channel/ChannelHandlerAdapter.java:80-93` \u2014 default handler forwards via `ctx.fireExceptionCaught(cause)`.\n  - `transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java:315-318,321-356` \u2014 locates the next inbound exception handler, dispatches on its executor, invokes `handler().exceptionCaught`, and forwards handler-thrown errors.\n  - `transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java:905-909` \u2014 starts exception propagation.\n  - `transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java:1146-1158` \u2014 `onUnhandledInboundException` logs at WARN and releases the cause when it reaches the pipeline tail. This is the primary context-loss boundary if no handler preserves or exports the exception.\n  - `transport/src/main/java/io/netty/bootstrap/ServerBootstrap.java:233-245` \u2014 default server child handler logs/handles channel exceptions and continues propagation.\n  - `handler/src/main/java/io/netty/handler/ssl/SslHandler.java:1186-1204` \u2014 SSL exceptions are either ignored or forwarded into the pipeline.\n\n- **Spring WebFlux / Reactor Netty bridge**\n  - `spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java:39-67` \u2014 `BiFunction<HttpServerRequest,HttpServerResponse,Mono<Void>>`; creates `ReactorServerHttpRequest/Response`, delegates to `HttpHandler.handle`, and only logs failures with `doOnError`; it does not translate or enrich the exception.\n  - `spring-web/src/main/java/org/springframework/http/server/reactive/ReactorNetty2HttpHandlerAdapter.java:35-68` \u2014 equivalent Reactor Netty 2 adapter.\n  - `spring-web/testFixtures/.../ReactorHttpServer.java:23-46` \u2014 confirms the server fixture wraps Spring\u2019s handler with `ReactorHttpHandlerAdapter`.\n  - `framework-docs/.../reactive-spring.adoc:93-105` \u2014 documented `HttpServer.handle(new ReactorHttpHandlerAdapter(handler))` integration.\n  - `spring-web/src/main/java/org/springframework/web/server/handler/ExceptionHandlingWebHandler.java:66-79` \u2014 converts synchronous throws to `Mono.error`, then applies registered `WebExceptionHandler`s through `onErrorResume`.\n  - `spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java:164-179` \u2014 obtains ordered `WebExceptionHandler` beans and installs them.\n  - `spring-webflux/src/main/java/org/springframework/web/reactive/DispatcherHandler.java:164-174` \u2014 propagates dispatch errors through `DispatchExceptionHandler` implementations.\n  - `spring-webflux/src/main/java/org/springframework/web/reactive/DispatchExceptionHandler.java:40-50` \u2014 contract explicitly retains the original `Throwable` in an unhandled error signal.\n  - `framework-docs/.../reactive-spring.adoc:420-445` \u2014 documents `WebExceptionHandler`, `ResponseStatusExceptionHandler`, and `WebFluxResponseStatusExceptionHandler`.\n\n**Trace and impact:** a Netty channel handler receives a connection-reset `Throwable` through `exceptionCaught`; forwarding uses `fireExceptionCaught` until a handler consumes it or the pipeline tail logs/releases it. Reactor Netty invokes Spring\u2019s `ReactorHttpHandlerAdapter`; the adapter returns the application `Mono` and logs failures but does not map low-level Netty exceptions. Spring\u2019s WebFlux chain receives the error signal and applies `WebExceptionHandler`/dispatch handling. If no custom handler maps it, the server-level response commonly becomes a generic 500.\n\n**Where context is lost:** primarily at the boundary between Netty/Reactor Netty and Spring: `ReactorHttpHandlerAdapter` preserves the throwable in Reactor\u2019s error signal but only emits a trace message containing `ex.getMessage()`, omitting structured channel/pipeline context. A second loss occurs in generic WebFlux error handling when the exception is mapped to an HTTP 500 without exposing the original cause. Netty\u2019s `onUnhandledInboundException` is an earlier loss point when the pipeline has no terminal application handler; it logs and releases the cause rather than exporting it to the HTTP layer.\n\n**Migration/recommendations:**\n- Add a final Netty `ChannelInboundHandler` with `exceptionCaught` that records channel ID, remote address, pipeline handler name, and the complete cause chain before forwarding/closing.\n- Configure Reactor Netty connection/server hooks or access logs to preserve channel-level metadata and correlate it with Spring\u2019s request log prefix.\n- Register an ordered Spring `WebExceptionHandler` that detects reset/transport exceptions, logs the original throwable and correlation data, and returns an appropriate response only when the connection is still writable.\n- Avoid replacing transport exceptions with bare `ResponseStatusException` or generic 500 errors; retain the original cause (`new ...(..., ex)`).\n- Add integration tests covering Netty handler failure \u2192 Reactor Netty `Mono.error` \u2192 WebFlux `WebExceptionHandler`, including assertions that the original cause and correlation metadata remain available.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "error-prov-dual-netty-spring-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 14,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "transport/src/main/java/io/netty/channel/ChannelHandler.java",
+    "transport/src/main/java/io/netty/channel/ChannelHandlerAdapter.java",
+    "transport/src/main/java/io/netty/channel/AbstractChannelHandlerContext.java",
+    "transport/src/main/java/io/netty/channel/DefaultChannelPipeline.java",
+    "transport/src/main/java/io/netty/bootstrap/ServerBootstrap.java",
+    "handler/src/main/java/io/netty/handler/ssl/SslHandler.java",
+    "spring-framework/spring-web/src/main/java/org/springframework/http/server/reactive/ReactorHttpHandlerAdapter.java",
+    "spring-web/src/main/java/org/springframework/http/server/reactive/ReactorNetty2HttpHandlerAdapter.java",
+    "spring-web/testFixtures/.../ReactorHttpServer.java",
+    "framework-docs/.../reactive-spring.adoc",
+    "spring-web/src/main/java/org/springframework/web/server/handler/ExceptionHandlingWebHandler.java",
+    "spring-web/src/main/java/org/springframework/web/server/adapter/WebHttpHandlerBuilder.java",
+    "spring-webflux/src/main/java/org/springframework/web/reactive/DispatcherHandler.java",
+    "spring-webflux/src/main/java/org/springframework/web/reactive/DispatchExceptionHandler.java"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "error-prov-dual-netty-spring-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 14,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

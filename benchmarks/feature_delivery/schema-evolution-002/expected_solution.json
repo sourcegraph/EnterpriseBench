@@ -1,0 +1,41 @@
+{
+  "task_id": "schema-evolution-002",
+  "checkpoints": {
+    "identify_schema_change": {
+      "expected_solution": "Zulip PR #31760 replaces the JSON file-based realm export tracking with a proper `RealmExport` Django model. The schema change creates a new table via a new migration named `0595_add_realmexport_table_and_backfill` added under zerver/migrations/ (table create + data backfill from filesystem state). The model is registered in `zerver/models/realms.py` (new `class RealmExport(models.Model)`) and exported from the package barrel `zerver/models/__init__.py`.",
+      "evaluation_criteria": [
+        "Must identify the change as a new RealmExport model + backfill migration",
+        "Must reference zerver/models/realms.py as the model location",
+        "Must reference the new migration `0595_add_realmexport_table_and_backfill` added under zerver/migrations/",
+        "Should reference zerver/models/__init__.py as the package barrel update"
+      ]
+    },
+    "find_direct_refs": {
+      "expected_solution": "Direct references — code paths that call the new RealmExport model directly or own its lifecycle: (1) `zerver/models/realms.py` — declares the model and its fields (status, export_type, date_started, etc.); (2) `zerver/actions/realm_export.py` — action layer that creates RealmExport rows when an admin requests an export; (3) `zerver/views/realm_export.py` — REST endpoints `POST /export/realm`, `GET /export/realm`, `DELETE /export/realm/{id}` that read/write RealmExport; (4) `zerver/worker/deferred_work.py` — async worker consumes the deferred-work queue, executes the export, and updates the row's status/result fields.",
+      "evaluation_criteria": [
+        "Must cite zerver/actions/realm_export.py as the action-layer reference",
+        "Must cite zerver/views/realm_export.py as the view-layer reference",
+        "Must cite zerver/worker/deferred_work.py for the async lifecycle",
+        "Should cite zerver/models/realms.py for the field-level model definition"
+      ]
+    },
+    "find_indirect_refs": {
+      "expected_solution": "Indirect references — code that depends on export state but doesn't import RealmExport directly: (1) `zerver/lib/export.py` — the underlying tarball builder that the worker invokes; previously it was the source of truth for export state, now it just produces artifacts and reports status back to RealmExport; (2) `zerver/management/commands/export.py` — CLI `manage.py export` command that creates RealmExport rows when run by an operator; (3) `zerver/models/__init__.py` — package barrel that must re-export RealmExport so other modules `from zerver.models import RealmExport` works.",
+      "evaluation_criteria": [
+        "Must cite zerver/lib/export.py as the underlying export-builder utility",
+        "Must cite zerver/management/commands/export.py as the CLI entry-point",
+        "Must cite zerver/models/__init__.py for the package barrel re-export",
+        "Should explain that zerver/lib/export.py shifts from source-of-truth to artifact builder"
+      ]
+    },
+    "identify_test_impact": {
+      "expected_solution": "Test files that need updates: (1) `zerver/tests/test_realm_export.py` — primary REST/lifecycle test for the new model and endpoints; (2) `zerver/tests/test_import_export.py` — covers the underlying export tarball builder; must validate it integrates correctly with RealmExport rows; (3) `zerver/tests/test_events.py` — verifies that export start/complete/fail events flow through the event system; (4) `zerver/tests/test_management_commands.py` — covers the `manage.py export` command path which now creates RealmExport rows.",
+      "evaluation_criteria": [
+        "Must cite zerver/tests/test_realm_export.py as the primary test target",
+        "Must cite zerver/tests/test_import_export.py for tarball-builder integration",
+        "Must cite zerver/tests/test_events.py and zerver/tests/test_management_commands.py",
+        "Should explain that test_management_commands.py now exercises a path that produces RealmExport rows"
+      ]
+    }
+  }
+}

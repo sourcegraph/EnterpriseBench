@@ -1,0 +1,32 @@
+{
+  "task_id": "monorepo-boundary-pnpm-lockfile-005",
+  "checkpoints": {
+    "identify_affected_packages": {
+      "expected_solution": "The pnpm v9.0.0 release (PRs #7470 and #7476) bumps the lockfile format to v6 and removes the registry URL from the dependency-path format, both via foundational packages: `@pnpm/constants` (`packages/constants/src/index.ts`) and `@pnpm/dependency-path` (`packages/dependency-path/src/index.ts` and `packages/dependency-path/test/index.ts`). The data-shape change cascades through nine sibling packages: `@pnpm/lockfile-file` (`lockfile/lockfile-file/`), `@pnpm/lockfile-utils` (`lockfile/lockfile-utils/`), `@pnpm/lockfile-to-pnp` (`lockfile/lockfile-to-pnp/`), `@pnpm/merge-lockfile-changes` (`lockfile/merge-lockfile-changes/`), `@pnpm/prune-lockfile` (`lockfile/prune-lockfile/`), `@pnpm/filter-lockfile` (`lockfile/filter-lockfile/`), `@pnpm/calc-dep-state` (`packages/calc-dep-state/`), `@pnpm/plugin-commands-rebuild` (`exec/plugin-commands-rebuild/`), and `@pnpm/audit` (`lockfile/audit/`). PR file count = 30.",
+      "evaluation_criteria": [
+        "Must identify the @pnpm/constants and @pnpm/dependency-path source-of-change packages",
+        "Must list at least 5 affected sibling packages, including @pnpm/lockfile-file and @pnpm/lockfile-utils",
+        "Must cite packages/dependency-path/src/index.ts as the changed dep-path source",
+        "Should reference lockfile/lockfile-file/src/write.ts or lockfile/lockfile-file/src/experiments/inlineSpecifiersLockfileConverters.ts"
+      ]
+    },
+    "classify_change_impact": {
+      "expected_solution": "Overall semver = **major** for v9.0.0 because the lockfile format and the dependency-path string format both change in observable ways (existing v5 lockfiles are not directly readable, and consumers parsing dep-path strings see a different shape). Per-package classifications: `@pnpm/constants` = major (constant value flips), `@pnpm/dependency-path` = major (output format change), and every downstream lockfile/* and packages/calc-dep-state package = major because their public functions consume the new dep-path strings or lockfile shape. Tooling that pinned to v5 (e.g., third-party PnP integrations via `@pnpm/lockfile-to-pnp`) requires migration. The breaking nature is the entire reason v9.0.0 was released as a major version.",
+      "evaluation_criteria": [
+        "Must classify overall semver as `major` and justify via lockfile format incompatibility",
+        "Must classify each downstream lockfile package (e.g., @pnpm/lockfile-file, @pnpm/lockfile-utils) as major",
+        "Must explain that the dep-path format change is observable to external consumers",
+        "Should note that v5 lockfiles need migration via lockfile/lockfile-file/src/experiments/inlineSpecifiersLockfileConverters.ts"
+      ]
+    },
+    "identify_boundary_violations": {
+      "expected_solution": "Source-of-change files: (1) `packages/constants/src/index.ts` — bumps `LOCKFILE_VERSION` constant to 6.0; (2) `packages/dependency-path/src/index.ts` — removes registry URL segment from dep-path strings; (3) `packages/dependency-path/test/index.ts` — updates expectations. Cascading consumers: (4) `lockfile/lockfile-file/src/write.ts` and `lockfile/lockfile-file/src/experiments/inlineSpecifiersLockfileConverters.ts` for read/write of v6 + inline-specifier conversion; (5) `lockfile/lockfile-file/test/lockfileV6Converters.test.ts` (new), `lockfile/lockfile-file/test/normalizeLockfile.test.ts`, `lockfile/lockfile-file/test/write.test.ts`; (6) `lockfile/lockfile-utils/test/nameVerFromPkgSnapshot.ts` and `lockfile/lockfile-utils/test/pkgSnapshotToResolution.ts`; (7) `lockfile/lockfile-to-pnp/src/index.ts` and `lockfile/lockfile-to-pnp/test/index.ts`; (8) `lockfile/merge-lockfile-changes/src/index.ts` and `lockfile/merge-lockfile-changes/test/index.ts`; (9) `lockfile/prune-lockfile/test/index.ts`; (10) `lockfile/filter-lockfile/test/filterByImporters.ts` and `lockfile/filter-lockfile/test/filterByImportersAndEngine.ts`; (11) `packages/calc-dep-state/test/index.ts` and `packages/calc-dep-state/test/lockfileToDepGraph.test.ts`; (12) `exec/plugin-commands-rebuild/test/index.ts`; (13) `lockfile/audit/test/index.ts`. Plus snapshot file `lockfile/lockfile-file/test/__snapshots__/write.test.ts.snap`.",
+      "evaluation_criteria": [
+        "Must cite packages/constants/src/index.ts as the lockfile-version constant change",
+        "Must cite packages/dependency-path/src/index.ts as the dep-path format change",
+        "Must cite lockfile/lockfile-file/src/write.ts or lockfile/lockfile-file/src/experiments/inlineSpecifiersLockfileConverters.ts",
+        "Should mention at least three cascading test files such as lockfile/lockfile-utils/test/nameVerFromPkgSnapshot.ts, lockfile/lockfile-to-pnp/src/index.ts, or packages/calc-dep-state/test/index.ts"
+      ]
+    }
+  }
+}

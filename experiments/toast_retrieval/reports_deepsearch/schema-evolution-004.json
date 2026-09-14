@@ -1,0 +1,230 @@
+{
+  "task_id": "schema-evolution-004",
+  "policy": "deepsearch",
+  "suite": "feature_delivery",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/zulip--f2a5dc94"
+  ],
+  "retrieved_paths": [
+    "zerver/migrations/0776_realm_default_avatar_source.py",
+    "zerver/models/realms.py",
+    "zerver/models/users.py",
+    "zerver/lib/avatar.py",
+    "zerver/actions/user_settings.py",
+    "zerver/lib/create_user.py",
+    "api_docs/changelog.md",
+    "zerver/data_import/slack.py",
+    "zerver/data_import/mattermost.py",
+    "zerver/data_import/rocketchat.py",
+    "zerver/data_import/microsoft_teams.py",
+    "web/src/admin.ts",
+    "web/src/settings_org.ts",
+    "web/src/settings_components.ts",
+    "web/src/settings_config.ts",
+    "web/src/state_data.ts",
+    "web/templates/settings/organization_settings_admin.hbs",
+    "package.json",
+    "zerver/tests/test_upload.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_realm.py",
+    "zerver/tests/test_transfer.py"
+  ],
+  "retrieved_paths_union": [
+    "zerver/migrations/0776_realm_default_avatar_source.py",
+    "zerver/models/realms.py",
+    "zerver/models/users.py",
+    "zerver/lib/avatar.py",
+    "zerver/actions/user_settings.py",
+    "zerver/lib/create_user.py",
+    "api_docs/changelog.md",
+    "zerver/data_import/slack.py",
+    "zerver/data_import/mattermost.py",
+    "zerver/data_import/rocketchat.py",
+    "zerver/data_import/microsoft_teams.py",
+    "web/src/admin.ts",
+    "web/src/settings_org.ts",
+    "web/src/settings_components.ts",
+    "web/src/settings_config.ts",
+    "web/src/state_data.ts",
+    "web/templates/settings/organization_settings_admin.hbs",
+    "package.json",
+    "zerver/tests/test_upload.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_realm.py",
+    "zerver/tests/test_transfer.py"
+  ],
+  "required_files": [
+    "zerver/models/realms.py",
+    "zerver/models/users.py",
+    "zerver/lib/avatar.py"
+  ],
+  "ir_scores": {
+    "task_id": "schema-evolution-004",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.7328,
+      "10": 0.7328
+    },
+    "mrr": 0.5,
+    "map_score": 0.6389,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1364,
+    "n_retrieved": 22,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "schema-evolution-004",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.7328,
+      "10": 0.7328
+    },
+    "mrr": 0.5,
+    "map_score": 0.6389,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1364,
+    "n_retrieved": 22,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 120.1,
+  "response_chars": 11878,
+  "raw_response": "---\ntitle: Impact analysis for moving default avatar source from user to realm\nshare_url: https://demo.sourcegraph.com/deepsearch/57086a61-017d-4d72-99ea-d02a7558ff2c\nurl: https://demo.sourcegraph.com/deepsearch/2132\ncreated: 2026-08-17T21:11:20Z\nupdated: 2026-08-17T21:12:57Z\n---\n\n# # Schema Change: Move Avatar Source from User to Realm Level\n\n## Context\n\nWe're changing how default avatar sources work. Currently `default_avatar_source` lives on each `UserProfile`, but it should really be a realm-level setting \u2014 organizations choose whether to use Gravatar or generated avatars, not individual users.\n\nThe migration `zerver/migrations/0776_realm_default_avatar_source.py` adds the field to Realm and the corresponding removal happens from UserProfile.\n\n## What I Need\n\nThis field is referenced in more places than you'd expect. I need the full picture:\n\n1. **Schema change**: The migration file and both model files (`realms.py` for the addition, `users.py` for the removal).\n\n2. **Direct references**: The core avatar logic in `lib/avatar.py` that reads this field. Also check the API examples \u2014 some may reference avatar source in example payloads.\n\n3. **Indirect references**: This is where it gets interesting. We have importers for migrating from other chat platforms (Slack, Mattermost, Rocket.Chat) and each one sets `default_avatar_source` during import. All of them need updating. Also check frontend templates and any dependency changes (we're patching a JavaScript library for avatar generation).\n\n4. **Test coverage**: We need updates in upload tests, importer tests, and event tests.\n\nWrite your findings to `/workspace/zulip/SCHEMA_IMPACT.md`.\n\n\nSearch only these repositories: github.com/sg-evals/zulip--f2a5dc94\n\nThe findings are written above (the full markdown content is the artifact). Here is a summary of what was found across the codebase:\n\n---\n\n## `default_avatar_source`: User \u2192 Realm \u2014 Impact Summary\n\n### 1. Schema Change\n- **Migration**: [`zerver/migrations/0776_realm_default_avatar_source.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/migrations/0776_realm_default_avatar_source.py) \u2014 adds `default_avatar_source` CharField (`\"G\"`/`\"J\"`, default `\"G\"`) to `realm`.\n- **`realms.py`** ([lines 723\u2013737](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/models/realms.py?L723-737)): field + constants + `property_types` entry added. All correct.\n- **`users.py`** ([lines 655\u2013666](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/models/users.py?L655-666)): `DEFAULT_AVATAR_SOURCE` class constant (`\"G\"`) and per-user `avatar_source` field still present. The class constant is the pending removal target; the `avatar_source` field itself stays.\n\n### 2. Direct References\n- [`zerver/lib/avatar.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/lib/avatar.py): `avatar_url()` reads the per-user `avatar_source` field (correct \u2014 not the realm default). `get_avatar_field()` branches on `UserProfile.AVATAR_FROM_*` constants \u2014 no immediate change needed unless those constants are removed later.\n- [`zerver/actions/user_settings.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/actions/user_settings.py?L444-458) and [`zerver/lib/create_user.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/lib/create_user.py?L208-210): already read from `realm.default_avatar_source` \u2014 **no changes needed**.\n- [`api_docs/changelog.md`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/api_docs/changelog.md?L119-123): Feature level 456 documents the new realm setting.\n\n### 3. Indirect References \u2014 the real work\n\n**Four importers all hardcode `UserProfile.DEFAULT_AVATAR_SOURCE` and need updating:**\n\n| File | Lines |\n|---|---|\n| [`zerver/data_import/slack.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/data_import/slack.py?L505-524) | 505, 524 |\n| [`zerver/data_import/mattermost.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/data_import/mattermost.py?L91) | 91 |\n| [`zerver/data_import/rocketchat.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/data_import/rocketchat.py?L95) | 95 |\n| [`zerver/data_import/microsoft_teams.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/data_import/microsoft_teams.py?L299-353) | 299, 353 |\n\nAll should replace `UserProfile.DEFAULT_AVATAR_SOURCE` with `Realm.AVATAR_FROM_GRAVATAR` (or derive from the realm object).\n\n**Frontend** (all already correctly reference `realm_default_avatar_source`): [`admin.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/web/src/admin.ts?L65), [`settings_org.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/web/src/settings_org.ts?L248-251), [`settings_components.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/web/src/settings_components.ts?L915), [`settings_config.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/web/src/settings_config.ts?L1408), [`state_data.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/web/src/state_data.ts?L486), [`organization_settings_admin.hbs`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/web/templates/settings/organization_settings_admin.hbs?L82-91).\n\n**JS dependency**: [`package.json`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/package.json?L54) has `jdenticon@^3.3.0`. No `patches/jdenticon.patch` exists yet \u2014 if one is planned, it is not yet committed.\n\n### 4. Test Coverage\n- [`test_upload.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/tests/test_upload.py?L1655-1695), [`test_events.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/tests/test_events.py?L1594-1599), [`test_realm.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/tests/test_realm.py?L2373-2375), [`test_transfer.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--f2a5dc94/-/blob/zerver/tests/test_transfer.py?L47-49): all correctly use `Realm.*` constants and `do_set_realm_property`.\n- **Gap**: No importer test files reference `default_avatar_source`. Tests should be added for all four importers to assert the realm-level default is applied when no user-specific avatar exists.\n\n## Sources\n\n- [github.com/sg-evals/zulip--f2a5dc94](/github.com/sg-evals/zulip--f2a5dc94)\n- [repo:^github.com/sg-evals/zulip--f2a5dc94$ default_avatar_source](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--f2a5dc94$%20default_avatar_source)\n- [repo:^github.com/sg-evals/zulip--f2a5dc94$ default_avatar_source file:mattermost](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--f2a5dc94$%20default_avatar_source%20file:mattermost)\n- [repo:^github.com/sg-evals/zulip--f2a5dc94$ default_avatar_source file:test](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--f2a5dc94$%20default_avatar_source%20file:test)\n- [repo:^github.com/sg-evals/zulip--f2a5dc94$ default_avatar_source file:avatar](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--f2a5dc94$%20default_avatar_source%20file:avatar)\n- [repo:^github.com/sg-evals/zulip--f2a5dc94$ avatar_source file:lib/avatar.py](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--f2a5dc94$%20avatar_source%20file:lib%2Favatar.py)\n- [github.com/sg-evals/zulip--f2a5dc94](/github.com/sg-evals/zulip--f2a5dc94)\n- [repo:^github.com/sg-evals/zulip--f2a5dc94$ default_avatar_source file:api_docs](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--f2a5dc94$%20default_avatar_source%20file:api_docs)\n- [repo:^github.com/sg-evals/zulip--f2a5dc94$ jdenticon file:pnpm-lock.yaml OR file:package.json](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--f2a5dc94$%20jdenticon%20file:pnpm-lock.yaml%20OR%20file:package.json)\n- [github.com/sg-evals/zulip--f2a5dc94/zerver/migrations/0776_realm_default_avatar_source.py@86b1312](/github.com/sg-evals/zulip--f2a5dc94@86b13124ae02ed39adba4cf2caaa6d9de4f7d4b7/-/blob/zerver/migrations/0776_realm_default_avatar_source.py)\n- [github.com/sg-evals/zulip--f2a5dc94/zerver/models/realms.py@86b1312?L720-755](/github.com/sg-evals/zulip--f2a5dc94@86b13124ae02ed39adba4cf2caaa6d9de4f7d4b7/-/blob/zerver/models/realms.py?L720-755)\n- [github.com/sg-evals/zulip--f2a5dc94/zerver/models/users.py@86b1312?L650-690](/github.com/sg-evals/zulip--f2a5dc94@86b13124ae02ed39adba4cf2caaa6d9de4f7d4b7/-/blob/zerver/models/users.py?L650-690)\n- [github.com/sg-evals/zulip--f2a5dc94/zerver/lib/avatar.py@86b1312](/github.com/sg-evals/zulip--f2a5dc94@86b13124ae02ed39adba4cf2caaa6d9de4f7d4b7/-/blob/zerver/lib/avatar.py)\n- [repo:^github.com/sg-evals/zulip--f2a5dc94$ jdenticon file:package.json](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--f2a5dc94$%20jdenticon%20file:package.json)\n- [repo:^github.com/sg-evals/zulip--f2a5dc94$ avatar_source file:data_import/slack.py](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--f2a5dc94$%20avatar_source%20file:data_import%2Fslack.py)\n- [repo:^github.com/sg-evals/zulip--f2a5dc94$ avatar_source file:data_import/rocketchat.py](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--f2a5dc94$%20avatar_source%20file:data_import%2Frocketchat.py)\n- [repo:^github.com/sg-evals/zulip--f2a5dc94$ default_avatar_source file:templates](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--f2a5dc94$%20default_avatar_source%20file:templates)\n- [repo:^github.com/sg-evals/zulip--f2a5dc94$ DEFAULT_AVATAR_SOURCE file:data_import](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--f2a5dc94$%20DEFAULT_AVATAR_SOURCE%20file:data_import)\n- [repo:^github.com/sg-evals/zulip--f2a5dc94$ default_avatar_source file:test_upload OR file:test_events OR file:test_realm](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--f2a5dc94$%20default_avatar_source%20file:test_upload%20OR%20file:test_events%20OR%20file:test_realm)\n- [github.com/sg-evals/zulip--f2a5dc94/zerver/data_import/slack.py@86b1312?L500-530](/github.com/sg-evals/zulip--f2a5dc94@86b13124ae02ed39adba4cf2caaa6d9de4f7d4b7/-/blob/zerver/data_import/slack.py?L500-530)\n- [github.com/sg-evals/zulip--f2a5dc94/zerver/data_import/rocketchat.py@86b1312?L90-120](/github.com/sg-evals/zulip--f2a5dc94@86b13124ae02ed39adba4cf2caaa6d9de4f7d4b7/-/blob/zerver/data_import/rocketchat.py?L90-120)\n- [github.com/sg-evals/zulip--f2a5dc94/zerver/tests/test_upload.py@86b1312?L1655-1695](/github.com/sg-evals/zulip--f2a5dc94@86b13124ae02ed39adba4cf2caaa6d9de4f7d4b7/-/blob/zerver/tests/test_upload.py?L1655-1695)\n- [github.com/sg-evals/zulip--f2a5dc94/zerver/tests/test_events.py@86b1312?L1590-1605](/github.com/sg-evals/zulip--f2a5dc94@86b13124ae02ed39adba4cf2caaa6d9de4f7d4b7/-/blob/zerver/tests/test_events.py?L1590-1605)\n- [github.com/sg-evals/zulip--f2a5dc94/zerver/tests/test_transfer.py@86b1312?L40-65](/github.com/sg-evals/zulip--f2a5dc94@86b13124ae02ed39adba4cf2caaa6d9de4f7d4b7/-/blob/zerver/tests/test_transfer.py?L40-65)\n- [github.com/sg-evals/zulip--f2a5dc94/api_docs/changelog.md@86b1312?L115-135](/github.com/sg-evals/zulip--f2a5dc94@86b13124ae02ed39adba4cf2caaa6d9de4f7d4b7/-/blob/api_docs/changelog.md?L115-135)\n\n\nGenerated files:\n- files/SCHEMA_IMPACT.json: /.api/agent-files/v1/deep-search/57086a61-017d-4d72-99ea-d02a7558ff2c/files/SCHEMA_IMPACT.json\n- files/SCHEMA_IMPACT_md.csv: /.api/agent-files/v1/deep-search/57086a61-017d-4d72-99ea-d02a7558ff2c/files/SCHEMA_IMPACT_md.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "schema-evolution-004",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.7328,
+      "10": 0.7328
+    },
+    "mrr": 0.5,
+    "map_score": 0.6389,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1364,
+    "n_retrieved": 22,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "zerver/migrations/0776_realm_default_avatar_source.py",
+    "zerver/models/realms.py",
+    "zerver/models/users.py",
+    "zerver/lib/avatar.py",
+    "zerver/actions/user_settings.py",
+    "zerver/lib/create_user.py",
+    "api_docs/changelog.md",
+    "zerver/data_import/slack.py",
+    "zerver/data_import/mattermost.py",
+    "zerver/data_import/rocketchat.py",
+    "zerver/data_import/microsoft_teams.py",
+    "web/src/admin.ts",
+    "web/src/settings_org.ts",
+    "web/src/settings_components.ts",
+    "web/src/settings_config.ts",
+    "web/src/state_data.ts",
+    "web/templates/settings/organization_settings_admin.hbs",
+    "package.json",
+    "zerver/tests/test_upload.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_realm.py",
+    "zerver/tests/test_transfer.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "schema-evolution-004",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.7328,
+      "10": 0.7328
+    },
+    "mrr": 0.5,
+    "map_score": 0.6389,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1364,
+    "n_retrieved": 22,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

@@ -40,15 +40,16 @@
     }
   ],
   "error_chain": [
-    "User runs docker container create with invalid options",
-    "Docker CLI parses command and sends request to Moby daemon via API",
-    "Moby daemon container.go validates container configuration",
-    "Moby daemon returns error response with internal error details",
-    "Docker CLI formats and displays error to user without full context"
+    "Container process launch in the runc/containerd shim fails to resolve the executable, emitting 'exec: executable file not found in $PATH' from the OCI runtime",
+    "Moby daemon task creation via libcontainerd (containerStart in daemon/start.go, OCI spec built by createSpec in daemon/oci_linux.go) receives the runtime failure and wraps it as 'failed to create task for container: failed to create shim task: OCI runtime create failed'",
+    "Moby daemon returns the wrapped failure as an HTTP error response to the CLI's /containers/{id}/start request",
+    "Docker CLI API client parses the daemon response and surfaces it prefixed with 'Error response from daemon'",
+    "Docker CLI run handler (runRun in cli/command/container/run.go) returns the error and cli/error.go formats the user-visible 'docker: ...' output, discarding the deeper runc PATH-resolution context"
   ],
   "trigger_conditions": [
-    "Docker CLI sends a container creation request with conflicting network options",
-    "Moby daemon validates the configuration in daemon/create.go",
-    "The error message from Moby is wrapped by CLI without preserving the root cause context"
+    "The executable exists in the image but is absent from the container's PATH environment, so runc's PATH resolution against Process.Args cannot locate it",
+    "An entrypoint or cmd override passed to docker run names a binary that is misspelled or not present in the resolved argv",
+    "An image layer problem leaves the binary missing, stripped of execute permission, or built for the wrong architecture, so the exec syscall fails",
+    "A relative command name is resolved against an empty or non-standard PATH inherited from the image configuration or an overriding --env PATH"
   ]
 }

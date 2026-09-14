@@ -1,0 +1,164 @@
+{
+  "task_id": "err-provenance-tri-httpx-proxy-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/httpx--0.27.0",
+    "github.com/sg-evals/httpcore--1.0.5",
+    "github.com/sg-evals/h11--v0.14.0"
+  ],
+  "retrieved_paths": [],
+  "retrieved_paths_union": [],
+  "required_files": [
+    "httpx/httpx/_transports/default.py",
+    "httpcore/httpcore/_async/http_proxy.py",
+    "httpcore/httpcore/_async/http11.py",
+    "h11/h11/_connection.py"
+  ],
+  "ir_scores": {
+    "task_id": "err-provenance-tri-httpx-proxy-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 0,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "ir_scores_union": {
+    "task_id": "err-provenance-tri-httpx-proxy-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 0,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "elapsed_seconds": 16.7,
+  "response_chars": 7287,
+  "raw_response": "The message originates in **h11**, then is translated by **httpcore** and finally by **httpx**. In this deployment, \u201cpeer\u201d is the endpoint on the other side of the tunneled stream\u2014normally the vendor origin as observed through the proxy; the proxy can also be the component that closes the tunnel, and the parser cannot distinguish which hop generated the EOF.\n\n```json\n{\n  \"origin\": {\n    \"repo\": \"h11\",\n    \"file\": \"h11/_connection.py\",\n    \"function\": \"Connection.next_event\",\n    \"lines\": \"426-489\",\n    \"condition\": \"next_event() calls _extract_next_receive_event(); it returns NEED_DATA while _receive_buffer_closed is already true. If the parser still needs bytes and no more bytes can arrive, h11 raises RemoteProtocolError(\\\"peer unexpectedly closed connection\\\").\"\n  },\n  \"path\": [\n    {\n      \"repo\": \"httpx\",\n      \"file\": \"httpx/_transports/default.py\",\n      \"symbol\": \"AsyncHTTPTransport.__init__\",\n      \"lines\": \"262-310\",\n      \"detail\": \"An http:// or https:// proxy URL selects httpcore.AsyncHTTPProxy.\"\n    },\n    {\n      \"repo\": \"httpcore\",\n      \"file\": \"httpcore/_async/http_proxy.py\",\n      \"symbol\": \"AsyncHTTPProxy.create_connection\",\n      \"lines\": \"147-167\",\n      \"detail\": \"HTTP origins use AsyncForwardHTTPConnection; HTTPS origins use AsyncTunnelHTTPConnection.\"\n    },\n    {\n      \"repo\": \"httpcore\",\n      \"file\": \"httpcore/_async/http_proxy.py\",\n      \"symbol\": \"AsyncTunnelHTTPConnection.handle_async_request\",\n      \"lines\": \"266-300\",\n      \"detail\": \"The tunnel connection sends CONNECT host:port to the proxy, validates the 2xx response, and obtains the proxy-provided network stream.\"\n    },\n    {\n      \"repo\": \"httpcore\",\n      \"file\": \"httpcore/_async/http_proxy.py\",\n      \"symbol\": \"AsyncTunnelHTTPConnection.handle_async_request\",\n      \"lines\": \"302-344\",\n      \"detail\": \"The stream is upgraded to TLS for the origin; when HTTP/1.1 is selected, AsyncHTTP11Connection is instantiated over that tunneled stream.\"\n    },\n    {\n      \"repo\": \"httpcore\",\n      \"file\": \"httpcore/_async/http11.py\",\n      \"symbol\": \"AsyncHTTP11Connection.__init__\",\n      \"lines\": \"50-70\",\n      \"detail\": \"The HTTP/1.1 layer creates h11.Connection(our_role=h11.CLIENT).\"\n    }\n  ],\n  \"translation\": {\n    \"httpcore\": {\n      \"repo\": \"httpcore\",\n      \"file\": \"httpcore/_async/http11.py\",\n      \"function\": \"AsyncHTTP11Connection._receive_event\",\n      \"lines\": \"216-243\",\n      \"detail\": \"next_event() is wrapped with map_exceptions({h11.RemoteProtocolError: httpcore.RemoteProtocolError}); therefore h11's exact text becomes an httpcore.RemoteProtocolError with the same message.\"\n    },\n    \"httpx\": {\n      \"repo\": \"httpx\",\n      \"file\": \"httpx/_transports/default.py\",\n      \"function\": \"map_httpcore_exceptions\",\n      \"lines\": \"66-104\",\n      \"detail\": \"The transport catches httpcore exceptions, looks them up in HTTPCORE_EXC_MAP, and raises the mapped httpx exception using the original message and `from exc`. httpcore.RemoteProtocolError maps to httpx.RemoteProtocolError.\"\n    },\n    \"streaming\": {\n      \"repo\": \"httpx\",\n      \"file\": \"httpx/_transports/default.py\",\n      \"function\": \"AsyncResponseStream.__aiter__\",\n      \"lines\": \"248-255\",\n      \"detail\": \"If the failure occurs while consuming the response body, the async iterator also runs under map_httpcore_exceptions, so the same translation occurs during body iteration rather than initial response acquisition.\"\n    }\n  },\n  \"distinction\": {\n    \"peer_unexpectedly_closed_connection\": \"h11 has already received EOF (`_receive_buffer_closed` is true), but its reader returned NEED_DATA because an HTTP event is incomplete. h11 raises the exact message.\",\n    \"server_disconnected_without_sending_a_response\": {\n      \"repo\": \"httpcore\",\n      \"file\": \"httpcore/_async/http11.py\",\n      \"function\": \"AsyncHTTP11Connection._receive_event\",\n      \"lines\": \"223-240\",\n      \"condition\": \"The network read returns b\\\"\\\" while h11.their_state is h11.SEND_RESPONSE. httpcore intercepts this before feeding EOF to h11 and raises RemoteProtocolError(\\\"Server disconnected without sending a response.\\\").\"\n    },\n    \"state_meaning\": \"their_state == SEND_RESPONSE means the peer has not produced the response headers yet. By contrast, the h11 message is used when parsing an already-started/incomplete event, such as incomplete response headers or body framing, after EOF.\"\n  },\n  \"network_interpretation\": \"CONNECT creates one logical tunneled stream: client -> corporate proxy -> vendor. After CONNECT and TLS, httpcore/h11 sees only the stream endpoint and calls it the peer. Thus the text does not identify the vendor specifically. If the proxy terminates or truncates the tunnel, it is the immediate peer closing the stream; if it transparently propagates an origin close, the origin is the ultimate cause. Vendor logs showing a complete 200 body do not rule out the proxy closing/truncating the client-facing tunnel after or during forwarding.\"\n}\n```\n\nCitations:\n\n- {\"repo\":\"h11\",\"file\":\"h11/_connection.py\",\"evidence_span\":\"if self._receive_buffer_closed:\\n                    # We're still trying to complete some event, but that's\\n                    # never going to happen because no more data is coming\\n                    raise RemoteProtocolError(\\\"peer unexpectedly closed connection\\\")\"}\n- {\"repo\":\"httpcore\",\"file\":\"httpcore/_async/http11.py\",\"evidence_span\":\"with map_exceptions({h11.RemoteProtocolError: RemoteProtocolError}):\\n                event = self._h11_state.next_event()\"}\n- {\"repo\":\"httpcore\",\"file\":\"httpcore/_async/http11.py\",\"evidence_span\":\"if data == b\\\"\\\" and self._h11_state.their_state == h11.SEND_RESPONSE:\\n                    msg = \\\"Server disconnected without sending a response.\\\"\\n                    raise RemoteProtocolError(msg)\"}\n- {\"repo\":\"httpcore\",\"file\":\"httpcore/_async/http11.py\",\"evidence_span\":\"self._h11_state = h11.Connection(\\n            our_role=h11.CLIENT,\\n            max_incomplete_event_size=self.MAX_INCOMPLETE_EVENT_SIZE,\\n        )\"}\n- {\"repo\":\"httpcore\",\"file\":\"httpcore/_async/http_proxy.py\",\"evidence_span\":\"return AsyncTunnelHTTPConnection(\\n            proxy_origin=self._proxy_url.origin,\\n            proxy_headers=self._proxy_headers,\\n            remote_origin=origin,\"}\n- {\"repo\":\"httpcore\",\"file\":\"httpcore/_async/http_proxy.py\",\"evidence_span\":\"connect_request = Request(\\n                    method=b\\\"CONNECT\\\",\\n                    url=connect_url,\\n                    headers=connect_headers,\\n                    extensions=request.extensions,\\n                )\"}\n- {\"repo\":\"httpcore\",\"file\":\"httpcore/_async/http_proxy.py\",\"evidence_span\":\"self._connection = AsyncHTTP11Connection(\\n                        origin=self._remote_origin,\\n                        stream=stream,\\n                        keepalive_expiry=self._keepalive_expiry,\\n                    )\"}\n- {\"repo\":\"httpx\",\"file\":\"httpx/_transports/default.py\",\"evidence_span\":\"elif proxy.url.scheme in (\\\"http\\\", \\\"https\\\"):\\n            self._pool = httpcore.AsyncHTTPProxy(\"}\n- {\"repo\":\"httpx\",\"file\":\"httpx/_transports/default.py\",\"evidence_span\":\"message = str(exc)\\n        raise mapped_exc(message) from exc\"}\n- {\"repo\":\"httpx\",\"file\":\"httpx/_transports/default.py\",\"evidence_span\":\"httpcore.RemoteProtocolError: RemoteProtocolError,\"}\n",
+  "ir_scores_unaligned": {
+    "task_id": "err-provenance-tri-httpx-proxy-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 0,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [],
+  "ir_scores_union_unaligned": {
+    "task_id": "err-provenance-tri-httpx-proxy-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 0,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

@@ -1,0 +1,30 @@
+{
+  "task_id": "refactor-dual-axum-tower-001",
+  "checkpoints": {
+    "router_generics": {
+      "expected_solution": "axum 0.7 dropped the `<B>` body generic from Router and switched to an internal `axum::body::Body` (a thin wrapper over hyper's body) constraint. The Router type lives in axum/src/routing/mod.rs at axum-v0.7.0; in 0.6 its signature was `Router<S = (), B = Body>`, in 0.7 it is `Router<S = ()>`. This affects every `tower::Service<Request<B>>` impl that previously parameterised on the body generic — those impls must now bind directly to `axum::body::Body` (or to hyper's `Incoming` for low-level middleware). The IMPACT_REPORT.md must mention 'Router', the body generic change, and the impl-site implications.",
+      "evaluation_criteria": [
+        "IMPACT_REPORT.md must mention 'Router' (verifier greps for the Router keyword)",
+        "Report must reference the body generic change — keywords 'generic', 'Body', or 'BoxBody' (any one of these satisfies the verifier's grep)",
+        "Report must discuss tower middleware impl sites — keyword 'impl' must appear (verifier grep) in the context of Service<Request<B>> implementations being affected",
+        "Must point to axum/src/routing/mod.rs as the location where Router's generic parameters are declared at axum-v0.7.0"
+      ]
+    },
+    "tower_service": {
+      "expected_solution": "tower's Service trait is defined in tower/src/lib.rs (re-exported via tower::Service) at tower-0.4.13. It has the shape `trait Service<Request> { type Response; type Error; type Future; ... }`. Composition uses `tower::Layer` from tower-layer/src/lib.rs which produces `Service<Request<B>>` middlewares. Under axum 0.7, the `B` type parameter on Request is now constrained to `axum::body::Body` for axum-shaped middlewares, so any tower middleware that wrote `impl<S, B> Service<Request<B>> for MyMw<S>` either keeps the generic and works (since axum hands them axum::body::Body) or gets replaced with a body-specific bound. The report must trace this interaction.",
+      "evaluation_criteria": [
+        "Report must reference tower/src/lib.rs as the Service trait location and explain the trait shape (Request, Response, Future associated types)",
+        "Report must mention tower's Layer composition primitive and reference tower-layer/src/lib.rs as the Layer trait source",
+        "Report must trace how axum's body generic removal flows through the Service<Request<B>> bound in tower middleware — i.e., what changes for middleware authors and what stays the same"
+      ]
+    },
+    "refactor_plan": {
+      "expected_solution": "The refactor plan must (a) describe the migration steps for tower middleware adapting to axum 0.7's body model and (b) explicitly mention 'middleware'. Concrete steps: 1) replace generic `B` body parameter with `axum::body::Body` in the Service impl bound; 2) remove BoxBody mapping middleware that exists solely to bridge body types; 3) update Layer<S> bounds to drop the body generic; 4) verify with `cargo check` against axum-v0.7.0 + tower-0.4.13. The report must read as actionable migration guidance, not just an analysis.",
+      "evaluation_criteria": [
+        "Report must contain at least one of the keywords 'refactor', 'adapt', or 'migration' (verifier grep)",
+        "Report must mention 'middleware' explicitly (second verifier grep target)",
+        "Steps must be ordered and concrete enough for a downstream maintainer to execute — name the Service impl bound change, the Layer signature update, and the BoxBody removal"
+      ]
+    }
+  }
+}

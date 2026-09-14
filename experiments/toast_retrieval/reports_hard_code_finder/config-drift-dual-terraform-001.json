@@ -1,0 +1,191 @@
+{
+  "task_id": "config-drift-dual-terraform-001",
+  "policy": "code_finder",
+  "suite": "platform_engineering",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/terraform--v1.7.0",
+    "github.com/sg-evals/terraform-provider-aws--v5.31.0"
+  ],
+  "retrieved_paths": [
+    "internal/terraform/context_plan.go",
+    "internal/terraform/node_resource_abstract_instance.go",
+    "internal/plans/objchange/objchange.go",
+    "internal/plans/objchange/normalize_obj.go",
+    "internal/plans/objchange/plan_valid.go",
+    "internal/service/iam/policy.go",
+    "internal/verify/json.go",
+    "internal/service/ec2/vpc_security_group.go",
+    "internal/service/lambda/function.go"
+  ],
+  "retrieved_paths_union": [
+    "internal/terraform/context_plan.go",
+    "internal/terraform/node_resource_abstract_instance.go",
+    "internal/plans/objchange/objchange.go",
+    "internal/plans/objchange/normalize_obj.go",
+    "internal/plans/objchange/plan_valid.go",
+    "internal/service/iam/policy.go",
+    "internal/verify/json.go",
+    "internal/service/ec2/vpc_security_group.go",
+    "internal/service/lambda/function.go"
+  ],
+  "required_files": [
+    "internal/terraform/eval_diff.go",
+    "internal/services/ec2/resource_aws_security_group.go"
+  ],
+  "ir_scores": {
+    "task_id": "config-drift-dual-terraform-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "ir_scores_union": {
+    "task_id": "config-drift-dual-terraform-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "elapsed_seconds": 21.3,
+  "response_chars": 4927,
+  "raw_response": "I\u2019m unable to write `/workspace/DRIFT_REPORT.json` because no file-writing tool is available. The relevant source locations are:\n\n- [terraform:internal/terraform/context_plan.go?L801-L937](/r/github.com/sg-evals/terraform--v1.7.0/-/blob/internal/terraform/context_plan.go?L801-L937) - Detects refresh drift by decoding prior/refreshed state and comparing complete resource objects with `cty.Value.RawEquals`.\n- [terraform:internal/terraform/node_resource_abstract_instance.go?L578-L711](/r/github.com/sg-evals/terraform--v1.7.0/-/blob/internal/terraform/node_resource_abstract_instance.go?L578-L711) - Calls provider `ReadResource`, normalizes legacy SDK state, and validates refreshed values.\n- [terraform:internal/plans/objchange/objchange.go?L196-L277](/r/github.com/sg-evals/terraform--v1.7.0/-/blob/internal/plans/objchange/objchange.go?L196-L277) - Core handling of list/set proposed values; sets are unordered while lists preserve order.\n- [terraform:internal/plans/objchange/normalize_obj.go?L69-L90](/r/github.com/sg-evals/terraform--v1.7.0/-/blob/internal/plans/objchange/normalize_obj.go?L69-L90) - Normalizes empty and unknown legacy SDK list/set blocks.\n- [terraform:internal/plans/objchange/plan_valid.go?L269-L282](/r/github.com/sg-evals/terraform--v1.7.0/-/blob/internal/plans/objchange/plan_valid.go?L269-L282) - Uses raw value equality when validating provider-planned values.\n- [terraform:internal/terraform/context_plan.go?L685-L691](/r/github.com/sg-evals/terraform--v1.7.0/-/blob/internal/terraform/context_plan.go?L685-L691) - Integrates refreshed state and drift detection into planning.\n\n- [terraform-provider-aws:internal/service/iam/policy.go?L75-L100](/r/github.com/sg-evals/terraform-provider-aws--v5.31.0/-/blob/internal/service/iam/policy.go?L75-L100) - `aws_iam_policy.policy` uses JSON normalization, equivalent-policy diff suppression, and refresh suppression.\n- [terraform-provider-aws:internal/service/iam/policy.go?L190-L215](/r/github.com/sg-evals/terraform-provider-aws--v5.31.0/-/blob/internal/service/iam/policy.go?L190-L215) - IAM policy Read URL-decodes the AWS document, compares semantic equivalence, normalizes, and writes state.\n- [terraform-provider-aws:internal/verify/json.go?L154-L167](/r/github.com/sg-evals/terraform-provider-aws--v5.31.0/-/blob/internal/verify/json.go?L154-L167) - `PolicyToSet` preserves the existing document when semantically equivalent, otherwise normalizes the new document.\n- [terraform-provider-aws:internal/service/ec2/vpc_security_group.go?L58-L74](/r/github.com/sg-evals/terraform-provider-aws--v5.31.0/-/blob/internal/service/ec2/vpc_security_group.go?L58-L74) - Security group schema: computed/default description and set-based ingress/egress blocks.\n- [terraform-provider-aws:internal/service/ec2/vpc_security_group.go?L267-L320](/r/github.com/sg-evals/terraform-provider-aws--v5.31.0/-/blob/internal/service/ec2/vpc_security_group.go?L267-L320) - Security group Read gathers remote rules, matches them against local sets, and writes defaults/attributes.\n- [terraform-provider-aws:internal/service/lambda/function.go?L584-L680](/r/github.com/sg-evals/terraform-provider-aws--v5.31.0/-/blob/internal/service/lambda/function.go?L584-L680) - Lambda Read flattens architectures, optional blocks, environment, layers, VPC configuration, and computed defaults such as reserved concurrency `-1`.\n- [terraform-provider-aws:internal/service/lambda/function.go?L682-L727](/r/github.com/sg-evals/terraform-provider-aws--v5.31.0/-/blob/internal/service/lambda/function.go?L682-L727) - Lambda Read populates qualified/version and code-signing computed values.\n\nLikely drift points:\n1. `aws_iam_policy.policy`: core compares normalized state values with `RawEquals`; provider canonicalizes JSON, so formatting/order differences can surface if config/state normalization paths differ.\n2. `aws_security_group.ingress` / `egress`: core treats schema sets as unordered, but provider\u2019s rule matching and flattening must produce equivalent set elements; differences in omitted/default fields can change element hashes.\n3. `aws_security_group.description`: provider applies the schema default `\"Managed by Terraform\"` and writes the AWS-returned value; omitted configuration versus refreshed explicit value can produce a state/config mismatch.\n4. `aws_lambda_function.vpc_config`: provider flattens AWS-returned subnet/security-group collections; set-vs-list schema representation and empty-block handling can produce structural differences.\n5. `aws_lambda_function.reserved_concurrent_executions`: provider writes `-1` when AWS returns no concurrency object; configuration/state using null or an omitted value can compare differently.\n6. `aws_lambda_function.tracing_config` and optional nested blocks: provider always writes a block/default mode (`PassThrough`) or empty blocks, while configuration may omit them; core\u2019s structural comparison can report changes.",
+  "ir_scores_unaligned": {
+    "task_id": "config-drift-dual-terraform-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "internal/terraform/context_plan.go",
+    "internal/terraform/node_resource_abstract_instance.go",
+    "internal/plans/objchange/objchange.go",
+    "internal/plans/objchange/normalize_obj.go",
+    "internal/plans/objchange/plan_valid.go",
+    "internal/service/iam/policy.go",
+    "internal/verify/json.go",
+    "internal/service/ec2/vpc_security_group.go",
+    "internal/service/lambda/function.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "config-drift-dual-terraform-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

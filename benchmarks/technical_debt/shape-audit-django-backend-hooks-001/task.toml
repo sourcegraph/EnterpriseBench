@@ -1,0 +1,87 @@
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+repo_set_id = "django-nav"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "shape-audit-django-backend-hooks-001"
+suite = "technical_debt"
+difficulty = "hard"
+estimated_duration_minutes = 15
+session_type = "single"
+task_type = "refactor_orchestration"
+description = "Unimplemented extension points in the database layer"
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/django/django"
+rev = "5.0"
+path = "django"
+role = "primary"
+
+[metadata]
+languages = ["python"]
+frameworks = ["django"]
+multi_repo_pattern = "investigate"
+retrieval_categories = ["syntactic_pattern", "interface_implementations", "cross_file", "framework_noise"]
+
+[[checkpoints]]
+name = "source_files"
+weight = 1.00
+verifier = "checks/check_source_files.sh"
+description = "Agent lists exactly the source files that qualify"
+timeout_seconds = 60
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "unknown"
+mcp_benefit_rationale = "Authored to measure primitive choice, not to presuppose it; no arm is expected to win a priori."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "django/db/backends/base/client.py"
+repo = "django"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "django/db/backends/base/operations.py"
+repo = "django"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "django/db/backends/ddl_references.py"
+repo = "django"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "django/db/migrations/serializer.py"
+repo = "django"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "django/db/models/constraints.py"
+repo = "django"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "django/db/models/expressions.py"
+repo = "django"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "django/db/models/lookups.py"
+repo = "django"
+confidence = 1.0
+source = "deterministic"

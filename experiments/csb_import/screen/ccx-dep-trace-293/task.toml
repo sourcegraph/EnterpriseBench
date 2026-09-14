@@ -1,0 +1,136 @@
+# Imported from CodeScaleBench CCX-dep-trace-293 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-dep-trace-293"
+suite = "platform_engineering"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Roslyn C# Type Inference and Overload Resolution Chain"
+
+[[repos]]
+url = "https://github.com/dotnet/roslyn"
+rev = "v4.12.0"
+path = "roslyn"
+role = "primary"
+
+[metadata]
+languages = ["csharp"]
+csb_mirror = "sg-evals/roslyn--v4.12.0"
+csb_commit = "NET-SDK-9.0.100"
+csb_family = "csb_org_crossrepo_tracing"
+csb_category = "cross-repo-dep-trace"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/OverloadResolution/OverloadResolution.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/OverloadResolution/OverloadResolution_ArgsToParameters.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/OverloadResolution/OverloadResolutionResult.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/OverloadResolution/MethodTypeInference.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/OverloadResolution/MemberResolutionResult.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/OverloadResolution/MemberAnalysisResult.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/OverloadResolution/MemberResolutionKind.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/OverloadResolution/MethodGroup.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/OverloadResolution/AnalyzedArguments.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/OverloadResolution/ArgumentAnalysisResult.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/BestTypeInferrer.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/Conversions/Conversions.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/Conversions/ConversionsBase.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/Conversions/UserDefinedImplicitConversions.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/Operators/BinaryOperatorOverloadResolution.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/Compilers/CSharp/Portable/Binder/Semantics/Operators/UnaryOperatorOverloadResolution.cs"
+repo = "roslyn"
+confidence = 0.9
+source = "deterministic"

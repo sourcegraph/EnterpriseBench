@@ -1,0 +1,102 @@
+name: Staleness Check
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'benchmarks/**'
+      - 'configs/**'
+  schedule:
+    # Weekly on Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  staleness-date:
+    name: Check repo version staleness
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: pip install tomli
+      - name: Check repo_versions.json staleness
+        id: staleness
+        run: |
+          set +e
+          python3 scripts/infra/check_repo_staleness.py --json > staleness_report.json
+          code=$?
+          cat staleness_report.json
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+      # Warning-only checks rot: on scheduled runs a stale manifest files (or
+      # refreshes) a tracking issue so remediation has an owner and a record.
+      - name: File or refresh staleness issue
+        if: github.event_name == 'schedule' && steps.staleness.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          {
+            echo "Weekly staleness check found repos whose \`last_verified\` exceeds the threshold."
+            echo
+            echo "Remediation: re-verify each stale repo and update \`configs/repo_versions.json\`"
+            echo "(and recreate the affected sg-evals mirrors via \`scripts/infra/create_sg_mirrors.py --execute\` if revs changed)."
+            echo
+            echo '```json'
+            cat staleness_report.json
+            echo '```'
+          } > issue_body.md
+          existing=$(gh issue list --label staleness --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file issue_body.md
+          else
+            gh label create staleness --description "repo_versions.json staleness tracking" --color D93F0B 2>/dev/null || true
+            gh issue create \
+              --title "Stale repo versions in configs/repo_versions.json" \
+              --label staleness \
+              --body-file issue_body.md
+          fi
+      - name: Fail job on staleness
+        if: steps.staleness.outputs.exit_code != '0'
+        run: exit 1
+
+  verify-files:
+    name: Verify required files exist at pinned revisions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: pip install tomli
+      - name: Verify ground_truth.required_files
+        run: python3 scripts/infra/check_repo_staleness.py --verify-files --json
+
+  unit-tests:
+    name: Run staleness tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          pip install pytest tomli jsonschema
+          pip install -e lib/
+      - name: Run staleness tests
+        run: |
+          python3 -m pytest tests/test_staleness_verify_files.py tests/test_repo_staleness.py -v --tb=short

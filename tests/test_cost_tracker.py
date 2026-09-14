@@ -536,27 +536,31 @@ class TestComputeCost:
 class TestParseDirIdentity:
     def test_baseline_run(self, tmp_path: Path) -> None:
         p = tmp_path / "runs" / "dep-traversal-001"
-        task_id, mode = _parse_dir_identity(p)
+        task_id, mode, variant_label = _parse_dir_identity(p)
         assert task_id == "dep-traversal-001"
         assert mode == "baseline"
+        assert variant_label is None
 
     def test_mcp_only(self, tmp_path: Path) -> None:
         p = tmp_path / "mcp_batch" / "dep-traversal-001_mcp_only"
-        task_id, mode = _parse_dir_identity(p)
+        task_id, mode, variant_label = _parse_dir_identity(p)
         assert task_id == "dep-traversal-001"
         assert mode == "mcp_only"
+        assert variant_label is None
 
     def test_hybrid(self, tmp_path: Path) -> None:
         p = tmp_path / "mcp_batch_v2" / "cal-drift-flask-config-001_hybrid"
-        task_id, mode = _parse_dir_identity(p)
+        task_id, mode, variant_label = _parse_dir_identity(p)
         assert task_id == "cal-drift-flask-config-001"
         assert mode == "hybrid"
+        assert variant_label is None
 
     def test_no_mode_suffix(self, tmp_path: Path) -> None:
         p = tmp_path / "mcp_batch" / "some-task-name"
-        task_id, mode = _parse_dir_identity(p)
+        task_id, mode, variant_label = _parse_dir_identity(p)
         assert task_id == "some-task-name"
         assert mode == "unknown"
+        assert variant_label is None
 
 
 # ---------------------------------------------------------------------------

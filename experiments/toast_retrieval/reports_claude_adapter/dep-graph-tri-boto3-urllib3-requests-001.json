@@ -1,0 +1,277 @@
+{
+  "task_id": "dep-graph-tri-boto3-urllib3-requests-001",
+  "policy": "claude_adapter",
+  "model": "anthropic/claude-sonnet-5",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/urllib3--2.0.0",
+    "github.com/sg-evals/requests--v2.31.0",
+    "github.com/sg-evals/botocore--1.31.0"
+  ],
+  "retrieved_paths": [
+    "setup.py",
+    "botocore/httpsession.py",
+    "botocore/compat.py",
+    "botocore/response.py",
+    "botocore/vendored/requests/packages/urllib3/__init__.py",
+    "botocore/vendored/requests/packages/urllib3/exceptions.py",
+    "docs/source/index.rst",
+    "docs/v2-migration-guide.rst",
+    "ci/0002-Stop-relying-on-removed-DEFAULT_CIPHERS.patch",
+    "noxfile.py",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/util/retry.py",
+    "src/urllib3/exceptions.py",
+    "src/urllib3/__init__.py",
+    "requests/adapters.py",
+    "requests/packages.py",
+    "requests/compat.py"
+  ],
+  "required_files": [
+    "urllib3/CHANGES.rst",
+    "requests/setup.cfg",
+    "botocore/setup.py"
+  ],
+  "ir_scores": {
+    "task_id": "dep-graph-tri-boto3-urllib3-requests-001",
+    "config_name": "claude_adapter",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 17,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "rounds_executed": 4,
+  "input_tokens": 42277,
+  "output_tokens": 1687,
+  "token_counting": "provider_reported",
+  "elapsed_seconds": 21.1,
+  "transcript": [
+    {
+      "role": "system",
+      "content": "You are a code retrieval policy. Given a task, find the source files required to carry it out. Search only these repositories: github.com/sg-evals/urllib3--2.0.0, github.com/sg-evals/requests--v2.31.0, github.com/sg-evals/botocore--1.31.0. When you are confident, call submit_files with every required file, most important first, using repo-relative paths exactly as the tools returned them."
+    },
+    {
+      "role": "user",
+      "content": "        # dep-graph-tri-boto3-urllib3-requests-001\n\n        **Suite:** dependency_management | **Type:** dependency_graph | **Difficulty:** expert\n        **Repos:** urllib3 + requests + botocore\n\n        ## Context\n\n        urllib3 2.0 was a major release that affected the entire Python HTTP\nstack. Both requests and botocore depend on urllib3 with conflicting\nversion constraints. botocore vendors its own urllib3 copy.\n\nYour task:\n1. Map the dependency chain: boto3/botocore \u2192 urllib3, requests \u2192 urllib3\n2. Find version pin conflicts between botocore and requests for urllib3\n3. Identify where botocore's vendored urllib3 diverges from upstream 2.0\n4. Document the upgrade coordination challenge across all three repos\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_0143DEUxAc9DYvhMzYUY3Eqg",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"urllib3\", \"top_k\": 50}"
+          }
+        },
+        {
+          "id": "toolu_01XGuqPz9L1i2Epx3SgnGbip",
+          "type": "function",
+          "function": {
+            "name": "list_files",
+            "arguments": "{\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"limit\": 200}"
+          }
+        },
+        {
+          "id": "toolu_018DExKsE6joTcSPH6BUDHEj",
+          "type": "function",
+          "function": {
+            "name": "list_files",
+            "arguments": "{\"repo\": \"github.com/sg-evals/requests--v2.31.0\", \"limit\": 200}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_0143DEUxAc9DYvhMzYUY3Eqg",
+      "content": "[{\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"botocore/httpsession.py\", \"chunk_index\": 4, \"score\": 1.0, \"text\": \"class URLLib3Session:\\ndef create_urllib3_context(\\nfrom urllib3 import PoolManager, Timeout, proxy_from_url\\nfrom urllib3.exceptions import (\\n    ConnectTimeoutError as URLLib3ConnectTimeoutError,\\nfrom urllib3.exceptions import (\\nfrom urllib3.exceptions import ReadTimeoutError as URLLib3ReadTimeoutError\\nfrom urllib3.exceptions import SSLError as URLLib3SSLError\\nfrom urllib3.util.retry import Retry\\nfrom urllib3.util.ssl_ import (\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01XGuqPz9L1i2Epx3SgnGbip",
+      "content": "[\".changes/1.10.0.json\", \".changes/1.10.1.json\", \".changes/1.10.10.json\", \".changes/1.10.11.json\", \".changes/1.10.12.json\", \".changes/1.10.13.json\", \".changes/1.10.14.json\", \".changes/1.10.15.json\", \".changes/1.10.16.json\", \".changes/1.10.17.json\", \".changes/1.10.18.json\", \".changes/1.10.19.json\", \".changes/1.10.2.json\", \".changes/1.10.20.json\", \".changes/1.10.21.json\", \".changes/1.10.22.json\", \".changes/1.10.23.json\", \".changes/1.10.24.json\", \".changes/1.10.25.json\", \".changes/1.10.26.json\", \".changes/1.10.27.json\", \".changes/1.10.28.json\", \".changes/1.10.29.json\", \".changes/1.10.3.json\", \".changes/1.10.30.json\", \".changes/1.10.31.json\", \".changes/1.10.32.json\", \".changes/1.10.33.json\", \".changes/1.10.34.json\", \".changes/1.10.35.json\", \".changes/1.10.36.json\", \".changes/1.10.37.json\", \".changes/1.10.38.json\", \".changes/1.10.39.json\", \".changes/1.10.4.json\", \".changes/1.10.40.json\", \".changes/1.10.41.json\", \".changes/1.10.42.json\", \".changes/1.10.43.json\", \".changes/1.10.44.json\", \".changes/1.10.45.json\", \".changes/1.10.46.json\", \".changes/1.10.47.json\", \".changes/1.10.48.json\", \".changes/1.10.49.json\", \".changes/1.10.5.json\", \".changes/1.10.50.json\", \".changes/1.10.51.json\", \".changes/1.10.52.json\", \".changes/1.10.53.json\", \".changes/1.10.54.json\", \".changes/1.10.55.json\", \".changes/1.10.56.json\", \".changes/1.10.57.json\", \".changes/1.10.58.json\", \".changes/1.10.59.json\", \".changes/1.10.6.json\", \".changes/1.10.60.json\", \".changes/1.10.61.json\", \".changes/1.10.62.json\", \".changes/1.10.63.json\", \".changes/1.10.64.json\", \".changes/1.10.65.json\", \".changes/1.10.66.json\", \".changes/1.10.67.json\", \".changes/1.10.68.json\", \".changes/1.10.69.json\", \".changes/1.10.7.json\", \".changes/1.10.70.json\", \".changes/1.10.71.json\", \".changes/1.10.72.json\", \".changes/1.10.73.json\", \".changes/1.10.74.json\", \".changes/1.10.75.json\", \".changes/1.10.76.json\", \".changes/1.10.77.json\", \".changes/1.10.78.json\", \".changes/1.10.79.json\", \".changes/1.10.8.json\", \".changes/1.10.80.json\", \".changes/1.10.81.json\", \".changes/1.10.82.json\", \".changes/1.10.83.json\", \".changes/1.10.84.json\", \".changes/1.10.9.json\", \".changes/1.11.0.json\", \".changes/1.11.1.json\", \".changes/1.11.2.json\", \".changes/1.11.3.json\", \".changes/1.11.4.json\", \".changes/1.11.5.json\", \".changes/1.11.6.json\", \".changes/1.11.7.json\", \".changes/1.11.8.json\", \".changes/1.11.9.json\", \".changes/1.12.0.json\", \".changes/1.12.1.json\", \".changes/1.12.10.json\", \".changes/1.12.100.json\", \".changes/1.12.101.json\", \".changes/1.12.102.json\", \".changes/1.12.103.json\", \".changes/1.12.104.json\", \".changes/1.12.105.json\", \".changes/1.12.106.json\", \".changes/1.12.107.json\", \".changes/1.12.108.json\", \".changes/1.12.109.json\", \".changes/1.12.11.json\", \".changes/1.12.110.json\", \".changes/1.12.111.json\", \".changes/1.12.112.json\", \".changes/1.12.113.json\", \".changes/1.12.114.json\", \".changes/1.12.115.json\", \".changes/1.12.116.json\", \".changes/1.12.117.json\", \".changes/1.12.118.json\", \".changes/1.12.119.json\", \".changes/1.12.12.json\", \".changes/1.12.120.json\", \".changes/1.12.121.json\", \".changes/1.12.122.json\", \".changes/1.12.123.json\", \".changes/1.12.124.json\", \".changes/1.12.125.json\", \".changes/1.12.126.json\", \".changes/1.12.127.json\", \".changes/1.12.128.json\", \".changes/1.12.129.json\", \".changes/1.12.13.json\", \".changes/1.12.130.json\", \".changes/1.12.131.json\", \".changes/1.12.132.json\", \".changes/1.12.133.json\", \".changes/1.12.134.json\", \".changes/1.12.135.json\", \".changes/1.12.136.json\", \".changes/1.12.137.json\", \".changes/1.12.138.json\", \".changes/1.12.139.json\", \".changes/1.12.14.json\", \".changes/1.12.140.json\", \".changes/1.12.141.json\", \".changes/1.12.142.json\", \".changes/1.12.143.json\", \".changes/1.12.144.json\", \".changes/1.12.145.json\", \".changes/1.12.146.json\", \".changes/1.12.147.json\", \".changes/1.12.148.json\", \".changes/1.12.149.json\", \".changes/1.12.15.json\", \".changes/1.12.150.json\", \".changes/1.12.151.json\", \".changes/1.12.152.json\", \".changes/1.12.153.json\", \".changes/1.12.154.json\", \".changes/1.12.155.json\", \".changes/1.12.156.json\", \".changes/1.12.157.json\", \".changes/1.12.158.json\", \".changes/1.12.159.json\", \".changes/1.12.16.json\", \".changes/1.12.160.json\", \".changes/1.12.161.json\", \".changes/1.12.162.json\", \".changes/1.12.163.json\", \".changes/1.12.164.json\", \".changes/1.12.165.json\", \".changes/1.12.166.json\", \".changes/1.12.167.json\", \".changes/1.12.168.json\", \".changes/1.12.169.json\", \".changes/1.12.17.json\", \".changes/1.12.170.json\", \".changes/1.12.171.json\", \".changes/1.12.172.json\", \".changes/1.12.173.json\", \".changes/1.12.174.json\", \".changes/1.12.175.json\", \".changes/1.12.176.json\", \".changes/1.12.177.json\", \".changes/1.12.178.json\", \".changes/1.12.179.json\", \".changes/1.12.18.json\", \".changes/1.12.180.json\", \".changes/1.12.181.json\", \".changes/1.12.182.json\", \".changes/1.12.183.json\", \".changes/1.12.184.json\", \".changes/1.12.185.json\", \".changes/1.12.186.json\", \".changes/1.12.187.json\", \".changes/1.12.188.json\", \".changes/1.12.189.json\", \".changes/1.12.19.json\", \".changes/1.12.190.json\", \".changes/1.12.191.json\", \".changes/1.12.192.json\"]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_018DExKsE6joTcSPH6BUDHEj",
+      "content": "[\".coveragerc\", \".git-blame-ignore-revs\", \".github/CODE_OF_CONDUCT.md\", \".github/CONTRIBUTING.md\", \".github/FUNDING.yml\", \".github/ISSUE_TEMPLATE.md\", \".github/ISSUE_TEMPLATE/Bug_report.md\", \".github/ISSUE_TEMPLATE/Custom.md\", \".github/ISSUE_TEMPLATE/Feature_request.md\", \".github/SECURITY.md\", \".github/workflows/codeql-analysis.yml\", \".github/workflows/lint.yml\", \".github/workflows/lock-issues.yml\", \".github/workflows/run-tests.yml\", \".gitignore\", \".pre-commit-config.yaml\", \"AUTHORS.rst\", \"HISTORY.md\", \"LICENSE\", \"MANIFEST.in\", \"Makefile\", \"NOTICE\", \"README.md\", \"docs/.nojekyll\", \"docs/Makefile\", \"docs/_static/custom.css\", \"docs/_static/requests-sidebar.png\", \"docs/_templates/hacks.html\", \"docs/_templates/sidebarintro.html\", \"docs/_templates/sidebarlogo.html\", \"docs/_themes/.gitignore\", \"docs/_themes/LICENSE\", \"docs/_themes/flask_theme_support.py\", \"docs/api.rst\", \"docs/community/faq.rst\", \"docs/community/out-there.rst\", \"docs/community/recommended.rst\", \"docs/community/release-process.rst\", \"docs/community/support.rst\", \"docs/community/updates.rst\", \"docs/community/vulnerabilities.rst\", \"docs/conf.py\", \"docs/dev/authors.rst\", \"docs/dev/contributing.rst\", \"docs/index.rst\", \"docs/make.bat\", \"docs/requirements.txt\", \"docs/user/advanced.rst\", \"docs/user/authentication.rst\", \"docs/user/install.rst\", \"docs/user/quickstart.rst\", \"ext/LICENSE\", \"ext/flower-of-life.jpg\", \"ext/kr-compressed.png\", \"ext/kr.png\", \"ext/psf-compressed.png\", \"ext/psf.png\", \"ext/requests-logo-compressed.png\", \"ext/requests-logo.ai\", \"ext/requests-logo.png\", \"ext/requests-logo.svg\", \"ext/ss-compressed.png\", \"ext/ss.png\", \"pyproject.toml\", \"requests/__init__.py\", \"requests/__version__.py\", \"requests/_internal_utils.py\", \"requests/adapters.py\", \"requests/api.py\", \"requests/auth.py\", \"requests/certs.py\", \"requests/compat.py\", \"requests/cookies.py\", \"requests/exceptions.py\", \"requests/help.py\", \"requests/hooks.py\", \"requests/models.py\", \"requests/packages.py\", \"requests/sessions.py\", \"requests/status_codes.py\", \"requests/structures.py\", \"requests/utils.py\", \"requirements-dev.txt\", \"setup.cfg\", \"setup.py\", \"tests/__init__.py\", \"tests/compat.py\", \"tests/conftest.py\", \"tests/test_help.py\", \"tests/test_hooks.py\", \"tests/test_lowlevel.py\", \"tests/test_packages.py\", \"tests/test_requests.py\", \"tests/test_structures.py\", \"tests/test_testserver.py\", \"tests/test_utils.py\", \"tests/testserver/__init__.py\", \"tests/testserver/server.py\", \"tests/utils.py\", \"tox.ini\"]"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_01XBeLc9xFm88hWzt5xeaD94",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"repo\": \"github.com/sg-evals/requests--v2.31.0\", \"path\": \"setup.py\"}"
+          }
+        },
+        {
+          "id": "toolu_01U3dxRg6PKd61BaYUGKWeBM",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"urllib3\", \"case_sensitive\": false, \"top_k\": 50}"
+          }
+        },
+        {
+          "id": "toolu_014dnj3pwooTrTLi2RYwo7PW",
+          "type": "function",
+          "function": {
+            "name": "list_files",
+            "arguments": "{\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"limit\": 500}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01XBeLc9xFm88hWzt5xeaD94",
+      "content": "{\"repo\": \"github.com/sg-evals/requests--v2.31.0\", \"path\": \"setup.py\", \"content\": \"#!/usr/bin/env python\\nimport os\\nimport sys\\nfrom codecs import open\\n\\nfrom setuptools import setup\\nfrom setuptools.command.test import test as TestCommand\\n\\nCURRENT_PYTHON = sys.version_info[:2]\\nREQUIRED_PYTHON = (3, 7)\\n\\nif CURRENT_PYTHON < REQUIRED_PYTHON:\\n    sys.stderr.write(\\n        \\\"\\\"\\\"\\n==========================\\nUnsupported Python version\\n==========================\\nThis version of Requests requires at least Python {}.{}, but\\nyou're trying to install it on Python {}.{}. To resolve this,\\nconsider upgrading to a supported Python version.\\n\\nIf you can't upgrade your Python version, you'll need to\\npin to an older version of Requests (<2.28).\\n\\\"\\\"\\\".format(\\n            *(REQUIRED_PYTHON + CURRENT_PYTHON)\\n        )\\n    )\\n    sys.exit(1)\\n\\n\\nclass PyTest(TestCommand):\\n    user_options = [(\\\"pytest-args=\\\", \\\"a\\\", \\\"Arguments to pass into py.test\\\")]\\n\\n    def initialize_options(self):\\n        TestCommand.initialize_options(self)\\n        try:\\n            from multiprocessing import cpu_count\\n\\n            self.pytest_args = [\\\"-n\\\", str(cpu_count()), \\\"--boxed\\\"]\\n        except (ImportError, NotImplementedError):\\n            self.pytest_args = [\\\"-n\\\", \\\"1\\\", \\\"--boxed\\\"]\\n\\n    def finalize_options(self):\\n        TestCommand.finalize_options(self)\\n        self.test_args = []\\n        self.test_suite = True\\n\\n    def run_tests(self):\\n        import pytest\\n\\n        errno = pytest.main(self.pytest_args)\\n        sys.exit(errno)\\n\\n\\n# 'setup.py publish' shortcut.\\nif sys.argv[-1] == \\\"publish\\\":\\n    os.system(\\\"python setup.py sdist bdist_wheel\\\")\\n    os.system(\\\"twine upload dist/*\\\")\\n    sys.exit()\\n\\nrequires = [\\n    \\\"charset_normalizer>=2,<4\\\",\\n    \\\"idna>=2.5,<4\\\",\\n    \\\"urllib3>=1.21.1,<3\\\",\\n    \\\"certifi>=2017.4.17\\\",\\n]\\ntest_requirements = [\\n    \\\"pytest-httpbin==2.0.0\\\",\\n    \\\"pytest-cov\\\",\\n    \\\"pytest-mock\\\",\\n    \\\"pytest-xdist\\\",\\n    \\\"PySocks>=1.5.6, !=1.5.7\\\",\\n    \\\"pytest>=3\\\",\\n]\\n\\nabout = {}\\nhere = os.path.abspath(os.path.dirname(__file__))\\nwith open(os.path.join(here, \\\"requests\\\", \\\"__version__.py\\\"), \\\"r\\\", \\\"utf-8\\\") as f:\\n    exec(f.read(), about)\\n\\nwith open(\\\"README.md\\\", \\\"r\\\", \\\"utf-8\\\") as f:\\n    readme = f.read()\\n\\nsetup(\\n    name=about[\\\"__title__\\\"],\\n    version=about[\\\"__version__\\\"],\\n    description=about[\\\"__description__\\\"],\\n    long_description=readme,\\n    long_description_content_type=\\\"text/markdown\\\",\\n    author=about[\\\"__author__\\\"],\\n    author_email=about[\\\"__author_email__\\\"],\\n    url=about[\\\"__url__\\\"],\\n    packages=[\\\"requests\\\"],\\n    package_data={\\\"\\\": [\\\"LICENSE\\\", \\\"NOTICE\\\"]},\\n    package_dir={\\\"requests\\\": \\\"requests\\\"},\\n    include_package_data=True,\\n    python_requires=\\\">=3.7\\\",\\n    install_requires=requires,\\n    license=about[\\\"__license__\\\"],\\n    zip_safe=False,\\n    classifiers=[\\n        \\\"Development Status :: 5 - Production/Stable\\\",\\n        \\\"Environment :: Web Environment\\\",\\n        \\\"Intended Audience :: Developers\\\",\\n        \\\"License :: OSI Approved :: Apache Software License\\\",\\n        \\\"Natural Language :: English\\\",\\n        \\\"Operating System :: OS Independent\\\",\\n        \\\"Programming Language :: Python\\\",\\n        \\\"Programming Language :: Python :: 3\\\",\\n        \\\"Programming Language :: Python :: 3.7\\\",\\n        \\\"Programming Language :: Python :: 3.8\\\",\\n        \\\"Programming Language :: Python :: 3.9\\\",\\n        \\\"Programming Language :: Python :: 3.10\\\",\\n        \\\"Programming Language :: Python :: 3.11\\\",\\n        \\\"Programming Language :: Python :: 3 :: Only\\\",\\n        \\\"Programming Language :: Python :: Implementation :: CPython\\\",\\n        \\\"Programming Language :: Python :: Implementation :: PyPy\\\",\\n        \\\"Topic :: Internet :: WWW/HTTP\\\",\\n        \\\"Topic :: Software Development :: Libraries\\\",\\n    ],\\n    cmdclass={\\\"test\\\": PyTest},\\n    tests_require=test_requirements,\\n    extras_require={\\n        \\\"security\\\": [],\\n        \\\"socks\\\": [\\\"PySocks>=1.5.6, !=1.5.7\\\"],\\n        \\\"use_chardet_on_py3\\\": [\\\"chardet>=3.0.2,<6\\\"],\\n    },\\n    project_urls={\\n        \\\"Documentation\\\": \\\"https://requests.readthedocs.io\\\",\\n        \\\"Source\\\": \\\"https://github.com/psf/requests\\\",\\n    },\\n)\"}"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01U3dxRg6PKd61BaYUGKWeBM",
+      "content": "[{\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"botocore/httpsession.py\", \"chunk_index\": 4, \"score\": 1.0, \"text\": \"class URLLib3Session:\\ndef create_urllib3_context(\\nfrom urllib3 import PoolManager, Timeout, proxy_from_url\\nfrom urllib3.exceptions import (\\n    ConnectTimeoutError as URLLib3ConnectTimeoutError,\\nfrom urllib3.exceptions import (\\nfrom urllib3.exceptions import ReadTimeoutError as URLLib3ReadTimeoutError\\nfrom urllib3.exceptions import SSLError as URLLib3SSLError\\nfrom urllib3.util.retry import Retry\\nfrom urllib3.util.ssl_ import (\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_014dnj3pwooTrTLi2RYwo7PW",
+      "content": "[\".changes/1.10.0.json\", \".changes/1.10.1.json\", \".changes/1.10.10.json\", \".changes/1.10.11.json\", \".changes/1.10.12.json\", \".changes/1.10.13.json\", \".changes/1.10.14.json\", \".changes/1.10.15.json\", \".changes/1.10.16.json\", \".changes/1.10.17.json\", \".changes/1.10.18.json\", \".changes/1.10.19.json\", \".changes/1.10.2.json\", \".changes/1.10.20.json\", \".changes/1.10.21.json\", \".changes/1.10.22.json\", \".changes/1.10.23.json\", \".changes/1.10.24.json\", \".changes/1.10.25.json\", \".changes/1.10.26.json\", \".changes/1.10.27.json\", \".changes/1.10.28.json\", \".changes/1.10.29.json\", \".changes/1.10.3.json\", \".changes/1.10.30.json\", \".changes/1.10.31.json\", \".changes/1.10.32.json\", \".changes/1.10.33.json\", \".changes/1.10.34.json\", \".changes/1.10.35.json\", \".changes/1.10.36.json\", \".changes/1.10.37.json\", \".changes/1.10.38.json\", \".changes/1.10.39.json\", \".changes/1.10.4.json\", \".changes/1.10.40.json\", \".changes/1.10.41.json\", \".changes/1.10.42.json\", \".changes/1.10.43.json\", \".changes/1.10.44.json\", \".changes/1.10.45.json\", \".changes/1.10.46.json\", \".changes/1.10.47.json\", \".changes/1.10.48.json\", \".changes/1.10.49.json\", \".changes/1.10.5.json\", \".changes/1.10.50.json\", \".changes/1.10.51.json\", \".changes/1.10.52.json\", \".changes/1.10.53.json\", \".changes/1.10.54.json\", \".changes/1.10.55.json\", \".changes/1.10.56.json\", \".changes/1.10.57.json\", \".changes/1.10.58.json\", \".changes/1.10.59.json\", \".changes/1.10.6.json\", \".changes/1.10.60.json\", \".changes/1.10.61.json\", \".changes/1.10.62.json\", \".changes/1.10.63.json\", \".changes/1.10.64.json\", \".changes/1.10.65.json\", \".changes/1.10.66.json\", \".changes/1.10.67.json\", \".changes/1.10.68.json\", \".changes/1.10.69.json\", \".changes/1.10.7.json\", \".changes/1.10.70.json\", \".changes/1.10.71.json\", \".changes/1.10.72.json\", \".changes/1.10.73.json\", \".changes/1.10.74.json\", \".changes/1.10.75.json\", \".changes/1.10.76.json\", \".changes/1.10.77.json\", \".changes/1.10.78.json\", \".changes/1.10.79.json\", \".changes/1.10.8.json\", \".changes/1.10.80.json\", \".changes/1.10.81.json\", \".changes/1.10.82.json\", \".changes/1.10.83.json\", \".changes/1.10.84.json\", \".changes/1.10.9.json\", \".changes/1.11.0.json\", \".changes/1.11.1.json\", \".changes/1.11.2.json\", \".changes/1.11.3.json\", \".changes/1.11.4.json\", \".changes/1.11.5.json\", \".changes/1.11.6.json\", \".changes/1.11.7.json\", \".changes/1.11.8.json\", \".changes/1.11.9.json\", \".changes/1.12.0.json\", \".changes/1.12.1.json\", \".changes/1.12.10.json\", \".changes/1.12.100.json\", \".changes/1.12.101.json\", \".changes/1.12.102.json\", \".changes/1.12.103.json\", \".changes/1.12.104.json\", \".changes/1.12.105.json\", \".changes/1.12.106.json\", \".changes/1.12.107.json\", \".changes/1.12.108.json\", \".changes/1.12.109.json\", \".changes/1.12.11.json\", \".changes/1.12.110.json\", \".changes/1.12.111.json\", \".changes/1.12.112.json\", \".changes/1.12.113.json\", \".changes/1.12.114.json\", \".changes/1.12.115.json\", \".changes/1.12.116.json\", \".changes/1.12.117.json\", \".changes/1.12.118.json\", \".changes/1.12.119.json\", \".changes/1.12.12.json\", \".changes/1.12.120.json\", \".changes/1.12.121.json\", \".changes/1.12.122.json\", \".changes/1.12.123.json\", \".changes/1.12.124.json\", \".changes/1.12.125.json\", \".changes/1.12.126.json\", \".changes/1.12.127.json\", \".changes/1.12.128.json\", \".changes/1.12.129.json\", \".changes/1.12.13.json\", \".changes/1.12.130.json\", \".changes/1.12.131.json\", \".changes/1.12.132.json\", \".changes/1.12.133.json\", \".changes/1.12.134.json\", \".changes/1.12.135.json\", \".changes/1.12.136.json\", \".changes/1.12.137.json\", \".changes/1.12.138.json\", \".changes/1.12.139.json\", \".changes/1.12.14.json\", \".changes/1.12.140.json\", \".changes/1.12.141.json\", \".changes/1.12.142.json\", \".changes/1.12.143.json\", \".changes/1.12.144.json\", \".changes/1.12.145.json\", \".changes/1.12.146.json\", \".changes/1.12.147.json\", \".changes/1.12.148.json\", \".changes/1.12.149.json\", \".changes/1.12.15.json\", \".changes/1.12.150.json\", \".changes/1.12.151.json\", \".changes/1.12.152.json\", \".changes/1.12.153.json\", \".changes/1.12.154.json\", \".changes/1.12.155.json\", \".changes/1.12.156.json\", \".changes/1.12.157.json\", \".changes/1.12.158.json\", \".changes/1.12.159.json\", \".changes/1.12.16.json\", \".changes/1.12.160.json\", \".changes/1.12.161.json\", \".changes/1.12.162.json\", \".changes/1.12.163.json\", \".changes/1.12.164.json\", \".changes/1.12.165.json\", \".changes/1.12.166.json\", \".changes/1.12.167.json\", \".changes/1.12.168.json\", \".changes/1.12.169.json\", \".changes/1.12.17.json\", \".changes/1.12.170.json\", \".changes/1.12.171.json\", \".changes/1.12.172.json\", \".changes/1.12.173.json\", \".changes/1.12.174.json\", \".changes/1.12.175.json\", \".changes/1.12.176.json\", \".changes/1.12.177.json\", \".changes/1.12.178.json\", \".changes/1.12.179.json\", \".changes/1.12.18.json\", \".changes/1.12.180.json\", \".changes/1.12.181.json\", \".changes/1.12.182.json\", \".changes/1.12.183.json\", \".changes/1.12.184.json\", \".changes/1.12.185.json\", \".changes/1.12.186.json\", \".changes/1.12.187.json\", \".changes/1.12.188.json\", \".changes/1.12.189.json\", \".changes/1.12.19.json\", \".changes/1.12.190.json\", \".changes/1.12.191.json\", \".changes/1.12.192.json\", \".changes/1.12.193.json\", \".changes/1.12.194.json\", \".changes/1.12.195.json\", \".changes/1.12.196.json\", \".changes/1.12.197.json\", \".changes/1.12.198.json\", \".changes/1.12.199.json\", \".changes/1.12.2.json\", \".changes/1.12.20.json\", \".changes/1.12.200.json\", \".changes/1.12.201.json\", \".changes/1.12.202.json\", \".changes/1.12.203.json\", \".changes/1.12.204.json\", \".changes/1.12.205.json\", \".changes/1.12.206.json\", \".changes/1.12.207.json\", \".changes/1.12.208.json\", \".changes/1.12.209.json\", \".changes/1.12.21.json\", \".changes/1.12.210.json\", \".changes/1.12.211.json\", \".changes/1.12.212.json\", \".changes/1.12.213.json\", \".changes/1.12.214.json\", \".changes/1.12.215.json\", \".changes/1.12.216.json\", \".changes/1.12.217.json\", \".changes/1.12.218.json\", \".changes/1.12.219.json\", \".changes/1.12.22.json\", \".changes/1.12.220.json\", \".changes/1.12.221.json\", \".changes/1.12.222.json\", \".changes/1.12.223.json\", \".changes/1.12.224.json\", \".changes/1.12.225.json\", \".changes/1.12.226.json\", \".changes/1.12.227.json\", \".changes/1.12.228.json\", \".changes/1.12.229.json\", \".changes/1.12.23.json\", \".changes/1.12.230.json\", \".changes/1.12.231.json\", \".changes/1.12.232.json\", \".changes/1.12.233.json\", \".changes/1.12.234.json\", \".changes/1.12.235.json\", \".changes/1.12.236.json\", \".changes/1.12.237.json\", \".changes/1.12.238.json\", \".changes/1.12.239.json\", \".changes/1.12.24.json\", \".changes/1.12.240.json\", \".changes/1.12.241.json\", \".changes/1.12.242.json\", \".changes/1.12.243.json\", \".changes/1.12.244.json\", \".changes/1.12.245.json\", \".changes/1.12.246.json\", \".changes/1.12.247.json\", \".changes/1.12.248.json\", \".changes/1.12.249.json\", \".changes/1.12.25.json\", \".changes/1.12.250.json\", \".changes/1.12.251.json\", \".changes/1.12.252.json\", \".changes/1.12.253.json\", \".changes/1.12.26.json\", \".changes/1.12.27.json\", \".changes/1.12.28.json\", \".changes/1.12.29.json\", \".changes/1.12.3.json\", \".changes/1.12.30.json\", \".changes/1.12.31.json\", \".changes/1.12.32.json\", \".changes/1.12.33.json\", \".changes/1.12.34.json\", \".changes/1.12.35.json\", \".changes/1.12.36.json\", \".changes/1.12.37.json\", \".changes/1.12.38.json\", \".changes/1.12.39.json\", \".changes/1.12.4.json\", \".changes/1.12.40.json\", \".changes/1.12.41.json\", \".changes/1.12.42.json\", \".changes/1.12.43.json\", \".changes/1.12.44.json\", \".changes/1.12.45.json\", \".changes/1.12.46.json\", \".changes/1.12.47.json\", \".changes/1.12.48.json\", \".changes/1.12.49.json\", \".changes/1.12.5.json\", \".changes/1.12.50.json\", \".changes/1.12.51.json\", \".changes/1.12.52.json\", \".changes/1.12.53.json\", \".changes/1.12.54.json\", \".changes/1.12.55.json\", \".changes/1.12.56.json\", \".changes/1.12.57.json\", \".changes/1.12.58.json\", \".changes/1.12.59.json\", \".changes/1.12.6.json\", \".changes/1.12.60.json\", \".changes/1.12.61.json\", \".changes/1.12.62.json\", \".changes/1.12.63.json\", \".changes/1.12.64.json\", \".changes/1.12.65.json\", \".changes/1.12.66.json\", \".changes/1.12.67.json\", \".changes/1.12.68.json\", \".changes/1.12.69.json\", \".changes/1.12.7.json\", \".changes/1.12.70.json\", \".changes/1.12.71.json\", \".changes/1.12.72.json\", \".changes/1.12.73.json\", \".changes/1.12.74.json\", \".changes/1.12.75.json\", \".changes/1.12.76.json\", \".changes/1.12.77.json\", \".changes/1.12.78.json\", \".changes/1.12.79.json\", \".changes/1.12.8.json\", \".changes/1.12.80.json\", \".changes/1.12.81.json\", \".changes/1.12.82.json\", \".changes/1.12.83.json\", \".changes/1.12.84.json\", \".changes/1.12.85.json\", \".changes/1.12.86.json\", \".changes/1.12.87.json\", \".changes/1.12.88.json\", \".changes/1.12.89.json\", \".changes/1.12.9.json\", \".changes/1.12.90.json\", \".changes/1.12.91.json\", \".changes/1.12.92.json\", \".changes/1.12.93.json\", \".changes/1.12.94.json\", \".changes/1.12.95.json\", \".changes/1.12.96.json\", \".changes/1.12.97.json\", \".changes/1.12.98.json\", \".changes/1.12.99.json\", \".changes/1.13.0.json\", \".changes/1.13.1.json\", \".changes/1.13.10.json\", \".changes/1.13.11.json\", \".changes/1.13.12.json\", \".changes/1.13.13.json\", \".changes/1.13.14.json\", \".changes/1.13.15.json\", \".changes/1.13.16.json\", \".changes/1.13.17.json\", \".changes/1.13.18.json\", \".changes/1.13.19.json\", \".changes/1.13.2.json\", \".changes/1.13.20.json\", \".changes/1.13.21.json\", \".changes/1.13.22.json\", \".changes/1.13.23.json\", \".changes/1.13.24.json\", \".changes/1.13.25.json\", \".changes/1.13.26.json\", \".changes/1.13.27.json\", \".changes/1.13.28.json\", \".changes/1.13.29.json\", \".changes/1.13.3.json\", \".changes/1.13.30.json\", \".changes/1.13.31.json\", \".changes/1.13.32.json\", \".changes/1.13.33.json\", \".changes/1.13.34.json\", \".changes/1.13.35.json\", \".changes/1.13.36.json\", \".changes/1.13.37.json\", \".changes/1.13.38.json\", \".changes/1.13.39.json\", \".changes/1.13.4.json\", \".changes/1.13.40.json\", \".changes/1.13.41.json\", \".changes/1.13.42.json\", \".changes/1.13.43.json\", \".changes/1.13.44.json\", \".changes/1.13.45.json\", \".changes/1.13.46.json\", \".changes/1.13.47.json\", \".changes/1.13.48.json\", \".changes/1.13.49.json\", \".changes/1.13.5.json\", \".changes/1.13.50.json\", \".changes/1.13.6.json\", \".changes/1.13.7.json\", \".changes/1.13.8.json\", \".changes/1.13.9.json\", \".changes/1.14.0.json\", \".changes/1.14.1.json\", \".changes/1.14.10.json\", \".changes/1.14.11.json\", \".changes/1.14.12.json\", \".changes/1.14.13.json\", \".changes/1.14.14.json\", \".changes/1.14.15.json\", \".changes/1.14.16.json\", \".changes/1.14.17.json\", \".changes/1.14.2.json\", \".changes/1.14.3.json\", \".changes/1.14.4.json\", \".changes/1.14.5.json\", \".changes/1.14.6.json\", \".changes/1.14.7.json\", \".changes/1.14.8.json\", \".changes/1.14.9.json\", \".changes/1.15.0.json\", \".changes/1.15.1.json\", \".changes/1.15.10.json\", \".changes/1.15.11.json\", \".changes/1.15.12.json\", \".changes/1.15.13.json\", \".changes/1.15.14.json\", \".changes/1.15.15.json\", \".changes/1.15.16.json\", \".changes/1.15.17.json\", \".changes/1.15.18.json\", \".changes/1.15.19.json\", \".changes/1.15.2.json\", \".changes/1.15.20.json\", \".changes/1.15.21.json\", \".changes/1.15.22.json\", \".changes/1.15.23.json\", \".changes/1.15.24.json\", \".changes/1.15.25.json\", \".changes/1.15.26.json\", \".changes/1.15.27.json\", \".changes/1.15.28.json\", \".changes/1.15.29.json\", \".changes/1.15.3.json\", \".changes/1.15.30.json\", \".changes/1.15.31.json\", \".changes/1.15.32.json\", \".changes/1.15.33.json\", \".changes/1.15.34.json\", \".changes/1.15.35.json\", \".changes/1.15.36.json\", \".changes/1.15.37.json\", \".changes/1.15.38.json\", \".changes/1.15.39.json\", \".changes/1.15.4.json\", \".changes/1.15.40.json\", \".changes/1.15.41.json\", \".changes/1.15.42.json\", \".changes/1.15.43.json\", \".changes/1.15.44.json\", \".changes/1.15.45.json\", \".changes/1.15.46.json\", \".changes/1.15.47.json\", \".changes/1.15.48.json\", \".changes/1.15.49.json\", \".changes/1.15.5.json\", \".changes/1.15.6.json\", \".changes/1.15.7.json\", \".changes/1.15.8.json\", \".changes/1.15.9.json\", \".changes/1.16.0.json\", \".changes/1.16.1.json\", \".changes/1.16.10.json\", \".changes/1.16.11.json\", \".changes/1.16.12.json\", \".changes/1.16.13.json\", \".changes/1.16.14.json\", \".changes/1.16.15.json\", \".changes/1.16.16.json\", \".changes/1.16.17.json\", \".changes/1.16.18.json\", \".changes/1.16.19.json\", \".changes/1.16.2.json\", \".changes/1.16.20.json\", \".changes/1.16.21.json\", \".changes/1.16.22.json\", \".changes/1.16.23.json\", \".changes/1.16.24.json\", \".changes/1.16.25.json\", \".changes/1.16.26.json\", \".changes/1.16.3.json\", \".changes/1.16.4.json\", \".changes/1.16.5.json\", \".changes/1.16.6.json\", \".changes/1.16.7.json\", \".changes/1.16.8.json\", \".changes/1.16.9.json\", \".changes/1.17.0.json\", \".changes/1.17.1.json\", \".changes/1.17.10.json\", \".changes/1.17.11.json\", \".changes/1.17.12.json\"]"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_01TCXuJLys3mZmTbUeDLbJYH",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"urllib3\", \"top_k\": 50}"
+          }
+        },
+        {
+          "id": "toolu_01S8mLNkNwzwCvCkeWWUYine",
+          "type": "function",
+          "function": {
+            "name": "search_corpus",
+            "arguments": "{\"query\": \"botocore setup.py install_requires urllib3\", \"top_k\": 20}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01TCXuJLys3mZmTbUeDLbJYH",
+      "content": "[{\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"botocore/httpsession.py\", \"chunk_index\": 4, \"score\": 1.0, \"text\": \"class URLLib3Session:\\ndef create_urllib3_context(\\nfrom urllib3 import PoolManager, Timeout, proxy_from_url\\nfrom urllib3.exceptions import (\\n    ConnectTimeoutError as URLLib3ConnectTimeoutError,\\nfrom urllib3.exceptions import (\\nfrom urllib3.exceptions import ReadTimeoutError as URLLib3ReadTimeoutError\\nfrom urllib3.exceptions import SSLError as URLLib3SSLError\\nfrom urllib3.util.retry import Retry\\nfrom urllib3.util.ssl_ import (\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01S8mLNkNwzwCvCkeWWUYine",
+      "content": "[{\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"setup.py\", \"chunk_index\": 0, \"score\": 1.0, \"text\": \"setup(\\n    name='botocore',\\n    version=find_version(\\\"botocore\\\", \\\"__init__.py\\\"),\\n    description='Low-level, data-driven core of boto 3.',\\n\\n    'python-dateutil>=2.1,<3.0.0',\\n    'urllib3>=1.25.4,<1.27',\\n]\\n\\n    include_package_data=True,\\n    install_requires=requires,\\n    license=\\\"Apache License 2.0\\\",\\n\"}, {\"repo\": \"github.com/sg-evals/urllib3--2.0.0\", \"path\": \"docs/v2-migration-guide.rst\", \"chunk_index\": 1, \"score\": 0.5, \"text\": \"    ...\\n    install_requires=[\\\"urllib3>=1.26,<3\\\"]\\n  )\\n\\n\\nThe first step to supporting urllib3 v2.0 is to make sure the version v2.x not being excluded by ``install_requires``. You should\\nensure your package allows for both urllib3 1.26.x and 2.0 to be used:\\n\\n\"}, {\"repo\": \"github.com/sg-evals/urllib3--2.0.0\", \"path\": \"docs/v2-migration-guide.rst\", \"chunk_index\": 2, \"score\": 0.3333, \"text\": \"  $ python -m pip install pipdeptree\\n  # We only care about packages requiring urllib3\\n  $ pipdeptree --reverse | grep \\\"requires: urllib3\\\"\\n\\n  - botocore==1.29.8 [requires: urllib3>=1.25.4,<1.27]\\n  - requests==2.28.1 [requires: urllib3>=1.21.1,<1.27]\\n\\nReading the output from above, there are two packages which depend on urllib3: ``botocore`` and ``requests``.\\nThe versions of these two packages both require urllib3 that is less than v2.0 (ie ``<1.27``).\\n\\nBecause both of these packages require urllib3 before v2.0 the new version of urllib3 can't be installed\\nby default. There are ways to force installing the newer version of urllib3 v2.0 (ie pinning to ``urllib3==2.0.0``)\\nwhich you can do to test your application.\\n\"}, {\"repo\": \"github.com/sg-evals/requests--v2.31.0\", \"path\": \"setup.py\", \"chunk_index\": 1, \"score\": 0.25, \"text\": \"    \\\"idna>=2.5,<4\\\",\\n    \\\"urllib3>=1.21.1,<3\\\",\\n    \\\"certifi>=2017.4.17\\\",\\n\\n    python_requires=\\\">=3.7\\\",\\n    install_requires=requires,\\n    license=about[\\\"__license__\\\"],\\n\"}, {\"repo\": \"github.com/sg-evals/requests--v2.31.0\", \"path\": \"setup.py\", \"chunk_index\": 0, \"score\": 0.2, \"text\": \"\\n# 'setup.py publish' shortcut.\\nif sys.argv[-1] == \\\"publish\\\":\\n    os.system(\\\"python setup.py sdist bdist_wheel\\\")\\n    os.system(\\\"twine upload dist/*\\\")\\n\"}, {\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"botocore/vendored/requests/packages/urllib3/__init__.py\", \"chunk_index\": 0, \"score\": 0.1667, \"text\": \"\\\"\\\"\\\"\\nurllib3 - Thread-safe connection pooling and re-using.\\n\\\"\\\"\\\"\\n\"}, {\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"botocore/httpsession.py\", \"chunk_index\": 4, \"score\": 0.1429, \"text\": \"\\nclass URLLib3Session:\\n    \\\"\\\"\\\"A basic HTTP client that supports connection pooling and proxies.\\n\"}, {\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"botocore/httpsession.py\", \"chunk_index\": 1, \"score\": 0.125, \"text\": \"\\ndef create_urllib3_context(\\n    ssl_version=None, cert_reqs=None, options=None, ciphers=None\\n\"}, {\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"botocore/httpsession.py\", \"chunk_index\": 0, \"score\": 0.1111, \"text\": \")\\nfrom urllib3.exceptions import ReadTimeoutError as URLLib3ReadTimeoutError\\nfrom urllib3.exceptions import SSLError as URLLib3SSLError\\nfrom urllib3.util.retry import Retry\\nfrom urllib3.util.ssl_ import (\\n    OP_NO_COMPRESSION,\\n\"}, {\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"botocore/response.py\", \"chunk_index\": 0, \"score\": 0.1, \"text\": \"\\nfrom urllib3.exceptions import ProtocolError as URLLib3ProtocolError\\nfrom urllib3.exceptions import ReadTimeoutError as URLLib3ReadTimeoutError\\n\\nfrom botocore import parsers\\nfrom botocore.compat import set_socket_timeout\\nfrom botocore.exceptions import (\\n    IncompleteReadError,\\n\\n    This provides a few additional conveniences that do not exist\\n    in the urllib3 model:\\n\\n\\n# Keep these imported.  There's pre-existing code that uses them.\\nfrom botocore import ScalarTypes  # noqa\\nfrom botocore.compat import XMLParseError  # noqa\\nfrom botocore.hooks import first_non_none_response  # noqa\\n\\n\"}, {\"repo\": \"github.com/sg-evals/urllib3--2.0.0\", \"path\": \"ci/0002-Stop-relying-on-removed-DEFAULT_CIPHERS.patch\", \"chunk_index\": 0, \"score\": 0.0909, \"text\": \"\\ndiff --git a/botocore/httpsession.py b/botocore/httpsession.py\\nindex 29b210377..aaecb454b 100644\\n--- a/botocore/httpsession.py\\n+++ b/botocore/httpsession.py\\n@@ -19,7 +19,6 @@ from urllib3.exceptions import ReadTimeoutError as URLLib3ReadTimeoutError\\n from urllib3.exceptions import SSLError as URLLib3SSLError\\n from urllib3.util.retry import Retry\\n from urllib3.util.ssl_ import (\\n-    DEFAULT_CIPHERS,\\n\\n---\\n botocore/httpsession.py | 4 ++--\\n 1 file changed, 2 insertions(+), 2 deletions(-)\\n\\n     OP_NO_SSLv2,\\n@@ -99,7 +98,8 @@ def create_urllib3_context(\\n \\n\"}, {\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"botocore/vendored/requests/packages/urllib3/exceptions.py\", \"chunk_index\": 1, \"score\": 0.0833, \"text\": \"    :param pool: The connection pool\\n    :type pool: :class:`~urllib3.connectionpool.HTTPConnectionPool`\\n    :param string url: The requested Url\\n\"}, {\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"docs/source/index.rst\", \"chunk_index\": 2, \"score\": 0.0769, \"text\": \"---------------------\\n* The vendored versions of ``requests`` and ``urllib3`` are no longer being\\n  used and have been replaced with a direct dependency on upstream ``urllib3``\\n  and ``requests`` is no longer a dependency of ``botocore``.  While these\\n  vendored dependencies are still in the ``botocore`` package they should not\\n  be used as they will be removed in the future. Any code that imports from\\n  ``botocore.vendored.requests.*`` should be updated accordingly. Specifically,\\n  the use of ``botocore.vendored.requests.exceptions.*`` or\\n  ``botocore.vendored.requests.packages.urllib3.exceptions.*`` must be updated\\n  to the corresponding exception classes in ``botocore.exceptions``.\\n* The version of ``urllib3`` used to make HTTP requests has been updated from\\n  v1.10.4 to the range >=1.20,<1.24.\\n\\n\"}, {\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"docs/source/index.rst\", \"chunk_index\": 0, \"score\": 0.0714, \"text\": \"Welcome to botocore\\n===================\\n\"}, {\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"docs/source/index.rst\", \"chunk_index\": 1, \"score\": 0.0667, \"text\": \"\\n    from botocore.session import Session\\n\"}, {\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"botocore/compat.py\", \"chunk_index\": 5, \"score\": 0.0625, \"text\": \"\\n# Vendoring IPv6 validation regex patterns from urllib3\\n# https://github.com/urllib3/urllib3/blob/7e856c0/src/urllib3/util/url.py\\nIPV4_PAT = r\\\"(?:[0-9]{1,3}\\\\.){3}[0-9]{1,3}\\\"\\n\"}, {\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"botocore/compat.py\", \"chunk_index\": 0, \"score\": 0.0588, \"text\": \"\\nfrom botocore.vendored import six\\nfrom botocore.exceptions import MD5UnavailableError\\nfrom dateutil.tz import tzlocal\\nfrom urllib3 import exceptions\\n\\n\"}, {\"repo\": \"github.com/sg-evals/botocore--1.31.0\", \"path\": \"botocore/compat.py\", \"chunk_index\": 1, \"score\": 0.0556, \"text\": \"        category=exceptions.InsecurePlatformWarning,\\n        module=r\\\".*urllib3\\\\.util\\\\.ssl_\\\",\\n    )\\n\"}, {\"repo\": \"github.com/sg-evals/urllib3--2.0.0\", \"path\": \"noxfile.py\", \"chunk_index\": 1, \"score\": 0.0526, \"text\": \"@nox.session()\\ndef downstream_botocore(session: nox.Session) -> None:\\n    root = os.getcwd()\\n\\n    session.install(\\\".\\\", silent=False)\\n    session.cd(f\\\"{tmp_dir}/botocore\\\")\\n\\n    session.run(\\\"python\\\", \\\"-c\\\", \\\"import urllib3; print(urllib3.__version__)\\\")\\n    session.run(\\\"python\\\", \\\"scripts/ci/run-tests\\\")\\n\"}, {\"repo\": \"github.com/sg-evals/urllib3--2.0.0\", \"path\": \"noxfile.py\", \"chunk_index\": 2, \"score\": 0.05, \"text\": \"\\n    session.run(\\\"python\\\", \\\"-c\\\", \\\"import urllib3; print(urllib3.__version__)\\\")\\n    session.run(\\\"pytest\\\", \\\"tests\\\")\\n\"}]"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_01NNyNpigVtchUXeYpfChKhk",
+          "type": "function",
+          "function": {
+            "name": "submit_files",
+            "arguments": "{\"files\": [{\"repo\":\"github.com/sg-evals/botocore--1.31.0\",\"path\":\"setup.py\"},{\"repo\":\"github.com/sg-evals/requests--v2.31.0\",\"path\":\"setup.py\"},{\"repo\":\"github.com/sg-evals/botocore--1.31.0\",\"path\":\"botocore/httpsession.py\"},{\"repo\":\"github.com/sg-evals/botocore--1.31.0\",\"path\":\"botocore/compat.py\"},{\"repo\":\"github.com/sg-evals/botocore--1.31.0\",\"path\":\"botocore/response.py\"},{\"repo\":\"github.com/sg-evals/botocore--1.31.0\",\"path\":\"botocore/vendored/requests/packages/urllib3/__init__.py\"},{\"repo\":\"github.com/sg-evals/botocore--1.31.0\",\"path\":\"botocore/vendored/requests/packages/urllib3/exceptions.py\"},{\"repo\":\"github.com/sg-evals/botocore--1.31.0\",\"path\":\"docs/source/index.rst\"},{\"repo\":\"github.com/sg-evals/urllib3--2.0.0\",\"path\":\"docs/v2-migration-guide.rst\"},{\"repo\":\"github.com/sg-evals/urllib3--2.0.0\",\"path\":\"ci/0002-Stop-relying-on-removed-DEFAULT_CIPHERS.patch\"},{\"repo\":\"github.com/sg-evals/urllib3--2.0.0\",\"path\":\"noxfile.py\"},{\"repo\":\"github.com/sg-evals/urllib3--2.0.0\",\"path\":\"src/urllib3/util/ssl_.py\"},{\"repo\":\"github.com/sg-evals/urllib3--2.0.0\",\"path\":\"src/urllib3/util/retry.py\"},{\"repo\":\"github.com/sg-evals/urllib3--2.0.0\",\"path\":\"src/urllib3/exceptions.py\"},{\"repo\":\"github.com/sg-evals/urllib3--2.0.0\",\"path\":\"src/urllib3/__init__.py\"},{\"repo\":\"github.com/sg-evals/requests--v2.31.0\",\"path\":\"requests/adapters.py\"},{\"repo\":\"github.com/sg-evals/requests--v2.31.0\",\"path\":\"requests/packages.py\"},{\"repo\":\"github.com/sg-evals/requests--v2.31.0\",\"path\":\"requests/compat.py\"}]}"
+          }
+        }
+      ]
+    }
+  ],
+  "ir_scores_unaligned": {
+    "task_id": "dep-graph-tri-boto3-urllib3-requests-001",
+    "config_name": "claude_adapter",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 17,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "setup.py",
+    "botocore/httpsession.py",
+    "botocore/compat.py",
+    "botocore/response.py",
+    "botocore/vendored/requests/packages/urllib3/__init__.py",
+    "botocore/vendored/requests/packages/urllib3/exceptions.py",
+    "docs/source/index.rst",
+    "docs/v2-migration-guide.rst",
+    "ci/0002-Stop-relying-on-removed-DEFAULT_CIPHERS.patch",
+    "noxfile.py",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/util/retry.py",
+    "src/urllib3/exceptions.py",
+    "src/urllib3/__init__.py",
+    "requests/adapters.py",
+    "requests/packages.py",
+    "requests/compat.py"
+  ],
+  "scoring": "aligned_suffix_v1"
+}

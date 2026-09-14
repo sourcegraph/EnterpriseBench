@@ -1,0 +1,119 @@
+# Refactor Orchestration: Flask request context to Werkzeug LocalStack migration
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "flask-werkzeug-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "refactor-dual-flask-werkzeug-001"
+suite = "technical_debt"
+task_type = "refactor_orchestration"
+difficulty = "hard"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Plan refactor of Flask request/app context globals from Werkzeug LocalStack to Python contextvars"
+prompt = """
+Flask's request context system (flask.g, flask.request, flask.session) is built
+on Werkzeug's LocalStack/LocalProxy, which predates Python's native contextvars
+module. Werkzeug 2.3+ added contextvars support alongside the legacy Local
+implementation. Flask 3.0 began migrating but still has hybrid code paths.
+
+Your task:
+1. Find all Flask code that uses Werkzeug's LocalStack and LocalProxy for
+   context management — trace from flask.globals through the request context
+   push/pop to identify every point where LocalStack is used vs where
+   contextvars could be used directly.
+2. Find where Werkzeug implements both the legacy Local/LocalStack and the new
+   contextvars-based ContextVar equivalents — identify the migration bridge
+   classes and how they maintain backward compatibility.
+3. Plan the refactor: for each Flask context global (request, session, g,
+   _app_ctx_stack, _request_ctx_stack), document what Werkzeug class it
+   currently uses, what it should migrate to, and what breaks if migrated
+   (particularly for greenlet/eventlet/gevent compatibility).
+4. Identify ordering constraints: which changes must happen in Werkzeug first,
+   and which Flask changes depend on specific Werkzeug versions.
+
+Document in your answer (use these JSON fields):
+{
+  "refactor_steps": [
+    {
+      "target": "<Flask/Werkzeug class or module>",
+      "current_implementation": "<what it uses now>",
+      "target_implementation": "<what it should use>",
+      "source_file": "<file path>",
+      "dependencies": ["<other steps that must complete first>"],
+      "breaking_changes": ["<what breaks>"]
+    }
+  ]
+}
+"""
+
+[[repos]]
+url = "https://github.com/pallets/flask"
+rev = "3.0.0"
+path = "flask"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/pallets/werkzeug"
+rev = "3.0.1"
+path = "werkzeug"
+role = "upstream"
+
+[metadata]
+languages = ["python"]
+total_loc = 100_000
+dependency_depth = 2
+frameworks = ["flask", "werkzeug"]
+multi_repo_pattern = "orchestrate"
+
+[[checkpoints]]
+name = "context_mapping"
+weight = 0.40
+verifier = "checks/check_context_mapping.sh"
+description = "Agent maps all Flask context globals to their Werkzeug implementations"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "werkzeug_bridge"
+weight = 0.30
+verifier = "checks/check_werkzeug_bridge.sh"
+description = "Agent identifies Werkzeug's contextvars bridge classes"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "refactor_ordering"
+weight = 0.30
+verifier = "checks/check_refactor_ordering.sh"
+description = "Agent identifies correct dependency ordering for the refactor"
+timeout_seconds = 60
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Mapping Flask context globals through Werkzeug's dual Local/contextvars implementations requires cross-repo search to trace proxy chains and identify all usage points"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "src/flask/globals.py"
+repo = "flask"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/werkzeug/local.py"
+repo = "werkzeug"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "src/flask/ctx.py"
+repo = "flask"
+confidence = 0.90

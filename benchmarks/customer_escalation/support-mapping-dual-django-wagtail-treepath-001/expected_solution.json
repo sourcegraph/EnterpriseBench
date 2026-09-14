@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-django-wagtail-treepath-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: wagtail/wagtail/models/__init__.py, wagtail/wagtail/query.py, django/django/db/models/query.py, django/django/db/models/sql/compiler.py. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify wagtail/wagtail/models/__init__.py as part of the error source",
+        "Must identify wagtail/wagtail/query.py as part of the error source",
+        "Must identify django/django/db/models/query.py as part of the error source",
+        "Must identify django/django/db/models/sql/compiler.py as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) Wagtail Page extends AbstractPage which inherits from treebeard MP_Node, providing a materialized-path field used to encode tree position -> (2) Page.get_descendants() builds a queryset filtered by path startswith on the parent's path, expecting an index-supported prefix lookup -> (3) When the customer's custom Page subclass overrides Meta without preserving indexes, Django's options.py drops the inherited db_index for path during model construction -> (4) Django's QuerySet.filter() in db/models/query.py compiles to SQL via sql/compiler.py, which falls back to a full table scan because no usable index is registered on the path column -> (5) The query plan regression manifests as N+1 latency in Wagtail's navigation rendering despite the same source code as before.",
+      "evaluation_criteria": [
+        "Must describe the step: Wagtail Page extends AbstractPage which inherits from treebeard MP_Node, providi...",
+        "Must describe the step: Page.get_descendants() builds a queryset filtered by path startswith on the pare...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) The customer's custom Page subclass overrides Meta or class_prepared without re-declaring Meta.indexes, dropping the inherited path index; (2) Django's model-options inheritance treats Meta.indexes as non-cumulative by default; Wagtail's AbstractPage relies on the parent index being kept; (3) The startswith path filter is only fast when the path field has a B-tree index; without it Django's compiler emits a full-scan plan.",
+      "evaluation_criteria": [
+        "Must identify the condition: The customer's custom Page subclass overrides Meta or class_prepared without re-...",
+        "Must identify the condition: Django's model-options inheritance treats Meta.indexes as non-cumulative by defa...",
+        "Must identify the condition: The startswith path filter is only fast when the path field has a B-tree index; ...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

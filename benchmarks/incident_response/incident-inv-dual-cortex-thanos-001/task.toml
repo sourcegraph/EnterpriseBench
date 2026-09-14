@@ -1,0 +1,103 @@
+# incident_investigation: Investigate Cortex ingester ring hash collision causing quer
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "cncf-observability-ecosystem"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "incident-inv-dual-cortex-thanos-001"
+suite = "incident_response"
+task_type = "incident_investigation"
+difficulty = "hard"
+estimated_duration_minutes = 40
+session_type = "single"
+description = "Investigate Cortex ingester ring hash collision causing query failures via Thanos StoreAPI"
+prompt = """
+A metrics platform using Cortex for write path and Thanos for read path
+is experiencing intermittent query failures. The issue appears when
+Cortex ingesters change ring membership and Thanos' StoreAPI returns
+partial results.
+
+Your task:
+1. Find how Cortex manages the ingester hash ring and handles membership changes
+2. Find how Thanos StoreAPI discovers and queries Cortex ingesters
+3. Identify the race condition between ring membership changes and query routing
+4. Document the failure mode and recommended mitigation
+
+Write your analysis to /workspace/analysis/IMPACT_REPORT.md
+"""
+
+[[repos]]
+url = "https://github.com/cortexproject/cortex"
+rev = "v1.16.0"
+path = "cortex"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/thanos-io/thanos"
+rev = "v0.32.0"
+path = "thanos"
+role = "dependency"
+
+[metadata]
+languages = ["go"]
+total_loc = 200_000
+dependency_depth = 2
+frameworks = ["cortex", "thanos"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "cortex_ring"
+weight = 0.30
+verifier = "checks/check_cortex_ring.sh"
+description = "Agent identifies Cortex ring management"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "thanos_store"
+weight = 0.40
+verifier = "checks/check_thanos_store.sh"
+description = "Agent finds Thanos StoreAPI discovery"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "race_condition"
+weight = 0.30
+verifier = "checks/check_race_condition.sh"
+description = "Agent identifies the race condition"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = ["migration_guide"]
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Ring membership and query routing tracing across two large repos needs search"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "cortex/pkg/ring/ring.go"
+repo = "cortex"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "thanos/pkg/store/proxy.go"
+repo = "thanos"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "cortex/pkg/ingester/ingester.go"
+repo = "cortex"
+confidence = 0.85
+
+[[ground_truth.sufficient_files]]
+path = "thanos/pkg/query/querier.go"
+repo = "thanos"
+confidence = 0.8

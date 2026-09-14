@@ -1,0 +1,329 @@
+<title>EnterpriseBench Run Browser</title>
+<style>
+:root{
+  --bg:#FBFBFC; --panel:#FFFFFF; --line:#DFE3E8; --line-2:#EDF0F3;
+  --ink:#14181D; --ink-2:#5A646F; --ink-3:#8A939E;
+  --accent:#1E6091; --good:#1F6F43; --bad:#9B2C2C; --warn:#8A5A12;
+  --chip:#F1F4F7; --hover:#F6F8FA;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1114; --panel:#161A1F; --line:#2A3038; --line-2:#20252B;
+    --ink:#E8ECF1; --ink-2:#A2ACB8; --ink-3:#6E7885;
+    --accent:#4192DB; --good:#4FA97A; --bad:#D45B5B; --warn:#C79A45;
+    --chip:#1D232A; --hover:#1B2027;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1114; --panel:#161A1F; --line:#2A3038; --line-2:#20252B;
+  --ink:#E8ECF1; --ink-2:#A2ACB8; --ink-3:#6E7885;
+  --accent:#4192DB; --good:#4FA97A; --bad:#D45B5B; --warn:#C79A45;
+  --chip:#1D232A; --hover:#1B2027;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45;margin:0}
+.wrap{max-width:1440px;margin:0 auto;padding:26px 22px 80px}
+header{border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:18px}
+h1{font-size:1.5rem;font-weight:650;letter-spacing:-.015em;margin:0 0 6px}
+.sub{color:var(--ink-2);font-size:.88rem;margin:0;max-width:78ch}
+.sub code{font-family:var(--mono);font-size:.85em;background:var(--chip);padding:1px 5px;border-radius:4px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+input[type=search],select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);
+  border-radius:7px;padding:7px 10px}
+input[type=search]{min-width:min(320px,100%);flex:1 1 240px}
+input[type=search]:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-size:.8rem;background:var(--chip);color:var(--ink-2);border:1px solid transparent;
+  border-radius:999px;padding:4px 11px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:16px}
+.tile{background:var(--panel);padding:11px 13px}
+.tile .n{font-family:var(--mono);font-size:1.16rem;font-weight:600;letter-spacing:-.02em;display:block}
+.tile .l{color:var(--ink-3);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th,td{padding:6px 9px;text-align:left;border-bottom:1px solid var(--line-2);white-space:nowrap}
+thead th{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);z-index:1;
+  font-weight:600;color:var(--ink-2);cursor:pointer;user-select:none;font-size:.76rem;
+  text-transform:uppercase;letter-spacing:.05em}
+thead th:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+thead th[data-dir]::after{content:" ▲";color:var(--accent)}
+thead th[data-dir="desc"]::after{content:" ▼"}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--hover)}
+tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.num{font-family:var(--mono);text-align:right}
+.task{max-width:30ch;overflow:hidden;text-overflow:ellipsis}
+.model{max-width:18ch;overflow:hidden;text-overflow:ellipsis}
+.tag{font-family:var(--mono);font-size:.76rem;background:var(--chip);color:var(--ink-2);padding:1px 6px;border-radius:4px}
+.good{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)} .dim{color:var(--ink-3)}
+tr.det td{background:var(--hover);white-space:normal;padding:14px 16px}
+.det-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px 22px}
+.det>div{min-width:0}
+.det h3{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin:0 0 6px;font-weight:600}
+.det ul{list-style:none;margin:0;padding:0;font-family:var(--mono);font-size:.8rem}
+.det li{display:flex;justify-content:space-between;gap:14px;padding:2px 0;border-bottom:1px solid var(--line-2)}
+.det li span:last-child{color:var(--ink-2)}
+.err{font-family:var(--mono);font-size:.78rem;color:var(--bad);white-space:pre-wrap;word-break:break-word}
+.seq{font-family:var(--mono);font-size:.78rem;color:var(--ink-2);word-break:break-word}
+.empty{padding:34px;text-align:center;color:var(--ink-3)}
+footer{margin-top:26px;color:var(--ink-3);font-size:.8rem;max-width:78ch}
+footer code{font-family:var(--mono);background:var(--chip);padding:1px 5px;border-radius:4px}
+@media (max-width:640px){.wrap{padding:18px 12px 60px}h1{font-size:1.28rem}}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>EnterpriseBench run browser</h1>
+  <p class="sub">Every scored run under <code>results/runs/</code>: @@N_RUNS@@ runs across @@N_TASKS@@ tasks and @@N_MODES@@ tool-access modes. A row is one agent session in one container. Click it for per-checkpoint scores, the MCP tool breakdown, and how the session opened. Modes differ only in filesystem permissions on the repo checkouts; the toolset handed to the agent is identical across all of them.</p>
+  <p class="sub" style="margin-top:8px">Two columns are worth reading before you compare anything. <b>Context tok</b> is what the model actually read, summed from the run trace as uncached input plus cache creation plus cache reads; a Claude harness reports <code>total_input_tokens</code> with cache reads excluded, which understates it by two or three orders of magnitude. Where a trace was captured only in part the reported figure is the larger of the two and is used instead; the detail panel names the source on every row. <b>Score</b> is on a 0&ndash;1 scale: runs written before the scorer moved to a weighted mean carry a weighted sum, and those are divided by total checkpoint weight, with the raw value kept in the detail panel.</p>
+</header>
+
+<div class="controls">
+  <input type="search" id="q" placeholder="Filter by task, repo, variant, or model" aria-label="Filter runs">
+  <select id="model" aria-label="Model"></select>
+  <select id="suite" aria-label="Suite"></select>
+  <select id="state" aria-label="Run state">
+    <option value="">All runs</option>
+    <option value="ok">Completed</option>
+    <option value="fail">Did not complete</option>
+    <option value="cf">Called code_finder</option>
+  </select>
+</div>
+<div class="chips" id="modes" role="group" aria-label="Tool-access mode"></div>
+
+<div class="tiles" id="tiles"></div>
+
+<div class="scroll">
+  <table>
+    <thead><tr>
+      <th data-k="task">Task</th>
+      <th data-k="variant">Variant</th>
+      <th data-k="model">Model</th>
+      <th data-k="score" class="num">Score</th>
+      <th data-k="passed" class="num">Checks</th>
+      <th data-k="context" class="num">Context tok</th>
+      <th data-k="cost" class="num">USD</th>
+      <th data-k="turns" class="num">Turns</th>
+      <th data-k="mcp" class="num">MCP</th>
+      <th data-k="cf" class="num">Finder</th>
+      <th data-k="first">Opened with</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="empty" id="empty" hidden>No run matches this filter.</div>
+</div>
+
+<footer>Generated by <code>python3 experiments/run_viewer/build.py</code> from the run artifacts in this repository. Scores come from <code>results.json</code> as written by the sealed verifier; nothing here is recomputed. A blank model or harness means the run predates that field. Runs under <code>results/runs/_invalidated/</code> are excluded, as are runs with no <code>results.json</code>, which were never scored. Where a trace carries no per-message usage the context figure falls back to the harness-reported input count; the detail panel says which of the two a row is showing.</footer>
+</div>
+
+<script>
+var RUNS = @@DATA@@;
+
+var q = document.getElementById('q'), sel = {
+  model: document.getElementById('model'),
+  suite: document.getElementById('suite'),
+  state: document.getElementById('state')
+};
+var sort = {k:'task', dir:'asc'}, openKey = null;
+
+function uniq(key){
+  var s = {};
+  RUNS.forEach(function(r){ if (r[key]) s[r[key]] = 1; });
+  return Object.keys(s).sort();
+}
+function fillSelect(el, values, label){
+  el.innerHTML = '<option value="">' + label + '</option>';
+  values.forEach(function(v){
+    var o = document.createElement('option'); o.value = v; o.textContent = v; el.appendChild(o);
+  });
+}
+fillSelect(sel.model, uniq('model'), 'All models');
+fillSelect(sel.suite, uniq('suite'), 'All suites');
+
+var modes = uniq('mode'), active = {};
+var modeBox = document.getElementById('modes');
+modes.forEach(function(m){
+  var b = document.createElement('button');
+  b.className = 'chip'; b.type = 'button'; b.textContent = m;
+  b.setAttribute('aria-pressed', 'false');
+  b.onclick = function(){
+    active[m] = !active[m];
+    b.setAttribute('aria-pressed', active[m] ? 'true' : 'false');
+    render();
+  };
+  modeBox.appendChild(b);
+});
+
+function matches(r){
+  if (sel.model.value && r.model !== sel.model.value) return false;
+  if (sel.suite.value && r.suite !== sel.suite.value) return false;
+  var picked = Object.keys(active).filter(function(m){ return active[m]; });
+  if (picked.length && picked.indexOf(r.mode) < 0) return false;
+  var st = sel.state.value;
+  if (st === 'ok' && !r.ok) return false;
+  if (st === 'fail' && r.ok) return false;
+  if (st === 'cf' && !(r.cf > 0)) return false;
+  var t = q.value.trim().toLowerCase();
+  if (!t) return true;
+  return [r.task, r.variant, r.model, r.type, r.suite, r.difficulty]
+    .concat(r.repos, r.languages).join(' ').toLowerCase().indexOf(t) >= 0;
+}
+
+function num(v){ return (v === null || v === undefined) ? '' : v; }
+function fmt(v, digits){
+  if (v === null || v === undefined) return '<span class="dim">&mdash;</span>';
+  return Number(v).toFixed(digits);
+}
+function thousands(v){
+  if (v === null || v === undefined) return '<span class="dim">&mdash;</span>';
+  return Math.round(v).toLocaleString('en-US');
+}
+function median(xs){
+  if (!xs.length) return null;
+  var s = xs.slice().sort(function(a, b){ return a - b; }), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+function mean(xs){
+  if (!xs.length) return null;
+  return xs.reduce(function(a, b){ return a + b; }, 0) / xs.length;
+}
+function pull(rows, key){
+  return rows.map(function(r){ return r[key]; })
+             .filter(function(v){ return typeof v === 'number' && isFinite(v); });
+}
+
+function tiles(rows){
+  var tasks = {};
+  rows.forEach(function(r){ tasks[r.task] = 1; });
+  var cf = rows.filter(function(r){ return r.cf > 0; }).length;
+  var data = [
+    [rows.length.toLocaleString('en-US'), 'runs'],
+    [Object.keys(tasks).length, 'tasks'],
+    [fmt(mean(pull(rows, 'score')), 3), 'mean score'],
+    [thousands(median(pull(rows, 'context'))), 'median context tok'],
+    [fmt(median(pull(rows, 'cost')), 3), 'median USD'],
+    [fmt(mean(pull(rows, 'mcp')), 1), 'mean MCP calls'],
+    [cf + ' / ' + rows.length, 'used code_finder']
+  ];
+  document.getElementById('tiles').innerHTML = data.map(function(d){
+    return '<div class="tile"><span class="n">' + d[0] + '</span><span class="l">' + d[1] + '</span></div>';
+  }).join('');
+}
+
+function scoreClass(r){
+  if (typeof r.score !== 'number') return 'dim';
+  if (r.score >= 0.999) return 'good';
+  if (r.score <= 0.001) return 'bad';
+  return '';
+}
+
+function detail(r){
+  var checks = r.checkpoints.length
+    ? r.checkpoints.map(function(c){
+        return '<li><span>' + c.name + '</span><span class="' + (c.passed ? 'good' : 'bad') + '">'
+             + Number(c.score).toFixed(2) + '</span></li>';
+      }).join('')
+    : '<li><span class="dim">no checkpoint detail recorded</span></li>';
+  var tools = Object.keys(r.tools).length
+    ? Object.keys(r.tools).map(function(k){
+        return '<li><span>' + k + '</span><span>' + r.tools[k] + '</span></li>';
+      }).join('')
+    : '<li><span class="dim">no MCP calls</span></li>';
+  var facts = [
+    ['mode', r.mode], ['variant label', r.label || '—'], ['harness', r.harness || '—'],
+    ['task type', r.type || '—'], ['difficulty', r.difficulty || '—'],
+    ['repos', r.repos.join(', ') || '—'], ['languages', r.languages.join(', ') || '—'],
+    ['phase', r.phase || '—'], ['output tokens', thousands(r.output)],
+    ['context source', r.context_from || '—'],
+    ['reported input tokens', thousands(r.input)],
+    ['raw score', r.rescaled ? (Number(r.raw_score).toFixed(2) + ' (÷ checkpoint weight)') : fmt(r.raw_score, 3)],
+    ['wall seconds', r.wall]
+  ].map(function(f){
+    return '<li><span>' + f[0] + '</span><span>' + f[1] + '</span></li>';
+  }).join('');
+  var opening = r.head.length
+    ? '<p class="seq">' + r.head.join(' → ') + '</p>'
+    : '<p class="seq dim">no tool calls recorded in the trace</p>';
+  var problem = r.ok ? '' :
+    '<div><h3>Did not complete</h3><p class="err">' + (r.failure || 'unclassified')
+    + (r.error ? '\n' + r.error : '') + '</p></div>';
+  return '<tr class="det"><td colspan="11"><div class="det det-grid">'
+    + '<div><h3>Checkpoints</h3><ul>' + checks + '</ul></div>'
+    + '<div><h3>MCP tool calls</h3><ul>' + tools + '</ul></div>'
+    + '<div><h3>Run</h3><ul>' + facts + '</ul></div>'
+    + '<div><h3>First tool calls</h3>' + opening + problem + '</div>'
+    + '</div></td></tr>';
+}
+
+function render(){
+  var rows = RUNS.filter(matches);
+  var k = sort.k, dir = sort.dir === 'asc' ? 1 : -1;
+  rows.sort(function(a, b){
+    var x = a[k], y = b[k];
+    var xn = typeof x === 'number', yn = typeof y === 'number';
+    if (xn && yn) return (x - y) * dir;
+    if (x === null || x === undefined || x === '') return 1;
+    if (y === null || y === undefined || y === '') return -1;
+    return String(x).localeCompare(String(y)) * dir;
+  });
+  tiles(rows);
+  document.getElementById('empty').hidden = rows.length > 0;
+  document.getElementById('rows').innerHTML = rows.map(function(r){
+    var key = r.task + '/' + r.variant;
+    var row = '<tr tabindex="0" data-key="' + key + '">'
+      + '<td class="task" title="' + r.task + '">' + r.task + '</td>'
+      + '<td><span class="tag">' + r.variant + '</span></td>'
+      + '<td class="model dim" title="' + (r.model || '') + '">' + (r.model || '—') + '</td>'
+      + '<td class="num ' + scoreClass(r) + '">' + fmt(r.score, 3) + '</td>'
+      + '<td class="num dim">' + num(r.passed) + '/' + num(r.total) + '</td>'
+      + '<td class="num">' + thousands(r.context) + '</td>'
+      + '<td class="num">' + fmt(r.cost, 3) + '</td>'
+      + '<td class="num dim">' + num(r.turns) + '</td>'
+      + '<td class="num">' + num(r.mcp) + '</td>'
+      + '<td class="num ' + (r.cf > 0 ? 'good' : 'dim') + '">' + (r.cf || 0) + '</td>'
+      + '<td class="dim">' + (r.first || '—') + '</td>'
+      + '</tr>';
+    return key === openKey ? row + detail(r) : row;
+  }).join('');
+}
+
+document.getElementById('rows').addEventListener('click', function(e){
+  var tr = e.target.closest('tr[data-key]');
+  if (!tr) return;
+  openKey = (openKey === tr.dataset.key) ? null : tr.dataset.key;
+  render();
+});
+document.getElementById('rows').addEventListener('keydown', function(e){
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  var tr = e.target.closest('tr[data-key]');
+  if (!tr) return;
+  e.preventDefault();
+  openKey = (openKey === tr.dataset.key) ? null : tr.dataset.key;
+  render();
+});
+
+Array.prototype.forEach.call(document.querySelectorAll('thead th'), function(th){
+  th.tabIndex = 0;
+  function go(){
+    var k = th.dataset.k;
+    sort = {k: k, dir: (sort.k === k && sort.dir === 'asc') ? 'desc' : 'asc'};
+    Array.prototype.forEach.call(document.querySelectorAll('thead th'), function(o){
+      o.removeAttribute('data-dir');
+    });
+    th.setAttribute('data-dir', sort.dir);
+    render();
+  }
+  th.onclick = go;
+  th.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+});
+
+[q, sel.model, sel.suite, sel.state].forEach(function(el){
+  el.addEventListener('input', function(){ openKey = null; render(); });
+});
+render();
+</script>

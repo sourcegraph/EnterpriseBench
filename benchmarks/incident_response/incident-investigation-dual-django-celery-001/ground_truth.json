@@ -1,0 +1,61 @@
+{
+  "task_id": "incident-investigation-dual-django-celery-001",
+  "task_type": "incident_investigation",
+  "repos": [
+    {
+      "url": "https://github.com/django/django",
+      "rev": "5.0",
+      "path": "django"
+    },
+    {
+      "url": "https://github.com/celery/celery",
+      "rev": "v5.3.6",
+      "path": "celery"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "django/db/utils.py",
+      "repo": "django",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "celery/concurrency/prefork.py",
+      "repo": "celery",
+      "confidence": 0.9,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "django/db/backends/base/base.py",
+      "repo": "django",
+      "confidence": 0.85
+    },
+    {
+      "path": "celery/worker/consumer/consumer.py",
+      "repo": "celery",
+      "confidence": 0.8
+    }
+  ],
+  "connection_lifecycle_terms": [
+    "close_old_connections",
+    "CONN_MAX_AGE",
+    "django.db.connections",
+    "ConnectionHandler",
+    "thread-local",
+    "request_started",
+    "request_finished"
+  ],
+  "worker_lifecycle_terms": [
+    "prefork",
+    "max-tasks-per-child",
+    "fork",
+    "child process",
+    "worker_process_init",
+    "worker_process_shutdown",
+    "billiard",
+    "recycle"
+  ]
+}

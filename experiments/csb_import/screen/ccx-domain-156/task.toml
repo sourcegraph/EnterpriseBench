@@ -1,0 +1,112 @@
+# Imported from CodeScaleBench CCX-domain-156 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-domain-156"
+suite = "platform_engineering"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Kubernetes SharedInformer Factory and Cache Sync"
+
+[[repos]]
+url = "https://github.com/kubernetes/kubernetes"
+rev = "v1.32.0"
+path = "kubernetes"
+role = "primary"
+
+[metadata]
+languages = ["go"]
+csb_mirror = "sg-evals/kubernetes--v1.32.0"
+csb_commit = "v1.32.0"
+csb_family = "csb_org_domain"
+csb_category = "domain-lineage"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/client-go/informers/factory.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/client-go/informers/generic.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/client-go/informers/internalinterfaces/factory_interfaces.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/client-go/tools/cache/shared_informer.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/client-go/tools/cache/controller.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/client-go/tools/cache/reflector.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/client-go/tools/cache/listwatch.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/client-go/tools/cache/delta_fifo.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/client-go/tools/cache/store.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/client-go/tools/cache/index.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/client-go/tools/cache/thread_safe_store.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "staging/src/k8s.io/client-go/tools/cache/reflector_data_consistency_detector.go"
+repo = "kubernetes"
+confidence = 0.9
+source = "deterministic"

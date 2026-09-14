@@ -1,0 +1,32 @@
+{
+  "task_id": "monorepo-boundary-pnpm-lifecycle-006",
+  "checkpoints": {
+    "identify_affected_packages": {
+      "expected_solution": "PR #8897 in pnpm v10.0.0 changes the lifecycle-script execution policy default to require an explicit allow-list. The change is in `@pnpm/config` (`config/config/src/getOptionsFromRootManifest.ts`), where the default value of the `onlyBuiltDependencies`/lifecycle-script options flips from permissive to allow-list-only. Two sibling packages observe the behavior change in their tests and command flow: (1) `@pnpm/plugin-commands-installation` / `@pnpm/plugin-commands-rebuild` (`exec/plugin-commands-rebuild/test/index.ts` covers the allow-list enforcement during install and rebuild), and (2) the top-level `pnpm` CLI (`pnpm/test/install/global.ts`, `pnpm/test/install/lifecycleScripts.ts`, `pnpm/test/monorepo/index.ts`) which exercises end-to-end lifecycle-script behavior.",
+      "evaluation_criteria": [
+        "Must identify @pnpm/config as the source-of-change package and cite config/config/src/getOptionsFromRootManifest.ts",
+        "Must identify the pnpm CLI package and reference at least one of pnpm/test/install/lifecycleScripts.ts, pnpm/test/install/global.ts, or pnpm/test/monorepo/index.ts",
+        "Must identify @pnpm/plugin-commands-rebuild (or plugin-commands-installation) and cite exec/plugin-commands-rebuild/test/index.ts",
+        "Should mention this is a default-value flip — the code path already exists, only the default changes"
+      ]
+    },
+    "classify_change_impact": {
+      "expected_solution": "Overall semver bump = **major** (v10.0.0). Although the source code change is small (single field default flipped in `config/config/src/getOptionsFromRootManifest.ts`), the *behavior* change is observable to every existing repo: previously running scripts now require an explicit allow-list and therefore are skipped by default. This is a deliberate breaking change for security hardening. Per-package: `@pnpm/config` = major (default value of public option flips), `@pnpm/plugin-commands-rebuild` and `pnpm` CLI = major because their observable behavior on existing projects changes — install/rebuild no longer runs arbitrary lifecycle scripts unless declared.",
+      "evaluation_criteria": [
+        "Must classify overall semver as `major` and explicitly call this a breaking behavior change despite small code surface",
+        "Must classify @pnpm/config as major because the default of a public option changes",
+        "Must classify the pnpm CLI as major because end-to-end install/rebuild behavior changes for existing repos",
+        "Should explain this is a deliberate security-hardening break — not a bug fix"
+      ]
+    },
+    "identify_boundary_violations": {
+      "expected_solution": "Concrete violation sites: (1) `config/config/src/getOptionsFromRootManifest.ts` — the only source change; the default for the lifecycle-script allow-list option flips. Test/coverage updates that show the boundary impact: (2) `exec/plugin-commands-rebuild/test/index.ts` — install-time rebuild now respects allow-list and tests must register expected scripts. (3) `pnpm/test/install/lifecycleScripts.ts` — direct coverage of the new policy: scripts not on the allow-list don't run by default. (4) `pnpm/test/install/global.ts` — global install path also affected. (5) `pnpm/test/monorepo/index.ts` — multi-package workspace install must thread allow-list through every workspace project. PR file count = 6, all clustered around the single config change plus its E2E coverage.",
+      "evaluation_criteria": [
+        "Must cite config/config/src/getOptionsFromRootManifest.ts as the single source-change file",
+        "Must cite at least two test files among pnpm/test/install/lifecycleScripts.ts, pnpm/test/install/global.ts, pnpm/test/monorepo/index.ts, and exec/plugin-commands-rebuild/test/index.ts",
+        "Must explain why the boundary cuts across config/CLI/exec — the config default flows through multiple consumer paths",
+        "Should note the small (6-file) PR scope despite the major semver impact"
+      ]
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-jest-babel-cache-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: jest/packages/jest-runtime/src/index.ts, jest/packages/jest-transform/src/ScriptTransformer.ts, babel/packages/babel-core/src/config/full.ts, babel/packages/babel-core/src/config/partial.ts. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify jest/packages/jest-runtime/src/index.ts as part of the error source",
+        "Must identify jest/packages/jest-transform/src/ScriptTransformer.ts as part of the error source",
+        "Must identify babel/packages/babel-core/src/config/full.ts as part of the error source",
+        "Must identify babel/packages/babel-core/src/config/partial.ts as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) Jest's ScriptTransformer.transform invokes the configured transformer (babel-jest) and consults a content-addressed cache keyed on the result of getCacheKey -> (2) babel-jest's getCacheKey hashes the source content, the babel config object, and the resolved package versions, but it does not follow plugin entry-points through transitive resolution -> (3) babel-core's partialConfig resolves plugins via loadPlugin, which walks node_modules but caches the loader result across runs in the same process -> (4) After a plugin upgrade without a package.json version bump (for instance a workspace symlink swap), babel-jest's cache key still matches the previous run because the version field is unchanged -> (5) Jest reuses the stale transformed output on the rerun; regeneratorRuntime is missing because the new plugin chunked the helper differently and the cached file points at a no-longer-valid helper path.",
+      "evaluation_criteria": [
+        "Must describe the step: Jest's ScriptTransformer.transform invokes the configured transformer (babel-jes...",
+        "Must describe the step: babel-jest's getCacheKey hashes the source content, the babel config object, and...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) A Babel plugin is upgraded in a way that changes its emit but not its package.json version (workspaces, lockfile resolution shifts); (2) babel-jest's getCacheKey uses package version, not plugin content hash, so the cache survives the upgrade; (3) Jest's ScriptTransformer trusts the cache hit and returns the stale transformed source on the rerun.",
+      "evaluation_criteria": [
+        "Must identify the condition: A Babel plugin is upgraded in a way that changes its emit but not its package.js...",
+        "Must identify the condition: babel-jest's getCacheKey uses package version, not plugin content hash, so the c...",
+        "Must identify the condition: Jest's ScriptTransformer trusts the cache hit and returns the stale transformed ...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

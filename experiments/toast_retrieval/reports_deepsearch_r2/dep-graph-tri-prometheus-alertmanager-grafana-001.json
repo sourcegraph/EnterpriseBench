@@ -1,0 +1,220 @@
+{
+  "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/prometheus--v2.47.0",
+    "github.com/sg-evals/alertmanager--v0.26.0",
+    "github.com/sg-evals/grafana--v10.2.0"
+  ],
+  "retrieved_paths": [
+    "notifier/notifier.go",
+    "rules/manager.go",
+    "api/v2/models/postable_alert.go",
+    "api/v2/openapi.yaml",
+    "api/v2/api.go",
+    "public/app/features/alerting/unified/api/prometheus.ts",
+    "public/app/features/query/state/DashboardQueryRunner/UnifiedAlertStatesWorker.ts",
+    "public/app/features/alerting/unified/api/alertmanagerApi.ts",
+    "rules/alerting.go",
+    "api/v2/compat.go",
+    "types/types.go",
+    "api/v2/models/alert.go",
+    "api/v1/api.go",
+    "pkg/services/ngalert/api/forking_prometheus.go",
+    "pkg/services/ngalert/api/forking_alertmanager.go",
+    "public/app/types/unified-alerting-dto.ts",
+    "public/app/plugins/datasource/alertmanager/types.ts",
+    "pkg/services/ngalert/api/generated_base_api_prometheus.go"
+  ],
+  "retrieved_paths_union": [
+    "notifier/notifier.go",
+    "rules/manager.go",
+    "api/v2/models/postable_alert.go",
+    "api/v2/openapi.yaml",
+    "api/v2/api.go",
+    "public/app/features/alerting/unified/api/prometheus.ts",
+    "public/app/features/query/state/DashboardQueryRunner/UnifiedAlertStatesWorker.ts",
+    "public/app/features/alerting/unified/api/alertmanagerApi.ts",
+    "rules/alerting.go",
+    "api/v2/compat.go",
+    "types/types.go",
+    "api/v2/models/alert.go",
+    "api/v1/api.go",
+    "pkg/services/ngalert/api/forking_prometheus.go",
+    "pkg/services/ngalert/api/forking_alertmanager.go",
+    "public/app/types/unified-alerting-dto.ts",
+    "public/app/plugins/datasource/alertmanager/types.ts",
+    "pkg/services/ngalert/api/generated_base_api_prometheus.go"
+  ],
+  "required_files": [
+    "prometheus/rules/alerting.go",
+    "alertmanager/api/v2/restapi/operations/alert/post_alerts.go",
+    "grafana/pkg/services/ngalert/api/api_prometheus.go"
+  ],
+  "ir_scores": {
+    "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1413
+    },
+    "mrr": 0.1111,
+    "map_score": 0.037,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0556,
+    "n_retrieved": 18,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1413
+    },
+    "mrr": 0.1111,
+    "map_score": 0.037,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0556,
+    "n_retrieved": 18,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 482.5,
+  "response_chars": 10439,
+  "raw_response": "---\ntitle: Three-way alerting API impact analysis for Prometheus, Alertmanager, and Grafana\nshare_url: https://demo.sourcegraph.com/deepsearch/2344f2c9-f810-4ff2-8882-799a539d771b\nurl: https://demo.sourcegraph.com/deepsearch/2162\ncreated: 2026-08-17T22:43:36Z\nupdated: 2026-08-17T22:48:53Z\n---\n\n#         # dep-graph-tri-prometheus-alertmanager-grafana-001\n\n        **Suite:** dependency_management | **Type:** dependency_graph | **Difficulty:** expert\n        **Repos:** prometheus + alertmanager + grafana\n\n        ## Context\n\n        Prometheus changed its alerting rule evaluation and notification API.\nAlertmanager receives alerts from Prometheus, and Grafana reads alert\nstate from both. Changes in Prometheus' alert format cascade downstream.\n\nYour task:\n1. Find where Prometheus defines alert rule evaluation and notification format\n2. Find where Alertmanager receives and processes Prometheus alerts\n3. Find where Grafana queries Prometheus and Alertmanager for alert state\n4. Document the three-way API contract and cascade points\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/prometheus--v2.47.0, github.com/sg-evals/alertmanager--v0.26.0, github.com/sg-evals/grafana--v10.2.0\n\nThe report has been written. Here is a summary of the findings:\n\n---\n\n## Impact Report Summary\n\nThe report documents 6 cascade points across the three-way Prometheus \u2192 Alertmanager \u2192 Grafana alert pipeline.\n\n### Key Contract Points\n\n**Prometheus \u2192 Alertmanager (wire format):**\n- [`notifier/notifier.go:57-70`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.47.0/-/blob/notifier/notifier.go?L57-70) defines `notifier.Alert` \u2014 the canonical JSON payload with `labels`, `annotations`, `startsAt`, `endsAt`, `generatorURL`.\n- [`rules/manager.go:1246-1269`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.47.0/-/blob/rules/manager.go?L1246-1269) `SendAlerts()` sets `StartsAt = alert.FiredAt` (not `ActiveAt`).\n- [`notifier/notifier.go:481-519`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.47.0/-/blob/notifier/notifier.go?L481-519) `sendAll()` dispatches to either v1 (raw JSON) or v2 (OpenAPI `PostableAlert`) per configured `api_version`.\n\n**Alertmanager ingestion:**\n- [`api/v2/models/postable_alert.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/api/v2/models/postable_alert.go) \u2014 `PostableAlert` (generated from [`openapi.yaml`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/api/v2/openapi.yaml)) is the authoritative contract; `labels` is required.\n- [`api/v2/api.go:308-368`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/api/v2/api.go?L308-368) `postAlertsHandler()` applies server-side `resolveTimeout` when `EndsAt` is zero.\n\n**Grafana consumption:**\n- [`prometheus.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/public/app/features/alerting/unified/api/prometheus.ts) calls `GET /api/v1/rules` and reads `activeAt` from alert instances \u2014 a field not sent to Alertmanager.\n- [`UnifiedAlertStatesWorker.ts:109-116`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/public/app/features/query/state/DashboardQueryRunner/UnifiedAlertStatesWorker.ts?L109-116) `promAlertStateToAlertState()` only handles `firing` and `pending`; unknown states (including `keep_firing`) silently become `OK`.\n- [`alertmanagerApi.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/public/app/features/alerting/unified/api/alertmanagerApi.ts) reads `fingerprint` from Alertmanager v2 responses for deduplication.\n\n### Critical Migration Actions\n1. **`keep_firing_for` state** \u2014 add `KeepFiring` to `PromAlertingRuleState` enum in Grafana and map it to `AlertState.Alerting` in `UnifiedAlertStatesWorker`.\n2. **`resolve_timeout` alignment** \u2014 ensure `--rules.alert.resend-delay` (Prometheus) < `global.resolve_timeout` (Alertmanager) to prevent spurious flaps.\n3. **Use API v2** \u2014 configure `api_version: v2` on all Alertmanager targets in Prometheus; Grafana exclusively uses the v2 API.\n\n## Sources\n\n- [github.com/sg-evals/prometheus--v2.47.0/notifier/notifier.go@a89d063?L57-100](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/notifier/notifier.go?L57-100)\n- [github.com/sg-evals/prometheus--v2.47.0/notifier/notifier.go@a89d063?L549-610](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/notifier/notifier.go?L549-610)\n- [github.com/sg-evals/prometheus--v2.47.0/rules/alerting.go@a89d063?L75-160](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/rules/alerting.go?L75-160)\n- [github.com/sg-evals/prometheus--v2.47.0/rules/manager.go@a89d063?L1241-1275](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/rules/manager.go?L1241-1275)\n- [github.com/sg-evals/alertmanager--v0.26.0/api/v2/models/postable_alert.go@fbc1fdc](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/api/v2/models/postable_alert.go)\n- [github.com/sg-evals/alertmanager--v0.26.0/api/v2/compat.go@fbc1fdc?L161-200](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/api/v2/compat.go?L161-200)\n- [github.com/sg-evals/alertmanager--v0.26.0/api/v2/api.go@fbc1fdc?L308-370](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/api/v2/api.go?L308-370)\n- [github.com/sg-evals/alertmanager--v0.26.0/types/types.go@fbc1fdc?L280-320](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/types/types.go?L280-320)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/features/alerting/unified/api/prometheus.ts@6e54105?L1-145](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/features/alerting/unified/api/prometheus.ts?L1-145)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/features/alerting/unified/api/alertmanagerApi.ts@6e54105?L1-100](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/features/alerting/unified/api/alertmanagerApi.ts?L1-100)\n- [github.com/sg-evals/prometheus--v2.47.0/notifier/notifier.go@a89d063?L451-550](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/notifier/notifier.go?L451-550)\n- [github.com/sg-evals/alertmanager--v0.26.0/api/v2/models/alert.go@fbc1fdc](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/api/v2/models/alert.go)\n- [github.com/sg-evals/alertmanager--v0.26.0/api/v1/api.go@fbc1fdc?L395-445](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/api/v1/api.go?L395-445)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/features/query/state/DashboardQueryRunner/UnifiedAlertStatesWorker.ts@6e54105?L50-120](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/features/query/state/DashboardQueryRunner/UnifiedAlertStatesWorker.ts?L50-120)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/services/ngalert/api/forking_prometheus.go@6e54105](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/services/ngalert/api/forking_prometheus.go)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/services/ngalert/api/forking_alertmanager.go@6e54105](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/services/ngalert/api/forking_alertmanager.go)\n- [repo:^github.com/sg-evals/grafana--v10.2.0$ PromRulesResponse PromRuleGroupDTO file:.*.ts](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fgrafana--v10.2.0$%20PromRulesResponse%20PromRuleGroupDTO%20file:.%2A.ts)\n- [repo:^github.com/sg-evals/grafana--v10.2.0$ AlertmanagerAlert file:alertmanager/types.ts](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fgrafana--v10.2.0$%20AlertmanagerAlert%20file:alertmanager%2Ftypes.ts)\n- [github.com/sg-evals/alertmanager--v0.26.0/api/v2/openapi.yaml@fbc1fdc?L183-230](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/api/v2/openapi.yaml?L183-230)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/types/unified-alerting-dto.ts@6e54105?L130-200](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/types/unified-alerting-dto.ts?L130-200)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/plugins/datasource/alertmanager/types.ts@6e54105?L210-260](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/plugins/datasource/alertmanager/types.ts?L210-260)\n- [github.com/sg-evals/prometheus--v2.47.0/rules/alerting.go@a89d063?L315-390](/github.com/sg-evals/prometheus--v2.47.0@a89d0635b0b2ee76e274ef871b1ff152b5150d04/-/blob/rules/alerting.go?L315-390)\n- [github.com/sg-evals/grafana--v10.2.0/public/app/types/unified-alerting-dto.ts@6e54105?L85-130](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/public/app/types/unified-alerting-dto.ts?L85-130)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/services/ngalert/api/generated_base_api_prometheus.go@6e54105?L45-100](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/services/ngalert/api/generated_base_api_prometheus.go?L45-100)\n\n\nGenerated files:\n- files/IMPACT_REPORT.json: /.api/agent-files/v1/deep-search/2344f2c9-f810-4ff2-8882-799a539d771b/files/IMPACT_REPORT.json\n- files/IMPACT_REPORT.csv: /.api/agent-files/v1/deep-search/2344f2c9-f810-4ff2-8882-799a539d771b/files/IMPACT_REPORT.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1413
+    },
+    "mrr": 0.1111,
+    "map_score": 0.037,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0556,
+    "n_retrieved": 18,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "notifier/notifier.go",
+    "rules/manager.go",
+    "api/v2/models/postable_alert.go",
+    "api/v2/openapi.yaml",
+    "api/v2/api.go",
+    "public/app/features/alerting/unified/api/prometheus.ts",
+    "public/app/features/query/state/DashboardQueryRunner/UnifiedAlertStatesWorker.ts",
+    "public/app/features/alerting/unified/api/alertmanagerApi.ts",
+    "prometheus/rules/alerting.go",
+    "api/v2/compat.go",
+    "types/types.go",
+    "api/v2/models/alert.go",
+    "api/v1/api.go",
+    "pkg/services/ngalert/api/forking_prometheus.go",
+    "pkg/services/ngalert/api/forking_alertmanager.go",
+    "public/app/types/unified-alerting-dto.ts",
+    "public/app/plugins/datasource/alertmanager/types.ts",
+    "pkg/services/ngalert/api/generated_base_api_prometheus.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "dep-graph-tri-prometheus-alertmanager-grafana-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1413
+    },
+    "mrr": 0.1111,
+    "map_score": 0.037,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.0556,
+    "n_retrieved": 18,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

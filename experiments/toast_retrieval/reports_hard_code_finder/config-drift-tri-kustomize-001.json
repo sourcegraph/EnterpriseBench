@@ -1,0 +1,220 @@
+{
+  "task_id": "config-drift-tri-kustomize-001",
+  "policy": "code_finder",
+  "suite": "platform_engineering",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/kustomize--kustomize_v5.3.0",
+    "github.com/sg-evals/argo-cd--v2.9.0",
+    "github.com/sg-evals/flux2--v2.2.0"
+  ],
+  "retrieved_paths": [
+    "plugin/builtin/patchtransformer/PatchTransformer.go",
+    "api/resource/resource.go",
+    "kyaml/yaml/merge2/merge2.go",
+    "kyaml/yaml/walk/associative_sequence.go",
+    "kyaml/openapi/openapi.go",
+    "site/content/en/docs/Reference/API/Kustomization%20File/patches.md",
+    "util/argo/diff/diff.go",
+    "util/argo/diff/normalize.go",
+    "util/argo/normalizers/knowntypes_normalizer.go",
+    "util/argo/resource_tracking.go",
+    "controller/sync.go",
+    "docs/faq.md",
+    "docs/user-guide/diffing.md",
+    "internal/build/build.go",
+    "pkg/manifestgen/kustomization/kustomization.go",
+    "cmd/flux/build_kustomization.go",
+    "manifests/scripts/bundle.sh",
+    "github.com/fluxcd/pkg/kustomize.Build"
+  ],
+  "retrieved_paths_union": [
+    "plugin/builtin/patchtransformer/PatchTransformer.go",
+    "api/resource/resource.go",
+    "kyaml/yaml/merge2/merge2.go",
+    "kyaml/yaml/walk/associative_sequence.go",
+    "kyaml/openapi/openapi.go",
+    "site/content/en/docs/Reference/API/Kustomization%20File/patches.md",
+    "util/argo/diff/diff.go",
+    "util/argo/diff/normalize.go",
+    "util/argo/normalizers/knowntypes_normalizer.go",
+    "util/argo/resource_tracking.go",
+    "controller/sync.go",
+    "docs/faq.md",
+    "docs/user-guide/diffing.md",
+    "internal/build/build.go",
+    "pkg/manifestgen/kustomization/kustomization.go",
+    "cmd/flux/build_kustomization.go",
+    "manifests/scripts/bundle.sh",
+    "github.com/fluxcd/pkg/kustomize.Build"
+  ],
+  "required_files": [
+    "api/types/kustomization.go",
+    "util/argo/normalizers/diff_normalizer.go",
+    "internal/controller/kustomization_controller.go"
+  ],
+  "ir_scores": {
+    "task_id": "config-drift-tri-kustomize-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 18,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "ir_scores_union": {
+    "task_id": "config-drift-tri-kustomize-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 18,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "elapsed_seconds": 34.4,
+  "response_chars": 7328,
+  "raw_response": "I could not write `/workspace/DRIFT_REPORT.json` because repository write access was unavailable. Findings so far:\n\n- **Kustomize strategic merge implementation**\n  - [kustomize--kustomize_v5.3.0:plugin/builtin/patchtransformer/PatchTransformer.go?L88-L123](/r/github.com/sg-evals/kustomize--kustomize_v5.3.0/-/blob/plugin/builtin/patchtransformer/PatchTransformer.go?L88-L123) \u2014 applies strategic merge patches sequentially and delegates to `Resource.ApplySmPatch`.\n  - [kustomize--kustomize_v5.3.0:api/resource/resource.go?L478-L500](/r/github.com/sg-evals/kustomize--kustomize_v5.3.0/-/blob/api/resource/resource.go?L478-L500) \u2014 invokes `patchstrategicmerge.Filter`.\n  - [kustomize--kustomize_v5.3.0:kyaml/yaml/merge2/merge2.go?L14-L20](/r/github.com/sg-evals/kustomize--kustomize_v5.3.0/-/blob/kyaml/yaml/merge2/merge2.go?L14-L20) \u2014 merge library entry point.\n  - [kustomize--kustomize_v5.3.0:kyaml/yaml/merge2/merge2.go?L110-L147](/r/github.com/sg-evals/kustomize--kustomize_v5.3.0/-/blob/kyaml/yaml/merge2/merge2.go?L110-L147) \u2014 associative lists merge by key; non-associative lists are replaced; `$patch: delete` and `$patch: replace` are honored.\n  - [kustomize--kustomize_v5.3.0:kyaml/yaml/walk/associative_sequence.go?L253-L305](/r/github.com/sg-evals/kustomize--kustomize_v5.3.0/-/blob/kyaml/yaml/walk/associative_sequence.go?L253-L305) \u2014 obtains schema merge keys, otherwise infers keys from list elements.\n  - [kustomize--kustomize_v5.3.0:kyaml/openapi/openapi.go?L537-L558](/r/github.com/sg-evals/kustomize--kustomize_v5.3.0/-/blob/kyaml/openapi/openapi.go?L537-L558) \u2014 resolves `x-kubernetes-list-map-keys` or `x-kubernetes-patch-merge-key`; custom schemas can define keys such as `name` or `mountPath`.\n  - [kustomize--kustomize_v5.3.0:site/content/en/docs/Reference/API/Kustomization%20File/patches.md?L13-L20](/r/github.com/sg-evals/kustomize--kustomize_v5.3.0/-/blob/site/content/en/docs/Reference/API/Kustomization%20File/patches.md?L13-L20) \u2014 patches are applied in declaration order.\n\n- **Argo CD normalization and tracking**\n  - [argo-cd--v2.9.0:util/argo/diff/diff.go?L344-L379](/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/util/argo/diff/diff.go?L344-L379) \u2014 pre-diff normalization deep-copies resources, normalizes tracking metadata, and optionally removes fields owned by configured managed-fields managers.\n  - [argo-cd--v2.9.0:util/argo/diff/normalize.go?L42-L54](/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/util/argo/diff/normalize.go?L42-L54) \u2014 composes ignore-difference and known-type normalizers.\n  - [argo-cd--v2.9.0:util/argo/normalizers/knowntypes_normalizer.go?L37-L65](/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/util/argo/normalizers/knowntypes_normalizer.go?L37-L65) \u2014 configures known Kubernetes types, including `PodSpec` for Rollouts.\n  - [argo-cd--v2.9.0:util/argo/normalizers/knowntypes_normalizer.go?L80-L119](/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/util/argo/normalizers/knowntypes_normalizer.go?L80-L119) \u2014 recursively remarshals list elements and nested fields.\n  - [argo-cd--v2.9.0:util/argo/normalizers/knowntypes_normalizer.go?L124-L157](/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/util/argo/normalizers/knowntypes_normalizer.go?L124-L157) \u2014 JSON round-tripping through typed Kubernetes structs can normalize representation, numeric quantities, omitted fields, and list ordering/serialization.\n  - [argo-cd--v2.9.0:util/argo/resource_tracking.go?L136-L175](/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/util/argo/resource_tracking.go?L136-L175) \u2014 writes tracking label or `argocd.argoproj.io/tracking-id` annotation depending on configured method.\n  - [argo-cd--v2.9.0:util/argo/resource_tracking.go?L201-L240](/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/util/argo/resource_tracking.go?L201-L240) \u2014 diff normalization copies annotation metadata from target to live and removes obsolete labels.\n  - [argo-cd--v2.9.0:controller/sync.go?L372-L381](/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/controller/sync.go?L372-L381) \u2014 sync can normalize targets before applying when `RespectIgnoreDifferences=true`.\n  - [argo-cd--v2.9.0:docs/faq.md?L228-L250](/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/docs/faq.md?L228-L250) \u2014 documents list-order and `$setElementOrder` failures.\n  - [argo-cd--v2.9.0:docs/user-guide/diffing.md?L142-L184](/r/github.com/sg-evals/argo-cd--v2.9.0/-/blob/docs/user-guide/diffing.md?L142-L184) \u2014 known Kubernetes type normalization for fields such as resource limits and volume mounts.\n\n- **Flux build path**\n  - [flux2--v2.2.0:internal/build/build.go?L239-L264](/r/github.com/sg-evals/flux2--v2.2.0/-/blob/internal/build/build.go?L239-L264) \u2014 builds through the Go API, serializes the `ResMap`, parses objects, then applies Flux `CommonMetadata`.\n  - [flux2--v2.2.0:internal/build/build.go?L375-L400](/r/github.com/sg-evals/flux2--v2.2.0/-/blob/internal/build/build.go?L375-L400) \u2014 invokes `github.com/fluxcd/pkg/kustomize.Build`, then performs Flux post-build variable substitution.\n  - [flux2--v2.2.0:pkg/manifestgen/kustomization/kustomization.go?L149-L204](/r/github.com/sg-evals/flux2--v2.2.0/-/blob/pkg/manifestgen/kustomization/kustomization.go?L149-L204) \u2014 standalone Flux manifest generation uses `krusty.MakeKustomizer`, secure filesystem restrictions, disabled plugins, and `k.Run`.\n  - [flux2--v2.2.0:cmd/flux/build_kustomization.go?L32-L45](/r/github.com/sg-evals/flux2--v2.2.0/-/blob/cmd/flux/build_kustomization.go?L32-L45) \u2014 CLI explicitly builds using the internal Go builder and can fetch/overlay a Flux Kustomization object.\n  - [flux2--v2.2.0:manifests/scripts/bundle.sh?L32-L35](/r/github.com/sg-evals/flux2--v2.2.0/-/blob/manifests/scripts/bundle.sh?L32-L35) \u2014 release manifest bundling uses external `kustomize build`, unlike the controller/API path.\n\nLikely drift points:\n\n1. **List merge-key source** \u2014 Kustomize uses OpenAPI extensions or inferred element keys; Argo\u2019s known-type normalizer uses typed Kubernetes JSON remarshal rather than applying Kustomize merge keys; Flux uses the embedded Kustomize API and should retain Kustomize merge semantics.\n2. **Patch order** \u2014 Kustomize applies patches in declaration order; Flux adds post-build variable substitution and common metadata after the build, potentially changing the final object without re-running strategic merge; Argo consumes the generated object and normalizes it before diff/sync.\n3. **List representation/order** \u2014 Argo\u2019s typed remarshal can alter serialization and representation of nested list fields, producing diffs or `$setElementOrder` conflicts even when Kustomize output is semantically equivalent.\n4. **Ignored/managed fields** \u2014 Argo may remove or copy fields based on ignore-differences and managed-fields configuration; Kustomize and Flux do not perform this diff-time normalization.\n5. **Metadata mutation** \u2014 Argo tracking labels/annotations and Flux common metadata are injected outside strategic merge processing, so metadata can differ from standalone Kustomize output and affect subsequent comparisons or patches.\n6. **Execution mode** \u2014 Flux\u2019s controller path uses `github.com/fluxcd/pkg/kustomize.Build` plus post-build substitutions, while the release/bundling path uses the external CLI; version/configuration differences between those paths can yield different output.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "config-drift-tri-kustomize-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 18,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "plugin/builtin/patchtransformer/PatchTransformer.go",
+    "api/resource/resource.go",
+    "kyaml/yaml/merge2/merge2.go",
+    "kyaml/yaml/walk/associative_sequence.go",
+    "kyaml/openapi/openapi.go",
+    "site/content/en/docs/Reference/API/Kustomization%20File/patches.md",
+    "util/argo/diff/diff.go",
+    "util/argo/diff/normalize.go",
+    "util/argo/normalizers/knowntypes_normalizer.go",
+    "util/argo/resource_tracking.go",
+    "controller/sync.go",
+    "docs/faq.md",
+    "docs/user-guide/diffing.md",
+    "internal/build/build.go",
+    "pkg/manifestgen/kustomization/kustomization.go",
+    "cmd/flux/build_kustomization.go",
+    "manifests/scripts/bundle.sh",
+    "github.com/fluxcd/pkg/kustomize.Build"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "config-drift-tri-kustomize-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 18,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

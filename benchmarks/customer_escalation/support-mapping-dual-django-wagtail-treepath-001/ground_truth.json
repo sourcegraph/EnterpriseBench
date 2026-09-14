@@ -1,0 +1,71 @@
+{
+  "task_id": "support-mapping-dual-django-wagtail-treepath-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/wagtail/wagtail",
+      "rev": "v5.2.2",
+      "path": "wagtail"
+    },
+    {
+      "url": "https://github.com/django/django",
+      "rev": "4.2.10",
+      "path": "django"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "wagtail/wagtail/models/__init__.py",
+      "repo": "wagtail",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "wagtail/wagtail/query.py",
+      "repo": "wagtail",
+      "confidence": 0.85,
+      "source": "deterministic"
+    },
+    {
+      "path": "django/django/db/models/query.py",
+      "repo": "django",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "django/django/db/models/sql/compiler.py",
+      "repo": "django",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "django/django/db/models/options.py",
+      "repo": "django",
+      "confidence": 0.75
+    },
+    {
+      "path": "django/django/db/models/fields/__init__.py",
+      "repo": "django",
+      "confidence": 0.7
+    }
+  ],
+  "error_chain": [
+    "Wagtail Page extends AbstractPage which inherits from treebeard MP_Node, providing a materialized-path field used to encode tree position",
+    "Page.get_descendants() builds a queryset filtered by path startswith on the parent's path, expecting an index-supported prefix lookup",
+    "When the customer's custom Page subclass overrides Meta without preserving indexes, Django's options.py drops the inherited db_index for path during model construction",
+    "Django's QuerySet.filter() in db/models/query.py compiles to SQL via sql/compiler.py, which falls back to a full table scan because no usable index is registered on the path column",
+    "The query plan regression manifests as N+1 latency in Wagtail's navigation rendering despite the same source code as before"
+  ],
+  "trigger_conditions": [
+    "The customer's custom Page subclass overrides Meta or class_prepared without re-declaring Meta.indexes, dropping the inherited path index",
+    "Django's model-options inheritance treats Meta.indexes as non-cumulative by default; Wagtail's AbstractPage relies on the parent index being kept",
+    "The startswith path filter is only fast when the path field has a B-tree index; without it Django's compiler emits a full-scan plan"
+  ],
+  "expected_answer": {
+    "error_origin": "Django sql/compiler.py emits a full-scan plan for the path startswith lookup because the customer's custom Page subclass dropped the inherited db_index on path",
+    "bypass_reason": "Meta.indexes is not cumulative across abstract bases in Django's options.py; the customer's subclass silently removes Wagtail's AbstractPage.path index",
+    "correct_config": "Re-declare Meta.indexes on the custom Page subclass to include the path B-tree index, or leave Meta unset so Wagtail's AbstractPage Meta is inherited verbatim"
+  }
+}

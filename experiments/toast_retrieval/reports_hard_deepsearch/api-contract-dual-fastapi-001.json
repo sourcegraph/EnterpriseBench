@@ -1,0 +1,194 @@
+{
+  "task_id": "api-contract-dual-fastapi-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/fastapi--0.109.0",
+    "github.com/sg-evals/httpx--0.26.0"
+  ],
+  "retrieved_paths": [
+    "fastapi/routing.py",
+    "fastapi/dependencies/utils.py",
+    "fastapi/_compat.py",
+    "httpx/_client.py",
+    "httpx/_content.py",
+    "httpx/_utils.py",
+    "httpx/_models.py",
+    "fastapi/encoders.py",
+    "httpx/_multipart.py",
+    "dependencies/utils.py"
+  ],
+  "retrieved_paths_union": [
+    "fastapi/routing.py",
+    "fastapi/dependencies/utils.py",
+    "fastapi/_compat.py",
+    "httpx/_client.py",
+    "httpx/_content.py",
+    "httpx/_utils.py",
+    "httpx/_models.py",
+    "fastapi/encoders.py",
+    "httpx/_multipart.py",
+    "dependencies/utils.py"
+  ],
+  "required_files": [
+    "fastapi/routing.py",
+    "httpx/_content.py"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.8503,
+      "10": 0.8503
+    },
+    "mrr": 1.0,
+    "map_score": 0.7,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.8503,
+      "10": 0.8503
+    },
+    "mrr": 1.0,
+    "map_score": 0.7,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 220.4,
+  "response_chars": 9428,
+  "raw_response": "---\ntitle: Trace FastAPI vs httpx request encoding differences causing 422 errors\nshare_url: https://demo.sourcegraph.com/deepsearch/c605218a-4be8-414f-8b4c-41bfbc3b5b49\nurl: https://demo.sourcegraph.com/deepsearch/2222\ncreated: 2026-08-18T01:59:06Z\nupdated: 2026-08-18T02:01:59Z\n---\n\n# # Trace API schema handling differences between FastAPI server validation and httpx client request encoding\n\nYour team uses FastAPI for backend services and httpx as the HTTP client in\nservice-to-service communication. After upgrading FastAPI to 0.109.0 and httpx\nto 0.26.0, some inter-service requests that previously worked now fail with\n422 Unprocessable Entity errors.\n\nThe issue appears to be a contract mismatch in how FastAPI's Pydantic v2\nvalidation handles request body encoding vs how httpx constructs and encodes\nrequest bodies. Specifically, the handling of nested models, optional fields\nwith defaults, and union types differs between the two libraries.\n\nYour task:\n\n1. Find where FastAPI processes incoming request bodies \u2014 locate the dependency\n   injection, body parsing, and Pydantic model validation logic. Identify how\n   FastAPI handles Content-Type negotiation and body deserialization for JSON\n   requests with nested models.\n2. Find where httpx constructs outgoing request bodies \u2014 locate the request\n   encoding, JSON serialization, and Content-Type header logic. Identify how\n   httpx handles nested dict/model serialization and None/default value handling.\n3. Identify the specific contract drift points: where FastAPI expects a\n   certain JSON structure that httpx's default serialization does not produce\n   (e.g., None vs missing keys, nested model serialization, union type encoding).\n4. Document each drift point with source files from both repos.\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md with:\n\n- FastAPI request validation chain (file paths)\n- httpx request encoding chain (file paths)\n- Contract drift points with examples\n- Recommended fixes\n\n\nSearch only these repositories: github.com/sg-evals/fastapi--0.109.0, github.com/sg-evals/httpx--0.26.0\n\nThe report is complete. Here is a summary of the findings:\n\n---\n\n## Analysis complete \u2014 6 drift points identified\n\nThe full report has been written. Here is the executive summary:\n\n### FastAPI Validation Chain\n\n1. [**`routing.py` L218\u2013291**](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.109.0/-/blob/fastapi/routing.py?L218-291) \u2014 ASGI handler reads body bytes, negotiates Content-Type (only `application/json` or `*+json` triggers JSON parsing), then calls `solve_dependencies()`.\n2. [**`dependencies/utils.py` L685\u2013764**](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.109.0/-/blob/fastapi/dependencies/utils.py?L685-764) \u2014 `request_body_to_args()` uses `received_body.get(field.alias)` \u2014 **cannot distinguish `null` from absent key**.\n3. [**`_compat.py` L83\u2013131**](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.109.0/-/blob/fastapi/_compat.py?L83-131) \u2014 Pydantic v2 `TypeAdapter.validate_python(from_attributes=True)` handles nested models and union discrimination.\n4. [**`dependencies/utils.py` L767\u2013810**](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.109.0/-/blob/fastapi/dependencies/utils.py?L767-810) \u2014 Multi-body routes wrap all params in a synthetic `Body_<route>` model; clients must send nested JSON.\n\n### httpx Encoding Chain\n\n1. [**`_client.py` L321\u2013370**](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.26.0/-/blob/httpx/_client.py?L321-370) \u2014 `build_request()` merges client config, passes everything to `Request()`.\n2. [**`_content.py` L176\u2013181**](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.26.0/-/blob/httpx/_content.py?L176-181) \u2014 `encode_json()` uses stdlib `json_dumps` with **no custom serializer** \u2014 Pydantic models, aliases, and `exclude_none` are all ignored.\n3. [**`_utils.py` L56\u201368**](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.26.0/-/blob/httpx/_utils.py?L56-68) \u2014 `primitive_value_to_str(None)` \u2192 `\"\"`, not `\"null\"`, in form data.\n\n### The 6 Contract Drift Points\n\n| # | Drift | FastAPI location | httpx location | Severity |\n|---|---|---|---|---|\n| 1 | `null` vs. absent key \u2014 FastAPI treats both as missing | `dependencies/utils.py` L716\u2013728 | `_content.py` L177 (`json.dumps` keeps `null`) | **Critical** |\n| 2 | Pydantic models not serializable by stdlib `json.dumps` | `_compat.py` L123\u2013125 | `_content.py` L177 | **Critical** |\n| 3 | Alias mismatch \u2014 FastAPI reads by `.alias`, httpx dumps by attribute name | `dependencies/utils.py` L712 | `_content.py` L177 | **High** |\n| 4 | Multi-body embedding \u2014 clients must send nested `{\"param\": {...}}` | `dependencies/utils.py` L767\u2013810 | (caller responsibility) | **High** |\n| 5 | Discriminated union \u2014 discriminator key must be explicit in client dict | `_compat.py` L107\u2013125 | (caller responsibility) | **Medium** |\n| 6 | `content=` raw bytes without Content-Type causes fragile parsing | `routing.py` L236\u2013249 | `_content.py` L207\u2013208 | **Medium** |\n\n### The One-line Fix\n\n```python\nhttpx.post(url, json=model.model_dump(mode=\"json\", by_alias=True, exclude_none=True))\n```\n\nThis single pattern resolves drift points 1, 2, and 3 simultaneously.\n\n## Sources\n\n- [github.com/sg-evals/fastapi--0.109.0/fastapi/dependencies/utils.py@e2b706d?L685-810](/github.com/sg-evals/fastapi--0.109.0@e2b706dd043bfb153dde74819787b249e50cec64/-/blob/fastapi/dependencies/utils.py?L685-810)\n- [github.com/sg-evals/httpx--0.26.0/httpx/_content.py@5aca400](/github.com/sg-evals/httpx--0.26.0@5aca4008cf82cc5e887bf8c1b8bff353d0b845c7/-/blob/httpx/_content.py)\n- [github.com/sg-evals/fastapi--0.109.0/fastapi/routing.py@e2b706d?L218-295](/github.com/sg-evals/fastapi--0.109.0@e2b706dd043bfb153dde74819787b249e50cec64/-/blob/fastapi/routing.py?L218-295)\n- [github.com/sg-evals/fastapi--0.109.0/fastapi/dependencies/utils.py@e2b706d?L522-685](/github.com/sg-evals/fastapi--0.109.0@e2b706dd043bfb153dde74819787b249e50cec64/-/blob/fastapi/dependencies/utils.py?L522-685)\n- [github.com/sg-evals/httpx--0.26.0/httpx/_models.py@5aca400?L306-395](/github.com/sg-evals/httpx--0.26.0@5aca4008cf82cc5e887bf8c1b8bff353d0b845c7/-/blob/httpx/_models.py?L306-395)\n- [github.com/sg-evals/fastapi--0.109.0/fastapi/dependencies/utils.py@e2b706d?L1-60](/github.com/sg-evals/fastapi--0.109.0@e2b706dd043bfb153dde74819787b249e50cec64/-/blob/fastapi/dependencies/utils.py?L1-60)\n- [repo:^github.com/sg-evals/fastapi--0.109.0$ union type discriminator validation pydantic](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Ffastapi--0.109.0$%20union%20type%20discriminator%20validation%20pydantic)\n- [repo:^github.com/sg-evals/httpx--0.26.0$ json serialization None default nested dict](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fhttpx--0.26.0$%20json%20serialization%20None%20default%20nested%20dict)\n- [github.com/sg-evals/fastapi--0.109.0/fastapi/_compat.py@e2b706d?L1-150](/github.com/sg-evals/fastapi--0.109.0@e2b706dd043bfb153dde74819787b249e50cec64/-/blob/fastapi/_compat.py?L1-150)\n- [github.com/sg-evals/httpx--0.26.0/httpx/_client.py@5aca400?L321-380](/github.com/sg-evals/httpx--0.26.0@5aca4008cf82cc5e887bf8c1b8bff353d0b845c7/-/blob/httpx/_client.py?L321-380)\n- [github.com/sg-evals/fastapi--0.109.0/fastapi/_compat.py@e2b706d?L150-300](/github.com/sg-evals/fastapi--0.109.0@e2b706dd043bfb153dde74819787b249e50cec64/-/blob/fastapi/_compat.py?L150-300)\n- [repo:^github.com/sg-evals/fastapi--0.109.0$ exclude_unset exclude_none serialize_response](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Ffastapi--0.109.0$%20exclude_unset%20exclude_none%20serialize_response)\n- [repo:^github.com/sg-evals/httpx--0.26.0$ primitive_value_to_str](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fhttpx--0.26.0$%20primitive_value_to_str)\n- [github.com/sg-evals/httpx--0.26.0/httpx/_utils.py@5aca400?L50-80](/github.com/sg-evals/httpx--0.26.0@5aca4008cf82cc5e887bf8c1b8bff353d0b845c7/-/blob/httpx/_utils.py?L50-80)\n- [github.com/sg-evals/fastapi--0.109.0/fastapi/routing.py@e2b706d?L85-218](/github.com/sg-evals/fastapi--0.109.0@e2b706dd043bfb153dde74819787b249e50cec64/-/blob/fastapi/routing.py?L85-218)\n- [repo:^github.com/sg-evals/fastapi--0.109.0$ jsonable_encoder](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Ffastapi--0.109.0$%20jsonable_encoder)\n- [github.com/sg-evals/fastapi--0.109.0/fastapi/encoders.py@e2b706d?L100-260](/github.com/sg-evals/fastapi--0.109.0@e2b706dd043bfb153dde74819787b249e50cec64/-/blob/fastapi/encoders.py?L100-260)\n- [github.com/sg-evals/httpx--0.26.0/httpx/_multipart.py@5aca400?L1-80](/github.com/sg-evals/httpx--0.26.0@5aca4008cf82cc5e887bf8c1b8bff353d0b845c7/-/blob/httpx/_multipart.py?L1-80)\n- [github.com/sg-evals/fastapi--0.109.0/fastapi/encoders.py@e2b706d?L260-310](/github.com/sg-evals/fastapi--0.109.0@e2b706dd043bfb153dde74819787b249e50cec64/-/blob/fastapi/encoders.py?L260-310)\n- [github.com/sg-evals/fastapi--0.109.0/fastapi/dependencies/utils.py@e2b706d?L706-730](/github.com/sg-evals/fastapi--0.109.0@e2b706dd043bfb153dde74819787b249e50cec64/-/blob/fastapi/dependencies/utils.py?L706-730)\n\n\nGenerated files:\n- files/IMPACT_REPORT_content.json: /.api/agent-files/v1/deep-search/c605218a-4be8-414f-8b4c-41bfbc3b5b49/files/IMPACT_REPORT_content.json\n- files/IMPACT_REPORT.csv: /.api/agent-files/v1/deep-search/c605218a-4be8-414f-8b4c-41bfbc3b5b49/files/IMPACT_REPORT.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.8503,
+      "10": 0.8503
+    },
+    "mrr": 1.0,
+    "map_score": 0.7,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "fastapi/routing.py",
+    "fastapi/dependencies/utils.py",
+    "fastapi/_compat.py",
+    "httpx/_client.py",
+    "httpx/_content.py",
+    "httpx/_utils.py",
+    "httpx/_models.py",
+    "fastapi/encoders.py",
+    "httpx/_multipart.py",
+    "dependencies/utils.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.8503,
+      "10": 0.8503
+    },
+    "mrr": 1.0,
+    "map_score": 0.7,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

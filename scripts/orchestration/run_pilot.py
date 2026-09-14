@@ -17,7 +17,7 @@ import logging
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -29,7 +29,21 @@ RUN_TASK_SCRIPT = REPO_ROOT / "scripts" / "orchestration" / "run_task.py"
 ABLATION_SCRIPT = REPO_ROOT / "scripts" / "validation" / "run_crnt_ablation.sh"
 RESULTS_DIR = REPO_ROOT / "results" / "phase1_pilot"
 
-VALID_MODES = frozenset({"baseline", "mcp_only", "hybrid", "cli"})
+VALID_MODES = frozenset(
+    {
+        "baseline",
+        "mcp_only",
+        "mcp_default",
+        "mcp_treatment",
+    "mcp_treat_instr",
+    "mcp_treat_edges",
+    "mcp_treat_nudge",
+        "mcp_code_finder",
+        "mcp_assisted",
+        "hybrid",
+        "cli",
+    }
+)
 REQUIRED_FIELDS = frozenset(
     {"task_id", "task_dir", "mode", "rep_index", "account_id", "output_dir"}
 )

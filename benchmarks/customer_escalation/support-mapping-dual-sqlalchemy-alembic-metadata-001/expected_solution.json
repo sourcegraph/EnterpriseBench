@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-sqlalchemy-alembic-metadata-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: alembic/alembic/autogenerate/compare.py, alembic/alembic/runtime/environment.py, sqlalchemy/lib/sqlalchemy/orm/decl_api.py, sqlalchemy/lib/sqlalchemy/sql/schema.py. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify alembic/alembic/autogenerate/compare.py as part of the error source",
+        "Must identify alembic/alembic/runtime/environment.py as part of the error source",
+        "Must identify sqlalchemy/lib/sqlalchemy/orm/decl_api.py as part of the error source",
+        "Must identify sqlalchemy/lib/sqlalchemy/sql/schema.py as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) Customer's env.py imports target_metadata from a single module; Alembic's environment.py passes it to context.configure -> (2) SQLAlchemy 2.0's DeclarativeBase, when subclassed in a different module, creates a NEW MetaData instance unless explicitly sharing one via metadata=Base.metadata -> (3) Alembic's compare.py walks target_metadata.tables and diffs against the live database; tables registered on OTHER MetaData instances are invisible to it -> (4) The autogenerate output is empty because most of the customer's model classes ended up on a different DeclarativeBase whose MetaData was never passed to env.py.",
+      "evaluation_criteria": [
+        "Must describe the step: Customer's env.py imports target_metadata from a single module; Alembic's enviro...",
+        "Must describe the step: SQLAlchemy 2.0's DeclarativeBase, when subclassed in a different module, creates...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Customer split models across modules and each module declared its own DeclarativeBase subclass without sharing metadata; (2) SQLAlchemy 2.0's DeclarativeBase changed how class-level metadata is created vs 1.4's declarative_base() factory; (3) Alembic's compare_metadata operates on a single MetaData; tables on disconnected instances are silently ignored.",
+      "evaluation_criteria": [
+        "Must identify the condition: Customer split models across modules and each module declared its own Declarativ...",
+        "Must identify the condition: SQLAlchemy 2.0's DeclarativeBase changed how class-level metadata is created vs ...",
+        "Must identify the condition: Alembic's compare_metadata operates on a single MetaData; tables on disconnected...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

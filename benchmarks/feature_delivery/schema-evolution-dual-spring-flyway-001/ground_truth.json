@@ -1,0 +1,56 @@
+{
+  "task_id": "schema-evolution-dual-spring-flyway-001",
+  "task_type": "db_schema_evolution",
+  "repos": [
+    {
+      "url": "https://github.com/spring-projects/spring-boot",
+      "rev": "v3.1.2",
+      "path": "spring-boot"
+    },
+    {
+      "url": "https://github.com/spring-projects/spring-framework",
+      "rev": "v6.0.11",
+      "path": "spring-framework"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/flyway/FlywayAutoConfiguration.java",
+      "repo": "spring-boot",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaAutoConfiguration.java",
+      "repo": "spring-boot",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "spring-context/src/main/java/org/springframework/context/support/AbstractApplicationContext.java",
+      "repo": "spring-framework",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateProperties.java",
+      "repo": "spring-boot",
+      "confidence": 0.85
+    }
+  ],
+  "race_condition_terms": [
+    "FlywayMigrationInitializer",
+    "EntityManagerFactory",
+    "BeanFactoryPostProcessor",
+    "@DependsOn",
+    "ddl-auto",
+    "validate",
+    "schema validation",
+    "Flyway",
+    "Hibernate",
+    "ordering",
+    "initialization"
+  ]
+}

@@ -1,0 +1,184 @@
+{
+  "task_id": "ccx-incident-032",
+  "policy": "code_finder",
+  "suite": "incident_response",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.31.2"
+  ],
+  "retrieved_paths": [
+    "source/common/http/utility.cc",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/http/conn_pool_base.cc",
+    "source/common/upstream/resource_manager_impl.h",
+    "source/common/upstream/upstream_impl.cc",
+    "api/envoy/config/cluster/v3/circuit_breaker.proto"
+  ],
+  "retrieved_paths_union": [
+    "source/common/http/utility.cc",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/http/conn_pool_base.cc",
+    "source/common/upstream/resource_manager_impl.h",
+    "source/common/upstream/upstream_impl.cc",
+    "api/envoy/config/cluster/v3/circuit_breaker.proto"
+  ],
+  "required_files": [
+    "source/common/http/utility.cc",
+    "envoy/http/stream_reset_handler.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/conn_pool/conn_pool_base.h",
+    "source/common/router/upstream_request.cc"
+  ],
+  "ir_scores": {
+    "task_id": "ccx-incident-032",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.4,
+      "5": 0.4,
+      "10": 0.4
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.5,
+      "5": 0.4,
+      "10": 0.2667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.5531,
+      "10": 0.5531
+    },
+    "mrr": 1.0,
+    "map_score": 0.4,
+    "file_recall": 0.4,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 6,
+    "n_ground_truth": 5,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "ccx-incident-032",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.4,
+      "5": 0.4,
+      "10": 0.4
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.5,
+      "5": 0.4,
+      "10": 0.2667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.5531,
+      "10": 0.5531
+    },
+    "mrr": 1.0,
+    "map_score": 0.4,
+    "file_recall": 0.4,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 6,
+    "n_ground_truth": 5,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 18.1,
+  "response_chars": 2320,
+  "raw_response": "Found the Envoy reset-string definition, connection-pool overflow paths, circuit-breaker resource wiring, and protobuf thresholds.\n\nRelevant files:\n- [envoy--v1.31.2:source/common/http/utility.cc?L1016-L1033](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/http/utility.cc?L1016-L1033) - Defines `Utility::resetReasonToString()` and maps `StreamResetReason::Overflow` to `\"overflow\"`.\n- [envoy--v1.31.2:source/common/conn_pool/conn_pool_base.cc?L127-L164](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/conn_pool/conn_pool_base.cc?L127-L164) - Checks the upstream connection circuit breaker via `host_->canCreateConnection()`, increments `upstream_cx_overflow_`, and rate-limits connection creation.\n- [envoy--v1.31.2:source/common/conn_pool/conn_pool_base.cc?L166-L181](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/conn_pool/conn_pool_base.cc?L166-L181) - Triggers `PoolFailureReason::Overflow` when the request/stream resource limit is exhausted.\n- [envoy--v1.31.2:source/common/conn_pool/conn_pool_base.cc?L255-L290](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/conn_pool/conn_pool_base.cc?L255-L290) - Triggers `PoolFailureReason::Overflow` when `max_pending_requests` is exhausted and increments `upstream_rq_pending_overflow_`.\n- [envoy--v1.31.2:source/common/http/conn_pool_base.cc?L71-L93](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/http/conn_pool_base.cc?L71-L93) - HTTP connection-pool pending-stream implementation used by the overflow path.\n- [envoy--v1.31.2:source/common/upstream/resource_manager_impl.h?L76-L102](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/upstream/resource_manager_impl.h?L76-L102) - Constructs resource limits for `max_connections` and `max_pending_requests`.\n- [envoy--v1.31.2:source/common/upstream/upstream_impl.cc?L1958-L2027](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/upstream/upstream_impl.cc?L1958-L2027) - Loads circuit-breaker defaults and protobuf values into `ResourceManagerImpl`.\n- [envoy--v1.31.2:api/envoy/config/cluster/v3/circuit_breaker.proto?L53-L69](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/api/envoy/config/cluster/v3/circuit_breaker.proto?L53-L69) - Defines `Thresholds.max_connections` and `Thresholds.max_pending_requests`, both defaulting to 1024 when unset.",
+  "ir_scores_unaligned": {
+    "task_id": "ccx-incident-032",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.4,
+      "5": 0.4,
+      "10": 0.4
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.5,
+      "5": 0.4,
+      "10": 0.2667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.5531,
+      "10": 0.5531
+    },
+    "mrr": 1.0,
+    "map_score": 0.4,
+    "file_recall": 0.4,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 6,
+    "n_ground_truth": 5,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "source/common/http/utility.cc",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/http/conn_pool_base.cc",
+    "source/common/upstream/resource_manager_impl.h",
+    "source/common/upstream/upstream_impl.cc",
+    "api/envoy/config/cluster/v3/circuit_breaker.proto"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "ccx-incident-032",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.4,
+      "5": 0.4,
+      "10": 0.4
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.5,
+      "5": 0.4,
+      "10": 0.2667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.5531,
+      "10": 0.5531
+    },
+    "mrr": 1.0,
+    "map_score": 0.4,
+    "file_recall": 0.4,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 6,
+    "n_ground_truth": 5,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

@@ -1,0 +1,201 @@
+{
+  "task_id": "incident-investigation-dual-flux-001",
+  "policy": "code_finder",
+  "suite": "incident_response",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/flux2--v2.2.0",
+    "github.com/sg-evals/helm-controller--v0.37.0"
+  ],
+  "retrieved_paths": [
+    "api/v2beta2/helmrelease_types.go",
+    "api/v2beta2/condition_types.go",
+    "internal/controller/helmrelease_controller.go",
+    "internal/reconcile/atomic_release.go",
+    "internal/reconcile/release.go",
+    "internal/reconcile/upgrade.go",
+    "cmd/flux/get_helmrelease.go",
+    "cmd/flux/get.go",
+    "cmd/flux/trace.go",
+    "cmd/flux/readiness.go",
+    "cmd/flux/reconcile.go",
+    "cmd/flux/status.go"
+  ],
+  "retrieved_paths_union": [
+    "api/v2beta2/helmrelease_types.go",
+    "api/v2beta2/condition_types.go",
+    "internal/controller/helmrelease_controller.go",
+    "internal/reconcile/atomic_release.go",
+    "internal/reconcile/release.go",
+    "internal/reconcile/upgrade.go",
+    "cmd/flux/get_helmrelease.go",
+    "cmd/flux/get.go",
+    "cmd/flux/trace.go",
+    "cmd/flux/readiness.go",
+    "cmd/flux/reconcile.go",
+    "cmd/flux/status.go"
+  ],
+  "required_files": [
+    "internal/controller/helmrelease_controller.go",
+    "internal/reconcile/release.go",
+    "cmd/flux/get_helmrelease.go"
+  ],
+  "ir_scores": {
+    "task_id": "incident-investigation-dual-flux-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.4162,
+      "10": 0.5726
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3873,
+    "file_recall": 1.0,
+    "context_efficiency": 0.25,
+    "n_retrieved": 12,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "incident-investigation-dual-flux-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.4162,
+      "10": 0.5726
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3873,
+    "file_recall": 1.0,
+    "context_efficiency": 0.25,
+    "n_retrieved": 12,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 22.2,
+  "response_chars": 5496,
+  "raw_response": "I\u2019m unable to write files in the checked-out `/workspace` paths because the available repository tools are read/search-only. Findings for the requested report are below.\n\n## Root cause and error chain\n\n- helm-controller v0.37 uses the `v2beta2` `HelmReleaseStatus.Conditions []metav1.Condition` API and exposes `GetConditions`/`SetConditions`; the older `GetStatusConditions` API is deprecated.\n- Reconciliation summarizes `Released`, `TestSuccess`, and `Remediated` conditions into the canonical `Ready` condition. The summary sorts conditions and copies the selected condition\u2019s status, reason, and message into `Ready`.\n- The reconciler\u2019s deferred patch always persists status, including owned conditions. During an upgrade, old/in-progress condition state is not explicitly normalized before the new summary logic runs. A stale old-format condition can therefore remain the selected condition, causing `Ready=False` despite Helm reporting a successful release.\n- Flux CLI\u2019s `flux get helmreleases` directly reads `.status.conditions`, finds the `Ready` condition, and renders its status/message. `flux reconcile` and readiness polling use the same condition, so the stale status is externally visible and operationally significant.\n- Downstream dependency checks use `conditions.IsTrue(..., ReadyCondition)` and observed generation, so dependent HelmReleases and other Flux workflows can remain blocked. Reconciliation repeatedly observes the stale non-ready state and requeues without clearing it.\n\n## Remediation\n\nOn the v2beta1 \u2192 v2beta2 transition, the controller should explicitly migrate or discard legacy/in-progress conditions before summarization:\n\n1. Detect legacy condition shape/version or an in-progress condition from the previous API.\n2. Preserve only semantically valid release history where safe.\n3. Remove stale `Ready`, `Released`, `TestSuccess`, `Remediated`, `Reconciling`, and `Stalled` entries that cannot be interpreted under v2beta2.\n4. Re-observe the Helm release and write fresh v2beta2 conditions.\n5. Summarize those fresh conditions into `Ready=True` on successful deployment, with the current observed generation.\n6. Ensure the migration is idempotent and does not requeue indefinitely.\n\nRelevant files:\n\n- [sg-evals/helm-controller--v0.37.0:api/v2beta2/helmrelease_types.go?L938-L951](/r/github.com/sg-evals/helm-controller--v0.37.0/-/blob/api/v2beta2/helmrelease_types.go?L938-L951) - v2beta2 `HelmReleaseStatus` and condition storage\n- [sg-evals/helm-controller--v0.37.0:api/v2beta2/helmrelease_types.go?L1229-L1243](/r/github.com/sg-evals/helm-controller--v0.37.0/-/blob/api/v2beta2/helmrelease_types.go?L1229-L1243) - `GetConditions`, `SetConditions`, and deprecated `GetStatusConditions`\n- [sg-evals/helm-controller--v0.37.0:api/v2beta2/condition_types.go?L19-L32](/r/github.com/sg-evals/helm-controller--v0.37.0/-/blob/api/v2beta2/condition_types.go?L19-L32) - v2beta2 condition types: `Released`, `TestSuccess`, `Remediated`\n- [sg-evals/helm-controller--v0.37.0:api/v2beta2/condition_types.go?L35-L97](/r/github.com/sg-evals/helm-controller--v0.37.0/-/blob/api/v2beta2/condition_types.go?L35-L97) - v2beta2 condition reasons\n- [sg-evals/helm-controller--v0.37.0:internal/controller/helmrelease_controller.go?L150-L176](/r/github.com/sg-evals/helm-controller--v0.37.0/-/blob/internal/controller/helmrelease_controller.go?L150-L176) - fetches HelmRelease and always patches status/owned conditions\n- [sg-evals/helm-controller--v0.37.0:internal/reconcile/atomic_release.go?L80-L104](/r/github.com/sg-evals/helm-controller--v0.37.0/-/blob/internal/reconcile/atomic_release.go?L80-L104) - reconciliation lifecycle and final status summarization\n- [sg-evals/helm-controller--v0.37.0:internal/reconcile/release.go?L110-L166](/r/github.com/sg-evals/helm-controller--v0.37.0/-/blob/internal/reconcile/release.go?L110-L166) - reads release conditions and writes the canonical `Ready` condition\n- [sg-evals/helm-controller--v0.37.0:internal/reconcile/upgrade.go?L66-L89](/r/github.com/sg-evals/helm-controller--v0.37.0/-/blob/internal/reconcile/upgrade.go?L66-L89) - upgrade path deletes some conditions, runs Helm upgrade, then summarizes\n- [sg-evals/helm-controller--v0.37.0:internal/controller/helmrelease_controller.go?L707-L730](/r/github.com/sg-evals/helm-controller--v0.37.0/-/blob/internal/controller/helmrelease_controller.go?L707-L730) - controller readiness gating pattern\n- [sg-evals/flux2--v2.2.0:cmd/flux/get_helmrelease.go?L31-L80](/r/github.com/sg-evals/flux2--v2.2.0/-/blob/cmd/flux/get_helmrelease.go?L31-L80) - `flux get helmreleases` command and Ready-column rendering\n- [sg-evals/flux2--v2.2.0:cmd/flux/get.go?L98-L115](/r/github.com/sg-evals/flux2--v2.2.0/-/blob/cmd/flux/get.go?L98-L115) - CLI reads `Ready` via `FindStatusCondition`\n- [sg-evals/flux2--v2.2.0:cmd/flux/trace.go?L383-L395](/r/github.com/sg-evals/flux2--v2.2.0/-/blob/cmd/flux/trace.go?L383-L395) - trace command reads HelmRelease `Ready`\n- [sg-evals/flux2--v2.2.0:cmd/flux/readiness.go?L45-L75](/r/github.com/sg-evals/flux2--v2.2.0/-/blob/cmd/flux/readiness.go?L45-L75) - readiness polling based on `Ready`\n- [sg-evals/flux2--v2.2.0:cmd/flux/reconcile.go?L121-L134](/r/github.com/sg-evals/flux2--v2.2.0/-/blob/cmd/flux/reconcile.go?L121-L134) - reconcile command waits for and evaluates `Ready`\n- [sg-evals/flux2--v2.2.0:cmd/flux/status.go?L32-L37](/r/github.com/sg-evals/flux2--v2.2.0/-/blob/cmd/flux/status.go?L32-L37) - compatibility interface for deprecated condition APIs",
+  "ir_scores_unaligned": {
+    "task_id": "incident-investigation-dual-flux-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.4162,
+      "10": 0.5726
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3873,
+    "file_recall": 1.0,
+    "context_efficiency": 0.25,
+    "n_retrieved": 12,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "api/v2beta2/helmrelease_types.go",
+    "api/v2beta2/condition_types.go",
+    "internal/controller/helmrelease_controller.go",
+    "internal/reconcile/atomic_release.go",
+    "internal/reconcile/release.go",
+    "internal/reconcile/upgrade.go",
+    "cmd/flux/get_helmrelease.go",
+    "cmd/flux/get.go",
+    "cmd/flux/trace.go",
+    "cmd/flux/readiness.go",
+    "cmd/flux/reconcile.go",
+    "cmd/flux/status.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "incident-investigation-dual-flux-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6667,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.5,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.4162,
+      "10": 0.5726
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3873,
+    "file_recall": 1.0,
+    "context_efficiency": 0.25,
+    "n_retrieved": 12,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

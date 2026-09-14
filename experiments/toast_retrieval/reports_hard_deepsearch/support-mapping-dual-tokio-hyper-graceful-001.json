@@ -1,0 +1,196 @@
+{
+  "task_id": "support-mapping-dual-tokio-hyper-graceful-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/hyper--v1.2.0",
+    "github.com/sg-evals/tokio--tokio-1.36.0"
+  ],
+  "retrieved_paths": [
+    "examples/graceful_shutdown.rs",
+    "src/server/conn/http1.rs",
+    "src/proto/h1/dispatch.rs",
+    "src/proto/h1/conn.rs",
+    "tokio/src/runtime/runtime.rs",
+    "tokio/src/runtime/scheduler/multi_thread/worker.rs",
+    "tokio/src/runtime/task/list.rs",
+    "tokio/src/runtime/task/harness.rs",
+    "tokio/src/runtime/io/scheduled_io.rs",
+    "tokio/src/signal/unix.rs"
+  ],
+  "retrieved_paths_union": [
+    "examples/graceful_shutdown.rs",
+    "src/server/conn/http1.rs",
+    "src/proto/h1/dispatch.rs",
+    "src/proto/h1/conn.rs",
+    "tokio/src/runtime/runtime.rs",
+    "tokio/src/runtime/scheduler/multi_thread/worker.rs",
+    "tokio/src/runtime/task/list.rs",
+    "tokio/src/runtime/task/harness.rs",
+    "tokio/src/runtime/io/scheduled_io.rs",
+    "tokio/src/signal/unix.rs"
+  ],
+  "required_files": [
+    "hyper/src/server/conn/http1.rs",
+    "hyper/src/proto/h1/conn.rs",
+    "tokio/tokio/src/runtime/runtime.rs",
+    "tokio/tokio/src/task/join_set.rs"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-tokio-hyper-graceful-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.75,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.6667,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.5654,
+      "10": 0.5654
+    },
+    "mrr": 0.5,
+    "map_score": 0.4,
+    "file_recall": 0.75,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-tokio-hyper-graceful-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.75,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.6667,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.5654,
+      "10": 0.5654
+    },
+    "mrr": 0.5,
+    "map_score": 0.4,
+    "file_recall": 0.75,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 151.9,
+  "response_chars": 17600,
+  "raw_response": "---\ntitle: Debugging hyper with_graceful_shutdown hang with tokio runtime draining on SIGTERM\nshare_url: https://demo.sourcegraph.com/deepsearch/2c0775e7-13a7-4adc-a422-f42934160c78\nurl: https://demo.sourcegraph.com/deepsearch/2220\ncreated: 2026-08-18T01:58:31Z\nupdated: 2026-08-18T01:59:57Z\n---\n\n# # Map customer hyper server hanging on graceful shutdown when tokio runtime drains to the hyper Server::with_graceful_shutdown / tokio runtime drain boundary\n\nA customer reports that their hyper-based service hangs for 60 seconds\non SIGTERM during deployment. The signal handler triggers\nServer::with_graceful_shutdown's shutdown_signal future, but the\nprocess refuses to exit until the kubernetes terminationGracePeriod\nkills it. They observe one in-flight long-poll request that never\ndrops.\n\nYour task:\n1. Find where hyper's Server type implements with_graceful_shutdown\n   and the connection-tracking it does for in-flight requests.\n2. Find where tokio's runtime drains tasks on Runtime::shutdown or\n   when the runtime handle is dropped, and how it interacts with\n   tasks holding I/O resources.\n3. Trace the cross-repo path: tokio::signal::ctrl_c future ->\n   hyper Server::with_graceful_shutdown future select -> hyper\n   Connection::poll close -> tokio reactor I/O cancellation. Cite\n   each file and the function or attribute responsible.\n4. Identify why an in-flight HTTP/1.1 long-poll request held in a\n   tokio task is not interrupted by hyper's graceful shutdown,\n   because hyper waits for the response body to complete and tokio\n   cannot force-cancel the task without dropping the runtime.\n\n\nSearch only these repositories: github.com/sg-evals/hyper--v1.2.0, github.com/sg-evals/tokio--tokio-1.36.0\n\nI have everything I need. Here is the complete analysis.\n\n---\n\n## Hyper Graceful Shutdown Hang: Full Cross-Repo Trace\n\n### 1. Hyper's `graceful_shutdown` and Connection Tracking (v1.2.0)\n\nIn hyper v1.2.0, there is **no monolithic `Server` type with `with_graceful_shutdown`**. The pattern is per-connection, as shown in the canonical [`examples/graceful_shutdown.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.2.0/-/blob/examples/graceful_shutdown.rs). Each accepted TCP connection is individually spawned and the caller drives a `tokio::select!` between the connection future and a shutdown signal, then calls `Connection::graceful_shutdown` explicitly.\n\n#### The `graceful_shutdown` call chain\n\n**Entry point** \u2014 [`Connection::graceful_shutdown`](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.2.0/-/blob/src/server/conn/http1.rs?L125-L137):\n```rust\npub fn graceful_shutdown(mut self: Pin<&mut Self>) {\n    self.conn.disable_keep_alive();\n}\n```\nThis delegates immediately to the dispatcher's `disable_keep_alive`.\n\n**Dispatcher layer** \u2014 [`Dispatcher::disable_keep_alive`](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.2.0/-/blob/src/proto/h1/dispatch.rs?L88-L98):\n```rust\npub(crate) fn disable_keep_alive(&mut self) {\n    self.conn.disable_keep_alive();\n    if self.conn.is_write_closed() || self.conn.has_initial_read_write_state() {\n        self.close();\n    }\n}\n```\nThe `self.close()` fast-path is **only taken** if the connection is already closed or has seen no I/O. If a request is in flight, neither condition holds \u2014 it falls through without closing.\n\n**Proto/conn layer** \u2014 [`Conn::disable_keep_alive`](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.2.0/-/blob/src/proto/h1/conn.rs?L804-L813):\n```rust\npub(crate) fn disable_keep_alive(&mut self) {\n    if self.state.is_idle() {\n        self.state.close();           // fast path: idle \u2192 close immediately\n    } else {\n        self.state.disable_keep_alive(); // in-progress: only sets a flag\n    }\n}\n```\nThe comment on line 810 says it all: **\"in-progress connection\"** \u2014 only a keep-alive flag is set, no close signal is issued.\n\n#### What keeps the connection alive: the in-flight service future\n\nThe server `Dispatch` struct in [`src/proto/h1/dispatch.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.2.0/-/blob/src/proto/h1/dispatch.rs?L497-L555) stores a **pinned `in_flight` service future**:\n\n```rust\npub(crate) struct Server<S, B> {\n    in_flight: Box<Pin<Option<S::Future>>>,\n    service: S,\n}\n```\n\n`poll_msg` blocks until `in_flight` resolves ([line 513\u2013514](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.2.0/-/blob/src/proto/h1/dispatch.rs?L513-L514)):\n```rust\nlet resp = ready!(fut.as_mut().poll(cx)?);\n```\n\nAnd `poll_write` only advances once `poll_msg` returns ([line 312](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.2.0/-/blob/src/proto/h1/dispatch.rs?L312)):\n```rust\nif let Some(msg) = ready!(Pin::new(&mut self.dispatch).poll_msg(cx)) {\n```\n\nThen after the service future resolves, `poll_write` must drain the **response body** frame-by-frame ([line 349](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.2.0/-/blob/src/proto/h1/dispatch.rs?L349)):\n```rust\nlet item = ready!(body.as_mut().poll_frame(cx));\n```\n\nOnly after the response body is fully flushed does `is_done()` return `true` ([line 412-427](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.2.0/-/blob/src/proto/h1/dispatch.rs?L412-L427)), allowing the `Connection` future to resolve.\n\n---\n\n### 2. Tokio Runtime Drain and I/O Cancellation (tokio-1.36.0)\n\n#### Runtime shutdown path\n\nWhen a `Runtime` is dropped, [`impl Drop for Runtime`](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.36.0/-/blob/tokio/src/runtime/runtime.rs?L458-L480) calls the scheduler's `shutdown()` method. For the multi-thread scheduler, this calls:\n\n**[`Core::pre_shutdown`](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.36.0/-/blob/tokio/src/runtime/scheduler/multi_thread/worker.rs?L954-L970)**:\n```rust\nfn pre_shutdown(&mut self, worker: &Worker) {\n    worker.handle.shared.owned.close_and_shutdown_all(start as usize);\n}\n```\n\n**[`OwnedTasks::close_and_shutdown_all`](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.36.0/-/blob/tokio/src/runtime/task/list.rs?L141-L162)**:\n```rust\npub(crate) fn close_and_shutdown_all(&self, start: usize) {\n    self.closed.store(true, Ordering::Release);\n    for i in start..self.get_shard_size() + start {\n        loop {\n            let task = self.list.pop_back(i);\n            match task {\n                Some(task) => { task.shutdown(); }\n                None => break,\n            }\n        }\n    }\n}\n```\n\n#### What `task.shutdown()` actually does\n\nIn [`harness.rs::Harness::shutdown`](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.36.0/-/blob/tokio/src/runtime/task/harness.rs?L232-L249):\n```rust\npub(super) fn shutdown(self) {\n    if !self.state().transition_to_shutdown() {\n        // The task is concurrently running. No further work needed.\n        self.drop_reference();\n        return;\n    }\n    cancel_task(self.core());\n    self.complete();\n}\n```\n\n`cancel_task` ([line 450-456](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.36.0/-/blob/tokio/src/runtime/task/harness.rs?L450-L456)) calls `core.drop_future_or_output()` \u2014 it **drops the future in place**, it does NOT call `Future::poll` with any cancellation signal. There is no cooperative \"cancel\" notification sent to the future. The future is simply deallocated.\n\n#### Critical constraint: if the task is currently running\n\nThe check `!self.state().transition_to_shutdown()` at line 239 means: **if the task is currently being polled on a worker thread, `shutdown()` does nothing immediately** \u2014 it drops a reference and returns. The task only gets cancelled when the current poll completes and the worker sees the `CANCELLED` bit. This means a long-poll handler that is `await`-ing inside `poll` is not interrupted.\n\n#### I/O reactor cancellation\n\n`ScheduledIo::drop` ([`scheduled_io.rs` line 400-404](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.36.0/-/blob/tokio/src/runtime/io/scheduled_io.rs?L400-L404)):\n```rust\nimpl Drop for ScheduledIo {\n    fn drop(&mut self) {\n        self.wake(Ready::ALL);   // wakes all waiters with all-ready flags\n    }\n}\n```\nThis wakes I/O interest waiters only when the `ScheduledIo` itself is dropped. The reactor does **not** push a synthetic error or EOF into the I/O stream while the task is still alive.\n\n---\n\n### 3. Cross-Repo Signal \u2192 Shutdown Trace\n\n```\ntokio::signal::ctrl_c()\n  \u2514\u2500 tokio/src/signal/ctrl_c.rs:59  ctrl_c() \u2192 os_impl::ctrl_c()?.recv().await\n     \u2514\u2500 tokio/src/signal/unix.rs:498  ctrl_c() \u2192 signal(SignalKind::interrupt())\n        \u2514\u2500 Signal backed by a UnixStream I/O registration in the tokio reactor\n           Resolves when SIGTERM/SIGINT is delivered by the OS\n\nUser code (e.g., examples/graceful_shutdown.rs:74-91):\n  tokio::select! {\n      res = conn.as_mut() => { ... }          // arm 1: connection completes\n      _ = shutdown_signal => {                // arm 2: signal fires\n          conn.as_mut().graceful_shutdown();  // calls disable_keep_alive\n          // then continues polling conn\n      }\n  }\n\nhyper src/server/conn/http1.rs:135\n  Connection::graceful_shutdown()\n    \u2514\u2500 self.conn.disable_keep_alive()\n\nhyper src/proto/h1/dispatch.rs:89-97\n  Dispatcher::disable_keep_alive()\n    \u2514\u2500 self.conn.disable_keep_alive()        // \u2192 conn.rs:805 sets flag only if in-progress\n    \u2514\u2500 no self.close() if request is in flight\n\nhyper src/proto/h1/dispatch.rs:430-448\n  impl Future for Dispatcher::poll()\n    \u2514\u2500 poll_catch \u2192 poll_inner \u2192 poll_loop\n       \u2514\u2500 poll_write \u2192 poll_msg \u2192 ready!(in_flight.poll(cx))  // BLOCKS here\n          waiting for service future (the long-poll handler) to complete\n\ntokio task/harness.rs:238-248\n  Harness::shutdown() called at runtime drop\n    \u2514\u2500 if task is running: drops reference, returns (no interrupt)\n    \u2514\u2500 cancel_task: drops the future only when poll returns\n\ntokio runtime/io/scheduled_io.rs:400-403\n  ScheduledIo::Drop \u2192 wake(Ready::ALL)\n    \u2514\u2500 wakes waiters only when the resource is dropped, not on graceful shutdown signal\n```\n\n---\n\n### 4. Why the Long-Poll Request Is Not Interrupted\n\nThis is the core of the deadlock. There are four cooperating failure modes:\n\n**A. `graceful_shutdown` only sets a flag, never interrupts an in-flight service future.**\n\n`Connection::graceful_shutdown` \u2192 `disable_keep_alive` \u2192 for an in-progress connection, [`conn.rs:811`](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.2.0/-/blob/src/proto/h1/conn.rs?L810-L812) only calls `state.disable_keep_alive()`. This sets a boolean flag that prevents re-use after the current request finishes. It does **not** send any cancellation into the service future (`S::Future` stored in `in_flight`). The dispatcher's `poll_write` will continue to `ready!` on that future indefinitely.\n\n**B. Hyper's dispatcher contract: \"continue polling until done.\"**\n\nThe `Connection` docs at [`http1.rs:128-136`](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.2.0/-/blob/src/server/conn/http1.rs?L125-L137) explicitly say:\n> *\"This `Connection` should continue to be polled until shutdown can finish.\"*\n\nAnd `is_done()` at [`dispatch.rs:412-427`](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.2.0/-/blob/src/proto/h1/dispatch.rs?L412-L427) only returns `true` when the write side is closed (which requires the response body to be fully written). For a long-poll request that never returns a response body, the dispatcher `Future` never resolves.\n\n**C. Tokio cannot force-cancel a task that is currently being polled.**\n\n`Harness::shutdown` at [`harness.rs:239-241`](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.36.0/-/blob/tokio/src/runtime/task/harness.rs?L239-L241):\n```rust\nif !self.state().transition_to_shutdown() {\n    self.drop_reference();\n    return;   // task is running; we cannot cancel it now\n}\n```\nWhile the tokio task holding the hyper `Connection` future is being polled (waiting on the service future which is waiting on the long-poll), `transition_to_shutdown()` fails and the shutdown attempt is a no-op. The future is only dropped when the current poll returns, which it won't until the service handler yields or completes.\n\n**D. The reactor does not deliver EOF or error to in-flight I/O waits.**\n\nThe `ScheduledIo::drop` wakes waiters only when the `ScheduledIo` itself is destroyed. There is no mechanism in tokio's I/O driver to inject a \"shutdown\" readiness event into a `TcpStream` that is still owned by a live task. The long-poll handler's internal `AsyncRead`/`AsyncWrite` awaits will never receive a reactor-level interruption signal.\n\n**The result**: The tokio task containing the `Connection` future sits blocked at `ready!(in_flight.poll(cx))` inside `poll_write` \u2192 `poll_msg`. The `Connection` future cannot resolve. The task cannot be cancelled while it is being polled. The runtime cannot drop the task. The process hangs until Kubernetes sends `SIGKILL` at `terminationGracePeriodSeconds`.\n\n---\n\n### Fix\n\nThe customer must impose an **application-level timeout** around each spawned connection task, as shown in the graceful shutdown example ([`examples/graceful_shutdown.rs:72-92`](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.2.0/-/blob/examples/graceful_shutdown.rs?L72-L92)): use a second `tokio::select!` after calling `graceful_shutdown`, with a `tokio::time::sleep` for a deadline. When that deadline fires, simply **drop the `conn` future** \u2014 this drops the `Connection`, which drops the `TcpStream`, which drops its `ScheduledIo` registration, which wakes all pending I/O waiters and unblocks the reactor. The service future is then cancelled as a consequence of Rust's drop semantics, not by any cooperative cancellation mechanism.\n\n## Sources\n\n- [github.com/sg-evals/hyper--v1.2.0/src/server/conn/http1.rs@4838a9e?L80-200](/github.com/sg-evals/hyper--v1.2.0@4838a9e0c056b1a2d4545f22c2ee0d1b4c013d7f/-/blob/src/server/conn/http1.rs?L80-200)\n- [github.com/sg-evals/hyper--v1.2.0/examples/graceful_shutdown.rs@4838a9e](/github.com/sg-evals/hyper--v1.2.0@4838a9e0c056b1a2d4545f22c2ee0d1b4c013d7f/-/blob/examples/graceful_shutdown.rs)\n- [github.com/sg-evals/tokio--tokio-1.36.0/tokio/src/runtime/task/list.rs@446f75f?L100-200](/github.com/sg-evals/tokio--tokio-1.36.0@446f75ffd339857ee02581e923d678cc4a27d4c7/-/blob/tokio/src/runtime/task/list.rs?L100-200)\n- [github.com/sg-evals/tokio--tokio-1.36.0/tokio/src/runtime/runtime.rs@446f75f?L392-480](/github.com/sg-evals/tokio--tokio-1.36.0@446f75ffd339857ee02581e923d678cc4a27d4c7/-/blob/tokio/src/runtime/runtime.rs?L392-480)\n- [github.com/sg-evals/tokio--tokio-1.36.0/tokio/src/runtime/io/scheduled_io.rs@446f75f?L380-420](/github.com/sg-evals/tokio--tokio-1.36.0@446f75ffd339857ee02581e923d678cc4a27d4c7/-/blob/tokio/src/runtime/io/scheduled_io.rs?L380-420)\n- [github.com/sg-evals/tokio--tokio-1.36.0/tokio/src/runtime/scheduler/multi_thread/worker.rs@446f75f?L940-1000](/github.com/sg-evals/tokio--tokio-1.36.0@446f75ffd339857ee02581e923d678cc4a27d4c7/-/blob/tokio/src/runtime/scheduler/multi_thread/worker.rs?L940-1000)\n- [github.com/sg-evals/hyper--v1.2.0/src/proto/h1/dispatch.rs@4838a9e?L80-180](/github.com/sg-evals/hyper--v1.2.0@4838a9e0c056b1a2d4545f22c2ee0d1b4c013d7f/-/blob/src/proto/h1/dispatch.rs?L80-180)\n- [github.com/sg-evals/hyper--v1.2.0/src/proto/h1/dispatch.rs@4838a9e?L290-450](/github.com/sg-evals/hyper--v1.2.0@4838a9e0c056b1a2d4545f22c2ee0d1b4c013d7f/-/blob/src/proto/h1/dispatch.rs?L290-450)\n- [repo:^github.com/sg-evals/tokio--tokio-1.36.0$ file:task/harness.rs shutdown poll_future](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Ftokio--tokio-1.36.0$%20file:task%2Fharness.rs%20shutdown%20poll_future)\n- [github.com/sg-evals/tokio--tokio-1.36.0/tokio/src/runtime/task/harness.rs@446f75f?L225-310](/github.com/sg-evals/tokio--tokio-1.36.0@446f75ffd339857ee02581e923d678cc4a27d4c7/-/blob/tokio/src/runtime/task/harness.rs?L225-310)\n- [github.com/sg-evals/hyper--v1.2.0/src/proto/h1/dispatch.rs@4838a9e?L480-560](/github.com/sg-evals/hyper--v1.2.0@4838a9e0c056b1a2d4545f22c2ee0d1b4c013d7f/-/blob/src/proto/h1/dispatch.rs?L480-560)\n- [repo:^github.com/sg-evals/tokio--tokio-1.36.0$ file:signal ctrl_c unix](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Ftokio--tokio-1.36.0$%20file:signal%20ctrl_c%20unix)\n- [github.com/sg-evals/tokio--tokio-1.36.0/tokio/src/runtime/task/harness.rs@446f75f?L440-510](/github.com/sg-evals/tokio--tokio-1.36.0@446f75ffd339857ee02581e923d678cc4a27d4c7/-/blob/tokio/src/runtime/task/harness.rs?L440-510)\n- [github.com/sg-evals/tokio--tokio-1.36.0/tokio/src/signal/unix.rs@446f75f?L460-510](/github.com/sg-evals/tokio--tokio-1.36.0@446f75ffd339857ee02581e923d678cc4a27d4c7/-/blob/tokio/src/signal/unix.rs?L460-510)\n- [github.com/sg-evals/hyper--v1.2.0/src/proto/h1/dispatch.rs@4838a9e?L195-295](/github.com/sg-evals/hyper--v1.2.0@4838a9e0c056b1a2d4545f22c2ee0d1b4c013d7f/-/blob/src/proto/h1/dispatch.rs?L195-295)\n- [repo:^github.com/sg-evals/hyper--v1.2.0$ has_initial_read_write_state is_write_closed disable_keep_alive](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fhyper--v1.2.0$%20has_initial_read_write_state%20is_write_closed%20disable_keep_alive)\n- [github.com/sg-evals/tokio--tokio-1.36.0/tokio/src/runtime/task/harness.rs@446f75f?L1-50](/github.com/sg-evals/tokio--tokio-1.36.0@446f75ffd339857ee02581e923d678cc4a27d4c7/-/blob/tokio/src/runtime/task/harness.rs?L1-50)\n- [github.com/sg-evals/hyper--v1.2.0/src/proto/h1/conn.rs@4838a9e?L800-830](/github.com/sg-evals/hyper--v1.2.0@4838a9e0c056b1a2d4545f22c2ee0d1b4c013d7f/-/blob/src/proto/h1/conn.rs?L800-830)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-tokio-hyper-graceful-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4144,
+      "10": 0.4144
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "examples/graceful_shutdown.rs",
+    "hyper/src/server/conn/http1.rs",
+    "src/proto/h1/dispatch.rs",
+    "hyper/src/proto/h1/conn.rs",
+    "tokio/tokio/src/runtime/runtime.rs",
+    "tokio/src/runtime/scheduler/multi_thread/worker.rs",
+    "tokio/src/runtime/task/list.rs",
+    "tokio/src/runtime/task/harness.rs",
+    "tokio/src/runtime/io/scheduled_io.rs",
+    "tokio/src/signal/unix.rs"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-tokio-hyper-graceful-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4144,
+      "10": 0.4144
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2,
+    "n_retrieved": 10,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

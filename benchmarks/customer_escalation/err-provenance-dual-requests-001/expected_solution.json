@@ -1,0 +1,33 @@
+{
+  "task_id": "err-provenance-dual-requests-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "Primary error source: requests/adapters.py. Supporting: src/urllib3/connectionpool.py. Surface error: Trace requests SSLError through to urllib3 certificate verification and ssl module interaction.",
+      "evaluation_criteria": [
+        "Must identify requests/adapters.py as part of the error source",
+        "Must identify src/urllib3/connectionpool.py as part of the error source",
+        "Must reference the surface error message ('Trace requests SSLError through to urllib3 certificate verification and ssl modu') or its origin",
+        "Must reference a specific function, type, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Error propagation chain: (1) Python ssl module raises SSLCertVerificationError during TLS handshake when certificate chain validation fails \u2192 (2) urllib3 HTTPSConnectionPool in src/urllib3/connectionpool.py catches SSLError during connection \u2192 (3) urllib3 wraps the SSLError in a MaxRetryError after exhausting retry attempts \u2192 (4) requests HTTPAdapter in src/requests/adapters.py catches urllib3 MaxRetryError \u2192 (5) requests wraps the exception in requests.exceptions.SSLError with nested exception context \u2192 (6) User sees multi-layered wrapped exception with original ssl module error buried in the chain.",
+      "evaluation_criteria": [
+        "Must describe the step: 'Python ssl module raises SSLCertVerificationError during TLS handshake when cert'",
+        "Must describe the propagation: 'User sees multi-layered wrapped exception with original ssl module error buried '",
+        "Must include all intermediate steps in the correct order",
+        "Must reference the chain in causal order (source \u2192 surface)",
+        "Must cite at least one file from the propagation path (e.g. requests/adapters.py)"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) REQUESTS_CA_BUNDLE env var is overridden when verify parameter is explicitly passed as True in requests.get(); (2) requests merge_environment_settings resolves verify=True to certifi default bundle instead of env var; (3) Corporate CA certificate is not in the certifi CA bundle and custom CA path is silently ignored; (4) urllib3 ssl_wrap_socket uses the resolved CA bundle path which does not contain the corporate CA root.",
+      "evaluation_criteria": [
+        "Must identify the condition: 'REQUESTS_CA_BUNDLE env var is overridden when verify parameter is explicitly pas'",
+        "Must identify the condition: 'requests merge_environment_settings resolves verify=True to certifi default bund'",
+        "Must identify the condition: 'Corporate CA certificate is not in the certifi CA bundle and custom CA path is s'",
+        "Must explain the combined conditions necessary to reproduce the error"
+      ]
+    }
+  }
+}

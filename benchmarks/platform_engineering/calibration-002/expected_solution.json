@@ -1,0 +1,30 @@
+{
+  "task_id": "cal-drift-click-envvar-002",
+  "checkpoints": {
+    "identify_drift_points": {
+      "expected_solution": "Two parameter-resolution drift points exist in Click. (1) envvar_resolution drift: in src/click/core.py the Option.resolve_envvar() method returns None when the configured envvar is unset OR set to an empty string; consume_value() then sees None and routes to the prompt path (or to default), but because resolve_envvar treats unset and empty alike, an envvar accidentally set to '' suppresses the default and triggers an unexpected prompt. (2) type_cast_value drift: src/click/core.py's type_cast_value() converts the envvar string to the parameter's ParamType (defined in src/click/types.py); when envvar resolution returns None, type_cast_value should yield the default, but for multi-value/tuple types the cast happens before the None-vs-default branch so a None envvar with a non-trivial default (e.g., a tuple) skips the default and produces None.",
+      "evaluation_criteria": [
+        "Must identify src/click/core.py as the file containing Option.resolve_envvar, consume_value, and type_cast_value",
+        "Must identify src/click/types.py as the location of ParamType subclasses that drive value conversion",
+        "Must call out the envvar-unset-vs-empty-string ambiguity inside resolve_envvar as one drift point",
+        "Must call out the type_cast_value -> default fallback edge case as the second drift point"
+      ]
+    },
+    "determine_expected_values": {
+      "expected_solution": "Expected precedence chain for Click parameter resolution: command-line argument (cli_arg) overrides everything; if absent, the envvar value (resolved via resolve_envvar) is used; if envvar is unset/None, the default value is used; if the default is also missing AND prompt= is set, the user is prompted. Implementation flow inside core.py is consume_value -> resolve_envvar -> type_cast_value -> (fallback) prompt_for_value. The expected behavior at each branch: an explicitly empty envvar should still count as 'set' for the purposes of suppressing the prompt, but should NOT bypass type_cast_value's fallback-to-default branch. type_cast_value should always produce the default when its incoming value is None, regardless of whether the parameter is multi-valued.",
+      "evaluation_criteria": [
+        "Must state the precedence chain: cli_arg -> envvar -> default -> prompt",
+        "Must explain that resolve_envvar in src/click/core.py is the single source of truth for envvar handling",
+        "Must explain that type_cast_value should fall back to the default when its input is None, including for tuple/multi-value types"
+      ]
+    },
+    "validate_corrected_config": {
+      "expected_solution": "Correction: tighten resolve_envvar() in src/click/core.py to distinguish unset vs empty envvars and to never short-circuit the default branch when the envvar is None. Specifically, consume_value should call type_cast_value(default) when resolve_envvar returns None, before reaching the prompt branch. The override_chain is cli_arg -> envvar -> default -> prompt. The fix is to insert a None-check after resolve_envvar that routes through the default rather than passing None directly into type_cast_value for non-trivial ParamTypes.",
+      "evaluation_criteria": [
+        "Must produce both an override_chain and a fix description in the answer (so check_config_valid awards full credit)",
+        "Must explain the corrected resolve_envvar -> type_cast_value -> default routing",
+        "Must reference src/click/core.py as the location of the fix and explain the None-fallback insertion point"
+      ]
+    }
+  }
+}

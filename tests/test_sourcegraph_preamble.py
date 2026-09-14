@@ -253,3 +253,114 @@ class TestUnknownMode:
     def test_unknown_mode_returns_empty(self) -> None:
         result = build_system_prompt(mode="unknown_mode")
         assert result == ""
+
+
+class TestToastPreamble:
+    """mcp_toast exposes one tool, `toast_search`, backed by Toast-1.
+
+    Its repo scope must be plain store identifiers: Toast takes repo names, not
+    the `repo:^...$` query fragment the Sourcegraph preamble renders.
+    """
+
+    def _repos(self) -> list[dict]:
+        return [
+            {
+                "url": "https://github.com/open-policy-agent/opa",
+                "rev": "v0.69.0",
+                "path": "opa",
+            }
+        ]
+
+    def test_names_toast_search_and_no_sourcegraph_tools(self) -> None:
+        prompt = build_system_prompt("mcp_toast", self._repos())
+
+        assert "toast_search" in prompt
+        assert "keyword_search" not in prompt
+        assert "code_finder" not in prompt
+
+    def test_repo_scope_is_a_bare_identifier(self) -> None:
+        prompt = build_system_prompt("mcp_toast", self._repos())
+
+        assert "github.com/sg-evals/opa--v0.69.0" in prompt
+        assert "repo:^" not in prompt
+
+    def test_states_the_filesystem_gate(self) -> None:
+        prompt = build_system_prompt("mcp_toast", self._repos())
+
+        assert "Permission denied" in prompt
+
+    def test_no_repos_still_yields_a_workflow(self) -> None:
+        prompt = build_system_prompt("mcp_toast", [])
+
+        assert "toast_search" in prompt
+        assert "Repositories to Search" not in prompt
+
+
+class TestDefaultMcpPreamble:
+    """mcp_default is the server as shipped: every tool, no steering.
+
+    The other three MCP arms each take a position on `code_finder` -- mcp_only
+    forbids it, mcp_assisted requires a bootstrap call, mcp_code_finder forces
+    one call per repo. All three therefore measure the tool under instruction.
+    This arm removes the instruction so the comparison can answer what a
+    customer gets by pointing an agent at the default endpoint.
+    """
+
+    def _repos(self) -> list[dict]:
+        return [
+            {
+                "url": "https://github.com/open-policy-agent/opa",
+                "rev": "v0.69.0",
+                "path": "opa",
+            }
+        ]
+
+    def test_offers_code_finder_without_requiring_it(self) -> None:
+        prompt = build_system_prompt("mcp_default", self._repos())
+
+        assert "code_finder" in prompt
+        assert "Do not call `code_finder`" not in prompt
+        assert "Required Code Finder Workflow" not in prompt
+        assert "Required Code Finder Bootstrap" not in prompt
+
+    def test_keeps_the_direct_retrieval_tools(self) -> None:
+        prompt = build_system_prompt("mcp_default", self._repos())
+
+        for tool in ("keyword_search", "nls_search", "read_file"):
+            assert tool in prompt
+
+    def test_states_the_filesystem_gate(self) -> None:
+        prompt = build_system_prompt("mcp_default", self._repos())
+
+        assert "Permission denied" in prompt
+
+    def test_shares_the_common_sections_with_mcp_only(self) -> None:
+        default = build_system_prompt("mcp_default", self._repos())
+        direct = build_system_prompt("mcp_only", self._repos())
+
+        assert "Tool Selection" in default
+        assert "Scoping (Always Do This)" in default
+        # The arms differ in exactly one section: the code_finder directive.
+        assert default != direct
+        assert "Direct MCP Arm" not in default
+
+
+class TestTreatmentArmSharesTheDefaultPreamble:
+    """mcp_treatment must vary the server, and nothing else.
+
+    If the preamble differed at all, a shift in code_finder adoption could be
+    attributed to our prompt rather than to Sourcegraph's tool descriptions,
+    which is the only thing the arm exists to measure.
+    """
+
+    @staticmethod
+    def _repos() -> list[dict]:
+        return [{"url": "https://github.com/pallets/flask", "rev": "main", "path": "flask"}]
+
+    def test_preamble_is_byte_identical_to_mcp_default(self) -> None:
+        assert build_system_prompt("mcp_treatment", repos=self._repos()) == (
+            build_system_prompt("mcp_default", repos=self._repos())
+        )
+
+    def test_preamble_is_not_empty(self) -> None:
+        assert build_system_prompt("mcp_treatment", repos=self._repos()).strip()

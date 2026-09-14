@@ -1,0 +1,33 @@
+{
+  "task_id": "monorepo-boundary-babel-decorators-002",
+  "checkpoints": {
+    "identify_affected_packages": {
+      "expected_solution": "The TC39 2023-11 normative decorator spec changes are applied in `@babel/helper-create-class-features-plugin` (`packages/babel-helper-create-class-features-plugin/src/decorators.ts` and `packages/babel-helper-create-class-features-plugin/src/index.ts`). Two sibling packages in the babel monorepo are affected: (1) `@babel/helpers` (`packages/babel-helpers`), where a new generated runtime helper `applyDecs2311` is added (`packages/babel-helpers/src/helpers-generated.ts` + `packages/babel-helpers/src/helpers/applyDecs2311.ts`) replacing/augmenting `applyDecs2305`, and (2) `@babel/plugin-proposal-decorators` (`packages/babel-plugin-proposal-decorators`), where `src/index.ts` selects the new transformer and the test fixture `options.json` files under `packages/babel-plugin-proposal-decorators/test/fixtures/2023-05-*/` pin the version. Confirmed by PR #16242 in v7.24.0.",
+      "evaluation_criteria": [
+        "Must identify @babel/helpers as affected and reference the new applyDecs2311 helper added under packages/babel-helpers/src/helpers/",
+        "Must identify @babel/plugin-proposal-decorators as affected and cite packages/babel-plugin-proposal-decorators/src/index.ts",
+        "Must cite the source change in packages/babel-helper-create-class-features-plugin/src/decorators.ts",
+        "Should mention that decorator test fixtures under packages/babel-plugin-proposal-decorators/test/fixtures/ are updated to declare the new spec version"
+      ]
+    },
+    "classify_change_impact": {
+      "expected_solution": "Overall semver bump is **minor** for the v7.24.0 release because a new public runtime helper (`applyDecs2311`) is added and the plugin gains a new opt-in spec version, both backwards compatible additions. Per-package: `@babel/helper-create-class-features-plugin` = minor (new emitted helper name and new options handling, no removals); `@babel/helpers` = minor (new generated helper `applyDecs2311` exported from the regenerated barrel under packages/babel-helpers/src/); `@babel/plugin-proposal-decorators` = minor (new decoration semantics enabled when consumers select the 2023-11 spec via the version option, prior 2023-05 path remains for backward compatibility).",
+      "evaluation_criteria": [
+        "Must classify the overall change as `minor` and justify with the additive helper",
+        "Must classify @babel/helpers as minor with reasoning about a new helper export added under packages/babel-helpers/src/",
+        "Must classify @babel/plugin-proposal-decorators as minor with reasoning about opt-in spec version (2023-11)",
+        "Should note backward compatibility — existing 2023-05 path remains usable"
+      ]
+    },
+    "identify_boundary_violations": {
+      "expected_solution": "Boundary violations to update for the 2023-11 normative semantics: (1) `packages/babel-helper-create-class-features-plugin/src/decorators.ts` — core spec implementation changes (decorator context object shape, accessor/auto-accessor handling, ordering of getter/setter wrapping); (2) `packages/babel-helper-create-class-features-plugin/src/index.ts` — version selector and helper-name lookup must dispatch to `applyDecs2311`; (3) the new runtime helper `applyDecs2311` added under packages/babel-helpers/src/helpers/; (4) the regenerated helpers barrel under packages/babel-helpers/src/ that exposes the helper to the plugin layer; (5) `packages/babel-plugin-proposal-decorators/src/index.ts` — plugin entry that translates user-facing version option into the right helper; (6) the version-pinned fixture options files under packages/babel-plugin-proposal-decorators/test/fixtures/2023-05-accessors/, 2023-05-accessors--to-es2015/, 2023-05-classes/, and 2023-05-classes--to-es2015/ declare the spec version and must be either left alone (for back-compat) or duplicated to 2023-11 variants. PR #16242 file count = 31, mostly fixtures.",
+      "evaluation_criteria": [
+        "Must cite packages/babel-helper-create-class-features-plugin/src/decorators.ts as the central spec implementation",
+        "Must reference the new applyDecs2311 helper added under packages/babel-helpers/src/helpers/",
+        "Must cite packages/babel-plugin-proposal-decorators/src/index.ts as the plugin entry that selects the helper",
+        "Should mention version-pinned fixture option files under packages/babel-plugin-proposal-decorators/test/fixtures/",
+        "Should mention the regenerated helpers barrel under packages/babel-helpers/src/"
+      ]
+    }
+  }
+}

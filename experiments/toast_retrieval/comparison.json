@@ -1,0 +1,187 @@
+{
+  "tasks": [
+    "api-contract-dual-envoy-istio-001",
+    "api-contract-dual-fastapi-001",
+    "api-contract-dual-hyper-reqwest-001",
+    "api-contract-dual-jackson-spring-001",
+    "api-contract-dual-serde-csv-001",
+    "api-contract-dual-sqlalchemy-alembic-001",
+    "api-contract-tri-envoy-001",
+    "api-contract-tri-protobuf-001",
+    "camel-routing-arch-001",
+    "ccx-dep-trace-106",
+    "dep-graph-tri-boto3-urllib3-requests-001",
+    "dep-graph-tri-prometheus-alertmanager-grafana-001",
+    "dep-graph-tri-tokio-hyper-tonic-001",
+    "dep-traversal-tri-boto3-001",
+    "dep-traversal-tri-jackson-001",
+    "dep-traversal-tri-openssl-001",
+    "schema-evolution-001",
+    "schema-evolution-002",
+    "schema-evolution-003",
+    "schema-evolution-004"
+  ],
+  "aggregates": {
+    "toast1": {
+      "n": 20,
+      "file_recall": 0.575,
+      "recall_at_10": 0.575,
+      "precision_at_5": 0.29,
+      "mrr": 0.506,
+      "ndcg_at_10": 0.457,
+      "mean_files_returned": 11.3,
+      "perfect": 8,
+      "zero": 5,
+      "empty": 4
+    },
+    "code_finder": {
+      "n": 20,
+      "file_recall": 0.858,
+      "recall_at_10": 0.792,
+      "precision_at_5": 0.41,
+      "mrr": 0.748,
+      "ndcg_at_10": 0.666,
+      "mean_files_returned": 16.05,
+      "perfect": 14,
+      "zero": 1,
+      "empty": 0,
+      "median_seconds": 31.1
+    },
+    "deepsearch": {
+      "n": 20,
+      "file_recall": 0.804,
+      "recall_at_10": 0.713,
+      "precision_at_5": 0.37,
+      "mrr": 0.604,
+      "ndcg_at_10": 0.58,
+      "mean_files_returned": 14.4,
+      "perfect": 12,
+      "zero": 1,
+      "empty": 0,
+      "median_seconds": 223.8
+    },
+    "claude_adapter": {
+      "n": 20,
+      "file_recall": 0.742,
+      "recall_at_10": 0.633,
+      "precision_at_5": 0.32,
+      "mrr": 0.622,
+      "ndcg_at_10": 0.534,
+      "mean_files_returned": 18.85,
+      "perfect": 12,
+      "zero": 3,
+      "empty": 2,
+      "median_seconds": 23.9
+    }
+  },
+  "strata": {
+    "1": {
+      "toast1": 0.611,
+      "code_finder": 0.972,
+      "deepsearch": 0.931,
+      "claude_adapter": 0.667
+    },
+    "2": {
+      "toast1": 0.75,
+      "code_finder": 1.0,
+      "deepsearch": 0.917,
+      "claude_adapter": 0.917
+    },
+    "3": {
+      "toast1": 0.417,
+      "code_finder": 0.667,
+      "deepsearch": 0.625,
+      "claude_adapter": 0.667
+    }
+  },
+  "pairs": {
+    "toast1+code_finder": {
+      "a_recall": 0.575,
+      "b_recall": 0.858,
+      "union_recall": 0.858,
+      "union_lift_over_best": 0.0,
+      "tasks_only_a_found_something": 0,
+      "tasks_only_b_found_something": 4,
+      "tasks_both_found_something": 15,
+      "tasks_neither_found_anything": 1,
+      "tasks_where_a_added_a_file_b_missed": 0,
+      "examples": []
+    },
+    "toast1+deepsearch": {
+      "a_recall": 0.575,
+      "b_recall": 0.804,
+      "union_recall": 0.829,
+      "union_lift_over_best": 0.025,
+      "tasks_only_a_found_something": 0,
+      "tasks_only_b_found_something": 4,
+      "tasks_both_found_something": 15,
+      "tasks_neither_found_anything": 1,
+      "tasks_where_a_added_a_file_b_missed": 1,
+      "examples": [
+        "api-contract-dual-envoy-istio-001"
+      ]
+    },
+    "toast1+claude_adapter": {
+      "a_recall": 0.575,
+      "b_recall": 0.742,
+      "union_recall": 0.767,
+      "union_lift_over_best": 0.025,
+      "tasks_only_a_found_something": 0,
+      "tasks_only_b_found_something": 2,
+      "tasks_both_found_something": 15,
+      "tasks_neither_found_anything": 3,
+      "tasks_where_a_added_a_file_b_missed": 1,
+      "examples": [
+        "api-contract-dual-envoy-istio-001"
+      ]
+    },
+    "code_finder+deepsearch": {
+      "a_recall": 0.858,
+      "b_recall": 0.804,
+      "union_recall": 0.867,
+      "union_lift_over_best": 0.008,
+      "tasks_only_a_found_something": 0,
+      "tasks_only_b_found_something": 0,
+      "tasks_both_found_something": 19,
+      "tasks_neither_found_anything": 1,
+      "tasks_where_a_added_a_file_b_missed": 4,
+      "examples": [
+        "api-contract-dual-envoy-istio-001",
+        "dep-graph-tri-prometheus-alertmanager-grafana-001",
+        "schema-evolution-002",
+        "schema-evolution-003"
+      ]
+    },
+    "code_finder+claude_adapter": {
+      "a_recall": 0.858,
+      "b_recall": 0.742,
+      "union_recall": 0.858,
+      "union_lift_over_best": 0.0,
+      "tasks_only_a_found_something": 2,
+      "tasks_only_b_found_something": 0,
+      "tasks_both_found_something": 17,
+      "tasks_neither_found_anything": 1,
+      "tasks_where_a_added_a_file_b_missed": 3,
+      "examples": [
+        "api-contract-dual-envoy-istio-001",
+        "schema-evolution-001",
+        "schema-evolution-002"
+      ]
+    },
+    "deepsearch+claude_adapter": {
+      "a_recall": 0.804,
+      "b_recall": 0.742,
+      "union_recall": 0.829,
+      "union_lift_over_best": 0.025,
+      "tasks_only_a_found_something": 2,
+      "tasks_only_b_found_something": 0,
+      "tasks_both_found_something": 17,
+      "tasks_neither_found_anything": 1,
+      "tasks_where_a_added_a_file_b_missed": 2,
+      "examples": [
+        "schema-evolution-001",
+        "schema-evolution-002"
+      ]
+    }
+  }
+}

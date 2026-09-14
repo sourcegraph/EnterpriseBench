@@ -1,0 +1,29 @@
+{
+  "task_id": "refactor-dual-flask-werkzeug-001",
+  "checkpoints": {
+    "context_mapping": {
+      "expected_solution": "Flask 3.0.0 declares its context globals (request, session, g, current_app, _cv_app, _cv_request) in src/flask/globals.py. Each global is a Werkzeug LocalProxy that delegates into a ContextVar at runtime. The push/pop machinery lives in src/flask/ctx.py (RequestContext, AppContext). The Werkzeug side of the bridge is src/werkzeug/local.py at werkzeug 3.0.1 — it defines Local, LocalStack, LocalProxy, and the newer ContextVar-backed implementations they delegate to. An ideal answer maps every Flask global to its underlying werkzeug class and notes which already use contextvars (current_app/request/session via ContextVar) versus which still wrap LocalStack (legacy _app_ctx_stack/_request_ctx_stack aliases). The agent must surface src/flask/globals.py and src/werkzeug/local.py in source_files for the verifier to credit the mapping.",
+      "evaluation_criteria": [
+        "source_files (or files / error_source.files) must include src/flask/globals.py and src/werkzeug/local.py — the GT required-file anchors",
+        "Each Flask global (request, session, g, current_app, _app_ctx_stack, _request_ctx_stack) must map to its underlying Werkzeug class — LocalProxy / LocalStack / ContextVar — referencing the implementation site in src/werkzeug/local.py",
+        "Mapping must distinguish 'already on contextvars' globals from 'still on LocalStack' compatibility aliases — the refactor's whole point is to identify the residual LocalStack usage"
+      ]
+    },
+    "werkzeug_bridge": {
+      "expected_solution": "src/werkzeug/local.py at werkzeug 3.0.1 contains both the legacy Local/LocalStack family and the contextvars-backed equivalents: Local now stores via ContextVar internally, LocalProxy resolves to a ContextVar-bound value, and LocalStack offers a thin compatibility shim that maps push/pop onto a ContextVar of a list. Werkzeug also exposes a `ContextVar`-aware `LocalProxy` that takes a callable returning the current contextvar value. The ideal answer names these bridge classes (Local, LocalProxy, LocalStack — and notes the contextvars-based reimplementation in 2.3+) and explains how greenlet/gevent compatibility is preserved by Werkzeug's _cv_get_ident. The verifier requires src/werkzeug/local.py in source_files.",
+      "evaluation_criteria": [
+        "source_files must include src/werkzeug/local.py (Werkzeug bridge anchor) and src/flask/globals.py (Flask consumer anchor)",
+        "Must name the bridge classes — at minimum LocalProxy and LocalStack — and explain how Werkzeug 2.3+ rewrote them on top of contextvars while preserving the older API surface for greenlet/gevent",
+        "Must explain the greenlet/eventlet compatibility hook (Werkzeug's get_ident / context-id callable) so the refactor plan understands what cannot simply be ripped out"
+      ]
+    },
+    "refactor_ordering": {
+      "expected_solution": "The refactor sequence is constrained by upstream dependencies: (1) Werkzeug must finalise its ContextVar-backed Local family before Flask can drop the LocalStack aliases — so any change to src/werkzeug/local.py ships first; (2) Flask's _app_ctx_stack and _request_ctx_stack are public-API aliases retained for back-compat — removing them is a Flask major-version change that depends on the Werkzeug step landing; (3) Greenlet/eventlet/gevent users need either werkzeug-native get_ident or a contextvars-aware monkey patch — both legs must support gevent before the legacy LocalStack path can be deleted. refactor_steps must declare the dependencies between these stages and surface src/flask/globals.py and src/werkzeug/local.py in source_files.",
+      "evaluation_criteria": [
+        "source_files must include src/flask/globals.py and src/werkzeug/local.py (verifier credit) plus the supplementary anchors src/flask/ctx.py and src/werkzeug/serving.py for completeness",
+        "refactor_steps entries must populate `dependencies` with at least one cross-step ordering (e.g., 'flask globals removal blocks on werkzeug local.py contextvars rewrite shipping') — leaving dependencies empty defeats the checkpoint",
+        "Plan must explicitly call out greenlet/eventlet/gevent compatibility under breaking_changes — these are the load-bearing constraints that prevent a naive contextvars-only migration"
+      ]
+    }
+  }
+}

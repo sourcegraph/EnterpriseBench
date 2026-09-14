@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-spring-kafka-rebalance-002",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: spring-kafka/spring-kafka/src/main/java/org/springframework/kafka/listener/KafkaMessageListenerContainer.java, spring-kafka/spring-kafka/src/main/java/org/springframework/kafka/listener/ContainerProperties.java, kafka/clients/src/main/java/org/apache/kafka/clients/consumer/internals/ConsumerCoordinator.java, kafka/clients/src/main/java/org/apache/kafka/clients/consumer/KafkaConsumer.java. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify spring-kafka/spring-kafka/src/main/java/org/springframework/kafka/listener/KafkaMessageListenerContainer.java as part of the error source",
+        "Must identify spring-kafka/spring-kafka/src/main/java/org/springframework/kafka/listener/ContainerProperties.java as part of the error source",
+        "Must identify kafka/clients/src/main/java/org/apache/kafka/clients/consumer/internals/ConsumerCoordinator.java as part of the error source",
+        "Must identify kafka/clients/src/main/java/org/apache/kafka/clients/consumer/KafkaConsumer.java as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) Spring Kafka's ListenerConsumer poll loop in KafkaMessageListenerContainer accumulates pending acks based on ContainerProperties.ackMode (BATCH, RECORD, etc.) -> (2) Kafka's ConsumerCoordinator detects rebalance and invokes ConsumerRebalanceListener.onPartitionsRevoked before assigning new partitions -> (3) With ackMode=BATCH, Spring defers commit until after the listener batch returns; if rebalance fires mid-batch, the deferred acks are discarded when the partition is revoked -> (4) Kafka's ConsumerCoordinator commits any acked offsets in onPartitionsRevoked, but Spring's pending ack queue is unflushed, so those records appear unacked and are reprocessed by the new owner.",
+      "evaluation_criteria": [
+        "Must describe the step: Spring Kafka's ListenerConsumer poll loop in KafkaMessageListenerContainer accum...",
+        "Must describe the step: Kafka's ConsumerCoordinator detects rebalance and invokes ConsumerRebalanceListe...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) ackMode is set to BATCH (default) and a consumer group rebalance fires while a batch is still being acked; (2) Spring's pending-ack queue has not been flushed to KafkaConsumer.commitSync by the time onPartitionsRevoked runs; (3) Kafka's ConsumerCoordinator commits only what it sees in its own in-memory offset map; Spring's queued acks never made it there.",
+      "evaluation_criteria": [
+        "Must identify the condition: ackMode is set to BATCH (default) and a consumer group rebalance fires while a b...",
+        "Must identify the condition: Spring's pending-ack queue has not been flushed to KafkaConsumer.commitSync by t...",
+        "Must identify the condition: Kafka's ConsumerCoordinator commits only what it sees in its own in-memory offse...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

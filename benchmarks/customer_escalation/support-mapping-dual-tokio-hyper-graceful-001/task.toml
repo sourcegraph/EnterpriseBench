@@ -1,0 +1,124 @@
+# support_code_mapping: Map customer hyper server hanging on graceful shutdown when tokio runtime drains to the hyper Server::with_graceful_shutdown / tokio runtime drain boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "rust-async-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-tokio-hyper-graceful-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 35
+session_type = "single"
+description = "Map customer hyper server hanging on graceful shutdown when tokio runtime drains to the hyper Server::with_graceful_shutdown / tokio runtime drain boundary"
+prompt = """
+A customer reports that their hyper-based service hangs for 60 seconds
+on SIGTERM during deployment. The signal handler triggers
+Server::with_graceful_shutdown's shutdown_signal future, but the
+process refuses to exit until the kubernetes terminationGracePeriod
+kills it. They observe one in-flight long-poll request that never
+drops.
+
+Your task:
+1. Find where hyper's Server type implements with_graceful_shutdown
+   and the connection-tracking it does for in-flight requests.
+2. Find where tokio's runtime drains tasks on Runtime::shutdown or
+   when the runtime handle is dropped, and how it interacts with
+   tasks holding I/O resources.
+3. Trace the cross-repo path: tokio::signal::ctrl_c future ->
+   hyper Server::with_graceful_shutdown future select -> hyper
+   Connection::poll close -> tokio reactor I/O cancellation. Cite
+   each file and the function or attribute responsible.
+4. Identify why an in-flight HTTP/1.1 long-poll request held in a
+   tokio task is not interrupted by hyper's graceful shutdown,
+   because hyper waits for the response body to complete and tokio
+   cannot force-cancel the task without dropping the runtime.
+"""
+
+[[repos]]
+url = "https://github.com/hyperium/hyper"
+rev = "v1.2.0"
+path = "hyper"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/tokio-rs/tokio"
+rev = "tokio-1.36.0"
+path = "tokio"
+role = "upstream"
+
+[metadata]
+languages = ["rust"]
+total_loc = 250000
+dependency_depth = 2
+frameworks = ["hyper", "tokio", "tower"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Graceful shutdown is split between hyper's connection-tracking and tokio's task cancellation semantics. The shutdown hang requires reading both repos to see why long-poll never drops."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "hyper/src/server/conn/http1.rs"
+repo = "hyper"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "hyper/src/proto/h1/conn.rs"
+repo = "hyper"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "tokio/tokio/src/runtime/runtime.rs"
+repo = "tokio"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "tokio/tokio/src/task/join_set.rs"
+repo = "tokio"
+confidence = 0.8
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "hyper/src/proto/h1/dispatch.rs"
+repo = "hyper"
+confidence = 0.75
+
+[[ground_truth.sufficient_files]]
+path = "tokio/tokio/src/signal/unix.rs"
+repo = "tokio"
+confidence = 0.7

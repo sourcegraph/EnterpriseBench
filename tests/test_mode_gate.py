@@ -67,6 +67,9 @@ EXPECTED_GATING = {
     "mcp_only": True,  # the ablation: local source denied at the filesystem.
     "mcp_default": True,  # the server as shipped; still MCP-only for code.
     "mcp_treatment": True,  # mcp_default with the unshipped server change applied.
+    "mcp_treat_instr": True,  # the change's initialize instructions, alone.
+    "mcp_treat_edges": True,  # the change's tool-description referrals, alone.
+    "mcp_treat_nudge": True,  # a referral appended to the first direct search.
     "mcp_code_finder": True,  # Code Finder is the sole remote retrieval path.
     "mcp_assisted": True,  # Finder bootstrap plus targeted remote follow-up.
     "mcp_toast": True,  # Toast-1, offered as a tool, is the sole path to code.
@@ -562,3 +565,16 @@ def test_gate_proof_survives_a_failed_gate(monkeypatch):
     assert proof["repo_dirs"], "a failed gate still records the trees it targeted"
     assert proof["reason"] == err
     assert "INVALID" in proof["reason"]
+
+
+def test_every_treatment_arm_names_a_real_overlay_variant():
+    """A treatment arm whose variant the overlay does not know serves control text."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from agents.harnesses import sourcegraph_server_treatment
+
+    assert run_task.TREATMENT_MODES == frozenset(run_task.TREATMENT_VARIANTS)
+    assert set(run_task.TREATMENT_VARIANTS.values()) <= set(
+        sourcegraph_server_treatment.VARIANTS
+    )
+    assert run_task.TREATMENT_MODES <= GATED_MODES
+    assert run_task.TREATMENT_MODES <= run_task.PROXY_MODES

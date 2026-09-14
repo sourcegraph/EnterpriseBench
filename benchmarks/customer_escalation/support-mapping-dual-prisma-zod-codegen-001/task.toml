@@ -1,0 +1,121 @@
+# support_code_mapping: Map customer zod-prisma codegen drift after Prisma schema reorder to the Prisma DMMF / zod-prisma generator boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "prisma-zod-codegen-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-prisma-zod-codegen-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "medium"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Map customer zod-prisma codegen drift after Prisma schema reorder to the Prisma DMMF / zod-prisma generator boundary"
+prompt = """
+A customer reports that after reordering fields in their
+schema.prisma file, their zod-prisma-generated zod schemas now
+validate request bodies inconsistently across services. Some
+services accept payloads other services reject, even though both
+regenerate from the same schema.prisma file.
+
+Your task:
+1. Find where Prisma's generator API exposes the DMMF (Data Model
+   Meta Format) to downstream generators like zod-prisma.
+2. Find where zod-prisma walks the DMMF model fields and how field
+   ordering affects the produced zod object.
+3. Trace the cross-repo path: prisma generate -> generator helper
+   getDMMF -> DMMF.Model.fields array -> zod-prisma model writer
+   -> zod object schema. Cite each file and the function responsible.
+4. Identify why DMMF's fields order is documented as schema-source
+   order, and why zod's z.object().strict() can validate identical
+   key sets but generate different default-discriminator behavior
+   when zod-prisma emits unions with field-position-dependent keys.
+"""
+
+[[repos]]
+url = "https://github.com/prisma/prisma"
+rev = "5.12.0"
+path = "prisma"
+role = "upstream"
+
+[[repos]]
+url = "https://github.com/colinhacks/zod"
+rev = "v3.23.0"
+path = "zod"
+role = "primary"
+
+[metadata]
+languages = ["typescript"]
+total_loc = 600000
+dependency_depth = 2
+frameworks = ["prisma", "zod"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Codegen drift is split between Prisma's DMMF emitter and zod's schema construction order. Cross-repo navigation is required to see why field reordering in schema.prisma changes runtime validation behavior."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "prisma/packages/internals/src/engine-commands/getDmmf.ts"
+repo = "prisma"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "prisma/packages/generator-helper/src/dmmf.ts"
+repo = "prisma"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "zod/src/types.ts"
+repo = "zod"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "zod/src/helpers/parseUtil.ts"
+repo = "zod"
+confidence = 0.8
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "prisma/packages/generator-helper/src/byline.ts"
+repo = "prisma"
+confidence = 0.65
+
+[[ground_truth.sufficient_files]]
+path = "zod/src/external.ts"
+repo = "zod"
+confidence = 0.7

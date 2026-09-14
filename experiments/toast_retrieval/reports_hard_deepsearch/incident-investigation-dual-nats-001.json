@@ -1,0 +1,190 @@
+{
+  "task_id": "incident-investigation-dual-nats-001",
+  "policy": "deepsearch",
+  "suite": "incident_response",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/nats-server--v2.10.22",
+    "github.com/sg-evals/nats.go--v1.37.0"
+  ],
+  "retrieved_paths": [
+    "server/consumer.go",
+    "server/filestore.go",
+    "server/memstore.go",
+    "jetstream/pull.go",
+    "jetstream/message.go",
+    "server/stream.go",
+    "jetstream/errors.go",
+    "nats-io/nats.go"
+  ],
+  "retrieved_paths_union": [
+    "server/consumer.go",
+    "server/filestore.go",
+    "server/memstore.go",
+    "jetstream/pull.go",
+    "jetstream/message.go",
+    "server/stream.go",
+    "jetstream/errors.go",
+    "nats-io/nats.go"
+  ],
+  "required_files": [
+    "server/consumer.go",
+    "server/filestore.go",
+    "js.go",
+    "jsm.go"
+  ],
+  "ir_scores": {
+    "task_id": "incident-investigation-dual-nats-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.6367,
+      "10": 0.6367
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.25,
+    "n_retrieved": 8,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "incident-investigation-dual-nats-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.6367,
+      "10": 0.6367
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.25,
+    "n_retrieved": 8,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 334.1,
+  "response_chars": 23692,
+  "raw_response": "---\ntitle: Investigating JetStream pull consumer \u201cbad pending entry\u201d after retention reclaim\nshare_url: https://demo.sourcegraph.com/deepsearch/8f50b72c-f856-4fcb-9d39-d375b2f29fab\nurl: https://demo.sourcegraph.com/deepsearch/2231\ncreated: 2026-08-18T02:05:14Z\nupdated: 2026-08-18T02:09:35Z\n---\n\n# # Incident: NATS JetStream pull consumer reports \"bad pending entry\" and silently drops messages\n\n## Alert\n\nA production FORWARDER service consuming a high-volume JetStream stream\nthrough a durable pull-based subscription is logging intermittent errors,\nand a downstream auditor is reporting gaps in delivery:\n\n```\n[WRN] Consumer 'STX_DATA > FORWARDER' error on write store state from\n      check pending: bad pending entry, sequence [7762827] out of range\nnats: pull subscribe: no messages available\naudit: gap detected: stream seq 7762820..7762830 missing from sink\n```\n\n## Symptoms\n\n- Errors only appear once the stream has been running long enough for its\n  size/age retention limits to start reclaiming space.\n- Disabling retention (or raising the limits) makes the failure go away.\n- Restarting the consumer does not heal the state \u2014 only deleting and\n  recreating the durable consumer clears the error.\n- The client gets `no messages available` and retries; subsequent fetches\n  succeed but the application never sees the missing sequence range, and\n  no error is ever surfaced to it.\n\n## Environment\n\n- `/workspace/nats-server/` \u2014 `nats-io/nats-server` v2.10.22\n- `/workspace/nats.go/` \u2014 `nats-io/nats.go` v1.37.0\n\nBoth Go projects. The failure spans the wire boundary between the two \u2014\nyou will need to read both repos to find it.\n\n## What I need\n\nInvestigate both codebases and write an incident report grounded in the\nactual code \u2014 cite the specific files and functions you found, not general\nJetStream theory.\n\n1. **Root cause** \u2014 name the specific file and function on each side of\n   the client/server boundary that participate in the failure, and explain\n   why the interaction between them produces \"bad pending entry, sequence\n   out of range\".\n2. **Error chain** \u2014 trace the cross-repo path, at least four hops, from\n   the client's pull request through whatever the server does with\n   outstanding deliveries, to the piece of the storage layer that reclaims\n   old data, and back to the silent gap observed by the client.\n3. **Affected components** \u2014 identify every component across both repos\n   that participates in this path (do not just repeat the repo names).\n4. **Remediation** \u2014 propose a concrete, code-grounded fix and say where\n   it belongs (which repo and file).\n\n## Output\n\nWrite your incident report to `/workspace/nats-server/INCIDENT_REPORT.md`.\n\n\nSearch only these repositories: github.com/sg-evals/nats-server--v2.10.22, github.com/sg-evals/nats.go--v1.37.0\n\nThe evaluator sandbox cannot write directly to `/workspace`. Let me produce the final report as a proper artifact file and present the full content here:\n\n---\n\n# Incident Report: NATS JetStream Pull Consumer \"Bad Pending Entry\" and Silent Message Drop\n\n**Date:** 2026-08-18\n**Severity:** High \u2014 silent data loss in production FORWARDER consumers\n**Repos:** `nats-io/nats-server` v2.10.22 \u00b7 `nats-io/nats.go` v1.37.0\n\n---\n\n## 1. Root Cause\n\nThe bug is a **race between two asynchronous server-side goroutines** \u2014 one performing in-flight pending cleanup and one performing retention-limit enforcement \u2014 that produces a `ConsumerState` where `o.asflr` (the ack-floor stream sequence) has been jumped forward past some sequences that are still present in `o.pending`, which the store then rejects as \"out of range\".\n\n### Server side \u2014 `checkPending()` in [`server/consumer.go:4592`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/consumer.go?L4592)\n\n`checkPending` is driven by the ack-wait timer. It iterates over `o.pending` and, for every entry whose stream sequence is either below the stream's current `FirstSeq` or at or below `o.asflr`, it:\n\n1. Deletes the entry from `o.pending`.\n2. **Advances `o.asflr` to that sequence** if it is higher than the current ack floor ([lines 4640\u20134641](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/consumer.go?L4640-L4641)).\n\nThe critical defect is that the loop uses a Go `range` over a map, which has **non-deterministic iteration order**. When retention removes a dense block of sequences, `o.asflr` may be bumped to a high value early in the iteration while the iterator has not yet visited (and thus not yet deleted) lower sequences in the same sweep. After the loop, [`writeStoreStateUnlocked()`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/consumer.go?L4715) is called with:\n\n```\nDelivered.Stream = o.sseq - 1\nAckFloor.Stream  = o.asflr      \u2190 jumped forward non-deterministically\nPending          = o.pending    \u2190 still contains seqs <= new asflr\n```\n\n### Server side \u2014 `consumerFileStore.Update()` in [`server/filestore.go:9012`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/filestore.go?L9012) (identical logic in [`server/memstore.go:1475`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/memstore.go?L1475))\n\nThe store's `Update` method validates every pending entry:\n\n```go\nif seq <= state.AckFloor.Stream || seq > state.Delivered.Stream {\n    return fmt.Errorf(\"bad pending entry, sequence [%d] out of range\", seq)\n}\n```\n\nBecause `o.asflr` overshot remaining entries, `seq <= state.AckFloor.Stream` fires, the write is rejected, and the server emits:\n\n```\n[WRN] Consumer 'STX_DATA > FORWARDER' error on write store state\n      from check pending: bad pending entry, sequence [7762827] out of range\n```\n\nThe in-memory consumer state is correct (those entries were deleted), but the **on-disk state was never written**. On restart, the consumer replays from a snapshot that predates the retention cleanup, and the server tries to deliver sequences the store has already reclaimed.\n\n### Client side \u2014 [`jetstream/pull.go:fetch()`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats.go--v1.37.0/-/blob/jetstream/pull.go?L752) + [`jetstream/message.go:checkMsg()`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats.go--v1.37.0/-/blob/jetstream/message.go?L391)\n\nWhen the server fails to load a reclaimed sequence from the store, it sends a `Status: 404 No Messages` control frame. `checkMsg` converts 404 \u2192 `ErrNoMessages`. The `fetch()` receive loop ([lines 788\u2013794](https://demo.sourcegraph.com/r/github.com/sg-evals/nats.go--v1.37.0/-/blob/jetstream/pull.go?L788-L794)) then:\n\n```go\nerrNotTimeoutOrNoMsgs := !errors.Is(err, nats.ErrTimeout) && !errors.Is(err, ErrNoMessages)\nif errNotTimeoutOrNoMsgs && !errors.Is(err, ErrMaxBytesExceeded) {\n    res.err = err\n}\nres.done = true\nreturn\n```\n\n**`ErrNoMessages` is explicitly excluded from `res.err`.** The fetch completes silently with `done=true`, no error surfaces to the application, and the missing sequence range is swallowed permanently.\n\n---\n\n## 2. Error Chain (Six Hops)\n\n**Hop 1 \u2014 nats-server** [`server/filestore.go:expireMsgs():4726`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/filestore.go?L4726)\nAge or size retention fires from a timer goroutine. Calls `removeMsgViaLimits(seq)` for each expired message. The store's `state.FirstSeq` advances.\n\n**Hop 2 \u2014 nats-server** [`server/stream.go:storeUpdates():3906`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/stream.go?L3906) \u2192 [`server/consumer.go:decStreamPending():5380`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/consumer.go?L5380)\nThe storage callback fans out the removal signal. For each single-message removal (`md == -1`), `decStreamPending` checks whether the sequence was in `o.pending` and, if so, spawns `go o.processTerm(...)`. Critically, the entry is **not** removed from `o.pending` synchronously \u2014 `processTerm` runs in a separate goroutine.\n\n**Hop 3 \u2014 nats-server** [`server/consumer.go:checkPending():4592`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/consumer.go?L4592)\nThe ack-wait timer fires concurrently. The function iterates `o.pending` in random map order, deleting stale entries and bumping `o.asflr`. The non-deterministic iteration allows `o.asflr` to overshoot entries still in `o.pending`. Then `writeStoreStateUnlocked()` is called.\n\n**Hop 4 \u2014 nats-server** [`server/filestore.go:consumerFileStore.Update():9012`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/filestore.go?L9012)\nStore validates the snapshot: `seq <= state.AckFloor.Stream` for a surviving pending entry. Returns `\"bad pending entry, sequence [N] out of range\"`. Write aborted. On-disk state is now stale.\n\n**Hop 5 \u2014 nats-server** [`server/consumer.go:getNextMsg():3555`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/consumer.go?L3555)\nOn the next client pull (or after restart), the server tries to deliver sequences from the stale snapshot. `LoadMsg()` returns `errDeletedMsg` / `ErrStoreMsgNotFound`. The server sends `Status: 404 No Messages`.\n\n**Hop 6 \u2014 nats.go client** [`jetstream/pull.go:fetch():788`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats.go--v1.37.0/-/blob/jetstream/pull.go?L788) + [`jetstream/message.go:checkMsg():391`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats.go--v1.37.0/-/blob/jetstream/message.go?L391)\n`checkMsg` maps 404 \u2192 `ErrNoMessages`. The `fetch()` loop suppresses it \u2014 `res.err` stays nil, `done=true`. Application sees a successful (but short) batch; sequence gap 7762820\u20137762830 is silently dropped.\n\n---\n\n## 3. Affected Components\n\n### nats-server\n\n| Component | File:Line | Role |\n|---|---|---|\n| `expireMsgs` | [`server/filestore.go:4726`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/filestore.go?L4726) | Retention timer; advances `state.FirstSeq` |\n| `enforceMsgLimit` / `enforceBytesLimit` | [`server/filestore.go:3616`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/filestore.go?L3616) | Synchronous publish-path retention; same effect |\n| `removeMsgViaLimits` | [`server/filestore.go:3768`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/filestore.go?L3768) | Limit-enforcement wrapper for `removeMsg` |\n| `storeUpdates` | [`server/stream.go:3906`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/stream.go?L3906) | Storage callback; fans removal signals to consumers |\n| `decStreamPending` | [`server/consumer.go:5380`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/consumer.go?L5380) | Per-consumer removal notification; spawns async `processTerm`, does NOT remove from `o.pending` synchronously |\n| `processTerm` | [`server/consumer.go:2437`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/consumer.go?L2437) | Treats removed-while-pending as terminal ack; publishes advisory |\n| **`checkPending`** | [`server/consumer.go:4592`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/consumer.go?L4592) | **Defective function** \u2014 random map iteration causes `o.asflr` overshoot |\n| `writeStoreStateUnlocked` | [`server/consumer.go:2580`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/consumer.go?L2580) | Snapshots consumer state and calls store `Update` |\n| `consumerFileStore.Update` | [`server/filestore.go:9012`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/filestore.go?L9012) | Validates and persists state; rejects the invalid snapshot |\n| `consumerMemStore.Update` | [`server/memstore.go:1475`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/memstore.go?L1475) | Same validation for in-memory streams |\n| `getNextMsg` | [`server/consumer.go:3555`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/consumer.go?L3555) | Loads next message for delivery; fails when sequence was reclaimed |\n\n### nats.go client\n\n| Component | File:Line | Role |\n|---|---|---|\n| `pullConsumer.Fetch` / `FetchBytes` / `FetchNoWait` | [`jetstream/pull.go:684`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats.go--v1.37.0/-/blob/jetstream/pull.go?L684) | Public entry points; build `pullRequest` and call `fetch()` |\n| `pullConsumer.fetch` | [`jetstream/pull.go:752`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats.go--v1.37.0/-/blob/jetstream/pull.go?L752) | Manages inbox subscription and receive loop |\n| `pullSubscription.pull` | [`jetstream/pull.go:909`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats.go--v1.37.0/-/blob/jetstream/pull.go?L909) | Publishes pull request to `$JS.API.CONSUMER.MSG.NEXT.<stream>.<consumer>` |\n| `checkMsg` | [`jetstream/message.go:391`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats.go--v1.37.0/-/blob/jetstream/message.go?L391) | Classifies control frames; maps 404 \u2192 `ErrNoMessages` |\n| `fetch` receive loop | [`jetstream/pull.go:788\u2013794`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats.go--v1.37.0/-/blob/jetstream/pull.go?L788-L794) | **Suppresses `ErrNoMessages`** \u2014 the silent-gap point |\n| `ErrNoMessages` | [`jetstream/errors.go:196`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats.go--v1.37.0/-/blob/jetstream/errors.go?L196) | The sentinel that is swallowed and never surfaced |\n\n---\n\n## 4. Remediation\n\n### Primary fix \u2014 `server/consumer.go`, `checkPending()` (nats-server)\n\nCollect all stale sequences first, sort them ascending, then advance `o.asflr` in order. This guarantees that when `o.asflr` is set to N, every sequence \u2264 N has already been removed from `o.pending`, so the invariant checked by `consumerFileStore.Update` can never be violated:\n\n```go\n// Replace the inline stale-entry deletion loop (approx. lines 4623\u20134646) with:\n\nvar staleSeqs []uint64\nfor seq := range o.pending {\n    if seq < fseq || seq <= o.asflr {\n        staleSeqs = append(staleSeqs, seq)\n    }\n}\nslices.Sort(staleSeqs) // ascending \u2014 o.asflr advances monotonically\n\nfor _, seq := range staleSeqs {\n    p := o.pending[seq]\n    delete(o.pending, seq)\n    delete(o.rdc, seq)\n    o.removeFromRedeliverQueue(seq)\n    shouldUpdateState = true\n    // Safe: every sequence < seq is already gone from o.pending.\n    if seq > o.asflr {\n        o.asflr = seq\n    }\n    if p != nil && p.Sequence > o.adflr {\n        o.adflr = p.Sequence\n    }\n}\n```\n\n**File:** `server/consumer.go`, function `checkPending`, approximately lines 4623\u20134646.\n\n### Secondary fix \u2014 `jetstream/pull.go`, `fetch()` receive loop (nats.go)\n\nA durable non-ordered consumer that receives a 404 mid-batch should signal the caller so it can take corrective action (e.g., delete and recreate the consumer):\n\n```go\n// Replace the existing block at lines 788\u2013793 with:\nif errors.Is(err, ErrNoMessages) {\n    // 404 mid-batch on a durable consumer may indicate a gap\n    // from stale consumer state after retention reclaim.\n    if receivedMsgs > 0 && receivedMsgs < req.Batch {\n        res.err = fmt.Errorf(\"%w: partial batch (%d/%d), possible gap from stale consumer state\",\n            ErrNoMessages, receivedMsgs, req.Batch)\n    }\n    // Clean empty-poll remains silent.\n} else if !errors.Is(err, nats.ErrTimeout) && !errors.Is(err, ErrMaxBytesExceeded) {\n    res.err = err\n}\n```\n\n**File:** `jetstream/pull.go`, inside the `fetch()` goroutine, approximately lines 788\u2013794.\n\n### Immediate operational workarounds\n\n1. **Delete and recreate the durable consumer** \u2014 resets on-disk state to a fresh, consistent snapshot (confirmed to clear the error).\n2. **Raise retention limits** (MaxAge / MaxBytes / MaxMsgs) to reduce the overlap window between retention cleanup and a large unacked pending set.\n3. **Monitor termination advisories** \u2014 [`processTerm`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/consumer.go?L2437) already publishes `JSConsumerDeliveryTerminatedAdvisory` on `$JS.EVENT.ADVISORY.CONSUMER.MSG_TERMINATED.<stream>.<consumer>` for every unacked-then-deleted message; subscribing to this subject provides early warning of the retention/pending collision before the corrupted state write occurs.\n\n---\n\n## Summary\n\nThe failure is a **server-side state-consistency defect in `checkPending`** ([`server/consumer.go:4592`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/consumer.go?L4592)): Go's non-deterministic map iteration allows the ack-floor `o.asflr` to be advanced past pending entries not yet deleted in the same sweep, producing a `ConsumerState` that [`consumerFileStore.Update`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats-server--v2.10.22/-/blob/server/filestore.go?L9012) correctly rejects. The rejected write leaves the on-disk snapshot stale, causing subsequent delivery attempts for reclaimed sequences. On the client side, **[`fetch()` in `jetstream/pull.go:788`](https://demo.sourcegraph.com/r/github.com/sg-evals/nats.go--v1.37.0/-/blob/jetstream/pull.go?L788) explicitly discards `ErrNoMessages`**, converting the server-side failure into a silent sequence gap the application never detects. The primary fix belongs in `server/consumer.go:checkPending` in the nats-server repo; a secondary hardening fix belongs in `jetstream/pull.go:fetch` in the nats.go repo.\n\n## Sources\n\n- [github.com/sg-evals/nats-server--v2.10.22/server/filestore.go@ed6715f?L8980-9080](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/filestore.go?L8980-9080)\n- [github.com/sg-evals/nats-server--v2.10.22/server/consumer.go@ed6715f?L4591-4720](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/consumer.go?L4591-4720)\n- [github.com/sg-evals/nats.go--v1.37.0/jetstream/pull.go@6a21dfe?L752-830](/github.com/sg-evals/nats.go--v1.37.0@6a21dfef68c81f95c17b8db227e75e45ccd07fa0/-/blob/jetstream/pull.go?L752-830)\n- [github.com/sg-evals/nats-server--v2.10.22/server/consumer.go@ed6715f?L4620-4650](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/consumer.go?L4620-4650)\n- [github.com/sg-evals/nats.go--v1.37.0/jetstream/pull.go@6a21dfe?L870-960](/github.com/sg-evals/nats.go--v1.37.0@6a21dfef68c81f95c17b8db227e75e45ccd07fa0/-/blob/jetstream/pull.go?L870-960)\n- [github.com/sg-evals/nats-server--v2.10.22/server/consumer.go@ed6715f?L2571-2620](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/consumer.go?L2571-2620)\n- [github.com/sg-evals/nats-server--v2.10.22/server/consumer.go@ed6715f?L5360-5430](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/consumer.go?L5360-5430)\n- [github.com/sg-evals/nats.go--v1.37.0/jetstream/pull.go@6a21dfe?L682-755](/github.com/sg-evals/nats.go--v1.37.0@6a21dfef68c81f95c17b8db227e75e45ccd07fa0/-/blob/jetstream/pull.go?L682-755)\n- [github.com/sg-evals/nats-server--v2.10.22/server/consumer.go@ed6715f?L3552-3650](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/consumer.go?L3552-3650)\n- [repo:^github.com/sg-evals/nats-server--v2.10.22$ \"bad pending entry\"](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fnats-server--v2.10.22$%20%22bad%20pending%20entry%22)\n- [repo:^github.com/sg-evals/nats.go--v1.37.0$ \"ErrNoMessages\" OR \"no messages\" checkMsg](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fnats.go--v1.37.0$%20%22ErrNoMessages%22%20OR%20%22no%20messages%22%20checkMsg)\n- [github.com/sg-evals/nats-server--v2.10.22/server/memstore.go@ed6715f?L1475-1510](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/memstore.go?L1475-1510)\n- [github.com/sg-evals/nats.go--v1.37.0/jetstream/message.go@6a21dfe?L385-440](/github.com/sg-evals/nats.go--v1.37.0@6a21dfef68c81f95c17b8db227e75e45ccd07fa0/-/blob/jetstream/message.go?L385-440)\n- [github.com/sg-evals/nats-server--v2.10.22/server/stream.go@ed6715f?L3902-3960](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/stream.go?L3902-3960)\n- [github.com/sg-evals/nats-server--v2.10.22/server/filestore.go@ed6715f?L4725-4760](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/filestore.go?L4725-4760)\n- [github.com/sg-evals/nats-server--v2.10.22/server/consumer.go@ed6715f?L5380-5405](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/consumer.go?L5380-5405)\n- [github.com/sg-evals/nats-server--v2.10.22/server/consumer.go@ed6715f?L4999-5060](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/consumer.go?L4999-5060)\n- [github.com/sg-evals/nats-server--v2.10.22/server/consumer.go@ed6715f?L4630-4650](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/consumer.go?L4630-4650)\n- [repo:^github.com/sg-evals/nats-server--v2.10.22$ \"processTerm\" \"ackTermUnackedLimitsReason\"](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fnats-server--v2.10.22$%20%22processTerm%22%20%22ackTermUnackedLimitsReason%22)\n- [github.com/sg-evals/nats-server--v2.10.22/server/consumer.go@ed6715f?L2436-2480](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/consumer.go?L2436-2480)\n- [github.com/sg-evals/nats-server--v2.10.22/server/consumer.go@ed6715f?L4712-4722](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/consumer.go?L4712-4722)\n- [github.com/sg-evals/nats.go--v1.37.0/jetstream/pull.go@6a21dfe?L780-802](/github.com/sg-evals/nats.go--v1.37.0@6a21dfef68c81f95c17b8db227e75e45ccd07fa0/-/blob/jetstream/pull.go?L780-802)\n- [github.com/sg-evals/nats-server--v2.10.22/server/consumer.go@ed6715f?L4591-4720](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/consumer.go?L4591-4720)\n- [github.com/sg-evals/nats-server--v2.10.22/server/consumer.go@ed6715f?L2580-2597](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/consumer.go?L2580-2597)\n- [github.com/sg-evals/nats-server--v2.10.22/server/filestore.go@ed6715f?L9012-9056](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/filestore.go?L9012-9056)\n- [github.com/sg-evals/nats-server--v2.10.22/server/filestore.go@ed6715f?L4725-4757](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/filestore.go?L4725-4757)\n- [github.com/sg-evals/nats-server--v2.10.22/server/stream.go@ed6715f?L3902-3929](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/stream.go?L3902-3929)\n- [github.com/sg-evals/nats-server--v2.10.22/server/consumer.go@ed6715f?L5380-5401](/github.com/sg-evals/nats-server--v2.10.22@ed6715f608580fa230c7c1637035281aa690975c/-/blob/server/consumer.go?L5380-5401)\n\n\nGenerated files:\n- files/INCIDENT_REPORT_content.json: /.api/agent-files/v1/deep-search/8f50b72c-f856-4fcb-9d39-d375b2f29fab/files/INCIDENT_REPORT_content.json\n- files/INCIDENT_REPORT_md.json: /.api/agent-files/v1/deep-search/8f50b72c-f856-4fcb-9d39-d375b2f29fab/files/INCIDENT_REPORT_md.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "incident-investigation-dual-nats-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.6367,
+      "10": 0.6367
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.25,
+    "n_retrieved": 8,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "server/consumer.go",
+    "server/filestore.go",
+    "server/memstore.go",
+    "jetstream/pull.go",
+    "jetstream/message.go",
+    "server/stream.go",
+    "jetstream/errors.go",
+    "nats-io/nats.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "incident-investigation-dual-nats-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.4444,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.6367,
+      "10": 0.6367
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.25,
+    "n_retrieved": 8,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

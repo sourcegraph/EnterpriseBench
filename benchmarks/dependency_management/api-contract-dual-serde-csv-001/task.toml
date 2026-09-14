@@ -1,0 +1,103 @@
+# api_contract: Trace serde Deserialize trait changes affecting csv crate's 
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "rust-async-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "api-contract-dual-serde-csv-001"
+suite = "dependency_management"
+task_type = "api_contract"
+difficulty = "hard"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Trace serde Deserialize trait changes affecting csv crate's record parsing"
+prompt = """
+The csv crate uses serde for deserializing CSV records into Rust structs.
+A change in how serde handles newtype struct deserialization affects
+csv's StringRecord parsing behavior.
+
+Your task:
+1. Find where serde defines Deserialize trait and newtype handling
+2. Find where csv implements serde deserialization for StringRecord
+3. Identify the API contract between serde's Deserializer trait and
+   csv's implementation
+4. Document the behavioral difference and affected use cases
+
+Write your analysis to /workspace/analysis/IMPACT_REPORT.md
+"""
+
+[[repos]]
+url = "https://github.com/serde-rs/serde"
+rev = "v1.0.193"
+path = "serde"
+role = "dependency"
+
+[[repos]]
+url = "https://github.com/BurntSushi/rust-csv"
+rev = "1.3.0"
+path = "csv"
+role = "primary"
+
+[metadata]
+languages = ["rust"]
+total_loc = 200_000
+dependency_depth = 2
+frameworks = ["serde", "csv"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "serde_deserialize"
+weight = 0.35
+verifier = "checks/check_serde_deserialize.sh"
+description = "Agent identifies serde Deserialize newtype handling"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "csv_serde_impl"
+weight = 0.35
+verifier = "checks/check_csv_serde_impl.sh"
+description = "Agent finds csv's serde integration"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "contract_drift"
+weight = 0.30
+verifier = "checks/check_contract_drift.sh"
+description = "Agent documents behavioral difference"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = ["migration_guide"]
+
+[tool_access]
+expected_mcp_benefit = "medium"
+mcp_benefit_rationale = "Trait-level search helps find Deserialize impls across crate boundaries"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "serde/serde/src/de/mod.rs"
+repo = "serde"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "csv/src/deserializer.rs"
+repo = "csv"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "serde/serde_derive/src/de.rs"
+repo = "serde"
+confidence = 0.8
+
+[[ground_truth.sufficient_files]]
+path = "csv/src/reader.rs"
+repo = "csv"
+confidence = 0.8

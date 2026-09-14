@@ -1,0 +1,216 @@
+{
+  "task_id": "schema-evolution-002",
+  "policy": "code_finder",
+  "suite": "feature_delivery",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/zulip--912c1b59"
+  ],
+  "retrieved_paths": [
+    "zerver/models/realm_audit_logs.py",
+    "zerver/models/__init__.py",
+    "zerver/views/realm_export.py",
+    "zerver/actions/realm_export.py",
+    "zerver/lib/export.py",
+    "zerver/worker/deferred_work.py",
+    "zerver/management/commands/export.py",
+    "zerver/lib/import_realm.py",
+    "zerver/tests/test_realm_export.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_import_export.py",
+    "zerver/tests/test_management_commands.py",
+    "web/src/settings_exports.ts",
+    "web/tests/lib/events.js",
+    "zerver/lib/event_schema.py",
+    "zerver/lib/events.py",
+    "zerver/migrations/0594_remove_realm_user_group_edit_policy.py"
+  ],
+  "retrieved_paths_union": [
+    "zerver/models/realm_audit_logs.py",
+    "zerver/models/__init__.py",
+    "zerver/views/realm_export.py",
+    "zerver/actions/realm_export.py",
+    "zerver/lib/export.py",
+    "zerver/worker/deferred_work.py",
+    "zerver/management/commands/export.py",
+    "zerver/lib/import_realm.py",
+    "zerver/tests/test_realm_export.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_import_export.py",
+    "zerver/tests/test_management_commands.py",
+    "web/src/settings_exports.ts",
+    "web/tests/lib/events.js",
+    "zerver/lib/event_schema.py",
+    "zerver/lib/events.py",
+    "zerver/migrations/0594_remove_realm_user_group_edit_policy.py"
+  ],
+  "required_files": [
+    "zerver/models/realms.py",
+    "zerver/actions/realm_export.py",
+    "zerver/views/realm_export.py",
+    "zerver/worker/deferred_work.py"
+  ],
+  "ir_scores": {
+    "task_id": "schema-evolution-002",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.3633,
+      "10": 0.5024
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 0.75,
+    "context_efficiency": 0.1765,
+    "n_retrieved": 17,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "schema-evolution-002",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.3633,
+      "10": 0.5024
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 0.75,
+    "context_efficiency": 0.1765,
+    "n_retrieved": 17,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 30.7,
+  "response_chars": 4787,
+  "raw_response": "I\u2019m unable to write `/workspace/zulip/SCHEMA_IMPACT.md` because the available tools only support repository search/read operations, not filesystem writes. Findings below identify the complete impact surface in the specified repository.\n\nRelevant files:\n\n- [sg-evals/zulip--912c1b59:zerver/models/realm_audit_logs.py?L15-L220](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/models/realm_audit_logs.py?L15-L220) - Current `REALM_EXPORTED` audit-log representation and shared `extra_data` fields being replaced.\n- [sg-evals/zulip--912c1b59:zerver/models/__init__.py?L45-L50](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/models/__init__.py?L45-L50) - Model registration/import location; add `RealmExport` here.\n- [sg-evals/zulip--912c1b59:zerver/views/realm_export.py?L20-L125](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/views/realm_export.py?L20-L125) - API endpoints create, list, and delete export records; currently use `RealmAuditLog` and JSON `extra_data`.\n- [sg-evals/zulip--912c1b59:zerver/actions/realm_export.py?L1-L25](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/actions/realm_export.py?L1-L25) - Export notifications and deletion; currently reads/writes `extra_data`.\n- [sg-evals/zulip--912c1b59:zerver/lib/export.py?L2474-L2513](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/lib/export.py?L2474-L2513) - Serializes export history and derives pending/failed/deleted state from JSON fields.\n- [sg-evals/zulip--912c1b59:zerver/worker/deferred_work.py?L128-L205](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/worker/deferred_work.py?L128-L205) - Background export execution; updates `started_timestamp`, `failed_timestamp`, and `export_path` in JSON tracking.\n- [sg-evals/zulip--912c1b59:zerver/management/commands/export.py?L160-L194](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/management/commands/export.py?L160-L194) - CLI exports create `REALM_EXPORTED` audit-log rows with `acting_user=None`.\n- [sg-evals/zulip--912c1b59:zerver/lib/import_realm.py?L1392-L1429](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/lib/import_realm.py?L1392-L1429) - Imports `zerver_realmauditlog`; assess whether `RealmExport` rows should be included in export/import data.\n- [sg-evals/zulip--912c1b59:zerver/lib/import_realm.py?L1718-L1727](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/lib/import_realm.py?L1718-L1727) - Detects cross-Zulip imports via `REALM_EXPORTED` audit logs.\n- [sg-evals/zulip--912c1b59:zerver/tests/test_realm_export.py?L27-L329](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/tests/test_realm_export.py?L27-L329) - Primary endpoint, worker, failure, deletion, rate-limit, and JSON-state coverage.\n- [sg-evals/zulip--912c1b59:zerver/tests/test_events.py?L3373-L3455](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/tests/test_events.py?L3373-L3455) - Realm-export event notifications for pending, completed, deleted, and failed states.\n- [sg-evals/zulip--912c1b59:zerver/tests/test_import_export.py?L341-L390](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/tests/test_import_export.py?L341-L390) - Round-trip export/import helper creates export audit records.\n- [sg-evals/zulip--912c1b59:zerver/tests/test_import_export.py?L1317-L1325](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/tests/test_import_export.py?L1317-L1325) - Audit-log round-trip assertions likely affected by introducing a separate model.\n- [sg-evals/zulip--912c1b59:zerver/tests/test_management_commands.py?L514-L546](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/tests/test_management_commands.py?L514-L546) - CLI export command coverage; should verify new tracking behavior.\n- [sg-evals/zulip--912c1b59:web/src/settings_exports.ts?L17-L80](/r/github.com/sg-evals/zulip--912c1b59/-/blob/web/src/settings_exports.ts?L17-L80) - Frontend export-status schema and rendering.\n- [sg-evals/zulip--912c1b59:web/tests/lib/events.js?L471-L483](/r/github.com/sg-evals/zulip--912c1b59/-/blob/web/tests/lib/events.js?L471-L483) - Frontend realm-export event fixture.\n- [sg-evals/zulip--912c1b59:zerver/lib/event_schema.py?L839-L872](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/lib/event_schema.py?L839-L872) - Server-side validation of export event payloads.\n- [sg-evals/zulip--912c1b59:zerver/lib/events.py?L1524-L1529](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/lib/events.py?L1524-L1529) - Applies realm-export events to event state.\n- [sg-evals/zulip--912c1b59:zerver/migrations/0594_remove_realm_user_group_edit_policy.py?L1-L20](/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/migrations/0594_remove_realm_user_group_edit_policy.py?L1-L20) - Latest migration present in the repository; the requested `0595_add_realmexport_table_and_backfill.py` was not found in this repository revision.",
+  "ir_scores_unaligned": {
+    "task_id": "schema-evolution-002",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.3633,
+      "10": 0.5024
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 0.75,
+    "context_efficiency": 0.1765,
+    "n_retrieved": 17,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "zerver/models/realm_audit_logs.py",
+    "zerver/models/__init__.py",
+    "zerver/views/realm_export.py",
+    "zerver/actions/realm_export.py",
+    "zerver/lib/export.py",
+    "zerver/worker/deferred_work.py",
+    "zerver/management/commands/export.py",
+    "zerver/lib/import_realm.py",
+    "zerver/tests/test_realm_export.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_import_export.py",
+    "zerver/tests/test_management_commands.py",
+    "web/src/settings_exports.ts",
+    "web/tests/lib/events.js",
+    "zerver/lib/event_schema.py",
+    "zerver/lib/events.py",
+    "zerver/migrations/0594_remove_realm_user_group_edit_policy.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "schema-evolution-002",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.3633,
+      "10": 0.5024
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 0.75,
+    "context_efficiency": 0.1765,
+    "n_retrieved": 17,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

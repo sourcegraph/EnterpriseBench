@@ -1,0 +1,29 @@
+{
+  "task_id": "refactor-orch-007",
+  "checkpoints": {
+    "identify_repos": {
+      "expected_solution": "Three repos cascade for the grpc.Dial → grpc.NewClient API migration: grpc/grpc-go (upstream — deprecates grpc.Dial/DialContext and introduces grpc.NewClient in v1.64), etcd-io/etcd (intermediary — replaces all grpc.Dial calls with grpc.NewClient and reimplements DialTimeout via the health endpoint in PR etcd-io/etcd#21282 merged 2026-02-26), and kubernetes/kubernetes (consumer — pulls in the new etcd client and updates its own grpc.Dial call sites in PR kubernetes/kubernetes#128419 merged 2025-05-16). REFACTOR_PLAN.md must mention 'grpc-go', 'etcd', and 'kubernetes' so check_repo_set.sh's three greps fire.",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must mention 'grpc-go' (or 'grpc.go'), 'etcd', and 'kubernetes' — the three grep targets",
+        "Plan must distinguish roles: grpc-go ships the API split (Dial deprecated, NewClient introduced), etcd absorbs it and re-implements DialTimeout via a health-endpoint probe, kubernetes pins to the updated etcd and migrates its own Dial sites",
+        "Plan should reference the relevant call-site files in etcd (the grpc client wrappers) and kubernetes (anywhere `grpc.Dial(` is invoked) so the migration footprint is concrete"
+      ]
+    },
+    "topological_order": {
+      "expected_solution": "Strict linear cascade: (1) grpc/grpc-go cuts v1.64 with grpc.NewClient; (2) etcd-io/etcd#21282 (merged 2026-02-26) replaces grpc.Dial with grpc.NewClient and re-implements DialTimeout; (3) kubernetes/kubernetes#128419 (merged 2025-05-16) bumps etcd and updates its own grpc.Dial call sites. dependency_graph: grpc/grpc-go: [], etcd-io/etcd: [grpc/grpc-go], kubernetes/kubernetes: [grpc/grpc-go, etcd-io/etcd]. Note the merged_at dates suggest a chronology gap (kubernetes pinned an earlier etcd that already had partial migration); the plan should treat the dependency_graph as authoritative for ordering, not the merge dates.",
+      "evaluation_criteria": [
+        "REFACTOR_PLAN.md must contain a three-entry numbered list ('1. grpc/grpc-go', '2. etcd-io/etcd', '3. kubernetes/kubernetes')",
+        "Order must respect the dependency graph: grpc-go before etcd before kubernetes",
+        "Each step must articulate the API change being absorbed: NewClient introduction in grpc-go, Dial→NewClient migration plus DialTimeout reimplementation in etcd, downstream consumer update in kubernetes",
+        "Repo identifiers must use canonical org/repo form so the verifier's tokeniser can match dependency_graph keys"
+      ]
+    },
+    "parallelism": {
+      "expected_solution": "No parallelizable steps — the chain is strictly linear. The plan should explicitly state 'no parallelizable steps' under a Parallelization heading. Claiming etcd and kubernetes can run in parallel would violate the kubernetes → etcd dependency edge.",
+      "evaluation_criteria": [
+        "Plan must explicitly note that no steps are parallelizable (ground truth's parallelizable_steps is empty)",
+        "Must NOT claim that etcd-io/etcd and kubernetes/kubernetes can be updated in parallel — the dependency_graph entry kubernetes/kubernetes: [grpc/grpc-go, etcd-io/etcd] makes parallel claims a violation"
+      ]
+    }
+  }
+}

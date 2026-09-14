@@ -1,0 +1,172 @@
+{
+  "task_id": "calibration-005",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/click--8.2.1"
+  ],
+  "retrieved_paths": [
+    "src/click/parser.py",
+    "src/click/core.py",
+    "github.com/sg-evals/click--8.2.1"
+  ],
+  "retrieved_paths_union": [
+    "src/click/parser.py",
+    "src/click/core.py",
+    "github.com/sg-evals/click--8.2.1"
+  ],
+  "required_files": [
+    "src/click/core.py",
+    "src/click/types.py"
+  ],
+  "ir_scores": {
+    "task_id": "calibration-005",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 3,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "calibration-005",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 3,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 110.5,
+  "response_chars": 8786,
+  "raw_response": "---\ntitle: Click 8.3 callback receives Sentinel.UNSET instead of None after upgrade\nshare_url: https://demo.sourcegraph.com/deepsearch/f124c640-7806-478d-94b6-dd14ca967e1e\nurl: https://demo.sourcegraph.com/deepsearch/2191\ncreated: 2026-08-18T01:41:16Z\nupdated: 2026-08-18T01:42:20Z\n---\n\n# # Support Ticket: Internal Sentinel object leaks into Click callback\n\n**Priority:** Medium\n**Submitted by:** CLI Developer\n**Product:** Click-based CLI tool\n\n---\n\nHi support,\n\nAfter upgrading Click to 8.3.x, our option callbacks started receiving a `Sentinel` object instead of `None` when no value is provided. Our callback code does `if value is None:` checks which now fail because it receives `Sentinel.UNSET` instead of `None`.\n\n```python\n@click.option('--format', callback=my_callback)\ndef cmd(format):\n    pass\n\ndef my_callback(ctx, param, value):\n    if value is None:  # This no longer works!\n        return \"default\"\n    return value\n```\n\nThe `value` is now `<Sentinel.UNSET>` instead of `None`.\n\nWe need to know:\n1. Which source files define and use the Sentinel object\n2. The code path from option parsing to callback invocation that passes Sentinel\n3. Whether this is intentional behavior or a bug\n\nThe repository is available at `/workspace/click/`.\n\n\nSearch only these repositories: github.com/sg-evals/click--8.2.1\n\nHere is the full analysis:\n\n---\n\n## Findings\n\n### 1. There is no `Sentinel` class or `Sentinel.UNSET` in Click 8.2.1\n\nThe repository `github.com/sg-evals/click--8.2.1` contains **no `Sentinel` class, no `Sentinel.UNSET`, and no named sentinel enum of any kind.** A search across all source files in `src/click/` yields zero results. The report that callbacks receive `Sentinel.UNSET` does not match this version of the codebase.\n\nThe only sentinel-style object in the codebase is:\n\n**[`src/click/parser.py` L49](r/github.com/sg-evals/click--8.2.1/-/blob/src/click/parser.py?L49)**\n```python\n_flag_needs_value = object()\n```\n\nThis is a **private, anonymous `object()` instance** \u2014 not a named `Sentinel` class \u2014 used solely to signal that an option was used as a flag without a value (e.g., `--opt` instead of `--opt VALUE`) when the option has `prompt` enabled but not `prompt_required`. It is resolved and eliminated **before** the callback ever runs (see below).\n\n---\n\n### 2. Source files involved\n\n| File | Role |\n|---|---|\n| [`src/click/parser.py` L46\u201349](r/github.com/sg-evals/click--8.2.1/-/blob/src/click/parser.py?L46-49) | Defines `_flag_needs_value` sentinel; emits it during CLI arg parsing |\n| [`src/click/parser.py` L436\u2013455](r/github.com/sg-evals/click--8.2.1/-/blob/src/click/parser.py?L436-455) | Sets `value = _flag_needs_value` when a flag-prompt option has no argument |\n| [`src/click/core.py` L33](r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L33) | Imports `_flag_needs_value` from parser |\n| [`src/click/core.py` L2586\u20132588](r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2586-2588) | `Option.__init__` sets `self._flag_needs_value` flag |\n| [`src/click/core.py` L2998\u20133033](r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2998-3033) | `Option.consume_value` detects and **resolves** `_flag_needs_value` \u2192 prompts or substitutes `flag_value` |\n| [`src/click/core.py` L2268\u20132286](r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2268-2286) | `Parameter.consume_value` fallback chain: CLI \u2192 env var \u2192 default map \u2192 default |\n| [`src/click/core.py` L2288\u20132337](r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2288-2337) | `type_cast_value`: if value is `None`, returns `None` (or `()` for multiple/nargs=-1) |\n| [`src/click/core.py` L2348\u20132357](r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2348-2357) | `process_value`: calls `type_cast_value`, then invokes the callback |\n\n---\n\n### 3. Code path: option parsing \u2192 callback invocation\n\n```\nCLI args\n  \u2502\n  \u25bc\nparser.py: _OptionParser processes args\n  \u2502  If option used as bare flag (--opt, no value) and _flag_needs_value:\n  \u2502    value = _flag_needs_value   \u2190 sentinel emitted here\n  \u2502\n  \u25bc\ncore.py: Option.consume_value()                    [L2998\u20133033]\n  \u2502  if value is _flag_needs_value:\n  \u2502    \u2192 prompt user  OR  use self.flag_value\n  \u2502  else: fallback chain (env var \u2192 default map \u2192 get_default())\n  \u2502  \u2190 _flag_needs_value is ALWAYS resolved here, never passes further\n  \u2502\n  \u25bc\ncore.py: Parameter.process_value(ctx, value)       [L2348\u20132357]\n  \u2502  value = type_cast_value(ctx, value)\n  \u2502    \u2192 if value is None: return None             [L2292\u20132293]\n  \u2502  if callback: value = callback(ctx, self, value)\n  \u2502\n  \u25bc\nYour callback receives: None (when option not provided, no default set)\n```\n\n---\n\n### 4. Is this intentional or a bug?\n\nIn **Click 8.2.1**, this is entirely intentional and correct:\n\n- `_flag_needs_value` is an **internal implementation detail** that is resolved inside [`Option.consume_value`](r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2998-3033) and never leaks to the callback.\n- When no value is provided for a standard option with no default, the full fallback chain in [`Parameter.consume_value`](r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2274-2284) returns `None`, and [`type_cast_value`](r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2292-2293) preserves `None`.\n- **The callback receives `None` as documented**, so `if value is None:` checks work correctly.\n\nThe described `Sentinel.UNSET` behavior \u2014 a named public sentinel class passed to callbacks \u2014 does not exist in Click 8.2.1. If it is being observed, it is being introduced by a **third-party library, a custom Click plugin, or a fork** layered on top of Click, not by Click itself. The upgrade to \"8.3.x\" referenced in the ticket should also be verified: if such a class appears there, it would be a breaking behavioral change introduced in a version not present in this repository.\n\n## Sources\n\n- [repo:^github.com/sg-evals/click--8.2.1$ Sentinel](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fclick--8.2.1$%20Sentinel)\n- [repo:^github.com/sg-evals/click--8.2.1$ class Sentinel](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fclick--8.2.1$%20class%20Sentinel)\n- [repo:^github.com/sg-evals/click--8.2.1$ UNSET](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fclick--8.2.1$%20UNSET)\n- [github.com/sg-evals/click--8.2.1/src/click/parser.py@29f1b4b?L1-80](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/parser.py?L1-80)\n- [github.com/sg-evals/click--8.2.1/src/click/core.py@29f1b4b?L2990-3050](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/core.py?L2990-3050)\n- [repo:^github.com/sg-evals/click--8.2.1$ _flag_needs_value](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fclick--8.2.1$%20_flag_needs_value)\n- [repo:^github.com/sg-evals/click--8.2.1$ Sentinel UNSET](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fclick--8.2.1$%20Sentinel%20UNSET)\n- [repo:^github.com/sg-evals/click--8.2.1$ callback invoke parameter value](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fclick--8.2.1$%20callback%20invoke%20parameter%20value)\n- [github.com/sg-evals/click--8.2.1/src/click/core.py@29f1b4b?L2550-2600](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/core.py?L2550-2600)\n- [repo:^github.com/sg-evals/click--8.2.1$ def process_value file:core.py](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fclick--8.2.1$%20def%20process_value%20file:core.py)\n- [github.com/sg-evals/click--8.2.1/src/click/core.py@29f1b4b?L2100-2200](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/core.py?L2100-2200)\n- [github.com/sg-evals/click--8.2.1/src/click/core.py@29f1b4b?L2348-2430](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/core.py?L2348-2430)\n- [repo:^github.com/sg-evals/click--8.2.1$ def type_cast_value file:core.py](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fclick--8.2.1$%20def%20type_cast_value%20file:core.py)\n- [repo:^github.com/sg-evals/click--8.2.1$ def consume_value file:core.py](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fclick--8.2.1$%20def%20consume_value%20file:core.py)\n- [github.com/sg-evals/click--8.2.1/src/click/core.py@29f1b4b?L2267-2350](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/core.py?L2267-2350)\n- [github.com/sg-evals/click--8.2.1/src/click/core.py@29f1b4b?L2288-2348](/github.com/sg-evals/click--8.2.1@29f1b4bccb4aded983b3404bc78f3c1e77deada8/-/blob/src/click/core.py?L2288-2348)\n- [github.com/sg-evals/click--8.2.1](/github.com/sg-evals/click--8.2.1)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "calibration-005",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 3,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "src/click/parser.py",
+    "src/click/core.py",
+    "github.com/sg-evals/click--8.2.1"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "calibration-005",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 3,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

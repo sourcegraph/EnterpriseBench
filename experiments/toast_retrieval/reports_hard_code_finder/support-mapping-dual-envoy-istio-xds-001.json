@@ -1,0 +1,214 @@
+{
+  "task_id": "support-mapping-dual-envoy-istio-xds-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.29.4",
+    "github.com/sg-evals/istio--1.21.1"
+  ],
+  "retrieved_paths": [
+    "source/common/listener_manager/lds_api.cc",
+    "source/common/listener_manager/listener_manager_impl.cc",
+    "source/common/listener_manager/listener_impl.h",
+    "source/common/listener_manager/listener_impl.cc",
+    "pilot/pkg/networking/core/configgen.go",
+    "pilot/pkg/bootstrap/discovery.go",
+    "pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/cds.go",
+    "pilot/pkg/xds/rds.go",
+    "pilot/pkg/xds/eds.go",
+    "pilot/pkg/xds/ads.go",
+    "pilot/pkg/xds/xdsgen.go",
+    "pilot/pkg/xds/discovery.go",
+    "pilot/pkg/xds/delta.go",
+    "architecture/networking/pilot.md",
+    "releasenotes/notes/xds-partial-full.yaml"
+  ],
+  "retrieved_paths_union": [
+    "source/common/listener_manager/lds_api.cc",
+    "source/common/listener_manager/listener_manager_impl.cc",
+    "source/common/listener_manager/listener_impl.h",
+    "source/common/listener_manager/listener_impl.cc",
+    "pilot/pkg/networking/core/configgen.go",
+    "pilot/pkg/bootstrap/discovery.go",
+    "pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/cds.go",
+    "pilot/pkg/xds/rds.go",
+    "pilot/pkg/xds/eds.go",
+    "pilot/pkg/xds/ads.go",
+    "pilot/pkg/xds/xdsgen.go",
+    "pilot/pkg/xds/discovery.go",
+    "pilot/pkg/xds/delta.go",
+    "architecture/networking/pilot.md",
+    "releasenotes/notes/xds-partial-full.yaml"
+  ],
+  "required_files": [
+    "envoy/source/common/listener_manager/listener_manager_impl.cc",
+    "envoy/source/common/listener_manager/listener_impl.cc",
+    "istio/pilot/pkg/xds/ads.go",
+    "istio/pilot/pkg/xds/lds.go"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-envoy-istio-xds-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4144,
+      "10": 0.5446
+    },
+    "mrr": 0.5,
+    "map_score": 0.4481,
+    "file_recall": 1.0,
+    "context_efficiency": 0.25,
+    "n_retrieved": 16,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-envoy-istio-xds-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2961,
+      "5": 0.4144,
+      "10": 0.5446
+    },
+    "mrr": 0.5,
+    "map_score": 0.4481,
+    "file_recall": 1.0,
+    "context_efficiency": 0.25,
+    "n_retrieved": 16,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "elapsed_seconds": 30.0,
+  "response_chars": 8198,
+  "raw_response": "Pilot\u2019s full SotW push can regenerate/send LDS with a new `version_info` even when the serialized listener hash is unchanged; Envoy\u2019s LDS path still calls `addOrUpdateListener`, builds a replacement, warms it, then drains the old listener.\n\nRelevant files:\n\n- [envoy--v1.29.4:source/common/listener_manager/lds_api.cc?L44-L115](/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/lds_api.cc?L44-L115) - LDS `onConfigUpdate`; pauses RDS/SDS, removes resources, then calls `ListenerManager::addOrUpdateListener(listener, resource.version(), true)` for every received resource.\n- [envoy--v1.29.4:source/common/listener_manager/listener_manager_impl.cc?L449-L505](/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_manager_impl.cc?L449-L505) - Public `addOrUpdateListener`; resolves listener name and delegates to the internal update path.\n- [envoy--v1.29.4:source/common/listener_manager/listener_manager_impl.cc?L529-L627](/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_manager_impl.cc?L529-L627) - `addOrUpdateListenerInternal`; computes `MessageUtil::hash(config)` at L541, checks duplicate/locked updates, creates a new `ListenerImpl`, and places it in warming state when workers are running.\n- [envoy--v1.29.4:source/common/listener_manager/listener_manager_impl.cc?L764-L794](/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_manager_impl.cc?L764-L794) - `onListenerWarmed`; swaps the warmed listener active and calls `drainListener` on the prior active listener.\n- [envoy--v1.29.4:source/common/listener_manager/listener_manager_impl.cc?L640-L683](/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_manager_impl.cc?L640-L683) - `drainListener`; stops accepting on workers and starts the configured local drain sequence before removal.\n- [envoy--v1.29.4:source/common/listener_manager/listener_manager_impl.cc?L824-L850](/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_manager_impl.cc?L824-L850) - `drainFilterChains`; in-place filter-chain replacement path, starts draining affected filter chains.\n- [envoy--v1.29.4:source/common/listener_manager/listener_impl.h?L196-L210](/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_impl.h?L196-L210) - `ListenerImpl` constructor receives both `version_info` and the computed config `hash`; version is metadata, while hash is used for duplicate checking.\n- [envoy--v1.29.4:source/common/listener_manager/listener_impl.cc?L245-L280](/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_impl.cc?L245-L280) - `ListenerImpl` construction and stored listener update state.\n- [envoy--v1.29.4:source/common/listener_manager/listener_impl.cc?L961-L970](/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_impl.cc?L961-L970) - `newListenerWithFilterChain`, preserving listener metadata while creating an updated listener.\n- [envoy--v1.29.4:source/common/listener_manager/listener_impl.h?L249-L261](/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/listener_impl.h?L249-L261) - `localDrainManager()` and `versionInfo()` accessors.\n- [envoy--v1.29.4:source/common/listener_manager/lds_api.cc?L47-L54](/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/lds_api.cc?L47-L54) - ADS mux pauses dependent RDS/SDS types while LDS is applied, establishing the LDS/RDS dependency boundary.\n- [envoy--v1.29.4:source/common/listener_manager/lds_api.cc?L112-L115](/r/github.com/sg-evals/envoy--v1.29.4/-/blob/source/common/listener_manager/lds_api.cc?L112-L115) - LDS system version is updated only after at least one listener was applied.\n\n- [istio--1.21.1:pilot/pkg/networking/core/configgen.go?L27-L54](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/networking/core/configgen.go?L27-L54) - `ConfigGenerator` interface: `BuildListeners` (LDS), `BuildClusters` (CDS), and `BuildHTTPRoutes` (RDS).\n- [istio--1.21.1:pilot/pkg/bootstrap/discovery.go?L37-L48](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/bootstrap/discovery.go?L37-L48) - Registers LDS, CDS, RDS, and EDS generators with the DiscoveryServer.\n- [istio--1.21.1:pilot/pkg/xds/lds.go?L61-L109](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/lds.go?L61-L109) - `ldsNeedsPush` only suppresses non-full LDS pushes for normal proxies; `LdsGenerator.Generate` calls `ConfigGenerator.BuildListeners` and serializes every listener into `model.Resources`.\n- [istio--1.21.1:pilot/pkg/xds/cds.go?L84-L100](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/cds.go?L84-L100) - CDS generator calls `BuildClusters`; delta CDS uses `BuildDeltaClusters`.\n- [istio--1.21.1:pilot/pkg/xds/rds.go?L44-L70](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/rds.go?L44-L70) - RDS is likewise full-push gated and calls `BuildHTTPRoutes`.\n- [istio--1.21.1:pilot/pkg/xds/eds.go?L168-L228](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/eds.go?L168-L228) - EDS builds or retrieves endpoint resources, with partial/incremental endpoint optimization.\n- [istio--1.21.1:pilot/pkg/xds/ads.go?L741-L770](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/ads.go?L741-L770) - `pushConnection`; full pushes recompute proxy state, then iterate watched resources and invoke `pushXds`.\n- [istio--1.21.1:pilot/pkg/xds/ads.go?L776-L787](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/ads.go?L776-L787) - `PushOrder`: CDS, EDS, LDS, RDS, SDS. Thus LDS is sent after CDS/EDS and before RDS/SDS.\n- [istio--1.21.1:pilot/pkg/xds/ads.go?L986-L1015](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/ads.go?L986-L1015) - `pushDetails`/`orderWatchedResources` enforce the same type ordering per ADS connection.\n- [istio--1.21.1:pilot/pkg/xds/xdsgen.go?L93-L154](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/xdsgen.go?L93-L154) - `pushXds`; selects the generator, generates resources, and constructs the SotW `DiscoveryResponse` with `VersionInfo: req.Push.PushVersion`, nonce, and all generated resources.\n- [istio--1.21.1:pilot/pkg/xds/discovery.go?L270-L273](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/discovery.go?L270-L273) - Push processing allocates a new numeric version via `NextVersion()` and initializes a new `PushContext`.\n- [istio--1.21.1:pilot/pkg/xds/discovery.go?L491-L503](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/discovery.go?L491-L503) - `initPushContext` assigns the new `PushVersion` to the snapshot.\n- [istio--1.21.1:pilot/pkg/xds/ads.go?L839-L866](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/ads.go?L839-L866) - `AdsPushAll`; full snapshot pushes set `Full: true` and start ADS delivery to all clients.\n- [istio--1.21.1:pilot/pkg/xds/ads.go?L730-L738](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/ads.go?L730-L738) - Delta ADS entry point; Istio\u2019s implementation routes to `StreamDeltas`, while the comment notes DeltaAggregatedResources is not otherwise implemented as a separate aggregate path.\n- [istio--1.21.1:pilot/pkg/xds/delta.go?L461-L469](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/delta.go?L461-L469) - Delta generation dispatches to `GenerateDeltas` when supported, otherwise falls back to normal generation.\n- [istio--1.21.1:pilot/pkg/xds/delta.go?L481-L489](/r/github.com/sg-evals/istio--1.21.1/-/blob/pilot/pkg/xds/delta.go?L481-L489) - Delta response carries `SystemVersionInfo` and only generated resources/deletions.\n- [istio--1.21.1:architecture/networking/pilot.md?L167-L181](/r/github.com/sg-evals/istio--1.21.1/-/blob/architecture/networking/pilot.md?L167-L181) - Explains that `Full` means PushContext recomputation, while SotW root types such as CDS/LDS generally require the full resource set; Delta is intended to send changed resources but was not yet fully optimized.\n- [istio--1.21.1:releasenotes/notes/xds-partial-full.yaml?L1-L11](/r/github.com/sg-evals/istio--1.21.1/-/blob/releasenotes/notes/xds-partial-full.yaml?L1-L11) - Documents partial-full push optimization and its disable switch.",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-envoy-istio-xds-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 16,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "source/common/listener_manager/lds_api.cc",
+    "envoy/source/common/listener_manager/listener_manager_impl.cc",
+    "source/common/listener_manager/listener_impl.h",
+    "envoy/source/common/listener_manager/listener_impl.cc",
+    "pilot/pkg/networking/core/configgen.go",
+    "pilot/pkg/bootstrap/discovery.go",
+    "istio/pilot/pkg/xds/lds.go",
+    "pilot/pkg/xds/cds.go",
+    "pilot/pkg/xds/rds.go",
+    "pilot/pkg/xds/eds.go",
+    "istio/pilot/pkg/xds/ads.go",
+    "pilot/pkg/xds/xdsgen.go",
+    "pilot/pkg/xds/discovery.go",
+    "pilot/pkg/xds/delta.go",
+    "architecture/networking/pilot.md",
+    "releasenotes/notes/xds-partial-full.yaml"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-envoy-istio-xds-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 16,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

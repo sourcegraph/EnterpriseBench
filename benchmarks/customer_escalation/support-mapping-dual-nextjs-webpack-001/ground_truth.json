@@ -1,0 +1,53 @@
+{
+  "task_id": "support-mapping-dual-nextjs-webpack-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/vercel/next.js",
+      "rev": "v13.5.6",
+      "path": "nextjs"
+    },
+    {
+      "url": "https://github.com/webpack/webpack",
+      "rev": "v5.88.2",
+      "path": "webpack"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "packages/next/src/build/webpack-config.ts",
+      "repo": "nextjs",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "lib/NormalModuleFactory.js",
+      "repo": "webpack",
+      "confidence": 0.9,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "packages/next/src/build/webpack/plugins/next-trace-entrypoints-plugin.ts",
+      "repo": "nextjs",
+      "confidence": 0.75
+    },
+    {
+      "path": "lib/sharing/SharePlugin.js",
+      "repo": "webpack",
+      "confidence": 0.8
+    }
+  ],
+  "error_chain": [
+    "Next.js generates internal webpack config with react-dom resolve alias",
+    "Customer adds Module Federation plugin SharePlugin to share react-dom",
+    "Webpack resolver encounters two competing definitions for the react-dom module",
+    "NormalModuleFactory raises module resolution conflict during compilation"
+  ],
+  "trigger_conditions": [
+    "Next.js sets resolve.alias react-dom to vendored copy in webpack-config.ts",
+    "Module Federation registers react-dom in the shared scope via SharePlugin",
+    "The shared scope and the resolve.alias both resolve before NormalModuleFactory creates the module"
+  ]
+}

@@ -1,0 +1,102 @@
+# refactor_orchestration: Trace axum 0.7 Router generic changes requiring tower Servic
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "rust-async-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "refactor-dual-axum-tower-001"
+suite = "technical_debt"
+task_type = "refactor_orchestration"
+difficulty = "hard"
+estimated_duration_minutes = 40
+session_type = "single"
+description = "Trace axum 0.7 Router generic changes requiring tower Service adaptation"
+prompt = """
+axum 0.7 changed Router to remove its generic body parameter and
+switched to a new body type constraint model. This breaks tower
+middleware that wraps axum routers.
+
+Your task:
+1. Find where axum defines the Router type and its generic parameters
+2. Find where tower defines the Service trait and middleware patterns
+3. Identify how the Router generic change affects tower middleware composition
+4. Document refactoring steps for tower middleware to work with axum 0.7
+
+Write your analysis to /workspace/analysis/IMPACT_REPORT.md
+"""
+
+[[repos]]
+url = "https://github.com/tokio-rs/axum"
+rev = "axum-v0.7.0"
+path = "axum"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/tower-rs/tower"
+rev = "tower-0.4.13"
+path = "tower"
+role = "dependency"
+
+[metadata]
+languages = ["rust"]
+total_loc = 200_000
+dependency_depth = 2
+frameworks = ["axum", "tower"]
+multi_repo_pattern = "propagate"
+
+[[checkpoints]]
+name = "router_generics"
+weight = 0.35
+verifier = "checks/check_router_generics.sh"
+description = "Agent identifies Router generic changes"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "tower_service"
+weight = 0.35
+verifier = "checks/check_tower_service.sh"
+description = "Agent traces tower Service trait interaction"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "refactor_plan"
+weight = 0.30
+verifier = "checks/check_refactor_plan.sh"
+description = "Agent documents refactoring steps"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = ["migration_guide"]
+
+[tool_access]
+expected_mcp_benefit = "medium"
+mcp_benefit_rationale = "Trait-level search across repos helps trace Service impl boundaries"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "axum/axum/src/routing/mod.rs"
+repo = "axum"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "tower/tower/src/lib.rs"
+repo = "tower"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "axum/axum/src/middleware/mod.rs"
+repo = "axum"
+confidence = 0.8
+
+[[ground_truth.sufficient_files]]
+path = "tower/tower-layer/src/lib.rs"
+repo = "tower"
+confidence = 0.8

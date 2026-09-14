@@ -10,11 +10,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import math
-import re
 import statistics
 import sys
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -42,6 +40,7 @@ from eb_verify.score_contract import (  # noqa: E402
     format_unreadable_sample,
     read_task_score,
 )
+from lib.shared import split_variant_label  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -73,6 +72,7 @@ class TaskResult:
     languages: tuple[str, ...]
     agent_time: float | None  # seconds
     source_path: str
+    variant_label: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +89,7 @@ def infer_mode(result_path: Path, data: dict[str, Any]) -> str:
 
     # Infer from parent directory name
     parent = result_path.parent.name
+    parent_mode, _ = split_variant_label(parent)
     for suffix in ("_hybrid", "_mcp_only", "_baseline"):
         if parent.endswith(suffix):
             return suffix.lstrip("_")
@@ -107,8 +108,8 @@ def infer_mode(result_path: Path, data: dict[str, Any]) -> str:
             return "mcp_only"
 
     # Multi-mode layout: results/runs/<task_id>/<mode>/results.json
-    if parent in ("baseline", "mcp_only", "hybrid"):
-        return parent
+    if parent_mode in ("baseline", "mcp_only", "hybrid", "cli"):
+        return parent_mode
 
     # Default for results/runs/ (legacy single-mode layout)
     if "runs" in result_path.parts:
@@ -161,11 +162,30 @@ def _parse_toml_metadata(path: Path) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _result_variant_label(result_path: Path, data: dict[str, Any]) -> str | None:
+    """Read and validate the experiment label before score-contract parsing."""
+    config = data.get("config")
+    if not isinstance(config, dict):
+        config = {}
+    variant_label = config.get("variant_label")
+    if variant_label is None:
+        _, variant_label = split_variant_label(result_path.parent.name)
+    if variant_label is not None and (
+        not isinstance(variant_label, str) or not variant_label
+    ):
+        raise ValueError(
+            f"invalid config.variant_label in {result_path}: "
+            f"expected a non-empty string or null"
+        )
+    return variant_label
+
+
 def parse_result(
     result_path: Path,
     benchmarks_root: Path,
     *,
     allow_legacy: bool = False,
+    exclude_variant_labeled: bool = False,
 ) -> TaskResult | None:
     """Parse a single results.json into a TaskResult.
 
@@ -180,6 +200,10 @@ def parse_result(
         data = json.loads(result_path.read_text())
     except (json.JSONDecodeError, OSError) as exc:
         logger.warning("Skipping %s: %s", result_path, exc)
+        return None
+
+    variant_label = _result_variant_label(result_path, data)
+    if exclude_variant_labeled and variant_label is not None:
         return None
 
     task_id = data.get("task_id")
@@ -227,7 +251,6 @@ def parse_result(
         tm = load_task_metadata_from_toml(task_id, benchmarks_root)
 
     mode = infer_mode(result_path, data)
-
     agent_time = data.get("timing", {}).get("agent")
 
     return TaskResult(
@@ -246,6 +269,7 @@ def parse_result(
         languages=tuple(tm.get("languages", [])),
         agent_time=agent_time,
         source_path=str(result_path),
+        variant_label=variant_label,
     )
 
 
@@ -254,6 +278,7 @@ def load_all_results(
     benchmarks_root: Path,
     *,
     allow_legacy: bool = False,
+    include_variant_labeled: bool = False,
 ) -> list[TaskResult]:
     """Scan all results dirs, parse, and deduplicate.
 
@@ -274,7 +299,12 @@ def load_all_results(
             continue
         for rjson in rdir.rglob("results.json"):
             try:
-                tr = parse_result(rjson, benchmarks_root, allow_legacy=allow_legacy)
+                tr = parse_result(
+                    rjson,
+                    benchmarks_root,
+                    allow_legacy=allow_legacy,
+                    exclude_variant_labeled=not include_variant_labeled,
+                )
             except ScoreContractError:
                 unreadable.append(str(rjson))
                 continue
@@ -295,10 +325,11 @@ def load_all_results(
             f"under v{LEGACY_SCORE_CONTRACT_VERSION} semantics."
         )
 
-    # Deduplicate: same task_id + mode -> keep highest score
-    best: dict[tuple[str, str], TaskResult] = {}
+    # A variant label is part of run identity. When variants are included, a
+    # higher-scoring tuning run must not displace the ordinary comparison row.
+    best: dict[tuple[str, str, str | None], TaskResult] = {}
     for tr in all_results:
-        key = (tr.task_id, tr.mode)
+        key = (tr.task_id, tr.mode, tr.variant_label)
         if key not in best or tr.normalized_score > best[key].normalized_score:
             best[key] = tr
 
@@ -342,6 +373,15 @@ def by_mode(results: list[TaskResult]) -> dict[str, dict[str, Any]]:
     for r in results:
         buckets.setdefault(r.mode, []).append(r)
     return {mode: _dist_stats(rs) for mode, rs in sorted(buckets.items())}
+
+
+def by_variant(results: list[TaskResult]) -> dict[str, dict[str, Any]]:
+    """Summarize explicitly labeled experiment arms without mixing them."""
+    buckets: dict[str, list[TaskResult]] = {}
+    for result in results:
+        if result.variant_label is not None:
+            buckets.setdefault(result.variant_label, []).append(result)
+    return {label: _dist_stats(rows) for label, rows in sorted(buckets.items())}
 
 
 def by_group_and_mode(
@@ -536,8 +576,15 @@ def analyze(
     benchmarks_root: Path,
     *,
     allow_legacy: bool = False,
+    include_variant_labeled: bool = False,
 ) -> dict[str, Any]:
-    results = load_all_results(results_dirs, benchmarks_root, allow_legacy=allow_legacy)
+    results = load_all_results(
+        results_dirs,
+        benchmarks_root,
+        allow_legacy=allow_legacy,
+        include_variant_labeled=include_variant_labeled,
+    )
+    headline_results = [result for result in results if result.variant_label is None]
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -547,13 +594,14 @@ def analyze(
             LEGACY_SCORE_CONTRACT_VERSION if allow_legacy else SCORE_CONTRACT_VERSION
         ),
         "total_results": len(results),
-        "by_mode": by_mode(results),
-        "by_suite": by_group_and_mode(results, "suite"),
-        "by_difficulty": by_group_and_mode(results, "difficulty"),
-        "by_task_type": by_group_and_mode(results, "task_type"),
-        "mcp_delta": mcp_deltas(results),
-        "calibration_bias": calibration_bias(results),
-        "per_task": per_task_summary(results),
+        "by_mode": by_mode(headline_results),
+        "by_variant": by_variant(results),
+        "by_suite": by_group_and_mode(headline_results, "suite"),
+        "by_difficulty": by_group_and_mode(headline_results, "difficulty"),
+        "by_task_type": by_group_and_mode(headline_results, "task_type"),
+        "mcp_delta": mcp_deltas(headline_results),
+        "calibration_bias": calibration_bias(headline_results),
+        "per_task": per_task_summary(headline_results),
     }
 
 
@@ -611,6 +659,15 @@ def main(argv: list[str] | None = None) -> None:
         ),
     )
     parser.add_argument(
+        "--include-variant-labeled",
+        action="store_true",
+        help=(
+            "Include labeled experiment runs and summarize them separately "
+            "under by_variant. Headline mode and MCP comparisons remain "
+            "restricted to unlabeled runs."
+        ),
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -635,6 +692,7 @@ def main(argv: list[str] | None = None) -> None:
             args.results_dirs,
             args.benchmarks_root,
             allow_legacy=args.legacy_score_contract,
+            include_variant_labeled=args.include_variant_labeled,
         )
     except ScoreContractError as exc:
         # An expected, actionable condition — the message already names the
@@ -646,7 +704,7 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("Wrote %s", args.output)
 
     # Print summary to stdout
-    print(f"\n=== EnterpriseBench Score Analysis ===")
+    print("\n=== EnterpriseBench Score Analysis ===")
     print(f"Total results: {report['total_results']}")
     print()
     for mode, stats in report["by_mode"].items():
@@ -656,6 +714,14 @@ def main(argv: list[str] | None = None) -> None:
             f"std={stats['std']:.3f}  pass_rate={stats['pass_rate']:.2f}"
         )
     print()
+    for label, stats in report["by_variant"].items():
+        print(
+            f"  variant:{label}  n={stats['count']:3d}  "
+            f"mean={stats['mean']:.3f}  median={stats['median']:.3f}  "
+            f"std={stats['std']:.3f}  pass_rate={stats['pass_rate']:.2f}"
+        )
+    if report["by_variant"]:
+        print()
 
     delta = report["mcp_delta"]
     for label, key in [

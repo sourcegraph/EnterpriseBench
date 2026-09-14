@@ -1,0 +1,43 @@
+{
+  "task_id": "dep-graph-dual-prometheus-thanos-001",
+  "task_type": "dependency_graph",
+  "repos": [
+    {
+      "url": "https://github.com/prometheus/prometheus",
+      "rev": "v2.47.0",
+      "path": "prometheus"
+    },
+    {
+      "url": "https://github.com/thanos-io/thanos",
+      "rev": "v0.32.0",
+      "path": "thanos"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "prometheus/tsdb/db.go",
+      "repo": "prometheus",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "thanos/pkg/shipper/shipper.go",
+      "repo": "thanos",
+      "confidence": 0.9,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "prometheus/tsdb/compact.go",
+      "repo": "prometheus",
+      "confidence": 0.85
+    },
+    {
+      "path": "thanos/pkg/store/prometheus.go",
+      "repo": "thanos",
+      "confidence": 0.8
+    }
+  ],
+  "dependency_type": "storage_api"
+}

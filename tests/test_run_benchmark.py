@@ -6,11 +6,13 @@ import json
 from pathlib import Path
 
 import pytest
+from unittest.mock import patch
 
 # Import the module under test
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
+import run_benchmark
 from run_benchmark import (
     TaskInfo,
     TaskResult,
@@ -18,6 +20,8 @@ from run_benchmark import (
     is_task_completed,
     filter_completed_tasks,
     build_parser,
+    filter_tasks,
+    manifest_task_ids,
     write_summary,
     main,
     PROJECT_ROOT,
@@ -370,3 +374,106 @@ class TestExtractCostFromResult:
             results_dir=tmp_path / "results" / "runs",
             mode="mcp_only",
         ) == pytest.approx(2.50)
+
+
+# ---------------------------------------------------------------------------
+# Manifest filter (curated slice dispatch)
+# ---------------------------------------------------------------------------
+
+def test_manifest_task_ids_strips_the_suite_qualifier(tmp_path: Path) -> None:
+    manifest = tmp_path / "slice.json"
+    manifest.write_text(
+        json.dumps({"tasks": ["incident_response/opa-001", "technical_debt/babel-001"]})
+    )
+    assert manifest_task_ids(manifest) == {"opa-001", "babel-001"}
+
+
+def test_filter_tasks_keeps_only_manifest_members() -> None:
+    tasks = [_make_task_info("a-001"), _make_task_info("b-002"), _make_task_info("c-003")]
+    kept = filter_tasks(tasks, task_ids={"a-001", "c-003"})
+    assert [t.task_id for t in kept] == ["a-001", "c-003"]
+
+
+def test_filter_tasks_without_a_manifest_keeps_everything() -> None:
+    tasks = [_make_task_info("a-001"), _make_task_info("b-002")]
+    assert len(filter_tasks(tasks, task_ids=None)) == 2
+
+
+def test_manifest_naming_a_task_that_does_not_exist_yields_nothing() -> None:
+    """Manifest drift must show as an empty run, not a silent full-corpus run."""
+    tasks = [_make_task_info("a-001")]
+    assert filter_tasks(tasks, task_ids={"absent-999"}) == []
+
+
+def test_manifest_filter_composes_with_the_other_filters() -> None:
+    tasks = [
+        _make_task_info("a-001", difficulty="hard"),
+        _make_task_info("b-002", difficulty="medium"),
+    ]
+    kept = filter_tasks(tasks, task_ids={"a-001", "b-002"}, difficulty="hard")
+    assert [t.task_id for t in kept] == ["a-001"]
+
+
+class TestRetiredAccountsAreNotDispatchedTo:
+    """A retired account must leave the round-robin, not just look unhealthy.
+
+    account2's organization has Claude Code subscription access disabled. Its
+    OAuth token still validates, so check_infra.py reported it ready while
+    every run assigned to it died on an HTTP 403 in under ten seconds. Left in
+    a five-account round-robin that silently costs every fifth task in a
+    sweep, and the losses read as task failures rather than as one dead
+    account.
+    """
+
+    def test_a_retired_account_is_dropped_from_a_range(self, monkeypatch) -> None:
+        monkeypatch.setattr(run_benchmark, "retired_accounts", lambda: frozenset({"account2"}))
+
+        assert run_benchmark.parse_accounts("1-5") == [1, 3, 4, 5]
+
+    def test_live_accounts_are_untouched(self, monkeypatch) -> None:
+        monkeypatch.setattr(run_benchmark, "retired_accounts", lambda: frozenset({"account2"}))
+
+        assert run_benchmark.parse_accounts("1,3,5") == [1, 3, 5]
+        assert run_benchmark.parse_accounts("4") == [4]
+
+    def test_an_all_retired_spec_refuses_rather_than_running_nothing(
+        self, monkeypatch
+    ) -> None:
+        """Returning [] here would dispatch with no account at all."""
+        monkeypatch.setattr(run_benchmark, "retired_accounts", lambda: frozenset({"account2"}))
+
+        with pytest.raises(SystemExit, match="retired"):
+            run_benchmark.parse_accounts("2")
+
+    def test_no_account_spec_still_means_no_accounts(self, monkeypatch) -> None:
+        monkeypatch.setattr(run_benchmark, "retired_accounts", lambda: frozenset({"account2"}))
+
+        assert run_benchmark.parse_accounts(None) == []
+
+    def test_account2_is_retired_in_the_shipped_config(self) -> None:
+        """The declaration itself, not a fixture of it."""
+        assert "account2" in run_benchmark.retired_accounts()
+
+
+class TestRetiredAccountsAreInvisibleToReadiness:
+    """Readiness output must not advertise capacity that 403s on first call.
+
+    account2's token validates indefinitely, so the token-expiry checks in
+    check_infra reported it healthy and counted its six slots as available
+    right up to the sweep that lost ten minutes to it.
+    """
+
+    def test_discovery_skips_retired_account_homes(self, tmp_path) -> None:
+        import sys
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "infra"))
+        import account_health
+
+        homes = tmp_path / ".claude-homes"
+        for name in ("account1", "account2", "account3"):
+            (homes / name).mkdir(parents=True)
+
+        with patch.object(account_health, "_retired_accounts", return_value=frozenset({"account2"})):
+            discovered = [path.name for path in account_health.discover_managed_account_homes(tmp_path)]
+
+        assert discovered == ["account1", "account3"]

@@ -1,0 +1,70 @@
+{
+  "task_id": "support-mapping-dual-sqlalchemy-alembic-metadata-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/sqlalchemy/sqlalchemy",
+      "rev": "rel_2_0_29",
+      "path": "sqlalchemy"
+    },
+    {
+      "url": "https://github.com/sqlalchemy/alembic",
+      "rev": "rel_1_13_1",
+      "path": "alembic"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "alembic/alembic/autogenerate/compare.py",
+      "repo": "alembic",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "alembic/alembic/runtime/environment.py",
+      "repo": "alembic",
+      "confidence": 0.85,
+      "source": "deterministic"
+    },
+    {
+      "path": "sqlalchemy/lib/sqlalchemy/orm/decl_api.py",
+      "repo": "sqlalchemy",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "sqlalchemy/lib/sqlalchemy/sql/schema.py",
+      "repo": "sqlalchemy",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "alembic/alembic/autogenerate/api.py",
+      "repo": "alembic",
+      "confidence": 0.75
+    },
+    {
+      "path": "sqlalchemy/lib/sqlalchemy/orm/decl_base.py",
+      "repo": "sqlalchemy",
+      "confidence": 0.7
+    }
+  ],
+  "error_chain": [
+    "Customer's env.py imports target_metadata from a single module; Alembic's environment.py passes it to context.configure",
+    "SQLAlchemy 2.0's DeclarativeBase, when subclassed in a different module, creates a NEW MetaData instance unless explicitly sharing one via metadata=Base.metadata",
+    "Alembic's compare.py walks target_metadata.tables and diffs against the live database; tables registered on OTHER MetaData instances are invisible to it",
+    "The autogenerate output is empty because most of the customer's model classes ended up on a different DeclarativeBase whose MetaData was never passed to env.py"
+  ],
+  "trigger_conditions": [
+    "Customer split models across modules and each module declared its own DeclarativeBase subclass without sharing metadata",
+    "SQLAlchemy 2.0's DeclarativeBase changed how class-level metadata is created vs 1.4's declarative_base() factory",
+    "Alembic's compare_metadata operates on a single MetaData; tables on disconnected instances are silently ignored"
+  ],
+  "expected_answer": {
+    "error_origin": "SQLAlchemy 2.0 DeclarativeBase creating per-subclass MetaData instances; Alembic's compare.py only sees the one passed via target_metadata",
+    "bypass_reason": "Alembic does not enumerate all DeclarativeBase subclasses; it trusts target_metadata to be the union",
+    "correct_config": "Use a single DeclarativeBase across modules and import all model modules into env.py before passing target_metadata, OR explicitly construct a combined MetaData and pass that"
+  }
+}

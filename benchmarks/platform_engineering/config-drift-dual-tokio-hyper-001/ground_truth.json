@@ -1,0 +1,52 @@
+{
+  "task_id": "config-drift-dual-tokio-hyper-001",
+  "task_type": "config_drift",
+  "repos": [
+    {
+      "url": "https://github.com/tokio-rs/tokio",
+      "rev": "tokio-1.29.1",
+      "path": "tokio"
+    },
+    {
+      "url": "https://github.com/hyperium/hyper",
+      "rev": "v1.0.0-rc.4",
+      "path": "hyper"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "tokio/src/runtime/builder.rs",
+      "repo": "tokio",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "src/server/conn/http1.rs",
+      "repo": "hyper",
+      "confidence": 0.9,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "tokio/src/runtime/config.rs",
+      "repo": "tokio",
+      "confidence": 0.85
+    },
+    {
+      "path": "src/server/conn/http2.rs",
+      "repo": "hyper",
+      "confidence": 0.8
+    }
+  ],
+  "expected_config_terms": [
+    "worker_threads",
+    "max_blocking_threads",
+    "num_cpus",
+    "keep_alive",
+    "http1::Builder",
+    "serve_connection",
+    "spawn",
+    "multi_thread"
+  ]
+}

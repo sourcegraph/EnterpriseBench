@@ -1,0 +1,184 @@
+{
+  "task_id": "err-provenance-03",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/kubernetes--v1.32.0"
+  ],
+  "retrieved_paths": [
+    "pkg/registry/core/rest/storage_core.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "staging/src/k8s.io/apiserver/pkg/server/hooks.go",
+    "staging/src/k8s.io/apiserver/pkg/server/healthz.go",
+    "pkg/controlplane/instance.go",
+    "test/e2e/apimachinery/health_handlers.go",
+    "plugin/pkg/admission/namespace/exists/admission.go"
+  ],
+  "retrieved_paths_union": [
+    "pkg/registry/core/rest/storage_core.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "staging/src/k8s.io/apiserver/pkg/server/hooks.go",
+    "staging/src/k8s.io/apiserver/pkg/server/healthz.go",
+    "pkg/controlplane/instance.go",
+    "test/e2e/apimachinery/health_handlers.go",
+    "plugin/pkg/admission/namespace/exists/admission.go"
+  ],
+  "required_files": [
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip_test.go"
+  ],
+  "ir_scores": {
+    "task_id": "err-provenance-03",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 7,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "err-provenance-03",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 7,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 18.1,
+  "response_chars": 3451,
+  "raw_response": "The failure originates in the legacy service allocator hook. During startup, the repair controllers must complete their first successful reconciliation before the hook finishes; API requests made while readiness is incomplete can be rejected, preventing that reconciliation from completing.\n\nRelevant files:\n\n- [sg-evals/kubernetes--v1.32.0:pkg/registry/core/rest/storage_core.go?L498-L539](/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/pkg/registry/core/rest/storage_core.go?L498-L539) - Registers `start-service-ip-repair-controllers`, starts ClusterIP and NodePort repair loops, waits up to one minute, and generates `unable to perform initial IP and Port allocation check`.\n- [sg-evals/kubernetes--v1.32.0:pkg/registry/core/rest/storage_core.go?L120-L138](/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/pkg/registry/core/rest/storage_core.go?L120-L138) - Constructs the IP and port repair controllers and their `RunUntil` callbacks.\n- [sg-evals/kubernetes--v1.32.0:pkg/registry/core/service/ipallocator/controller/repairip.go?L193-L228](/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/pkg/registry/core/service/ipallocator/controller/repairip.go?L193-L228) - Waits for Service, ServiceCIDR, and IPAddress informer sync; waits for the default ServiceCIDR; runs the initial repair; invokes the success callback only afterward.\n- [sg-evals/kubernetes--v1.32.0:pkg/registry/core/service/ipallocator/controller/repairip.go?L203-L218](/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/pkg/registry/core/service/ipallocator/controller/repairip.go?L203-L218) - Shows the initial synchronization dependency that can stall during mixed-version startup.\n- [sg-evals/kubernetes--v1.32.0:staging/src/k8s.io/apiserver/pkg/server/hooks.go?L155-L207](/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/staging/src/k8s.io/apiserver/pkg/server/hooks.go?L155-L207) - Runs post-start hooks asynchronously and logs/fatals on hook errors; the hook\u2019s `done` channel is closed only after successful completion.\n- [sg-evals/kubernetes--v1.32.0:staging/src/k8s.io/apiserver/pkg/server/hooks.go?L222-L245](/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/staging/src/k8s.io/apiserver/pkg/server/hooks.go?L222-L245) - Implements the corresponding health check, returning `not finished` until the hook completes.\n- [sg-evals/kubernetes--v1.32.0:staging/src/k8s.io/apiserver/pkg/server/healthz.go?L85-L110](/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/staging/src/k8s.io/apiserver/pkg/server/healthz.go?L85-L110) - Documents and registers boot-sequence checks for `/readyz`; readiness has no grace period.\n- [sg-evals/kubernetes--v1.32.0:pkg/controlplane/instance.go?L347-L372](/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/pkg/controlplane/instance.go?L347-L372) - Shows related service bootstrap and ServiceCIDR startup ordering.\n- [sg-evals/kubernetes--v1.32.0:test/e2e/apimachinery/health_handlers.go?L41-L103](/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/test/e2e/apimachinery/health_handlers.go?L41-L103) - Expected `/readyz` output, including `informer-sync` and `poststarthook/start-service-ip-repair-controllers`.\n- [sg-evals/kubernetes--v1.32.0:plugin/pkg/admission/namespace/exists/admission.go?L60-L70](/r/github.com/sg-evals/kubernetes--v1.32.0/-/blob/plugin/pkg/admission/namespace/exists/admission.go?L60-L70) - Example of the `not yet ready to handle request` forbidden response emitted when an admission plugin\u2019s readiness gate is false.",
+  "ir_scores_unaligned": {
+    "task_id": "err-provenance-03",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 7,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "pkg/registry/core/rest/storage_core.go",
+    "pkg/registry/core/service/ipallocator/controller/repairip.go",
+    "staging/src/k8s.io/apiserver/pkg/server/hooks.go",
+    "staging/src/k8s.io/apiserver/pkg/server/healthz.go",
+    "pkg/controlplane/instance.go",
+    "test/e2e/apimachinery/health_handlers.go",
+    "plugin/pkg/admission/namespace/exists/admission.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "err-provenance-03",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 7,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

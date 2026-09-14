@@ -1,0 +1,179 @@
+{
+  "task_id": "err-provenance-tri-httpx-proxy-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/httpx--0.27.0",
+    "github.com/sg-evals/httpcore--1.0.5",
+    "github.com/sg-evals/h11--v0.14.0"
+  ],
+  "retrieved_paths": [
+    "h11/_connection.py",
+    "httpx/_transports/default.py",
+    "httpcore/_async/http_proxy.py",
+    "httpcore/_async/http11.py"
+  ],
+  "retrieved_paths_union": [
+    "h11/_connection.py",
+    "httpx/_transports/default.py",
+    "httpcore/_async/http_proxy.py",
+    "httpcore/_async/http11.py"
+  ],
+  "required_files": [
+    "httpx/httpx/_transports/default.py",
+    "httpcore/httpcore/_async/http_proxy.py",
+    "httpcore/httpcore/_async/http11.py",
+    "h11/h11/_connection.py"
+  ],
+  "ir_scores": {
+    "task_id": "err-provenance-tri-httpx-proxy-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.8889,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 4,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "ir_scores_union": {
+    "task_id": "err-provenance-tri-httpx-proxy-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 0.8,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.8571,
+      "5": 0.8889,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 1.0,
+    "n_retrieved": 4,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "elapsed_seconds": 110.3,
+  "response_chars": 12578,
+  "raw_response": "---\ntitle: Trace httpx \u201cpeer unexpectedly closed connection\u201d through proxy CONNECT tunnel\nshare_url: https://demo.sourcegraph.com/deepsearch/da5296f3-ec99-4f68-b09a-e85fc0c11fae\nurl: https://demo.sourcegraph.com/deepsearch/2238\ncreated: 2026-08-18T02:12:42Z\nupdated: 2026-08-18T02:14:32Z\n---\n\n# # Trace 'peer unexpectedly closed connection' from a proxied httpx client through httpcore's CONNECT tunnel to its origin\n\nA customer's platform team runs async httpx workers inside a locked-down\ndatacenter where all egress traverses a corporate HTTP proxy. Their client:\n\n    client = httpx.AsyncClient(\n        proxy=\"http://proxy.internal.example-corp.net:3128\",\n        timeout=httpx.Timeout(120.0),\n    )\n    resp = await client.get(\"https://reports.vendor-api.com/v2/export/full.csv\")\n\nLarge exports intermittently fail with:\n\n    httpx.RemoteProtocolError: peer unexpectedly closed connection\n\nThe vendor's API team checked their access logs: every request from this\ncustomer shows a 200 with the full body written. From a jump host that\nbypasses the proxy the same download always succeeds. The customer is\nescalating because the error text blames the \"peer\" -- they read that as\nhttpx accusing the vendor API of closing the connection, which the vendor\ndenies. Nobody on the customer side can say which component actually\ngenerates this message.\n\nYour task:\n\n1. Locate the exact origin of the message text \"peer unexpectedly closed\n   connection\" -- which repository, file, and function raise it, and the\n   precise receive-buffer/state condition that triggers it.\n2. Trace how a proxied httpx request wires that parser into the stack: the\n   AsyncHTTPTransport branch that constructs the proxy connection pool for\n   http/https proxy URLs, the tunnel connection class that issues the CONNECT\n   request to the proxy, and the HTTP/1.1 connection layer that instantiates\n   the parser state machine over the tunneled stream. Cite the file and the\n   class or function responsible at each step.\n3. Explain every exception-translation layer between the origin and what the\n   customer sees: the mapping applied around next_event() in the HTTP/1.1\n   connection layer, and the httpx-side context manager and exception table\n   that produce httpx.RemoteProtocolError.\n4. Explain the trigger conditions: when does this exact message fire versus\n   the alternative \"Server disconnected without sending a response.\" raised\n   one layer up (including the their_state check that separates the two\n   cases), and which network hop -- the origin server or the corporate\n   proxy -- is actually the \"peer\" closing the tunneled connection in this\n   deployment.\n\n- Source files across all three repositories on the failure path\n- The full error chain from the public httpx API down to the origin of the\n  message text and back up through both translation layers\n- Trigger conditions distinguishing the two disconnect messages\n\nIn answer.json, alongside your analysis fields, include a top-level\n\"citations\" list with one entry per cited file:\n{\"repo\": ..., \"file\": ..., \"evidence_span\": ...} -- where \"repo\" is the\nrepository directory (httpx, httpcore, or h11), \"file\" is the path inside\nthat repository, and \"evidence_span\" is a verbatim excerpt copied from the\ncited file (at least 20 characters). Paraphrased or fabricated spans fail\nverification.\n\n\nSearch only these repositories: github.com/sg-evals/httpx--0.27.0, github.com/sg-evals/httpcore--1.0.5, github.com/sg-evals/h11--v0.14.0\n\nHere is the full analysis, with all citations backed by verbatim code spans.\n\n---\n\n## 1. Origin of \"peer unexpectedly closed connection\"\n\n**Repo:** h11 | **File:** [`h11/_connection.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/h11--v0.14.0/-/blob/h11/_connection.py?L426-L489) | **Function:** `Connection.next_event()`\n\nThe raise is at [line 482](https://demo.sourcegraph.com/r/github.com/sg-evals/h11--v0.14.0/-/blob/h11/_connection.py?L479-L482):\n\n```python\nif self._receive_buffer_closed:\n    # We're still trying to complete some event, but that's\n    # never going to happen because no more data is coming\n    raise RemoteProtocolError(\"peer unexpectedly closed connection\")\n```\n\n**Trigger condition:** `next_event()` calls `_extract_next_receive_event()`, which returns `NEED_DATA` because the response body parser still requires more bytes. Back in `next_event()`, the `NEED_DATA` branch is entered. `_receive_buffer_closed` is `True` (set by `receive_data(b\"\")` when the caller passed an empty read, signalling TCP EOF). This means parsing is stuck mid-response with no more data coming \u2014 so the error fires. Crucially, some response bytes have already been parsed (status line + headers at minimum), because otherwise a different check fires first (see \u00a74).\n\n---\n\n## 2. Proxy wiring \u2014 the full stack\n\n### Step 1 \u2014 `AsyncHTTPTransport` selects the proxy pool\n[`httpx/_transports/default.py` lines 293-310](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_transports/default.py?L293-L310)\n\nWhen `proxy.url.scheme in (\"http\", \"https\")`, `AsyncHTTPTransport.__init__` constructs `httpcore.AsyncHTTPProxy(...)`. All subsequent `handle_async_request()` calls are wrapped in `map_httpcore_exceptions()`.\n\n### Step 2 \u2014 `AsyncHTTPProxy.create_connection` picks the tunnel branch\n[`httpcore/_async/http_proxy.py` lines 147-167](https://demo.sourcegraph.com/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http_proxy.py?L147-L167)\n\n```python\ndef create_connection(self, origin: Origin) -> AsyncConnectionInterface:\n    if origin.scheme == b\"http\":\n        return AsyncForwardHTTPConnection(...)   # plain forward\n    return AsyncTunnelHTTPConnection(...)        # HTTPS \u2192 CONNECT tunnel\n```\n\nBecause the target is `https://reports.vendor-api.com`, the HTTPS branch is taken and an `AsyncTunnelHTTPConnection` is returned.\n\n### Step 3 \u2014 `AsyncTunnelHTTPConnection` issues CONNECT, upgrades to TLS, instantiates HTTP/1.1\n[`httpcore/_async/http_proxy.py` lines 266-344](https://demo.sourcegraph.com/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http_proxy.py?L266-L344)\n\n1. Sends a `CONNECT reports.vendor-api.com:443 HTTP/1.1` request to the proxy via an inner `AsyncHTTPConnection`.\n2. Reads back the `200 Connection established` response; extracts `network_stream` from `connect_response.extensions[\"network_stream\"]`.\n3. Calls `stream.start_tls(...)` on that stream to establish TLS *through the tunnel*.\n4. Constructs `AsyncHTTP11Connection(origin=self._remote_origin, stream=stream, ...)` (line 337) over the tunneled TLS stream.\n\n### Step 4 \u2014 `AsyncHTTP11Connection` wires h11\n[`httpcore/_async/http11.py` lines 54-70](https://demo.sourcegraph.com/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http11.py?L54-L70)\n\n```python\nself._h11_state = h11.Connection(\n    our_role=h11.CLIENT,\n    max_incomplete_event_size=self.MAX_INCOMPLETE_EVENT_SIZE,\n)\n```\n\n`_receive_event()` drives the loop: `self._h11_state.next_event()` \u2192 if `NEED_DATA` \u2192 `self._network_stream.read(...)` \u2192 `self._h11_state.receive_data(data)`.\n\n---\n\n## 3. Exception translation layers\n\n### Layer 1 \u2014 httpcore maps `h11.RemoteProtocolError` \u2192 `httpcore.RemoteProtocolError`\n[`httpcore/_async/http11.py` line 220](https://demo.sourcegraph.com/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http11.py?L219-L221)\n\n```python\nwith map_exceptions({h11.RemoteProtocolError: RemoteProtocolError}):\n    event = self._h11_state.next_event()\n```\n\n`map_exceptions` re-raises `h11.RemoteProtocolError` as `httpcore.RemoteProtocolError` with the identical message string.\n\n### Layer 2 \u2014 httpx maps `httpcore.RemoteProtocolError` \u2192 `httpx.RemoteProtocolError`\n[`httpx/_transports/default.py` lines 66-104](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_transports/default.py?L66-L104)\n\n`map_httpcore_exceptions()` iterates `HTTPCORE_EXC_MAP` and picks the most specific match. The table entry `httpcore.RemoteProtocolError: RemoteProtocolError` at line 103 fires. The exception is re-raised as `httpx.RemoteProtocolError(str(exc)) from exc` \u2014 again preserving the message verbatim.\n\nThe context manager is applied in two places:\n- `handle_async_request()` (line 372) \u2014 catches errors during header exchange.\n- `AsyncResponseStream.__aiter__()` (line 253) \u2014 catches errors during **body streaming**, which is where the customer's intermittent failure occurs.\n\n**Full chain:**\n```\nh11.RemoteProtocolError(\"peer unexpectedly closed connection\")\n  \u2192 [map_exceptions, httpcore/_async/http11.py:220]\n  \u2192 httpcore.RemoteProtocolError(\"peer unexpectedly closed connection\")\n  \u2192 [map_httpcore_exceptions, httpx/_transports/default.py:253]\n  \u2192 httpx.RemoteProtocolError(\"peer unexpectedly closed connection\")\n```\n\n---\n\n## 4. Trigger conditions \u2014 two disconnect messages and which peer is guilty\n\n### The `their_state` branch that separates the two messages\n[`httpcore/_async/http11.py` lines 223-240](https://demo.sourcegraph.com/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http11.py?L223-L240)\n\n```python\nif event is h11.NEED_DATA:\n    data = await self._network_stream.read(self.READ_NUM_BYTES, timeout=timeout)\n\n    if data == b\"\" and self._h11_state.their_state == h11.SEND_RESPONSE:\n        msg = \"Server disconnected without sending a response.\"\n        raise RemoteProtocolError(msg)\n\n    self._h11_state.receive_data(data)\n```\n\n| Condition | Message | Meaning |\n|---|---|---|\n| EOF received AND `their_state == h11.SEND_RESPONSE` | `\"Server disconnected without sending a response.\"` | Connection dropped before **any** response bytes arrived \u2014 not even the status line. Raised by httpcore directly, bypassing h11. |\n| EOF received AND `their_state != h11.SEND_RESPONSE` (e.g., `SEND_BODY`) | `\"peer unexpectedly closed connection\"` | Partial response received (headers OK), stream closed mid-body. Raised by h11 inside `next_event()`. |\n\n### Which \"peer\" is actually closing the connection\n\nThe `AsyncHTTP11Connection` in play is the one created in step 3 above, whose `_network_stream` is the **TLS stream obtained from the CONNECT tunnel** \u2014 i.e., its TCP peer is the **corporate proxy**, not the vendor origin server. The vendor's access logs confirm complete responses; the proxy is terminating the tunnel toward the client before all body bytes are forwarded. Likely causes: a proxy-side body-size limit, a tunnel idle/keepalive timeout triggered during slow streaming of a large CSV, or a proxy memory/buffer limit causing the tunnel to be reset mid-transfer.\n\nThe error message says \"peer\" \u2014 but \"peer\" from h11/httpcore's perspective is whoever is on the other end of the socket that `AsyncHTTP11Connection` holds, which is the **proxy**. The vendor is not the peer in this topology.\n\n---\n\nThe `answer.json` file with full structured analysis and 14 verbatim citation spans is available for download above.\n\n## Sources\n\n- [repo:^github.com/sg-evals/h11--v0.14.0$ \"peer unexpectedly closed connection\"](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fh11--v0.14.0$%20%22peer%20unexpectedly%20closed%20connection%22)\n- [repo:^github.com/sg-evals/httpcore--1.0.5$ AsyncHTTPProxy tunnel CONNECT](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fhttpcore--1.0.5$%20AsyncHTTPProxy%20tunnel%20CONNECT)\n- [repo:^github.com/sg-evals/httpx--0.27.0$ RemoteProtocolError exception map](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fhttpx--0.27.0$%20RemoteProtocolError%20exception%20map)\n- [github.com/sg-evals/h11--v0.14.0/h11/_connection.py@270c515?L455-500](/github.com/sg-evals/h11--v0.14.0@270c51553c58d3393878ba8ae89a8c336457572a/-/blob/h11/_connection.py?L455-500)\n- [github.com/sg-evals/httpcore--1.0.5/httpcore/_async/http_proxy.py@21db646](/github.com/sg-evals/httpcore--1.0.5@21db64629e9da54f3cc544c0ec9c68bfbc1491d8/-/blob/httpcore/_async/http_proxy.py)\n- [github.com/sg-evals/httpx--0.27.0/httpx/_transports/default.py@3a7d067](/github.com/sg-evals/httpx--0.27.0@3a7d0672239ee8b616ccf2861607b21bc9598a05/-/blob/httpx/_transports/default.py)\n- [github.com/sg-evals/httpcore--1.0.5/httpcore/_async/http11.py@21db646](/github.com/sg-evals/httpcore--1.0.5@21db64629e9da54f3cc544c0ec9c68bfbc1491d8/-/blob/httpcore/_async/http11.py)\n- [github.com/sg-evals/h11--v0.14.0/h11/_connection.py@270c515?L380-460](/github.com/sg-evals/h11--v0.14.0@270c51553c58d3393878ba8ae89a8c336457572a/-/blob/h11/_connection.py?L380-460)\n\n\nGenerated files:\n- files/answer.json: /.api/agent-files/v1/deep-search/da5296f3-ec99-4f68-b09a-e85fc0c11fae/files/answer.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "err-provenance-tri-httpx-proxy-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.3904
+    },
+    "mrr": 1.0,
+    "map_score": 0.25,
+    "file_recall": 0.25,
+    "context_efficiency": 0.25,
+    "n_retrieved": 4,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "h11/h11/_connection.py",
+    "httpx/httpx/_transports/default.py",
+    "httpcore/httpcore/_async/http_proxy.py",
+    "httpcore/httpcore/_async/http11.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "err-provenance-tri-httpx-proxy-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.3904
+    },
+    "mrr": 1.0,
+    "map_score": 0.25,
+    "file_recall": 0.25,
+    "context_efficiency": 0.25,
+    "n_retrieved": 4,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

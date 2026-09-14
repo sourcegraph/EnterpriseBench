@@ -105,6 +105,8 @@ class TestConfigJsonSnapshot:
             timeout=600,
             memory_mb=4096,
             mode="mcp_only",
+            judge_model="cc:haiku",
+            judge_account=3,
         )
         result = _make_result()
         task_data = _make_task_data()
@@ -117,6 +119,8 @@ class TestConfigJsonSnapshot:
         assert data["timeout"] == 600
         assert data["memory_mb"] == 4096
         assert data["mode"] == "mcp_only"
+        assert data["judge_model"] == "cc:haiku"
+        assert data["judge_account"] == 3
 
     def test_config_json_excludes_sensitive_fields(self, tmp_path: Path) -> None:
         """config.json should not contain file paths or account numbers."""

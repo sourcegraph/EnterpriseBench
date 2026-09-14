@@ -1,0 +1,32 @@
+{
+  "task_id": "monorepo-boundary-babel-forof-004",
+  "checkpoints": {
+    "identify_affected_packages": {
+      "expected_solution": "Two unrelated bug fixes ship together in v7.23.6. PR #16166 fixes `retainLines` indentation in `@babel/generator` (`packages/babel-generator/src/printer.ts` plus its test in `packages/babel-generator/test/index.js`). PR #16011 fixes the `iterableIsArray` assumption in `@babel/plugin-transform-for-of` (`packages/babel-plugin-transform-for-of/src/index.ts`) when the iterable variable is shadowed inside the loop. Affected sibling packages: (1) `@babel/plugin-transform-for-of` itself (the source fix and fixture updates) and (2) `@babel/preset-env` because its integration fixtures `packages/babel-preset-env/test/fixtures/plugins-integration/for-of-array-block-scoping/` and `packages/babel-preset-env/test/fixtures/plugins-integration/for-of-array-block-scoping-2/` exercise the changed plugin and are regenerated.",
+      "evaluation_criteria": [
+        "Must identify @babel/plugin-transform-for-of as affected (source change in packages/babel-plugin-transform-for-of/src/index.ts)",
+        "Must identify @babel/preset-env as affected via its integration fixtures",
+        "Must reference packages/babel-generator/src/printer.ts as the retainLines fix site",
+        "Should note both PRs ride together in the v7.23.6 release"
+      ]
+    },
+    "classify_change_impact": {
+      "expected_solution": "Both changes are bug fixes — overall semver = **patch**. `@babel/generator` = patch (output of the printer is corrected only when `retainLines` is true; default `retainLines=false` paths are unchanged). `@babel/plugin-transform-for-of` = patch (correct transformation when iterable variable is reassigned/shadowed in the loop body — previously the optimization assumed array-ness incorrectly, producing wrong runtime behavior). `@babel/preset-env` = patch (no API changes; only integration test fixtures regenerated to match the corrected plugin output).",
+      "evaluation_criteria": [
+        "Must classify the overall release as `patch` and justify as bug-fix only",
+        "Must classify @babel/plugin-transform-for-of as patch with reasoning that the prior behavior was incorrect under variable shadowing",
+        "Must classify @babel/preset-env as patch with reasoning that only fixtures change (no public API)",
+        "Should note that retainLines fix is conditional on the retainLines option being enabled"
+      ]
+    },
+    "identify_boundary_violations": {
+      "expected_solution": "Concrete violations: (1) `packages/babel-generator/src/printer.ts` — change in indentation handling when `retainLines` is enabled (function that decides whitespace before tokens); (2) `packages/babel-generator/test/index.js` — coverage for the new behavior; (3) `packages/babel-plugin-transform-for-of/src/index.ts` — the visitor that previously assumed `iterableIsArray` regardless of variable shadowing; (4) the new fixture `for-of-modify-iterable` (input + output) added under packages/babel-plugin-transform-for-of/test/fixtures/assumption-iterableIsArray/; (5) `packages/babel-plugin-transform-for-of/package.json` — version bump or dependency update; (6) integration fixtures for `for-of-array-block-scoping` (exec, output, and the `-2` variant) added under packages/babel-preset-env/test/fixtures/plugins-integration/. PR file counts: #16166=2 files, #16011=13 files.",
+      "evaluation_criteria": [
+        "Must cite packages/babel-generator/src/printer.ts as the retainLines violation site",
+        "Must cite packages/babel-plugin-transform-for-of/src/index.ts as the iterableIsArray violation site",
+        "Must reference the new for-of-modify-iterable fixture under packages/babel-plugin-transform-for-of/test/fixtures/assumption-iterableIsArray/",
+        "Should reference the for-of-array-block-scoping integration fixtures under packages/babel-preset-env/test/fixtures/plugins-integration/"
+      ]
+    }
+  }
+}

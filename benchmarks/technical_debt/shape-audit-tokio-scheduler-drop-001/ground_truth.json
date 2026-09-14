@@ -1,0 +1,37 @@
+{
+  "task_id": "shape-audit-tokio-scheduler-drop-001",
+  "repo": "tokio-rs/tokio",
+  "repo_rev": "tokio-1.29.1",
+  "required_files": [
+    {
+      "path": "tokio/src/runtime/scheduler/current_thread.rs",
+      "repo": "tokio",
+      "confidence": 1.0,
+      "source": "deterministic",
+      "rationale": "Contains at least one match for the specified code shape."
+    },
+    {
+      "path": "tokio/src/runtime/scheduler/multi_thread/counters.rs",
+      "repo": "tokio",
+      "confidence": 1.0,
+      "source": "deterministic",
+      "rationale": "Contains at least one match for the specified code shape."
+    },
+    {
+      "path": "tokio/src/runtime/scheduler/multi_thread/worker.rs",
+      "repo": "tokio",
+      "confidence": 1.0,
+      "source": "deterministic",
+      "rationale": "Contains at least one match for the specified code shape."
+    }
+  ],
+  "sufficient_files": [],
+  "provenance": {
+    "oracle": "parser (ast-grep pattern match)",
+    "command": "ast-grep run --pattern 'impl Drop for $T {\\n    $$$B\\n}' --lang rust tokio/src/runtime/scheduler",
+    "clone": "tokio--tokio-1.29.1",
+    "scope": "tokio/src/runtime/scheduler",
+    "excluded": "(^|/)(tests?|testing|vendor|third_party|node_modules|examples?|docs?|fixtures?)(/|$)|_test\\.|test_|\\.pb\\.go$|(^|/)CHANGELOG|generated",
+    "bias_note": "The oracle for this axis is the same class of tool as one experimental condition's primitive. That condition can reproduce this key more directly than the others, which is a property of the axis and must be stated with any per-category claim drawn from it."
+  }
+}

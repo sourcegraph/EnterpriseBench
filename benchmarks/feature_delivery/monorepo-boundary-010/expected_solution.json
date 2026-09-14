@@ -1,0 +1,32 @@
+{
+  "task_id": "monorepo-boundary-rustc-statics-010",
+  "checkpoints": {
+    "identify_affected_packages": {
+      "expected_solution": "PR #116564 (nightly-2024-02-15) changes the representation of static initializers in `rustc_middle` (`compiler/rustc_middle/`): instead of storing them as MIR bodies, they are stored directly in metadata. Source-of-change crate is `rustc_middle` with edits across `compiler/rustc_middle/src/mir/interpret/error.rs`, `compiler/rustc_middle/src/mir/interpret/mod.rs`, `compiler/rustc_middle/src/mir/interpret/queries.rs`, `compiler/rustc_middle/src/mir/mod.rs`, `compiler/rustc_middle/src/mir/pretty.rs`, `compiler/rustc_middle/src/query/erase.rs`, `compiler/rustc_middle/src/query/mod.rs`, and `compiler/rustc_middle/src/ty/parameterized.rs`. Affected sibling crates: (1) `rustc_const_eval` (interpreter changes for metadata-based statics, ~17 files), (2) `rustc_metadata` (encode/decode of static initializers), (3) `rustc_mir_transform` (GVN transform), and (4) `miri` (`src/tools/miri/src/shims/intrinsics/mod.rs`).",
+      "evaluation_criteria": [
+        "Must identify rustc_middle as the source-of-change crate with at least one file from compiler/rustc_middle/src/mir/interpret/",
+        "Must list all four affected sibling crates: rustc_const_eval, rustc_metadata, rustc_mir_transform, and miri",
+        "Must cite compiler/rustc_metadata/src/rmeta/encoder.rs as the metadata encoding change site",
+        "Should mention compiler/rustc_const_eval/src/interpret/eval_context.rs or compiler/rustc_const_eval/src/const_eval/eval_queries.rs as the interpreter-side change"
+      ]
+    },
+    "classify_change_impact": {
+      "expected_solution": "Overall semver = **minor** for this internal compiler refactor — the visible semantics of static-initializer evaluation are preserved (same const-eval results), but the *implementation pipeline* changes: queries, intrinsics, and metadata layout shift, which is a semver-minor (additive new code paths plus query-result-type tweaks) rather than a behavior break. Per-crate: `rustc_middle` = minor (new error variants, query reshape; no removed public types just internal redirects); `rustc_const_eval` = minor (interpreter knows the new representation, behavior unchanged for valid programs); `rustc_metadata` = minor (encoder/decoder gain a new path; older metadata still readable); `rustc_mir_transform` = minor (GVN updates with the new representation); `miri` = minor (shims updated).",
+      "evaluation_criteria": [
+        "Must classify the overall change as `minor` (additive/internal refactor) and justify with semantics-preserving framing",
+        "Must classify rustc_metadata as minor with reasoning that the encoder gains a new path",
+        "Must classify rustc_const_eval as minor with reasoning that observable behavior for valid programs is unchanged",
+        "Should note that the scope is purely internal compiler plumbing — no nightly-feature surface changes"
+      ]
+    },
+    "identify_boundary_violations": {
+      "expected_solution": "Concrete violations grouped by crate. rustc_middle: (1) `compiler/rustc_middle/src/mir/interpret/error.rs` — new error variants for metadata-based statics; (2) `compiler/rustc_middle/src/mir/interpret/mod.rs` and `queries.rs` — query plumbing; (3) `compiler/rustc_middle/src/mir/mod.rs` and `pretty.rs` — MIR no longer carries static body; (4) `compiler/rustc_middle/src/query/erase.rs` and `query/mod.rs` — query-result-type changes; (5) `compiler/rustc_middle/src/ty/parameterized.rs` — generic param thread-through. rustc_const_eval (~17 files): (6) `compiler/rustc_const_eval/messages.ftl`; (7) `compiler/rustc_const_eval/src/const_eval/error.rs`; (8) `compiler/rustc_const_eval/src/const_eval/eval_queries.rs`; (9) `compiler/rustc_const_eval/src/const_eval/machine.rs`; (10) `compiler/rustc_const_eval/src/interpret/cast.rs`, `eval_context.rs`, `intern.rs`, `intrinsics.rs`, `machine.rs`, `memory.rs`, `mod.rs`, `place.rs`, `step.rs`, `terminator.rs`, `util.rs`, `validity.rs`; (11) `compiler/rustc_const_eval/src/lib.rs`. rustc_metadata: (12) `compiler/rustc_metadata/src/rmeta/decoder/cstore_impl.rs`; (13) `compiler/rustc_metadata/src/rmeta/encoder.rs`; (14) `compiler/rustc_metadata/src/rmeta/mod.rs`. rustc_mir_transform: (15) `compiler/rustc_mir_transform/src/gvn.rs`. miri: (16) `src/tools/miri/src/shims/intrinsics/mod.rs`. PR file count = 30.",
+      "evaluation_criteria": [
+        "Must cite at least three rustc_middle files such as compiler/rustc_middle/src/mir/interpret/error.rs and compiler/rustc_middle/src/query/mod.rs",
+        "Must cite compiler/rustc_metadata/src/rmeta/encoder.rs as the metadata encoder change",
+        "Must cite at least two rustc_const_eval files such as compiler/rustc_const_eval/src/interpret/eval_context.rs and compiler/rustc_const_eval/src/const_eval/eval_queries.rs",
+        "Should mention compiler/rustc_mir_transform/src/gvn.rs and src/tools/miri/src/shims/intrinsics/mod.rs as the smaller-scope downstream sites"
+      ]
+    }
+  }
+}

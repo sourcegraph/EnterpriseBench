@@ -7,8 +7,6 @@ bias when the agent is Claude.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from .backends import create_backend
 from .models import CheckpointJudgeInput, CheckpointJudgeResult, validate_score
 from .prompts import CHECKPOINT_EVAL_PROMPT, CHECKPOINT_EVAL_SYSTEM
@@ -28,11 +26,20 @@ class LLMJudge:
         model: str = "claude-haiku-4-5-20251001",
         temperature: float = 0.0,
         pass_threshold: float = 0.5,
+        account: int | None = None,
     ):
         self.model = model
         self.temperature = temperature
         self.pass_threshold = pass_threshold
-        self._backend = create_backend(model=model, temperature=temperature)
+        self._backend = create_backend(
+            model=model,
+            temperature=temperature,
+            account=account,
+        )
+
+    @property
+    def provenance(self) -> dict[str, object]:
+        return self._backend.provenance
 
     def evaluate_checkpoint(
         self,

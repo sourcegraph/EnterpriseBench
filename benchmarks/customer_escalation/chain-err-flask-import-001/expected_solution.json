@@ -1,0 +1,29 @@
+{
+  "task_id": "chain-err-flask-import-001",
+  "checkpoints": {
+    "investigation_quality": {
+      "expected_solution": "Investigation must enumerate the modules in the cycle: src/flask/__init__.py \u2192 src/flask/json/__init__.py \u2192 src/flask/globals.py \u2192 src/flask/app.py. Root cause: Circular import between flask.json and flask.globals when flask.json is imported at module level before Flask app is initialized. INVESTIGATION.md must capture the cycle, the trigger import, and propose a workaround without changing code in this phase.",
+      "evaluation_criteria": [
+        "Must enumerate every module participating in the cycle",
+        "Must identify the trigger import (the symbol whose load resolves the cycle)",
+        "Must include severity / workaround language without prescribing the actual code change"
+      ]
+    },
+    "cycle_identified": {
+      "expected_solution": "The import cycle is: src/flask/__init__.py \u2192 src/flask/json/__init__.py \u2192 src/flask/globals.py \u2192 src/flask/app.py \u2192 src/flask/__init__.py.",
+      "evaluation_criteria": [
+        "Must list at least the modules: src/flask/__init__.py, src/flask/json/__init__.py, src/flask/globals.py",
+        "Must show the cycle as a closed loop (final module imports the first)",
+        "Must identify which import statement(s) close the cycle"
+      ]
+    },
+    "fix_applied": {
+      "expected_solution": "Fix approach: Use lazy/deferred imports in flask/json/__init__.py to avoid importing flask.globals at module load time. Apply the fix in src/flask/json/__init__.py (the module that creates the dependency back to the root). Verification: re-running the importer code path must succeed without ImportError.",
+      "evaluation_criteria": [
+        "Must apply a code change that breaks the cycle (e.g. lazy import or import-inside-function)",
+        "Must keep public API behavior unchanged (callers still get the expected symbol)",
+        "Must include a verification step demonstrating the cycle is resolved"
+      ]
+    }
+  }
+}

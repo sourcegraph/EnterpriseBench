@@ -1,0 +1,199 @@
+{
+  "task_id": "support-mapping-dual-react-relay-suspense-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/react--v18.2.0",
+    "github.com/sg-evals/relay--v16.2.0"
+  ],
+  "retrieved_paths": [
+    "packages/relay-runtime/mutations/RelayRecordSourceProxy.js",
+    "packages/relay-runtime/mutations/RelayRecordSourceSelectorProxy.js",
+    "packages/relay-runtime/store/RelayModernStore.js",
+    "packages/react-relay/relay-hooks/useSubscribeToInvalidationState.js",
+    "packages/relay-runtime/store/RelayModernEnvironment.js",
+    "packages/react-relay/relay-hooks/useFragment.js",
+    "packages/react-relay/relay-hooks/useLazyLoadQuery.js",
+    "packages/react-reconciler/src/ReactFiberHooks.old.js",
+    "packages/react-reconciler/src/ReactFiberBeginWork.old.js",
+    "packages/react-reconciler/src/ReactFiberThrow.old.js",
+    "packages/react-reconciler/src/ReactFiberWorkLoop.old.js"
+  ],
+  "retrieved_paths_union": [
+    "packages/relay-runtime/mutations/RelayRecordSourceProxy.js",
+    "packages/relay-runtime/mutations/RelayRecordSourceSelectorProxy.js",
+    "packages/relay-runtime/store/RelayModernStore.js",
+    "packages/react-relay/relay-hooks/useSubscribeToInvalidationState.js",
+    "packages/relay-runtime/store/RelayModernEnvironment.js",
+    "packages/react-relay/relay-hooks/useFragment.js",
+    "packages/react-relay/relay-hooks/useLazyLoadQuery.js",
+    "packages/react-reconciler/src/ReactFiberHooks.old.js",
+    "packages/react-reconciler/src/ReactFiberBeginWork.old.js",
+    "packages/react-reconciler/src/ReactFiberThrow.old.js",
+    "packages/react-reconciler/src/ReactFiberWorkLoop.old.js"
+  ],
+  "required_files": [
+    "react/packages/react-reconciler/src/ReactFiberSuspenseComponent.js",
+    "react/packages/react-reconciler/src/ReactFiberBeginWork.js",
+    "relay/packages/relay-runtime/store/RelayModernEnvironment.js",
+    "relay/packages/react-relay/relay-hooks/useFragmentInternal.js"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-react-relay-suspense-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.151,
+      "10": 0.151
+    },
+    "mrr": 0.2,
+    "map_score": 0.05,
+    "file_recall": 0.25,
+    "context_efficiency": 0.0909,
+    "n_retrieved": 11,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-react-relay-suspense-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.151,
+      "10": 0.151
+    },
+    "mrr": 0.2,
+    "map_score": 0.05,
+    "file_recall": 0.25,
+    "context_efficiency": 0.0909,
+    "n_retrieved": 11,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 22.0,
+  "response_chars": 6415,
+  "raw_response": "The path is split across Relay\u2019s invalidation/subscription machinery and React\u2019s external-store/Suspense reconciliation.\n\nRelevant files:\n\n- [relay--v16.2.0:packages/relay-runtime/mutations/RelayRecordSourceProxy.js?L150-L163](/r/github.com/sg-evals/relay--v16.2.0/-/blob/packages/relay-runtime/mutations/RelayRecordSourceProxy.js?L150-L163) - `invalidateStore()` marks the mutation record source globally invalid.\n- [relay--v16.2.0:packages/relay-runtime/mutations/RelayRecordSourceSelectorProxy.js?L125-L135](/r/github.com/sg-evals/relay--v16.2.0/-/blob/packages/relay-runtime/mutations/RelayRecordSourceSelectorProxy.js?L125-L135) - Mutation updater-facing `invalidateStore()` delegates to the record source.\n- [relay--v16.2.0:packages/relay-runtime/store/RelayModernStore.js?L160-L190](/r/github.com/sg-evals/relay--v16.2.0/-/blob/packages/relay-runtime/store/RelayModernStore.js?L160-L190) - Store commit path captures the global invalidation epoch while applying updates.\n- [relay--v16.2.0:packages/relay-runtime/store/RelayModernStore.js?L330-L350](/r/github.com/sg-evals/relay--v16.2.0/-/blob/packages/relay-runtime/store/RelayModernStore.js?L330-L350) - Store notification loop invokes `_updateInvalidationSubscription` after publishing.\n- [relay--v16.2.0:packages/relay-runtime/store/RelayModernStore.js?L458-L496](/r/github.com/sg-evals/relay--v16.2.0/-/blob/packages/relay-runtime/store/RelayModernStore.js?L458-L496) - `lookupInvalidationState()` records both per-record epochs and the global epoch; `checkInvalidationState()` treats any global epoch change as invalidation for every subscription.\n- [relay--v16.2.0:packages/relay-runtime/store/RelayModernStore.js?L498-L523](/r/github.com/sg-evals/relay--v16.2.0/-/blob/packages/relay-runtime/store/RelayModernStore.js?L498-L523) - `subscribeToInvalidationState()` registers callbacks; `_updateInvalidationSubscription()` calls every subscriber when `invalidatedStore` is true, regardless of subscribed IDs.\n- [relay--v16.2.0:packages/react-relay/relay-hooks/useSubscribeToInvalidationState.js?L20-L49](/r/github.com/sg-evals/relay--v16.2.0/-/blob/packages/react-relay/relay-hooks/useSubscribeToInvalidationState.js?L20-L49) - Hook looks up invalidation state and subscribes through `store.subscribeToInvalidationState`; callback execution is triggered by store invalidation.\n- [relay--v16.2.0:packages/relay-runtime/store/RelayModernEnvironment.js?L85-L145](/r/github.com/sg-evals/relay--v16.2.0/-/blob/packages/relay-runtime/store/RelayModernEnvironment.js?L85-L145) - `RelayModernEnvironment` owns the store and publish queue used by mutation execution/commit.\n- [relay--v16.2.0:packages/relay-runtime/store/RelayModernEnvironment.js?L450-L490](/r/github.com/sg-evals/relay--v16.2.0/-/blob/packages/relay-runtime/store/RelayModernEnvironment.js?L450-L490) - Environment execution path publishes queued mutation changes through the store.\n- [relay--v16.2.0:packages/react-relay/relay-hooks/useFragment.js?L1-L180](/r/github.com/sg-evals/relay--v16.2.0/-/blob/packages/react-relay/relay-hooks/useFragment.js?L1-L180) - Fragment hook reads Relay snapshots and subscribes to store changes; a notified subscription causes hook re-evaluation.\n- [relay--v16.2.0:packages/react-relay/relay-hooks/useLazyLoadQuery.js?L1-L180](/r/github.com/sg-evals/relay--v16.2.0/-/blob/packages/react-relay/relay-hooks/useLazyLoadQuery.js?L1-L180) - Query hook reads query data and may suspend by throwing the pending network promise during re-evaluation.\n- [react--v18.2.0:packages/react-reconciler/src/ReactFiberHooks.old.js?L2800-L2835](/r/github.com/sg-evals/react--v18.2.0/-/blob/packages/react-reconciler/src/ReactFiberHooks.old.js?L2800-L2835) - Reconciler implementation of `useSyncExternalStore`; external-store notifications schedule a fiber update and snapshot checks.\n- [react--v18.2.0:packages/react-reconciler/src/ReactFiberBeginWork.old.js?L3456-L3475](/r/github.com/sg-evals/react--v18.2.0/-/blob/packages/react-reconciler/src/ReactFiberBeginWork.old.js?L3456-L3475) - `checkScheduledUpdateOrContext()` prevents bailout when an update/context dependency changed.\n- [react--v18.2.0:packages/react-reconciler/src/ReactFiberBeginWork.old.js?L1986-L2034](/r/github.com/sg-evals/react--v18.2.0/-/blob/packages/react-reconciler/src/ReactFiberBeginWork.old.js?L1986-L2034) - `updateSuspenseComponent()` decides `showFallback` from `DidCapture` and `shouldRemainOnFallback`.\n- [react--v18.2.0:packages/react-reconciler/src/ReactFiberThrow.old.js?L292-L335](/r/github.com/sg-evals/react--v18.2.0/-/blob/packages/react-reconciler/src/ReactFiberThrow.old.js?L292-L335) - `markSuspenseBoundaryShouldCapture()` marks the nearest boundary for a fallback pass after a descendant throws.\n- [react--v18.2.0:packages/react-reconciler/src/ReactFiberThrow.old.js?L404-L470](/r/github.com/sg-evals/react--v18.2.0/-/blob/packages/react-reconciler/src/ReactFiberThrow.old.js?L404-L470) - `throwException()` recognizes a thrown wakeable and marks the Suspense boundary for capture.\n- [react--v18.2.0:packages/react-reconciler/src/ReactFiberWorkLoop.old.js?L1525-L1555](/r/github.com/sg-evals/react--v18.2.0/-/blob/packages/react-reconciler/src/ReactFiberWorkLoop.old.js?L1525-L1555) - Render work handles thrown promises, marks the component suspended, and schedules the boundary retry.\n- [react--v18.2.0:packages/react-reconciler/src/ReactFiberBeginWork.old.js?L320-L355](/r/github.com/sg-evals/react--v18.2.0/-/blob/packages/react-reconciler/src/ReactFiberBeginWork.old.js?L320-L355) - `forceUnmountCurrentAndReconcile()` is the explicit path that discards the current child tree and remounts it when reconciliation requires replacement.\n\nWhy the global bump is transitive: Relay stores a `\"global\"` invalidation epoch in every `InvalidationState`; a store invalidation changes that epoch and the notification path can invoke subscribers even when none of their specific IDs were invalidated. Any resulting Relay hook update re-runs the component. If `useFragment`/`useLazyLoadQuery` observes data now considered stale or pending, it can throw a wakeable; React\u2019s `throwException()` marks the nearest Suspense boundary with capture state, and `updateSuspenseComponent()` switches to the fallback. The fallback/primary branch transition unmounts the visible subtree, so its client state is lost even though the originally invalidated record was not directly read by that subtree.",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-react-relay-suspense-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 11,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "packages/relay-runtime/mutations/RelayRecordSourceProxy.js",
+    "packages/relay-runtime/mutations/RelayRecordSourceSelectorProxy.js",
+    "packages/relay-runtime/store/RelayModernStore.js",
+    "packages/react-relay/relay-hooks/useSubscribeToInvalidationState.js",
+    "relay/packages/relay-runtime/store/RelayModernEnvironment.js",
+    "packages/react-relay/relay-hooks/useFragment.js",
+    "packages/react-relay/relay-hooks/useLazyLoadQuery.js",
+    "packages/react-reconciler/src/ReactFiberHooks.old.js",
+    "packages/react-reconciler/src/ReactFiberBeginWork.old.js",
+    "packages/react-reconciler/src/ReactFiberThrow.old.js",
+    "packages/react-reconciler/src/ReactFiberWorkLoop.old.js"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-react-relay-suspense-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 11,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

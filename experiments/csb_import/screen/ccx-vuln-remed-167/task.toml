@@ -1,0 +1,106 @@
+# Imported from CodeScaleBench CCX-vuln-remed-167 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-vuln-remed-167"
+suite = "platform_engineering"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Grafana API Key Authentication and Scope Enforcement"
+
+[[repos]]
+url = "https://github.com/grafana/grafana"
+rev = "26d36ec"
+path = "grafana"
+role = "primary"
+
+[metadata]
+languages = ["go"]
+csb_mirror = "sg-evals/grafana--26d36ec"
+csb_commit = "26d36ec"
+csb_family = "csb_org_security"
+csb_category = "vuln-remediation"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "pkg/services/authn/clients/api_key.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/apikey/model.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/apikey/apikey.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/apikey/apikeyimpl/apikey.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/apikey/apikeyimpl/store.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/apikey/apikeyimpl/xorm_store.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/components/apikeygen/apikeygen.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/components/satokengen/tokengen.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/contexthandler/contexthandler.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/authn/authnimpl/registration.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "pkg/services/grpcserver/interceptors/auth.go"
+repo = "grafana"
+confidence = 0.9
+source = "deterministic"

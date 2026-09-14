@@ -1,0 +1,29 @@
+{
+  "task_id": "dead-code-dual-spring-hibernate-001",
+  "checkpoints": {
+    "dead_code_locations": {
+      "expected_solution": "Spring Boot 3.1.2 and Spring Framework 6.0.11 have moved to Jakarta EE / Hibernate 6.x; Hibernate 5 compatibility branches in the auto-configuration are now unreachable. The headline dead-code site is spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaAutoConfiguration.java — class-existence probes for Hibernate 5 internals always evaluate to false because the runtime requires Hibernate 6. Supporting anchors: spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateProperties.java (legacy Hibernate 5 property keys), and across the Spring Framework repo, spring-orm/src/main/java/org/springframework/orm/jpa/vendor/HibernateJpaVendorAdapter.java (vendor adapter still carries Hibernate 5 dialect mapping shims) and the entire spring-orm/src/main/java/org/springframework/orm/hibernate5/ tree (e.g., HibernateTransactionManager.java) which is dead under Spring Framework 6. Each dead_code_locations entry must populate file, class_or_function, dead_branch_condition, hibernate6_replacement, and explanation.",
+      "evaluation_criteria": [
+        "source_files (or files / error_source.files) must include spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaAutoConfiguration.java and spring-orm/src/main/java/org/springframework/orm/jpa/vendor/HibernateJpaVendorAdapter.java (the GT required anchors)",
+        "Every dead_code_locations entry must populate `file`, `class_or_function`, `dead_branch_condition`, and `explanation` — entries missing any of these underdeliver the prompt's structural contract",
+        "Dead-branch conditions must be Hibernate-version specific (e.g., 'ClassUtils.isPresent(\"org.hibernate.boot.MetadataBuilder\", classLoader)' or property keys removed in Hibernate 6), not generic 'old code' labels"
+      ]
+    },
+    "dependency_trace": {
+      "expected_solution": "The trace must walk from HibernateJpaAutoConfiguration through HibernateJpaConfiguration / EntityManagerFactory creation in Spring Boot, into the HibernateJpaVendorAdapter and dialect-resolution code in Spring Framework's spring-orm module, and finally into the now-dead spring-orm/src/main/java/org/springframework/orm/hibernate5/ tree (HibernateTransactionManager etc.). At each step the trace identifies whether the layer is live (Hibernate 6 path) or dead (Hibernate 5 branch). Required-file anchors that must surface: spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaAutoConfiguration.java and spring-orm/src/main/java/org/springframework/orm/jpa/vendor/HibernateJpaVendorAdapter.java.",
+      "evaluation_criteria": [
+        "source_files must include both required anchors: spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaAutoConfiguration.java and spring-orm/src/main/java/org/springframework/orm/jpa/vendor/HibernateJpaVendorAdapter.java",
+        "The trace must explicitly cross the spring-boot ↔ spring-framework repo boundary (auto-config → vendor adapter → dialect resolver) and label each step live or dead",
+        "Dead segments must reference Hibernate 5 packages (org.hibernate.dialect.* removals, criteria API changes, or the spring-orm/.../hibernate5/ tree) rather than generic 'compatibility code' descriptions"
+      ]
+    },
+    "removal_impact": {
+      "expected_solution": "For every dead-code entry the answer must populate `hibernate6_replacement` with the concrete Hibernate 6 API that supplanted the dead Hibernate 5 code (e.g., 'org.hibernate.dialect.Dialect#getVersion → DatabaseVersion' or 'jakarta.persistence.* replaces javax.persistence.*'). Removal impact must distinguish between (a) deletion-safe shims (no behavioural change) and (b) shims still emitted for binary-compatibility with downstream apps that compiled against Hibernate 5. The GT required anchors must surface in source_files for the verifier to credit the removal_impact analysis.",
+      "evaluation_criteria": [
+        "source_files must include both required anchors: spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaAutoConfiguration.java and spring-orm/src/main/java/org/springframework/orm/jpa/vendor/HibernateJpaVendorAdapter.java",
+        "Every dead_code_locations entry must populate `hibernate6_replacement` with a concrete Hibernate 6 API (Jakarta namespace move, dialect API change, criteria API change) — not just say 'replaced'",
+        "Removal impact must distinguish deletion-safe shims from binary-compatibility shims so a Spring Boot release engineer can decide what to drop in the next major"
+      ]
+    }
+  }
+}

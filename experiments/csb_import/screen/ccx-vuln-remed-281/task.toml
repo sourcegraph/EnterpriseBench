@@ -1,0 +1,82 @@
+# Imported from CodeScaleBench CCX-vuln-remed-281 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-vuln-remed-281"
+suite = "platform_engineering"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Node.js child_process Command Injection Guards"
+
+[[repos]]
+url = "https://github.com/nodejs/node"
+rev = "v22.13.0"
+path = "node"
+role = "primary"
+
+[metadata]
+languages = ["javascript"]
+csb_mirror = "sg-evals/node--v22.13.0"
+csb_commit = "v22.13.0"
+csb_family = "csb_org_security"
+csb_category = "vuln-remediation"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "lib/child_process.js"
+repo = "node"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/internal/child_process.js"
+repo = "node"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/process_wrap.cc"
+repo = "node"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/spawn_sync.cc"
+repo = "node"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/spawn_sync.h"
+repo = "node"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/permission/child_process_permission.cc"
+repo = "node"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "src/permission/child_process_permission.h"
+repo = "node"
+confidence = 0.9
+source = "deterministic"

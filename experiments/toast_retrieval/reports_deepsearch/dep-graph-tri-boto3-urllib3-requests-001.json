@@ -1,0 +1,214 @@
+{
+  "task_id": "dep-graph-tri-boto3-urllib3-requests-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/urllib3--2.0.0",
+    "github.com/sg-evals/requests--v2.31.0",
+    "github.com/sg-evals/botocore--1.31.0"
+  ],
+  "retrieved_paths": [
+    "setup.cfg",
+    "botocore/httpsession.py",
+    "requests/adapters.py",
+    "pyproject.toml",
+    "src/urllib3/__init__.py",
+    "src/urllib3/util",
+    "botocore/vendored/requests/packages",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/_version.py",
+    "botocore/vendored/requests/packages/urllib3/__init__.py",
+    "src/urllib3/contrib",
+    "botocore/compat.py",
+    "src/urllib3/contrib/pyopenssl.py",
+    "botocore/awsrequest.py",
+    "CHANGES.rst",
+    "src/urllib3/connection.py"
+  ],
+  "retrieved_paths_union": [
+    "setup.cfg",
+    "botocore/httpsession.py",
+    "requests/adapters.py",
+    "pyproject.toml",
+    "src/urllib3/__init__.py",
+    "src/urllib3/util",
+    "botocore/vendored/requests/packages",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/_version.py",
+    "botocore/vendored/requests/packages/urllib3/__init__.py",
+    "src/urllib3/contrib",
+    "botocore/compat.py",
+    "src/urllib3/contrib/pyopenssl.py",
+    "botocore/awsrequest.py",
+    "CHANGES.rst",
+    "src/urllib3/connection.py"
+  ],
+  "required_files": [
+    "urllib3/CHANGES.rst",
+    "requests/setup.cfg",
+    "botocore/setup.py"
+  ],
+  "ir_scores": {
+    "task_id": "dep-graph-tri-boto3-urllib3-requests-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 16,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "ir_scores_union": {
+    "task_id": "dep-graph-tri-boto3-urllib3-requests-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 16,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "elapsed_seconds": 220.5,
+  "response_chars": 9900,
+  "raw_response": "---\ntitle: Analyze urllib3 version conflicts across requests and botocore (boto3)\nshare_url: https://demo.sourcegraph.com/deepsearch/379798ae-a057-4aac-8ac0-faaa57cf69b9\nurl: https://demo.sourcegraph.com/deepsearch/2141\ncreated: 2026-08-17T21:21:57Z\nupdated: 2026-08-17T21:25:36Z\n---\n\n#         # dep-graph-tri-boto3-urllib3-requests-001\n\n        **Suite:** dependency_management | **Type:** dependency_graph | **Difficulty:** expert\n        **Repos:** urllib3 + requests + botocore\n\n        ## Context\n\n        urllib3 2.0 was a major release that affected the entire Python HTTP\nstack. Both requests and botocore depend on urllib3 with conflicting\nversion constraints. botocore vendors its own urllib3 copy.\n\nYour task:\n1. Map the dependency chain: boto3/botocore \u2192 urllib3, requests \u2192 urllib3\n2. Find version pin conflicts between botocore and requests for urllib3\n3. Identify where botocore's vendored urllib3 diverges from upstream 2.0\n4. Document the upgrade coordination challenge across all three repos\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/urllib3--2.0.0, github.com/sg-evals/requests--v2.31.0, github.com/sg-evals/botocore--1.31.0\n\nThe report has been written. Here is a summary of the findings:\n\n---\n\n## Analysis Complete\n\nThe full impact report is available at the file above. Key findings:\n\n### Version Pin Conflict (Hard Block)\n\nBoth packages use `urllib3<1.27`, making urllib3 2.0.0 **unreachable by either**:\n- [botocore `setup.cfg`](https://demo.sourcegraph.com/r/github.com/sg-evals/botocore--1.31.0/-/blob/setup.cfg?L8): `urllib3>=1.25.4,<1.27`\n- [requests `setup.cfg`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/setup.cfg?L10): `urllib3>=1.21.1,<1.27`\n\n### Critical Breaking Points in botocore\n\n| Issue | File | Lines | Severity |\n|-------|------|-------|----------|\n| `strict=True` to `PoolManager` \u2014 deprecated in 2.0, removed in 2.1.0 | [`httpsession.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/httpsession.py?L337-L347) | 338 | **High** |\n| Vendored `create_urllib3_context()` diverges from 2.0 (no TLS 1.2 floor, uses `PROTOCOL_TLS`) | [`httpsession.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/httpsession.py?L102-L179) | 102\u2013179 | **High** |\n| `DEFAULT_CIPHERS` removed \u2014 has try/except fallback already | [`httpsession.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/httpsession.py?L51-L57) | 51\u201357 | Medium |\n| `pyopenssl` deprecated \u2014 fallback exists | [`httpsession.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/httpsession.py?L39-L49) | 39\u201349 | Low |\n\n### Critical Breaking Points in requests\n\n| Issue | File | Lines | Severity |\n|-------|------|-------|----------|\n| Direct mutation of `conn.cert_reqs`, `conn.ca_certs`, `conn.ca_cert_dir` \u2014 unreliable in 2.0 | [`adapters.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L237-L283) | 237\u2013283 | **High** |\n| `enforce_content_length=True` new default \u2014 new exceptions possible | [`adapters.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L486-L498) | 486 | Medium |\n\n### Vendored urllib3 in botocore\n\n[`botocore/vendored/requests/packages/urllib3/`](https://demo.sourcegraph.com/r/github.com/sg-evals/botocore--1.31.0/-/tree/botocore/vendored/requests/packages/urllib3) is a **stub only** (`__version__ = ''`), not a full copy. The real urllib3 (system-installed) is used for all actual HTTP operations. The stub provides exception class forwarding only, and its empty version string means there is no guard against urllib3 2.0 mismatch.\n\n### Migration Path\n\nFix both version pins to `<3`, remove `strict=True` from botocore's `PoolManager` kwargs, delete botocore's vendored `create_urllib3_context()` in favor of the upstream one with `ssl_minimum_version=TLSVersion.TLSv1_2`, and refactor requests' `cert_verify()` away from direct attribute mutation. These two library changes must be coordinated and released simultaneously for boto3+requests environments.\n\n## Sources\n\n- [github.com/sg-evals/urllib3--2.0.0](/github.com/sg-evals/urllib3--2.0.0)\n- [github.com/sg-evals/requests--v2.31.0](/github.com/sg-evals/requests--v2.31.0)\n- [github.com/sg-evals/botocore--1.31.0](/github.com/sg-evals/botocore--1.31.0)\n- [github.com/sg-evals/requests--v2.31.0/setup.cfg@888b11e](/github.com/sg-evals/requests--v2.31.0@888b11ea9c865915151fc53f9feb080c32399f32/-/blob/setup.cfg)\n- [github.com/sg-evals/botocore--1.31.0/setup.cfg@8be0f37](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/setup.cfg)\n- [github.com/sg-evals/urllib3--2.0.0/setup.cfg@15ad55b](/github.com/sg-evals/urllib3--2.0.0@15ad55b536cb76dc492e1ff645c7425a84f595e8/-/blob/setup.cfg)\n- [github.com/sg-evals/botocore--1.31.0](/github.com/sg-evals/botocore--1.31.0)\n- [github.com/sg-evals/botocore--1.31.0](/github.com/sg-evals/botocore--1.31.0)\n- [github.com/sg-evals/urllib3--2.0.0/pyproject.toml@15ad55b](/github.com/sg-evals/urllib3--2.0.0@15ad55b536cb76dc492e1ff645c7425a84f595e8/-/blob/pyproject.toml)\n- [github.com/sg-evals/botocore--1.31.0/botocore/httpsession.py@8be0f37](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/httpsession.py)\n- [github.com/sg-evals/urllib3--2.0.0](/github.com/sg-evals/urllib3--2.0.0)\n- [github.com/sg-evals/requests--v2.31.0/requests/adapters.py@888b11e](/github.com/sg-evals/requests--v2.31.0@888b11ea9c865915151fc53f9feb080c32399f32/-/blob/requests/adapters.py)\n- [github.com/sg-evals/botocore--1.31.0](/github.com/sg-evals/botocore--1.31.0)\n- [github.com/sg-evals/urllib3--2.0.0/src/urllib3/__init__.py@15ad55b](/github.com/sg-evals/urllib3--2.0.0@15ad55b536cb76dc492e1ff645c7425a84f595e8/-/blob/src/urllib3/__init__.py)\n- [github.com/sg-evals/urllib3--2.0.0/src/urllib3/util@15ad55b](/github.com/sg-evals/urllib3--2.0.0@15ad55b536cb76dc492e1ff645c7425a84f595e8/-/blob/src/urllib3/util)\n- [github.com/sg-evals/botocore--1.31.0/botocore/vendored/requests/packages@8be0f37](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/vendored/requests/packages)\n- [github.com/sg-evals/urllib3--2.0.0/src/urllib3/util/ssl_.py@15ad55b](/github.com/sg-evals/urllib3--2.0.0@15ad55b536cb76dc492e1ff645c7425a84f595e8/-/blob/src/urllib3/util/ssl_.py)\n- [github.com/sg-evals/botocore--1.31.0](/github.com/sg-evals/botocore--1.31.0)\n- [github.com/sg-evals/urllib3--2.0.0/src/urllib3/_version.py@15ad55b](/github.com/sg-evals/urllib3--2.0.0@15ad55b536cb76dc492e1ff645c7425a84f595e8/-/blob/src/urllib3/_version.py)\n- [github.com/sg-evals/botocore--1.31.0/botocore/vendored/requests/packages/urllib3/__init__.py@8be0f37](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/vendored/requests/packages/urllib3/__init__.py)\n- [github.com/sg-evals/urllib3--2.0.0/src/urllib3/contrib@15ad55b](/github.com/sg-evals/urllib3--2.0.0@15ad55b536cb76dc492e1ff645c7425a84f595e8/-/blob/src/urllib3/contrib)\n- [github.com/sg-evals/botocore--1.31.0/botocore/compat.py@8be0f37](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/compat.py)\n- [github.com/sg-evals/urllib3--2.0.0/src/urllib3/contrib/pyopenssl.py@15ad55b?L1-60](/github.com/sg-evals/urllib3--2.0.0@15ad55b536cb76dc492e1ff645c7425a84f595e8/-/blob/src/urllib3/contrib/pyopenssl.py?L1-60)\n- [github.com/sg-evals/botocore--1.31.0/botocore/awsrequest.py@8be0f37?L1-80](/github.com/sg-evals/botocore--1.31.0@8be0f3763e6a0335d74fdfa38d928b42644cd828/-/blob/botocore/awsrequest.py?L1-80)\n- [repo:^github.com/sg-evals/urllib3--2.0.0$ strict](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Furllib3--2.0.0$%20strict)\n- [github.com/sg-evals/urllib3--2.0.0/CHANGES.rst@15ad55b?L1-120](/github.com/sg-evals/urllib3--2.0.0@15ad55b536cb76dc492e1ff645c7425a84f595e8/-/blob/CHANGES.rst?L1-120)\n- [repo:^github.com/sg-evals/urllib3--2.0.0$ VerifiedHTTPSConnection](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Furllib3--2.0.0$%20VerifiedHTTPSConnection)\n- [repo:^github.com/sg-evals/urllib3--2.0.0$ DEFAULT_CIPHERS](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Furllib3--2.0.0$%20DEFAULT_CIPHERS)\n- [repo:^github.com/sg-evals/botocore--1.31.0$ OP_NO_SSLv2 OP_NO_SSLv3 PROTOCOL_TLS](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fbotocore--1.31.0$%20OP_NO_SSLv2%20OP_NO_SSLv3%20PROTOCOL_TLS)\n- [github.com/sg-evals/urllib3--2.0.0/src/urllib3/connection.py@15ad55b?L870-882](/github.com/sg-evals/urllib3--2.0.0@15ad55b536cb76dc492e1ff645c7425a84f595e8/-/blob/src/urllib3/connection.py?L870-882)\n\n\nGenerated files:\n- files/analysis_IMPACT_REPORT.json: /.api/agent-files/v1/deep-search/379798ae-a057-4aac-8ac0-faaa57cf69b9/files/analysis_IMPACT_REPORT.json\n- files/placeholder.csv: /.api/agent-files/v1/deep-search/379798ae-a057-4aac-8ac0-faaa57cf69b9/files/placeholder.csv\n- files/IMPACT_REPORT_md.svg: /.api/agent-files/v1/deep-search/379798ae-a057-4aac-8ac0-faaa57cf69b9/files/IMPACT_REPORT_md.svg\n",
+  "ir_scores_unaligned": {
+    "task_id": "dep-graph-tri-boto3-urllib3-requests-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 16,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "setup.cfg",
+    "botocore/httpsession.py",
+    "requests/adapters.py",
+    "pyproject.toml",
+    "src/urllib3/__init__.py",
+    "src/urllib3/util",
+    "botocore/vendored/requests/packages",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/_version.py",
+    "botocore/vendored/requests/packages/urllib3/__init__.py",
+    "src/urllib3/contrib",
+    "botocore/compat.py",
+    "src/urllib3/contrib/pyopenssl.py",
+    "botocore/awsrequest.py",
+    "CHANGES.rst",
+    "src/urllib3/connection.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "dep-graph-tri-boto3-urllib3-requests-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 16,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

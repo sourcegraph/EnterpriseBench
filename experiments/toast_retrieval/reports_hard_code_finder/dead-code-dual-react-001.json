@@ -1,0 +1,188 @@
+{
+  "task_id": "dead-code-dual-react-001",
+  "policy": "code_finder",
+  "suite": "technical_debt",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/react--v18.2.0",
+    "github.com/sg-evals/create-react-app--v5.0.1"
+  ],
+  "retrieved_paths": [
+    "CHANGELOG.md",
+    "packages/react-dom/src/client/ReactDOMLegacy.js",
+    "packages/react/src/ReactElementValidator.js",
+    "packages/react/src/React.js",
+    "packages/react-error-overlay/src/iframeScript.js",
+    "packages/react-scripts/config/webpack.config.js",
+    "packages/cra-template/template/src/index.js",
+    "packages/cra-template-typescript/template/src/index.tsx"
+  ],
+  "retrieved_paths_union": [
+    "CHANGELOG.md",
+    "packages/react-dom/src/client/ReactDOMLegacy.js",
+    "packages/react/src/ReactElementValidator.js",
+    "packages/react/src/React.js",
+    "packages/react-error-overlay/src/iframeScript.js",
+    "packages/react-scripts/config/webpack.config.js",
+    "packages/cra-template/template/src/index.js",
+    "packages/cra-template-typescript/template/src/index.tsx"
+  ],
+  "required_files": [
+    "packages/react/src/ReactSharedInternals.js",
+    "packages/react-scripts/config/webpack.config.js"
+  ],
+  "ir_scores": {
+    "task_id": "dead-code-dual-react-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.2184
+    },
+    "mrr": 0.1667,
+    "map_score": 0.0833,
+    "file_recall": 0.5,
+    "context_efficiency": 0.125,
+    "n_retrieved": 8,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "dead-code-dual-react-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.2184
+    },
+    "mrr": 0.1667,
+    "map_score": 0.0833,
+    "file_recall": 0.5,
+    "context_efficiency": 0.125,
+    "n_retrieved": 8,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 24.8,
+  "response_chars": 3173,
+  "raw_response": "I found three concrete CRA references to React 18 deprecated APIs. No CRA references to React\u2019s secret internals or `createFactory` were found; the profiling `scheduler/tracing` alias is a compatibility/profiling shim, but not itself a React internal API. I could not write `/workspace/dead_code_report.json` because no file-writing tool was available.\n\nRelevant findings:\n\n- [react--v18.2.0:CHANGELOG.md?L64-L70](/r/github.com/sg-evals/react--v18.2.0/-/blob/CHANGELOG.md?L64-L70) \u2014 React 18 deprecates `ReactDOM.render`, `hydrate`, `unmountComponentAtNode`, `renderSubtreeIntoContainer`, and `renderToNodeStream`.\n- [react--v18.2.0:packages/react-dom/src/client/ReactDOMLegacy.js?L240-L320](/r/github.com/sg-evals/react--v18.2.0/-/blob/packages/react-dom/src/client/ReactDOMLegacy.js?L240-L320) \u2014 legacy ReactDOM implementations, including `render`, `hydrate`, and `unmountComponentAtNode`.\n- [react--v18.2.0:packages/react/src/ReactElementValidator.js?L489-L513](/r/github.com/sg-evals/react--v18.2.0/-/blob/packages/react/src/ReactElementValidator.js?L489-L513) \u2014 `createFactory` is explicitly deprecated; no CRA callsite found.\n- [react--v18.2.0:packages/react/src/React.js?L115-L128](/r/github.com/sg-evals/react--v18.2.0/-/blob/packages/react/src/React.js?L115-L128) \u2014 exports `__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED` and deprecated `createFactory`; no CRA references found.\n- [create-react-app--v5.0.1:packages/react-error-overlay/src/iframeScript.js?L8-L11](/r/github.com/sg-evals/create-react-app--v5.0.1/-/blob/packages/react-error-overlay/src/iframeScript.js?L8-L11) \u2014 imports legacy `react-dom`.\n- [create-react-app--v5.0.1:packages/react-error-overlay/src/iframeScript.js?L50-L59](/r/github.com/sg-evals/create-react-app--v5.0.1/-/blob/packages/react-error-overlay/src/iframeScript.js?L50-L59) \u2014 calls `ReactDOM.unmountComponentAtNode` and `ReactDOM.render`. **Deprecated API; load-bearing** for the overlay\u2019s update/unmount behavior. Under React 18 these calls warn and operate in React 17 compatibility mode.\n- [create-react-app--v5.0.1:packages/react-scripts/config/webpack.config.js?L322-L330](/r/github.com/sg-evals/create-react-app--v5.0.1/-/blob/packages/react-scripts/config/webpack.config.js?L322-L330) \u2014 production profiling alias for `scheduler/tracing` \u2192 `scheduler/tracing-profiling`. **Vestigial/low-confidence compatibility shim**: CRA retains an old Scheduler tracing path for profiling; no direct CRA source caller of the deprecated tracing API was found.\n- [create-react-app--v5.0.1:packages/cra-template/template/src/index.js?L1-L12](/r/github.com/sg-evals/create-react-app--v5.0.1/-/blob/packages/cra-template/template/src/index.js?L1-L12) \u2014 uses `react-dom/client` and `createRoot`, so it is already migrated and does not reference deprecated legacy rendering.\n- [create-react-app--v5.0.1:packages/cra-template-typescript/template/src/index.tsx?L1-L10](/r/github.com/sg-evals/create-react-app--v5.0.1/-/blob/packages/cra-template-typescript/template/src/index.tsx?L1-L10) \u2014 TypeScript template likewise uses `react-dom/client` and `createRoot`; no dead legacy API reference.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "dead-code-dual-react-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.2184
+    },
+    "mrr": 0.1667,
+    "map_score": 0.0833,
+    "file_recall": 0.5,
+    "context_efficiency": 0.125,
+    "n_retrieved": 8,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "CHANGELOG.md",
+    "packages/react-dom/src/client/ReactDOMLegacy.js",
+    "packages/react/src/ReactElementValidator.js",
+    "packages/react/src/React.js",
+    "packages/react-error-overlay/src/iframeScript.js",
+    "packages/react-scripts/config/webpack.config.js",
+    "packages/cra-template/template/src/index.js",
+    "packages/cra-template-typescript/template/src/index.tsx"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "dead-code-dual-react-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.2184
+    },
+    "mrr": 0.1667,
+    "map_score": 0.0833,
+    "file_recall": 0.5,
+    "context_efficiency": 0.125,
+    "n_retrieved": 8,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

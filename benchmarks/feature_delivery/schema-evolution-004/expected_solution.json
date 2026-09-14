@@ -1,0 +1,41 @@
+{
+  "task_id": "schema-evolution-004",
+  "checkpoints": {
+    "identify_schema_change": {
+      "expected_solution": "Zulip PR #38020 moves `default_avatar_source` from `UserProfile` to `Realm` so avatar source becomes a realm-wide setting instead of per-user. Schema-side changes: (a) field added to `Realm` in `zerver/models/realms.py`; (b) field removed from `UserProfile` in `zerver/models/users.py`; (c) Django migration `zerver/migrations/0776_realm_default_avatar_source.py` performs the addition + data backfill (with the old field stripped from a squashed migration). The avatar resolution helper in `zerver/lib/avatar.py` switches from reading the user-profile column to the realm column.",
+      "evaluation_criteria": [
+        "Must identify the change as moving default_avatar_source from UserProfile to Realm",
+        "Must reference both zerver/models/realms.py and zerver/models/users.py",
+        "Must reference zerver/migrations/0776_realm_default_avatar_source.py",
+        "Should mention zerver/lib/avatar.py as the consumer that switches column"
+      ]
+    },
+    "find_direct_refs": {
+      "expected_solution": "Direct references — code that reads or writes `default_avatar_source` after the move: (1) `zerver/lib/avatar.py` — central helper `avatar_source_for_user` / URL builders consult the new realm-level setting; (2) `zerver/models/realms.py` — declares the new field on Realm; (3) `zerver/models/users.py` — drops the field from UserProfile; (4) `zerver/openapi/python_examples.py` — Python API examples documenting the avatar endpoints must demonstrate the realm-level setting.",
+      "evaluation_criteria": [
+        "Must cite zerver/lib/avatar.py as the central avatar-resolution helper",
+        "Must cite both zerver/models/realms.py and zerver/models/users.py",
+        "Must cite zerver/openapi/python_examples.py for API examples",
+        "Should explain that zerver/lib/avatar.py is the chokepoint for avatar source decisions"
+      ]
+    },
+    "find_indirect_refs": {
+      "expected_solution": "Indirect references — importers and frontend templates: (1) `web/templates/settings/organization_settings_admin.hbs` — admin settings template gains a control for the realm-level avatar source; (2) `zerver/tests/test_mattermost_importer.py`, `zerver/tests/test_rocketchat_importer.py`, `zerver/tests/test_slack_importer.py` — importers historically wrote `default_avatar_source` on imported UserProfiles; with the move, importers must no longer set the per-user field and instead respect realm-level setting (or the importer logic itself drops the assignment); (3) the squashed migration `zerver/migrations/0001_squashed_0569.py` and the older `zerver/migrations/0031_remove_system_avatar_source.py` are touched to keep the full migration history coherent.",
+      "evaluation_criteria": [
+        "Must cite web/templates/settings/organization_settings_admin.hbs as the admin-settings template",
+        "Must mention all three importer test files: zerver/tests/test_mattermost_importer.py, zerver/tests/test_rocketchat_importer.py, zerver/tests/test_slack_importer.py",
+        "Must explain that importers previously set per-user avatar source and must adapt",
+        "Should mention that older migration files (e.g., zerver/migrations/0001_squashed_0569.py) are touched for history coherence"
+      ]
+    },
+    "identify_test_impact": {
+      "expected_solution": "Test files needing updates: (1) `zerver/tests/test_events.py` — verifies that realm/update events convey the new field; (2) `zerver/tests/test_upload.py` and `zerver/tests/test_upload_s3.py` — avatar upload paths consult the new realm setting; (3) `zerver/tests/test_mattermost_importer.py`, `zerver/tests/test_rocketchat_importer.py`, `zerver/tests/test_slack_importer.py` — importer suites verify the field is no longer being set on UserProfile and the realm default is honored; (4) configuration churn in package.json and the pnpm lockfile rides along when frontend test deps update.",
+      "evaluation_criteria": [
+        "Must cite zerver/tests/test_events.py for event-payload coverage",
+        "Must cite zerver/tests/test_upload.py and zerver/tests/test_upload_s3.py for avatar-upload coverage",
+        "Must cite at least two importer tests among zerver/tests/test_mattermost_importer.py, zerver/tests/test_rocketchat_importer.py, zerver/tests/test_slack_importer.py",
+        "Should mention package.json and pnpm lockfile churn travels with the PR"
+      ]
+    }
+  }
+}

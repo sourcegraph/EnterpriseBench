@@ -1,0 +1,70 @@
+{
+  "task_id": "support-mapping-dual-log4j-slf4j-async-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/qos-ch/slf4j",
+      "rev": "v_2.0.13",
+      "path": "slf4j"
+    },
+    {
+      "url": "https://github.com/apache/logging-log4j2",
+      "rev": "rel/2.23.1",
+      "path": "log4j2"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "slf4j/slf4j-api/src/main/java/org/slf4j/LoggerFactory.java",
+      "repo": "slf4j",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "slf4j/slf4j-api/src/main/java/org/slf4j/Logger.java",
+      "repo": "slf4j",
+      "confidence": 0.8,
+      "source": "deterministic"
+    },
+    {
+      "path": "log4j2/log4j-core/src/main/java/org/apache/logging/log4j/core/appender/AsyncAppender.java",
+      "repo": "log4j2",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "log4j2/log4j-core/src/main/java/org/apache/logging/log4j/core/async/AsyncLoggerConfigDisruptor.java",
+      "repo": "log4j2",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "slf4j/slf4j-api/src/main/java/org/slf4j/spi/LocationAwareLogger.java",
+      "repo": "slf4j",
+      "confidence": 0.7
+    },
+    {
+      "path": "log4j2/log4j-core/src/main/java/org/apache/logging/log4j/core/async/AsyncQueueFullPolicy.java",
+      "repo": "log4j2",
+      "confidence": 0.85
+    }
+  ],
+  "error_chain": [
+    "slf4j's LoggerFactory binds at runtime to log4j-slf4j-impl which exposes a Log4jLogger that forwards each call to log4j2's AbstractLogger.logMessage",
+    "When the appender chain includes AsyncAppender, log events enter a blocking queue or LMAX Disruptor ring depending on configuration",
+    "log4j2's AsyncAppender uses AsyncQueueFullPolicy to decide what to do when the queue is full; the default Discard policy drops events below ERROR level",
+    "Under burst load the ring buffer fills, AsyncQueueFullPolicy.Discard drops INFO/DEBUG events silently, and slf4j callers see Logger.info() return without a thrown exception"
+  ],
+  "trigger_conditions": [
+    "Customer's log4j2 config uses AsyncAppender or AsyncLoggerConfig with the default discard policy",
+    "Sustained burst load fills the Disruptor ring beyond ringBufferSize",
+    "The discard policy drops sub-ERROR events without error reporting back to slf4j's Logger.info caller"
+  ],
+  "expected_answer": {
+    "error_origin": "log4j2 AsyncQueueFullPolicy.Discard dropping sub-ERROR events when the AsyncAppender ring buffer is full",
+    "bypass_reason": "slf4j's binding API has no return contract for delivery; log4j2's discard policy silently drops events at the appender rather than back-pressuring callers",
+    "correct_config": "Set log4j2.AsyncQueueFullPolicy=Default (which blocks the caller) or increase ringBufferSize via AsyncLoggerConfig.RingBufferSize, accepting back-pressure on the slf4j caller path"
+  }
+}

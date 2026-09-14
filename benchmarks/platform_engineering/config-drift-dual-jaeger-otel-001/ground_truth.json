@@ -1,0 +1,43 @@
+{
+  "task_id": "config-drift-dual-jaeger-otel-001",
+  "task_type": "config_drift",
+  "repos": [
+    {
+      "url": "https://github.com/jaegertracing/jaeger",
+      "rev": "v1.51.0",
+      "path": "jaeger"
+    },
+    {
+      "url": "https://github.com/open-telemetry/opentelemetry-collector",
+      "rev": "v0.89.0",
+      "path": "otel-collector"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "jaeger/cmd/collector/app/flags.go",
+      "repo": "jaeger",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "otel-collector/service/service.go",
+      "repo": "otel-collector",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "jaeger/cmd/collector/app/handler/grpc_handler.go",
+      "repo": "jaeger",
+      "confidence": 0.8
+    },
+    {
+      "path": "otel-collector/receiver/otlpreceiver/factory.go",
+      "repo": "otel-collector",
+      "confidence": 0.8
+    }
+  ],
+  "drift_type": "config_format_migration"
+}

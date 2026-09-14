@@ -1,0 +1,169 @@
+{
+  "task_id": "calibration-002",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/click--8.2.1"
+  ],
+  "retrieved_paths": [
+    "src/click/core.py",
+    "docs/options.md"
+  ],
+  "retrieved_paths_union": [
+    "src/click/core.py",
+    "docs/options.md"
+  ],
+  "required_files": [
+    "src/click/core.py",
+    "src/click/decorators.py"
+  ],
+  "ir_scores": {
+    "task_id": "calibration-002",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.5,
+    "n_retrieved": 2,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "calibration-002",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.5,
+    "n_retrieved": 2,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 48.4,
+  "response_chars": 6212,
+  "raw_response": "Now I have everything needed. Here is the full explanation:\n\n---\n\n## Root Cause: `flag_value` with `--flag/--no-flag` syntax is not supported and silently misbehaves\n\n### 1. Where `flag_value` is processed\n\nThe logic lives in [`Option.__init__`](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2533-L2624) in `src/click/core.py`.\n\n### 2. The exact interaction between `flag_value` and `default`\n\nFollow the execution order in `__init__`:\n\n**Step A** \u2014 Capture whether `default` was explicitly passed ([line 2557]((/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2557))):\n```python\ndefault_is_missing = \"default\" not in attrs\n```\n`attrs` is a `**kwargs` dict. The check happens *before* `super().__init__()` is called.\n\n**Step B** \u2014 `super().__init__()` is called ([line 2558]((/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2558-2560))), which stores `self.default` from `attrs`.\n\n**Step C** \u2014 Determine `is_flag` ([lines 2590\u20132599](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2590-L2599)):\n```python\nif is_flag is None:\n    if flag_value is not None:\n        is_flag = True          # <-- triggered when flag_value=True is passed\n    ...\n    else:\n        is_flag = bool(self.secondary_opts)  # <-- triggered by --verbose/--no-verbose\n```\nWhen you pass `flag_value=True`, `is_flag` is set to `True` here. `self.secondary_opts` (populated from `--no-verbose`) is **never consulted**.\n\n**Step D** \u2014 Override `self.default` to `False` if `default_is_missing` ([lines 2607\u20132611](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2607-L2611)):\n```python\nif is_flag and default_is_missing and not self.required:\n    ...\n    self.default = False\n```\nThis only fires when `default` was **not** provided by the caller.\n\n**Step E** \u2014 If `flag_value` is still `None`, derive it from `self.default` ([lines 2613\u20132614](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2613-L2614)):\n```python\nif is_flag and flag_value is None:\n    flag_value = not self.default\n```\nThis is the normal path for `--verbose/--no-verbose` (no explicit `flag_value`): `flag_value` becomes `not default`.\n\n**Step F** \u2014 Compute `is_bool_flag` ([line 2623](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2623)):\n```python\nself.is_bool_flag: bool = is_flag and isinstance(self.type, types.BoolParamType)\n```\nWhen `flag_value=True` (a bool), the type resolves to `BoolParamType`, so `is_bool_flag=True`. When `flag_value` is e.g. `\"upper\"` (a string), `is_bool_flag=False`.\n\n### 3. Why ordering matters and what actually breaks\n\n**Case 1: `flag_value=True, default=True` (your first example)**\n\n- `flag_value` is not `None` \u2192 `is_flag = True` (via Step C, first branch)\n- `default_is_missing = False` \u2192 Step D is skipped, `self.default` stays `True`\n- Step E is skipped (`flag_value` is not `None`)\n- `is_bool_flag = True` (bool type)\n- `self.secondary_opts` is set (from `--no-verbose`), but the code path for a bool flag with secondary opts adds both `--verbose` and `--no-verbose` to the parser ([line 2749](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2749-L2751)):\n\n```python\nif self.is_bool_flag and self.secondary_opts:\n    parser.add_option(obj=self, dest=self.name, action=\"store_true\", ...)\n    parser.add_option(obj=self, dest=self.name, action=\"store_false\", ...)\n```\n\nSo `--no-verbose` *does* store `False`... but only if `is_bool_flag` ends up `True`. The **actual bug** is subtler: when you write `--verbose/--no-verbose, flag_value=True`, `flag_value` is redundant (it equals the value `--verbose` would naturally store), and the behavior is correct: `--no-verbose` sets the value to `False`. This is **not** the broken case.\n\n**Case 2: `flag_value=True, default=True` where there are NO secondary opts**\n\nIf you write `@click.option('--verbose', flag_value=True, default=True)` (single opt), then:\n- `is_flag = True` (Step C, because `flag_value is not None`)\n- `is_bool_flag = True`\n- `self.secondary_opts` is empty \u2192 the parser only adds `--verbose` as `store_true`\n- There is no `--no-verbose` to set `False`; the flag always stores `True` when passed, and the default is `True` when omitted \u2014 it can never be `False`\n\n**Case 3: `default=True, flag_value=True` (your second example \u2014 same kwargs, different order)**\n\nPython `**kwargs` dictionaries are insertion-ordered but `option()` receives them as named parameters, so the **Python parameter order does not affect behavior**. Both calls produce *identical* `Option` objects. If you observe different runtime behavior, it is caused by something else (e.g. decorator stacking order, a different option name being used in one test, or a cached import).\n\n### Summary\n\n| Scenario | `is_flag` source | `flag_value` | `is_bool_flag` | `--no-verbose` works? |\n|---|---|---|---|---|\n| `--verbose/--no-verbose` (no `flag_value`) | `bool(secondary_opts)` | `not default` | `True` | Yes |\n| `--verbose/--no-verbose, flag_value=True` | `flag_value is not None` | `True` (explicit) | `True` | Yes (same path) |\n| `--verbose, flag_value=True, default=True` | `flag_value is not None` | `True` (explicit) | `True` | No `--no-verbose` exists |\n\n**The real issue:** mixing `--flag/--no-flag` syntax with an explicit `flag_value=True` is redundant and not the intended API. `flag_value` is designed for **non-boolean** flag groups (e.g. `--upper`/`--lower` sharing the same destination, as shown in the [docs example](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/docs/options.md?L317-L327)). For `--verbose/--no-verbose`, omit `flag_value` entirely and set only `default=True`:\n\n```python\n@click.option('--verbose/--no-verbose', default=True)\n```\n\nClick will automatically set `flag_value = not self.default = False` for `--no-verbose` via [line 2614](https://demo.sourcegraph.com/r/github.com/sg-evals/click--8.2.1/-/blob/src/click/core.py?L2614), and the secondary opt will store `False` correctly.\n\nLink: https://demo.sourcegraph.com/deepsearch/2ddb1d22-aebb-47a4-881b-1862fa34c390",
+  "ir_scores_unaligned": {
+    "task_id": "calibration-002",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.5,
+    "n_retrieved": 2,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "src/click/core.py",
+    "docs/options.md"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "calibration-002",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.5,
+    "n_retrieved": 2,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-envoy-istio-xds-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: envoy/source/common/listener_manager/listener_manager_impl.cc, envoy/source/common/listener_manager/listener_impl.cc, istio/pilot/pkg/xds/ads.go, istio/pilot/pkg/xds/lds.go. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify envoy/source/common/listener_manager/listener_manager_impl.cc as part of the error source",
+        "Must identify envoy/source/common/listener_manager/listener_impl.cc as part of the error source",
+        "Must identify istio/pilot/pkg/xds/ads.go as part of the error source",
+        "Must identify istio/pilot/pkg/xds/lds.go as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) Istio Pilot's ConfigGenerator builds a snapshot per push event; ads.go pushes LDS+RDS+CDS+EDS to subscribed Envoys via DeltaAggregatedResources or AggregatedResources -> (2) lds.go computes listener resources per proxy and serializes them with a new version string even when content is unchanged, because the version is monotonic per push -> (3) Envoy's grpc_mux_impl receives the snapshot and routes each listener resource into ListenerManager::addOrUpdateListener -> (4) ListenerManager compares the listener config against the existing active listener; if Envoy considers them different (for example, by hash recompute mismatch), it triggers a drain via ConnectionHandler::drainListener -> (5) During drain, in-flight requests on idle connections are reset with 503 from the connection's onCloseSocket path until the new listener takes over.",
+      "evaluation_criteria": [
+        "Must describe the step: Istio Pilot's ConfigGenerator builds a snapshot per push event; ads.go pushes LD...",
+        "Must describe the step: lds.go computes listener resources per proxy and serializes them with a new vers...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Istio Pilot uses full-snapshot ADS (not delta-xDS) so version is bumped on every push regardless of content; (2) Envoy's ListenerManager re-evaluates listener identity on every LDS update; spurious version changes can trigger drain when hash comparison drifts; (3) ConnectionHandler::drainListener resets idle connections with 503 during the drain window, visible as the customer's 503 spike.",
+      "evaluation_criteria": [
+        "Must identify the condition: Istio Pilot uses full-snapshot ADS (not delta-xDS) so version is bumped on every...",
+        "Must identify the condition: Envoy's ListenerManager re-evaluates listener identity on every LDS update; spur...",
+        "Must identify the condition: ConnectionHandler::drainListener resets idle connections with 503 during the dra...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

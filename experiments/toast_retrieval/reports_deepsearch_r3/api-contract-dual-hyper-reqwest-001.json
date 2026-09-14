@@ -1,0 +1,215 @@
+{
+  "task_id": "api-contract-dual-hyper-reqwest-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/hyper--v1.0.0",
+    "github.com/sg-evals/reqwest--v0.11.22"
+  ],
+  "retrieved_paths": [
+    "Cargo.toml",
+    "src/async_impl/body.rs",
+    "src/async_impl/response.rs",
+    "src/body/incoming.rs",
+    "src/async_impl/decoder.rs",
+    "src/blocking/body.rs",
+    "src/client/mod.rs",
+    "src/async_impl/client.rs",
+    "src/connect.rs",
+    "src/dns/gai.rs",
+    "src/dns/resolve.rs",
+    "src/dns/trust_dns.rs",
+    "src/body/mod.rs",
+    "src/lib.rs",
+    "body/incoming.rs",
+    "src/async_impl/h3_client/connect.rs",
+    "src/async_impl/h3_client/dns.rs"
+  ],
+  "retrieved_paths_union": [
+    "Cargo.toml",
+    "src/async_impl/body.rs",
+    "src/async_impl/response.rs",
+    "src/body/incoming.rs",
+    "src/async_impl/decoder.rs",
+    "src/blocking/body.rs",
+    "src/client/mod.rs",
+    "src/async_impl/client.rs",
+    "src/connect.rs",
+    "src/dns/gai.rs",
+    "src/dns/resolve.rs",
+    "src/dns/trust_dns.rs",
+    "src/body/mod.rs",
+    "src/lib.rs",
+    "body/incoming.rs",
+    "src/async_impl/h3_client/connect.rs",
+    "src/async_impl/h3_client/dns.rs"
+  ],
+  "required_files": [
+    "hyper/src/body/mod.rs",
+    "reqwest/src/async_impl/client.rs"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1934
+    },
+    "mrr": 0.125,
+    "map_score": 0.1394,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1176,
+    "n_retrieved": 17,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1934
+    },
+    "mrr": 0.125,
+    "map_score": 0.1394,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1176,
+    "n_retrieved": 17,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 233.2,
+  "response_chars": 18667,
+  "raw_response": "---\ntitle: Analyze hyper and reqwest body-type contract mismatch and migration path\nshare_url: https://demo.sourcegraph.com/deepsearch/5563c86d-8b46-4d62-8212-4a9a97a8d123\nurl: https://demo.sourcegraph.com/deepsearch/2175\ncreated: 2026-08-17T22:58:09Z\nupdated: 2026-08-17T23:01:09Z\n---\n\n#         # api-contract-dual-hyper-reqwest-001\n\n        **Suite:** dependency_management | **Type:** api_contract | **Difficulty:** hard\n        **Repos:** hyper + reqwest\n\n        ## Context\n\n        Between the versions pinned in this workspace, hyper made a breaking\nchange to how it represents request/response bodies, and reqwest is pinned\nto a version that predates that change. The reqwest HTTP client depends\nheavily on hyper's body-related types in its client implementation.\n\nYour task:\n1. Find where hyper defines its body-related types and traits in this\n   version, and work out what changed relative to what reqwest expects.\n2. Find where reqwest uses hyper's body type(s) in its client implementation.\n3. Identify the contract mismatch between hyper's current body types\n   and reqwest's existing usage.\n4. Document the migration path for each affected reqwest module, citing the\n   specific files, types, and functions involved on both sides.\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/hyper--v1.0.0, github.com/sg-evals/reqwest--v0.11.22\n\nThe content is fully captured. Here is the complete analysis:\n\n---\n\n## hyper v1.0.0 vs reqwest v0.11.22 \u2014 Impact Report\n\n### Version Pin Summary\n\n| crate | version | hyper dep | http dep | http-body dep |\n|---|---|---|---|---|\n| hyper | 1.0.0 | (self) | `\"1\"` | `\"1\"` |\n| reqwest | 0.11.22 | `\"0.14.21\"` | `\"0.2\"` | `\"0.4.0\"` |\n\nSources: [hyper Cargo.toml](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.0.0/-/blob/Cargo.toml?L23-28), [reqwest Cargo.toml](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/Cargo.toml?L84-103).\n\n---\n\n### Breaking Change 1 \u2014 `hyper::Body` (concrete struct) is REMOVED\n\n**Nature:** Removal\n\nIn hyper 0.14, `hyper::Body` was a concrete, all-purpose struct that handled both sending (with `channel()`, `wrap_stream()`) and receiving. In v1.0, it is **entirely gone**. The only concrete body type is `hyper::body::Incoming`, used only for received data.\n\n**reqwest files affected:**\n\n- [`src/async_impl/body.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L45) \u2014 `struct WrapHyper(hyper::Body)`\n- [`src/async_impl/body.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L111) \u2014 `Body::response(body: hyper::Body, \u2026)`\n- [`src/async_impl/body.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L121) \u2014 `Body::wrap(body: hyper::Body)`\n- [`src/async_impl/body.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L169-179) \u2014 `impl From<hyper::Body> for Body`\n- [`src/async_impl/response.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/response.rs?L33-47) \u2014 `Response::new(res: hyper::Response<hyper::Body>, \u2026)`\n\n**Migration:** Replace `hyper::Body` with `hyper::body::Incoming` for received responses. For outbound request bodies, use `http_body_util::Full<Bytes>`, `http_body_util::Empty`, or `http_body_util::combinators::BoxBody`.\n\n---\n\n### Breaking Change 2 \u2014 `http_body::Body` trait changed: `poll_data`/`poll_trailers` \u2192 `poll_frame`\n\n**Nature:** Signature change (trait method replacement)\n\nhyper v1.0 uses `http-body = \"1\"`. The v0.4 trait had two methods:\n```rust\nfn poll_data(\u2026) -> Poll<Option<Result<Data, Error>>>\nfn poll_trailers(\u2026) -> Poll<Result<Option<HeaderMap>, Error>>\n```\nThe v1.0 trait replaces both with a single method ([`body/incoming.rs` L174\u2013177](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.0.0/-/blob/src/body/incoming.rs?L174-177)):\n```rust\nfn poll_frame(mut self: Pin<&mut Self>, cx: &mut Context<'_>)\n    -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>>\n```\n`Frame` carries either data or trailers. `is_end_stream` is removed from the trait.\n\n**reqwest files affected:**\n\n- [`src/async_impl/body.rs` L233\u2013290](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L233-290) \u2014 `impl HttpBody for ImplStream`\n- [`src/async_impl/body.rs` L302\u2013326](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L302-326) \u2014 `impl HttpBody for WrapStream<S>`\n- [`src/async_impl/body.rs` L330\u2013358](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L330-358) \u2014 `impl HttpBody for WrapHyper`\n- [`src/async_impl/decoder.rs` L260\u2013286](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/decoder.rs?L260-286) \u2014 `impl HttpBody for Decoder`\n\n**Migration:** Rewrite all `HttpBody` impls to implement `poll_frame`, emitting `Frame::data(bytes)` or `Frame::trailers(header_map)`.\n\n---\n\n### Breaking Change 3 \u2014 `hyper::body::HttpBody` import path removed\n\n**Nature:** Rename/removal\n\nreqwest imports `use hyper::body::HttpBody` in two files. In v1.0, the re-export alias `HttpBody` at that path is gone.\n\n**reqwest files affected:**\n- [`src/async_impl/decoder.rs` L19](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/decoder.rs?L19)\n- [`src/async_impl/response.rs` L81](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/response.rs?L81)\n\n**Migration:** `use http_body::Body as HttpBody;`\n\n---\n\n### Breaking Change 4 \u2014 `hyper::body::to_bytes()` removed\n\n**Nature:** Removal\n\n```rust\n// src/async_impl/response.rs line 259\nhyper::body::to_bytes(self.res.into_body()).await\n```\n\n**Migration:** Add `http-body-util` dependency. Use:\n```rust\nuse http_body_util::BodyExt;\nbody.collect().await?.to_bytes()\n```\n\n---\n\n### Breaking Change 5 \u2014 `hyper::Body::channel()` and `hyper::body::Sender` removed\n\n**Nature:** Removal\n\nreqwest's blocking body bridge ([`src/blocking/body.rs` L136](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/blocking/body.rs?L136)) calls `hyper::Body::channel()` and holds a `hyper::body::Sender` ([L260](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/blocking/body.rs?L260)).\n\n**Migration:** Build a custom `mpsc`-based body using `futures_channel::mpsc` with a hand-written v1 `Body` impl (mirroring how `hyper::body::Incoming` works internally at [src/body/incoming.rs L44\u201358](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.0.0/-/blob/src/body/incoming.rs?L44-58)).\n\n---\n\n### Breaking Change 6 \u2014 `hyper::Client`, `hyper::client::{HttpConnector, ResponseFuture}` removed\n\n**Nature:** Removal (moved to `hyper-util`)\n\nThe high-level pooled `hyper::Client` and its builder are gone from v1.0's [`src/client/mod.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/hyper--v1.0.0/-/blob/src/client/mod.rs) \u2014 only `conn::` remains.\n\n**reqwest files affected:**\n- [`src/async_impl/client.rs` L16](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/client.rs?L16) \u2014 `use hyper::client::{HttpConnector, ResponseFuture as HyperResponseFuture}`\n- [`src/async_impl/client.rs` L615](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/client.rs?L615) \u2014 `hyper::Client::builder()`\n- [`src/async_impl/client.rs` L684](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/client.rs?L684) \u2014 `builder.build(connector)`\n\n**Migration:** Add `hyper-util` crate. Use `hyper_util::client::legacy::{Builder, Client, connect::HttpConnector, ResponseFuture}`.\n\n---\n\n### Breaking Change 7 \u2014 `hyper::client::connect::{Connected, Connection, HttpInfo, dns::Name}` removed\n\n**Nature:** Removal (moved to `hyper-util`)\n\n**reqwest files affected:**\n- [`src/connect.rs` L5-6](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/connect.rs?L5-6) \u2014 `Connected`, `Connection`\n- [`src/async_impl/response.rs` L8](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/response.rs?L8) \u2014 `HttpInfo`\n- [`src/dns/gai.rs` L2](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/dns/gai.rs?L2), [`src/dns/resolve.rs` L1](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/dns/resolve.rs?L1), [`src/dns/trust_dns.rs` L3](https://demo.sourcegraph.com/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/dns/trust_dns.rs?L3), `src/async_impl/h3_client/connect.rs`, `src/async_impl/h3_client/dns.rs` \u2014 `dns::Name`\n\n**Migration:** All from `hyper_util::client::legacy::connect` / `hyper_util::client::legacy::connect::dns`.\n\n---\n\n### Breaking Change 8 \u2014 `hyper::service::Service` removed; `http` crate major version bump\n\n**Nature:** Removal / version incompatibility\n\n- `hyper::service::Service` is gone. **Migration:** `use tower_service::Service;` (already a direct reqwest dep).\n- hyper v1.0 requires `http = \"1\"` vs. reqwest's `http = \"0.2\"`. All `http::Request`, `http::Response`, `http::HeaderMap`, `http::Uri`, etc. are incompatible across this boundary.\n\n---\n\n### New Dependencies Required for Migration\n\n```toml\nhyper          = { version = \"1\",   features = [\"http1\", \"http2\", \"client\"] }\nhyper-util     = { version = \"0.1\", features = [\"client\", \"client-legacy\", \"http1\", \"http2\", \"tokio\"] }\nhttp-body-util = \"0.1\"\nhttp-body      = \"1\"\nhttp           = \"1\"       # breaking upgrade from 0.2\n```\n\n---\n\n### Complete File-Level Summary\n\n| reqwest file | Symbol | Change | Migration |\n|---|---|---|---|\n| `src/async_impl/body.rs` | `hyper::Body` | Removal | `hyper::body::Incoming` / `http_body_util` types |\n| `src/async_impl/body.rs` | `poll_data`/`poll_trailers` on `ImplStream`, `WrapHyper`, `WrapStream` | Signature | Implement `poll_frame` |\n| `src/async_impl/body.rs` | `From<hyper::Body>` | Removal | `From<hyper::body::Incoming>` |\n| `src/async_impl/response.rs` | `hyper::Response<hyper::Body>` | Removal | `hyper::Response<hyper::body::Incoming>` |\n| `src/async_impl/response.rs` | `hyper::body::to_bytes` | Removal | `http_body_util::BodyExt::collect()` |\n| `src/async_impl/response.rs` | `hyper::client::connect::HttpInfo` | Removal | `hyper_util::client::legacy::connect::HttpInfo` |\n| `src/async_impl/decoder.rs` | `hyper::body::HttpBody` path | Removal | `http_body::Body` |\n| `src/async_impl/decoder.rs` | `impl HttpBody for Decoder` | Signature | Implement `poll_frame` |\n| `src/async_impl/client.rs` | `hyper::client::{HttpConnector, ResponseFuture}` | Removal | `hyper_util::client::legacy::*` |\n| `src/async_impl/client.rs` | `hyper::Client::builder()` | Removal | `hyper_util::client::legacy::Builder` |\n| `src/async_impl/client.rs` | `body.into_stream()` as request body | Trait version mismatch | Rewrite `ImplStream` for `http-body = \"1\"` |\n| `src/blocking/body.rs` | `hyper::Body::channel()` | Removal | Custom mpsc `Body` |\n| `src/blocking/body.rs` | `hyper::body::Sender` | Removal | Custom sender |\n| `src/connect.rs` | `hyper::client::connect::{Connected, Connection}` | Removal | `hyper_util::client::legacy::connect` |\n| `src/connect.rs` | `hyper::service::Service` | Removal | `tower_service::Service` |\n| `src/dns/gai.rs` | `hyper::client::connect::dns::{GaiResolver, Name}` | Removal | `hyper_util::client::legacy::connect::dns` |\n| `src/dns/resolve.rs` | `hyper::client::connect::dns::Name` | Removal | `hyper_util::client::legacy::connect::dns::Name` |\n| `src/dns/trust_dns.rs` | `hyper::client::connect::dns::Name` | Removal | same |\n| `tests/*` | `hyper::Body::wrap_stream()` | Removal | `http_body_util::StreamBody` |\n| `tests/*` | `hyper::body::to_bytes()` | Removal | `http_body_util::BodyExt::collect()` |\n\nThe report content is also saved to the file artifact above. The core contract mismatch is: **reqwest is built on hyper 0.14's monolithic `hyper::Body` concrete type and the old two-method `http-body = \"0.4\"` trait, both of which are entirely gone from hyper 1.0** \u2014 replaced by `hyper::body::Incoming` (receive-only), the `http-body = \"1\"` single `poll_frame` trait, and a companion `hyper-util` crate that holds the pooled client infrastructure reqwest depended on.\n\n## Sources\n\n- [github.com/sg-evals/hyper--v1.0.0](/github.com/sg-evals/hyper--v1.0.0)\n- [github.com/sg-evals/reqwest--v0.11.22](/github.com/sg-evals/reqwest--v0.11.22)\n- [github.com/sg-evals/hyper--v1.0.0/Cargo.toml@b24ec98](/github.com/sg-evals/hyper--v1.0.0@b24ec982d5f32b45cdb69c0dbab5b57bd624ab0a/-/blob/Cargo.toml)\n- [github.com/sg-evals/reqwest--v0.11.22/Cargo.toml@d4e6a3e](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/Cargo.toml)\n- [github.com/sg-evals/hyper--v1.0.0](/github.com/sg-evals/hyper--v1.0.0)\n- [github.com/sg-evals/reqwest--v0.11.22](/github.com/sg-evals/reqwest--v0.11.22)\n- [github.com/sg-evals/hyper--v1.0.0](/github.com/sg-evals/hyper--v1.0.0)\n- [github.com/sg-evals/reqwest--v0.11.22](/github.com/sg-evals/reqwest--v0.11.22)\n- [github.com/sg-evals/hyper--v1.0.0/src/body/mod.rs@b24ec98](/github.com/sg-evals/hyper--v1.0.0@b24ec982d5f32b45cdb69c0dbab5b57bd624ab0a/-/blob/src/body/mod.rs)\n- [github.com/sg-evals/reqwest--v0.11.22/src/async_impl/body.rs@d4e6a3e](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/async_impl/body.rs)\n- [github.com/sg-evals/hyper--v1.0.0/src/body/incoming.rs@b24ec98](/github.com/sg-evals/hyper--v1.0.0@b24ec982d5f32b45cdb69c0dbab5b57bd624ab0a/-/blob/src/body/incoming.rs)\n- [github.com/sg-evals/reqwest--v0.11.22/src/async_impl/client.rs@d4e6a3e?L1-100](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/async_impl/client.rs?L1-100)\n- [github.com/sg-evals/reqwest--v0.11.22/src/async_impl/client.rs@d4e6a3e?L100-300](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/async_impl/client.rs?L100-300)\n- [github.com/sg-evals/reqwest--v0.11.22/src/async_impl/response.rs@d4e6a3e](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/async_impl/response.rs)\n- [github.com/sg-evals/hyper--v1.0.0/src/lib.rs@b24ec98](/github.com/sg-evals/hyper--v1.0.0@b24ec982d5f32b45cdb69c0dbab5b57bd624ab0a/-/blob/src/lib.rs)\n- [github.com/sg-evals/reqwest--v0.11.22/src/async_impl/decoder.rs@d4e6a3e?L1-100](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/async_impl/decoder.rs?L1-100)\n- [github.com/sg-evals/reqwest--v0.11.22/src/async_impl/decoder.rs@d4e6a3e?L100-300](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/async_impl/decoder.rs?L100-300)\n- [github.com/sg-evals/reqwest--v0.11.22/src/async_impl/client.rs@d4e6a3e?L600-800](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/async_impl/client.rs?L600-800)\n- [repo:^github.com/sg-evals/reqwest--v0.11.22$ hyper::Body](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Freqwest--v0.11.22$%20hyper::Body)\n- [repo:^github.com/sg-evals/reqwest--v0.11.22$ hyper::body::to_bytes OR hyper::body::HttpBody OR hyper::client::connect](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Freqwest--v0.11.22$%20hyper::body::to_bytes%20OR%20hyper::body::HttpBody%20OR%20hyper::client::connect)\n- [github.com/sg-evals/hyper--v1.0.0](/github.com/sg-evals/hyper--v1.0.0)\n- [github.com/sg-evals/reqwest--v0.11.22/src/blocking/body.rs@d4e6a3e?L120-175](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/blocking/body.rs?L120-175)\n- [github.com/sg-evals/reqwest--v0.11.22/src/blocking/body.rs@d4e6a3e?L240-310](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/blocking/body.rs?L240-310)\n- [github.com/sg-evals/hyper--v1.0.0/src/client/mod.rs@b24ec98?L1-80](/github.com/sg-evals/hyper--v1.0.0@b24ec982d5f32b45cdb69c0dbab5b57bd624ab0a/-/blob/src/client/mod.rs?L1-80)\n- [github.com/sg-evals/reqwest--v0.11.22/src/async_impl/client.rs@d4e6a3e?L1540-1620](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/async_impl/client.rs?L1540-1620)\n- [repo:^github.com/sg-evals/reqwest--v0.11.22$ ResponseFuture hyper::Client](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Freqwest--v0.11.22$%20ResponseFuture%20hyper::Client)\n- [github.com/sg-evals/reqwest--v0.11.22/src/async_impl/client.rs@d4e6a3e?L1660-1800](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/async_impl/client.rs?L1660-1800)\n- [github.com/sg-evals/reqwest--v0.11.22/src/async_impl/client.rs@d4e6a3e?L1800-1970](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/async_impl/client.rs?L1800-1970)\n- [github.com/sg-evals/reqwest--v0.11.22/src/async_impl/client.rs@d4e6a3e?L2070-2200](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/async_impl/client.rs?L2070-2200)\n- [github.com/sg-evals/hyper--v1.0.0](/github.com/sg-evals/hyper--v1.0.0)\n- [github.com/sg-evals/reqwest--v0.11.22/src/async_impl/client.rs@d4e6a3e?L2200-2320](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/async_impl/client.rs?L2200-2320)\n- [github.com/sg-evals/reqwest--v0.11.22/src/async_impl/client.rs@d4e6a3e?L2320-2420](/github.com/sg-evals/reqwest--v0.11.22@d4e6a3e3e7db49f856f7a6cbda4bbc3079e08f1e/-/blob/src/async_impl/client.rs?L2320-2420)\n\n\nGenerated files:\n- files/IMPACT_REPORT.json: /.api/agent-files/v1/deep-search/5563c86d-8b46-4d62-8212-4a9a97a8d123/files/IMPACT_REPORT.json\n- files/IMPACT_REPORT_md.csv: /.api/agent-files/v1/deep-search/5563c86d-8b46-4d62-8212-4a9a97a8d123/files/IMPACT_REPORT_md.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1934
+    },
+    "mrr": 0.125,
+    "map_score": 0.1394,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1176,
+    "n_retrieved": 17,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "Cargo.toml",
+    "src/async_impl/body.rs",
+    "src/async_impl/response.rs",
+    "src/body/incoming.rs",
+    "src/async_impl/decoder.rs",
+    "src/blocking/body.rs",
+    "src/client/mod.rs",
+    "reqwest/src/async_impl/client.rs",
+    "src/connect.rs",
+    "src/dns/gai.rs",
+    "src/dns/resolve.rs",
+    "src/dns/trust_dns.rs",
+    "hyper/src/body/mod.rs",
+    "src/lib.rs",
+    "body/incoming.rs",
+    "src/async_impl/h3_client/connect.rs",
+    "src/async_impl/h3_client/dns.rs"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1934
+    },
+    "mrr": 0.125,
+    "map_score": 0.1394,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1176,
+    "n_retrieved": 17,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

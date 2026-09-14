@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: fastapi/fastapi/dependencies/utils.py, fastapi/fastapi/routing.py, pydantic/pydantic/main.py, pydantic/pydantic/_internal/_discriminated_union.py. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify fastapi/fastapi/dependencies/utils.py as part of the error source",
+        "Must identify fastapi/fastapi/routing.py as part of the error source",
+        "Must identify pydantic/pydantic/main.py as part of the error source",
+        "Must identify pydantic/pydantic/_internal/_discriminated_union.py as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) FastAPI routing.py builds a request handler that calls solve_dependencies in dependencies/utils.py, which in turn validates the request body via Pydantic's model_validate_json -> (2) Pydantic v2 main.py routes model_validate_json into the core schema, where _internal/_discriminated_union.py uses the discriminator field to pick the right variant -> (3) If a model_validator(mode='before') in functional_validators.py returns a dict that omits the discriminator key, the union resolver falls back to the first variant and skips the field -> (4) FastAPI receives the populated model with None on the dropped field and serializes it as the 200 OK response without raising 422 because Pydantic considered validation successful.",
+      "evaluation_criteria": [
+        "Must describe the step: FastAPI routing.py builds a request handler that calls solve_dependencies in dep...",
+        "Must describe the step: Pydantic v2 main.py routes model_validate_json into the core schema, where _inte...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) The model uses a discriminated union with a model_validator(mode='before') that pre-processes the dict and drops the discriminator key; (2) Pydantic v2 changed discriminator resolution to silently fall back to the first variant when the discriminator value is missing; (3) FastAPI does not surface this fallback as a 422; the agent must inspect the dependency-resolution path to detect it.",
+      "evaluation_criteria": [
+        "Must identify the condition: The model uses a discriminated union with a model_validator(mode='before') that ...",
+        "Must identify the condition: Pydantic v2 changed discriminator resolution to silently fall back to the first ...",
+        "Must identify the condition: FastAPI does not surface this fallback as a 422; the agent must inspect the depe...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

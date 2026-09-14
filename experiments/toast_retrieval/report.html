@@ -1,0 +1,1143 @@
+<title>Should Toast-1 Join Our MCP Server</title>
+<style>
+  :root {
+    --ground:      #F2F5F5;
+    --surface:     #FFFFFF;
+    --surface-alt: #E9EEEE;
+    --ink:         #11191C;
+    --ink-soft:    #3D4C51;
+    --muted:       #64757B;
+    --rule:        #D2DBDB;
+    --rule-strong: #A9B7B8;
+    --accent:      #0E5F5A;
+    --accent-soft: #D5E7E4;
+    --toast:       #9A6A12;
+    --toast-dim:   #C2A167;
+    --finder:      #0E5F5A;
+    --deep:        #5B6E96;
+    --claude:      #7A4E7E;
+    --critical:    #A03828;
+    --shadow:      0 1px 2px rgba(17,25,28,.06), 0 8px 24px rgba(17,25,28,.05);
+
+    --serif: "Iowan Old Style", "Charter", Charter, Georgia, "Times New Roman", serif;
+    --sans:  ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0D1416;
+      --surface:     #141D20;
+      --surface-alt: #1B2528;
+      --ink:         #E8EEEE;
+      --ink-soft:    #BCC9CB;
+      --muted:       #85989C;
+      --rule:        #263437;
+      --rule-strong: #3B4C50;
+      --accent:      #5BC0B4;
+      --accent-soft: #17322F;
+      --toast:       #D2A04A;
+      --toast-dim:   #8B7038;
+      --finder:      #5BC0B4;
+      --deep:        #93A6CC;
+      --claude:      #C79BD0;
+      --critical:    #E08B7C;
+      --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0D1416;
+    --surface:     #141D20;
+    --surface-alt: #1B2528;
+    --ink:         #E8EEEE;
+    --ink-soft:    #BCC9CB;
+    --muted:       #85989C;
+    --rule:        #263437;
+    --rule-strong: #3B4C50;
+    --accent:      #5BC0B4;
+    --accent-soft: #17322F;
+    --toast:       #D2A04A;
+    --toast-dim:   #8B7038;
+    --finder:      #5BC0B4;
+    --deep:        #93A6CC;
+    --claude:      #C79BD0;
+    --critical:    #E08B7C;
+    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+
+  .prose { max-width: 68ch; }
+  .prose > * + * { margin-top: 1em; }
+  .prose p { margin: 0; color: var(--ink-soft); }
+
+  header.masthead { padding: 72px 0 0; display: flex; flex-direction: column; gap: 24px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: 8px 14px;
+  }
+  .eyebrow span + span::before { content: "/"; color: var(--rule-strong); margin-right: 14px; }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(2.4rem, 6vw, 3.9rem);
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    margin: 0;
+    max-width: 17ch;
+  }
+  .standfirst {
+    font-family: var(--serif);
+    font-size: clamp(1.15rem, 2.2vw, 1.42rem);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 58ch;
+    margin: 0;
+  }
+
+  .factstrip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1px; background: var(--rule);
+    border: 1px solid var(--rule); border-radius: 3px; overflow: hidden;
+  }
+  .fact { background: var(--surface); padding: 14px 16px; display: flex; flex-direction: column; gap: 3px; }
+  .fact dt {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .fact dd { margin: 0; font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+  section { display: flex; flex-direction: column; gap: 22px; }
+
+  h2 {
+    font-family: var(--serif); font-weight: 600;
+    font-size: clamp(1.5rem, 3vw, 2rem); line-height: 1.15;
+    letter-spacing: -0.015em; text-wrap: balance; margin: 0;
+    padding-top: 18px; border-top: 2px solid var(--ink); max-width: 26ch;
+  }
+  h3 { font-family: var(--sans); font-weight: 650; font-size: 1.02rem; letter-spacing: -0.005em; margin: 0; color: var(--ink); }
+
+  code, .mono { font-family: var(--mono); font-size: .88em; }
+  code { background: var(--surface-alt); border-radius: 2px; padding: 1px 5px; color: var(--ink); word-break: break-word; }
+  strong { font-weight: 650; color: var(--ink); }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+  /* verdicts */
+  .verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; }
+  .verdict {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-top: 4px solid var(--critical);
+    border-radius: 3px; padding: 22px 24px;
+    display: flex; flex-direction: column; gap: 10px;
+    box-shadow: var(--shadow);
+  }
+  .verdict.ok { border-top-color: var(--accent); }
+  .verdict .q { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .verdict .a {
+    font-family: var(--serif); font-size: 2.1rem; line-height: 1;
+    color: var(--critical); letter-spacing: -0.02em;
+  }
+  .verdict.ok .a { color: var(--accent); }
+  .verdict p { margin: 0; font-size: 15px; color: var(--ink-soft); line-height: 1.55; }
+
+  .headline {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-left: 4px solid var(--accent); border-radius: 3px;
+    padding: 30px 32px;
+    display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    gap: 12px 34px; align-items: center; box-shadow: var(--shadow);
+  }
+  .headline .num {
+    font-family: var(--serif); font-size: clamp(3rem, 8vw, 4.6rem);
+    line-height: .9; font-variant-numeric: tabular-nums;
+    color: var(--accent); letter-spacing: -0.03em;
+  }
+  .headline p { margin: 0; color: var(--ink-soft); max-width: 48ch; }
+  @media (max-width: 620px) { .headline { grid-template-columns: 1fr; } }
+
+  .scroller { overflow-x: auto; border: 1px solid var(--rule); border-radius: 3px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td {
+    text-align: right; padding: 10px 14px; border-bottom: 1px solid var(--rule);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  th:first-child, td:first-child { text-align: left; }
+  thead th {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted); font-weight: 500;
+    border-bottom: 1px solid var(--rule-strong); background: var(--surface-alt);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.name { font-family: var(--mono); font-size: 13px; }
+  .win { color: var(--accent); font-weight: 650; }
+  .lose { color: var(--critical); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: baseline; }
+  .d-toast  { background: var(--toast); }
+  .d-toast2 { background: var(--toast-dim); }
+  .d-finder { background: var(--finder); }
+  .d-deep   { background: var(--deep); }
+  .d-claude { background: var(--claude); }
+
+  caption, .caption {
+    caption-side: bottom; text-align: left; font-size: 13.5px;
+    color: var(--muted); padding: 12px 14px; line-height: 1.5;
+  }
+  .caption { padding: 0; }
+
+  .chart { background: var(--surface); border: 1px solid var(--rule); border-radius: 3px; padding: 22px; overflow-x: auto; }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 6px 20px;
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 20px;
+  }
+  .rows { display: flex; flex-direction: column; gap: 3px; min-width: 560px; }
+  .grouphead {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--rule); padding: 14px 0 5px; margin-bottom: 4px;
+  }
+  .rows > .grouphead:first-child { padding-top: 0; }
+  .row { display: grid; grid-template-columns: 250px 1fr; gap: 16px; align-items: center; padding: 3px 0; }
+  .row .label {
+    font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .bars { display: flex; flex-direction: column; gap: 2px; }
+  .bar { height: 9px; border-radius: 1px; position: relative; background: var(--surface-alt); }
+  .bar i { display: block; height: 100%; border-radius: 1px; }
+  .bar.b-toast  i { background: var(--toast); }
+  .bar.b-toast2 i { background: var(--toast-dim); }
+  .bar.b-finder i { background: var(--finder); }
+  .bar.b-deep   i { background: var(--deep); }
+  .bar.b-claude i { background: var(--claude); }
+  .bar.zero::after {
+    content: "0"; position: absolute; left: 3px; top: 50%; transform: translateY(-50%);
+    font-family: var(--mono); font-size: 8.5px; color: var(--muted);
+  }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 3px;
+    padding: 20px 22px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .card p { margin: 0; font-size: 15px; color: var(--ink-soft); line-height: 1.55; }
+  .card .tag { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+
+  .note { background: var(--accent-soft); border: 1px solid var(--rule); border-radius: 3px; padding: 20px 24px; }
+  .note > * + * { margin-top: .7em; }
+  .note p { margin: 0; color: var(--ink-soft); font-size: 15.5px; }
+
+  pre {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 3px;
+    padding: 16px 18px; overflow-x: auto; margin: 0;
+    font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--ink-soft);
+  }
+  pre b { color: var(--ink); font-weight: 600; }
+
+  ul.tight { margin: 0; padding-left: 1.15em; display: flex; flex-direction: column; gap: .5em; }
+  ul.tight li { color: var(--ink-soft); }
+  ul.tight li::marker { color: var(--rule-strong); }
+
+  footer { border-top: 1px solid var(--rule); padding-top: 22px; font-size: 14px; color: var(--muted); max-width: 68ch; }
+  footer p { margin: 0 0 .7em; }
+</style>
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">
+      <span>EnterpriseBench</span>
+      <span>Search policy evaluation</span>
+      <span>2026-08-17</span>
+    </div>
+    <h1>Should Toast-1 Join Our MCP Server</h1>
+    <p class="standfirst">
+      Mixedbread's Toast-1 is a model trained specifically as a search policy. We ran it against
+      <code>code_finder</code> and <code>deepsearch</code> over the same Sourcegraph index, on 63
+      tasks whose prompts do not name the files being looked for. It loses to both by roughly 0.2
+      recall, it is the least stable of the three across repeats, and a model-swap ablation puts
+      the deficit in the model rather than in its access to the index. One earlier conclusion
+      reversed: on the harder corpus Toast-1 does find files <code>code_finder</code> misses.
+    </p>
+    <dl class="factstrip">
+      <div class="fact"><dt>Hard slice</dt><dd>63 tasks</dd></div>
+      <div class="fact"><dt>Disclosure</dt><dd>&le;1/3, 44 at zero</dd></div>
+      <div class="fact"><dt>Policies</dt><dd>3 + ablation</dd></div>
+      <div class="fact"><dt>Repeats</dt><dd>2&ndash;3 per policy</dd></div>
+      <div class="fact"><dt>Repos</dt><dd>39 stores</dd></div>
+      <div class="fact"><dt>Ground truth</dt><dd>file level</dd></div>
+      <div class="fact"><dt>Index</dt><dd>demo.sourcegraph</dd></div>
+    </dl>
+  </header>
+
+  <section>
+    <div class="verdicts">
+      <div class="verdict">
+        <span class="q">Replace code_finder?</span>
+        <span class="a">No</span>
+        <p>
+          0.435 mean recall against <code>code_finder</code>'s 0.627 on the hard slice, losing
+          every repo-count stratum, with twice the zero-recall tasks. A repeat of the same sweep
+          scored 0.331, so 0.435 is the optimistic reading.
+        </p>
+      </div>
+      <div class="verdict ok">
+        <span class="q">Augment code_finder?</span>
+        <span class="a">Open</span>
+        <p>
+          Toast-1 contributes a required file <code>code_finder</code> missed on 9 of 63 tasks,
+          worth +0.064 union recall. Two policies we already ship do better on that same axis
+          (+0.081), which is the bar a third policy has to clear.
+        </p>
+      </div>
+      <div class="verdict">
+        <span class="q">The engine, with internal access?</span>
+        <span class="a">No</span>
+        <p>
+          A frontier model over Toast-1's own external tools matches <code>code_finder</code>
+          per-task on 17 of 20 and never beats it. The access lever measures ~0.03; the model gap
+          is the rest, and better access has no headroom to buy it back.
+        </p>
+      </div>
+      <div class="verdict ok">
+        <span class="q">Worth knowing anyway</span>
+        <span class="a">Yes</span>
+        <p>
+          On hard tasks <code>code_finder</code> and <code>deepsearch</code> converge (0.627 vs
+          0.633, inside repeat noise) and <code>deepsearch</code> costs 10x the latency for it.
+          That is a result about two things we already ship.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="headline">
+      <div class="num">0.435</div>
+      <p>
+        Toast-1's mean file recall on the 63-task hard slice, against 0.627 for
+        <code>code_finder</code> and 0.633 for <code>deepsearch</code>. An identical repeat of the
+        Toast sweep returned 0.331. Both numbers sit below both shipped policies in every stratum.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Three policies, one index</h2>
+    <div class="prose">
+      <p>
+        A search policy takes a task, decides its own queries, and returns the files that matter.
+        All three here got the identical task text, were scoped to the identical repositories, and
+        were scored by the same IR functions against file-level ground truth authored independently
+        of this experiment.
+      </p>
+      <p>
+        Read these numbers, not the 20-task corpus we started on. A third of that corpus names its
+        own required files inside the task prompt, which manufactures agreement between policies
+        and inflates every score. Each task here keeps at most a third of its required files
+        namable from the prompt, and 44 of the 63 disclose nothing at all.
+      </p>
+    </div>
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr>
+            <th>Policy</th><th>Recall</th><th>R@10</th><th>P@5</th><th>MRR</th><th>nDCG@10</th>
+            <th>Files</th><th>Perfect</th><th>Zero</th><th>Median</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="name"><span class="dot d-toast"></span>toast-1</td>
+            <td class="lose">0.435</td><td>0.419</td><td>0.232</td><td>0.515</td><td>0.382</td>
+            <td>8.9</td><td>7</td><td class="lose">14</td><td>26s</td>
+          </tr>
+          <tr>
+            <td class="name"><span class="dot d-toast2"></span>toast-1, repeat</td>
+            <td class="lose">0.331</td><td>0.331</td><td>0.181</td><td>0.464</td><td>0.328</td>
+            <td>8.3</td><td class="lose">4</td><td class="lose">26</td><td>26s</td>
+          </tr>
+          <tr>
+            <td class="name"><span class="dot d-finder"></span>code_finder</td>
+            <td>0.627</td><td class="win">0.594</td><td>0.270</td>
+            <td>0.555</td><td>0.480</td>
+            <td>9.4</td><td class="win">21</td><td>9</td><td class="win">22s</td>
+          </tr>
+          <tr>
+            <td class="name"><span class="dot d-deep"></span>deepsearch</td>
+            <td class="win">0.633</td><td>0.593</td><td class="win">0.302</td>
+            <td class="win">0.586</td><td class="win">0.488</td>
+            <td>11.4</td><td>17</td><td class="win">5</td><td class="lose">221s</td>
+          </tr>
+        </tbody>
+        <caption>
+          Mean over the 63 hard-slice tasks. "Files" is mean returned per task. "Perfect" and
+          "Zero" count tasks at recall 1.0 and 0.0. Median is per-task wall clock; Toast-1 ran
+          through a local adapter and its latency is not directly comparable to a hosted product.
+        </caption>
+      </table>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <span class="tag">Stratification</span>
+        <h3>Loses at every complexity</h3>
+        <p>
+          Single / dual / tri-repo recall runs 0.396 / 0.471 / 0.383 for Toast-1, against 0.494 /
+          0.750 / 0.444 for <code>code_finder</code> and 0.586 / 0.671 / 0.583 for
+          <code>deepsearch</code>. There is no band where the purpose-trained policy pulls ahead.
+        </p>
+      </div>
+      <div class="card">
+        <span class="tag">Volume control</span>
+        <h3>Not just more files</h3>
+        <p>
+          Returning more files flatters raw recall, so the gap was re-measured with
+          <code>code_finder</code> truncated per task to Toast-1's own set size. On the 20-task
+          corpus that still gives 0.717 against 0.575. On the hard slice the volume difference is
+          small to begin with: 9.4 files against 8.9.
+        </p>
+      </div>
+      <div class="card">
+        <span class="tag">Failure shape</span>
+        <h3>Zeros, not near-misses</h3>
+        <p>
+          Toast-1 returns nothing relevant on 14 of 63 tasks, rising to 26 on the repeat.
+          <code>deepsearch</code> fails outright on 5. For infrastructure, an intermittent total
+          miss is a different problem from a lower average, and a worse one.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Per task, and per run</h2>
+    <div class="chart">
+      <div class="legend">
+        <span><span class="dot d-toast"></span>toast-1</span>
+        <span><span class="dot d-toast2"></span>toast-1, repeat</span>
+        <span><span class="dot d-finder"></span>code_finder</span>
+        <span><span class="dot d-deep"></span>deepsearch</span>
+      </div>
+      <div class="rows">
+        <div class="grouphead">Single repo &middot; n=16</div>
+        <div class="row"><div class="label">calibration-002</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">calibration-008</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">ceph-rgw-auth-secure-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:75.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:75.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:75.0%"></i></div></div></div>
+        <div class="row"><div class="label">schema-evolution-002</div><div class="bars">
+          <div class="bar b-toast"><i style="width:25.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:75.0%"></i></div>
+          <div class="bar b-deep"><i style="width:75.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-002</div><div class="bars">
+          <div class="bar b-toast"><i style="width:33.3%"></i></div>
+          <div class="bar b-toast2"><i style="width:33.3%"></i></div>
+          <div class="bar b-finder"><i style="width:66.7%"></i></div>
+          <div class="bar b-deep"><i style="width:66.7%"></i></div></div></div>
+        <div class="row"><div class="label">ansible-galaxy-tar-regression-prove-001</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:50.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">calibration-005</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:50.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">calibration-007</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:50.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">err-provenance-03</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:50.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">refactor-orchestration-006</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:50.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">ccx-incident-032</div><div class="bars">
+          <div class="bar b-toast"><i style="width:100.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:40.0%"></i></div>
+          <div class="bar b-finder"><i style="width:40.0%"></i></div>
+          <div class="bar b-deep"><i style="width:80.0%"></i></div></div></div>
+        <div class="row"><div class="label">chain-err-flask-import-001</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:33.3%"></i></div>
+          <div class="bar b-finder"><i style="width:33.3%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:25.0%"></i></div>
+          <div class="bar b-deep"><i style="width:25.0%"></i></div></div></div>
+        <div class="row"><div class="label">calibration-003</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-deep zero"><i style="width:0.0%"></i></div></div></div>
+        <div class="row"><div class="label">schema-evolution-001</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-deep"><i style="width:83.3%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-003</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:33.3%"></i></div>
+          <div class="bar b-finder zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-deep"><i style="width:33.3%"></i></div></div></div>
+        <div class="grouphead">Two repos &middot; n=35</div>
+        <div class="row"><div class="label">api-contract-dual-fastapi-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">api-contract-dual-serde-csv-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:100.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">config-drift-dual-setuptools-pip-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:100.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">dep-graph-dual-prometheus-thanos-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:100.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">err-provenance-dual-requests-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">error-prov-dual-otel-jaeger-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">incident-investigation-dual-flux-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:33.3%"></i></div>
+          <div class="bar b-toast2"><i style="width:66.7%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">schema-evolution-dual-django-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:100.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-004</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-dual-envoy-istio-xds-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:75.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:75.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-dual-fastapi-pydantic-validator-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:100.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:75.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:75.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-dual-flask-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-dual-flask-werkzeug-ctxvar-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:66.7%"></i></div>
+          <div class="bar b-toast2"><i style="width:100.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-dual-httpx-httpcore-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:75.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:75.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-dual-jest-babel-cache-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:25.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-dual-nextjs-webpack-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">incident-investigation-dual-cilium-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:25.0%"></i></div>
+          <div class="bar b-finder"><i style="width:75.0%"></i></div>
+          <div class="bar b-deep"><i style="width:75.0%"></i></div></div></div>
+        <div class="row"><div class="label">incident-investigation-dual-cortex-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:25.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:75.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">incident-investigation-dual-nats-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:75.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:75.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">incident-investigation-dual-opa-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:75.0%"></i></div>
+          <div class="bar b-deep"><i style="width:75.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-dual-axum-tower-middleware-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:75.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:75.0%"></i></div>
+          <div class="bar b-deep"><i style="width:75.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-dual-sqlalchemy-alembic-metadata-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:75.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-dual-tokio-hyper-graceful-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:75.0%"></i></div>
+          <div class="bar b-deep"><i style="width:75.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-dual-tonic-tokio-streamcancel-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:75.0%"></i></div>
+          <div class="bar b-deep"><i style="width:75.0%"></i></div></div></div>
+        <div class="row"><div class="label">dead-code-dual-react-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:50.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">dep-graph-dual-log4j-spring-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:50.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">err-provenance-dual-grafana-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:50.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">error-prov-dual-netty-spring-001</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:50.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">incident-investigation-dual-loki-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:25.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:50.0%"></i></div>
+          <div class="bar b-deep"><i style="width:75.0%"></i></div></div></div>
+        <div class="row"><div class="label">incident-investigation-dual-prometheus-001</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:50.0%"></i></div>
+          <div class="bar b-deep zero"><i style="width:0.0%"></i></div></div></div>
+        <div class="row"><div class="label">refactor-dual-axum-tower-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:50.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:50.0%"></i></div>
+          <div class="bar b-finder"><i style="width:50.0%"></i></div>
+          <div class="bar b-deep"><i style="width:50.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-dual-babel-swc-decorators-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:25.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:50.0%"></i></div>
+          <div class="bar b-deep"><i style="width:25.0%"></i></div></div></div>
+        <div class="row"><div class="label">support-mapping-dual-react-relay-suspense-001</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:25.0%"></i></div>
+          <div class="bar b-deep"><i style="width:25.0%"></i></div></div></div>
+        <div class="row"><div class="label">config-drift-dual-terraform-001</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-deep zero"><i style="width:0.0%"></i></div></div></div>
+        <div class="row"><div class="label">error-prov-dual-tokio-tower-001</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-deep zero"><i style="width:0.0%"></i></div></div></div>
+        <div class="grouphead">Three or more repos &middot; n=12</div>
+        <div class="row"><div class="label">err-provenance-tri-httpx-socks-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:60.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:80.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">refactor-orchestration-tri-tokio-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:100.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:100.0%"></i></div>
+          <div class="bar b-finder"><i style="width:100.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+        <div class="row"><div class="label">dep-graph-tri-prometheus-alertmanager-grafana-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:33.3%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:66.7%"></i></div>
+          <div class="bar b-deep"><i style="width:66.7%"></i></div></div></div>
+        <div class="row"><div class="label">incident-investigation-tri-containerd-001</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:66.7%"></i></div>
+          <div class="bar b-deep"><i style="width:66.7%"></i></div></div></div>
+        <div class="row"><div class="label">refactor-orchestration-tri-babel-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:66.7%"></i></div>
+          <div class="bar b-toast2"><i style="width:66.7%"></i></div>
+          <div class="bar b-finder"><i style="width:66.7%"></i></div>
+          <div class="bar b-deep"><i style="width:66.7%"></i></div></div></div>
+        <div class="row"><div class="label">schema-evolution-tri-supabase-001</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder"><i style="width:66.7%"></i></div>
+          <div class="bar b-deep"><i style="width:66.7%"></i></div></div></div>
+        <div class="row"><div class="label">api-contract-tri-protobuf-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:33.3%"></i></div>
+          <div class="bar b-toast2"><i style="width:33.3%"></i></div>
+          <div class="bar b-finder"><i style="width:33.3%"></i></div>
+          <div class="bar b-deep"><i style="width:33.3%"></i></div></div></div>
+        <div class="row"><div class="label">refactor-orchestration-tri-spring-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:33.3%"></i></div>
+          <div class="bar b-toast2"><i style="width:66.7%"></i></div>
+          <div class="bar b-finder"><i style="width:33.3%"></i></div>
+          <div class="bar b-deep"><i style="width:33.3%"></i></div></div></div>
+        <div class="row"><div class="label">api-contract-tri-envoy-001</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-deep"><i style="width:33.3%"></i></div></div></div>
+        <div class="row"><div class="label">config-drift-tri-kustomize-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:33.3%"></i></div>
+          <div class="bar b-toast2"><i style="width:33.3%"></i></div>
+          <div class="bar b-finder zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-deep"><i style="width:33.3%"></i></div></div></div>
+        <div class="row"><div class="label">dep-graph-tri-boto3-urllib3-requests-001</div><div class="bars">
+          <div class="bar b-toast zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-toast2 zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-finder zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-deep zero"><i style="width:0.0%"></i></div></div></div>
+        <div class="row"><div class="label">err-provenance-tri-httpx-proxy-001</div><div class="bars">
+          <div class="bar b-toast"><i style="width:100.0%"></i></div>
+          <div class="bar b-toast2"><i style="width:100.0%"></i></div>
+          <div class="bar b-finder zero"><i style="width:0.0%"></i></div>
+          <div class="bar b-deep"><i style="width:100.0%"></i></div></div></div>
+      </div>
+    </div>
+    <p class="caption">
+      File-level recall per task, sorted within each stratum by <code>code_finder</code>'s score.
+      The two Toast bars are the same policy on the same tasks in two identical runs: 35 of 63
+      tasks changed score between them.
+    </p>
+  </section>
+
+  <section>
+    <h2>The corpus was naming its own answers</h2>
+    <div class="prose">
+      <p>
+        The first version of this comparison ran on 20 tasks and concluded that Toast-1 found
+        nothing <code>code_finder</code> missed, on every task. That conclusion did not survive a
+        check of the corpus. A tiered matcher (exact path, then path stem, then basename) against
+        each task's own prompt found that <strong>a third of the required files are named in the
+        prompt the agent receives</strong>. A policy that reads the prompt carefully scores on
+        those without retrieving anything, and every policy reads the prompt, so scores compress
+        toward each other.
+      </p>
+      <p>
+        The hard slice was selected by that measurement: 63 tasks at or below 1/3 disclosure, 44 of
+        them naming nothing, every repository already indexed. Disclosure is now computed at
+        selection time and enforced in CI, so a new task cannot quietly rejoin the leaky set.
+      </p>
+    </div>
+    <div class="note">
+      <p>
+        <strong>The reversal.</strong> On the leaky corpus, adding Toast-1 to
+        <code>code_finder</code> lifted union recall by +0.000, on 20 of 20 tasks. On the hard
+        slice it lifts by +0.064, contributing a required file <code>code_finder</code> missed on 9
+        of 63 tasks. An independent repeat reproduces it: +0.056, again on 9 of 63, and 6 of those
+        tasks are the same tasks in both runs. "Strict subset" was an artifact of shared prompt
+        strings, not a property of the policies.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Did the scorer count what the policies found?</h2>
+    <div class="prose">
+      <p>
+        A recall number is a retrieval measurement only if the emitted paths are real and the
+        scorer credits the ones that match. Neither had been checked, and one of them was wrong.
+      </p>
+      <p>
+        The metric library normalizes paths by stripping one leading segment unless it is on a
+        22-name allowlist (<code>src</code>, <code>lib</code>, <code>pkg</code>, <code>cmd</code>,
+        &hellip;). Ground truth is repo-qualified for part of the corpus and repo-relative for the
+        rest; retrieval output is uniformly repo-relative. For a repo whose top directory is not on
+        that list (<code>sdk</code>, <code>httpx</code>, <code>axum</code>,
+        <code>packages</code>, <code>source</code>, <code>fastapi</code>), ground truth loses only
+        its repo name while the retrieved path loses a real directory:
+      </p>
+    </div>
+    <pre>ground truth  otel-go/sdk/trace/batch_span_processor.go  &rarr;  <b>sdk</b>/trace/batch_span_processor.go
+retrieved             sdk/trace/batch_span_processor.go  &rarr;      trace/batch_span_processor.go</pre>
+    <div class="prose">
+      <p>
+        A correct retrieval scored as a miss. Every sweep on disk was re-scored offline against a
+        matcher that compares path suffixes in either direction, so it does not care which side
+        carries the repo name. Pre-fix values are kept in each report, and corrected reports carry
+        a scoring-contract stamp that the comparison script refuses to read without.
+      </p>
+    </div>
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>Sweep</th><th>Before</th><th>After</th><th>Delta</th><th>Tasks moved</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="name"><span class="dot d-toast"></span>toast-1, hard slice</td>
+              <td>0.314</td><td>0.435</td><td>+0.121</td><td>16 / 63</td></tr>
+          <tr><td class="name"><span class="dot d-finder"></span>code_finder, hard slice</td>
+              <td>0.470</td><td>0.627</td><td>+0.156</td><td>17 / 63</td></tr>
+          <tr><td class="name"><span class="dot d-deep"></span>deepsearch, hard slice</td>
+              <td>0.485</td><td>0.633</td><td>+0.148</td><td>18 / 63</td></tr>
+        </tbody>
+        <caption>
+          The correction is not a constant offset. It depends on each repo's top-level directory
+          name and on the citation form each policy emits, which is why the uncorrected numbers
+          were a confound rather than a scale factor. The <code>code_finder</code>-to-Toast gap
+          widens from 0.156 to 0.192.
+        </caption>
+      </table>
+    </div>
+    <div class="prose">
+      <p>
+        A suffix matcher can over-credit, and a first pass did. Two constraints close that, each
+        answering a false credit found in the reports: the prefix it will discard is bounded at two
+        components (a repo name plus at most one source root), which stops a vendored copy of
+        another project's file from being credited as that file; and assignment is one-to-one, so a
+        path like <code>pkg_resources/__init__.py</code> cannot claim both setuptools' copy and
+        pip's vendored one in the same task. Neither constraint changed a published score, because
+        every real credit also came from a citation exact enough to survive them.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Do the emitted paths exist?</h2>
+    <div class="prose">
+      <p>
+        Every (repo, path) pair from the three hard-slice sweeps was checked against the same index
+        the policies searched, in two stages: an exact blob lookup, then, for anything that failed
+        it, a search for any file in the repo ending with that path. The second stage matters:
+        <code>sansio/app.py</code> is a real Flask file cited without its <code>src/flask/</code>
+        prefix, which costs precision but is a real retrieval, not an invention.
+      </p>
+    </div>
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>Policy</th><th>Paths emitted</th><th>Abbreviated</th><th>Nonexistent</th>
+              <th>Credit from guessable root files</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="name"><span class="dot d-toast"></span>toast-1</td>
+              <td>561</td><td>0 (0.0%)</td><td class="win">0 (0.0%)</td><td>7 / 85 (8.2%)</td></tr>
+          <tr><td class="name"><span class="dot d-finder"></span>code_finder</td>
+              <td>595</td><td>5 (0.8%)</td><td>8 (1.3%)</td><td>6 / 119 (5.0%)</td></tr>
+          <tr><td class="name"><span class="dot d-deep"></span>deepsearch</td>
+              <td>720</td><td>31 (4.3%)</td><td class="lose">36 (5.0%)</td><td>7 / 125 (5.6%)</td></tr>
+        </tbody>
+        <caption>
+          "Guessable root files" counts credited required files whose names are repo-root
+          conventions (<code>package.json</code>, <code>go.mod</code>, <code>.go-version</code>),
+          which score the same whether a policy searched for them or named them from memory. At
+          5&ndash;8% everywhere it does not move the ranking.
+        </caption>
+      </table>
+    </div>
+    <div class="prose">
+      <p>
+        Toast-1 emitted zero paths that do not exist. Every path it returned is a real file, which
+        is what a retrieval policy over a real index should produce and is a point in its favour
+        that the recall numbers do not show. <code>deepsearch</code> invents the most, and the
+        inventions are plausible rather than obvious: a Django migration filename that was never
+        created, <code>Modules/_ssl.c</code> (a CPython file) in a <code>requests</code> task.
+      </p>
+      <p>
+        What this cannot check is whether an existing, non-guessable path was reached by a tool
+        call or recalled from training. That needs the tool-call transcript. Our Toast runner
+        persists only the returned paths and token counts; the MCP runner persists the model's
+        prose, not its calls. It is filed as a gap rather than argued away, and it is the one
+        instrumentation change that would make these numbers fully auditable.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Whose fault was 0.575?</h2>
+    <div class="prose">
+      <p>
+        The product comparison carries a confound it can name but not remove: Toast-1 reached the
+        index through our adapter, while <code>code_finder</code> has Sourcegraph-internal access.
+        So a fourth arm holds the tools fixed and swaps the model. Claude
+        (<code>anthropic/claude-sonnet-5</code>) drives the exact retrieval seams Toast-1 drove,
+        with the same task text, the same 4-round budget Toast-1 used on every task, and the same
+        sampling parameters. This arm has run on the 20-task corpus only, so its numbers are on
+        that corpus throughout.
+      </p>
+    </div>
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>Policy</th><th>Access</th><th>Recall (20)</th><th>Recall, both answering</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="name"><span class="dot d-toast"></span>toast-1</td>
+              <td>external adapter</td><td class="lose">0.575</td><td class="lose">0.639</td></tr>
+          <tr><td class="name"><span class="dot d-claude"></span>claude-over-adapter</td>
+              <td>external adapter</td><td>0.742</td><td>0.824</td></tr>
+          <tr><td class="name"><span class="dot d-finder"></span>code_finder</td>
+              <td>internal</td><td class="win">0.858</td><td class="win">0.852</td></tr>
+        </tbody>
+        <caption>
+          "Both answering" excludes the two tasks where claude-over-adapter submitted an empty
+          answer; the exclusion is applied to every policy's mean identically.
+        </caption>
+      </table>
+    </div>
+    <div class="prose">
+      <p>
+        Claude over the external adapter posts per-task recall <strong>identical to
+        <code>code_finder</code> on 17 of 20 tasks</strong> and never beats it. Its losses are
+        tasks where it answered the forced final round with an empty file list: those instructions
+        end by demanding a written report, and the model punted rather than answer with files, the
+        same deliverable mismatch <code>code_finder</code> showed when it apologized about a file
+        it could not write.
+      </p>
+      <p>
+        The readout: access was not the bottleneck. A general model recovers nearly the whole
+        Toast-to-<code>code_finder</code> gap over the same tools Toast-1 had, so what remains is
+        the model, measured on the tool surface Toast-1 was purpose-trained for. Cost does not
+        reopen it. Toast-1 ran at roughly a fifth of claude-over-adapter's per-task price, but
+        0.639 against 0.824 recall is not a trade.
+      </p>
+      <p>
+        The side finding stands on its own: four rounds of a frontier model over a thin external
+        adapter (natural-language search, grep, file read, file list) matched a shipped agentic
+        product task-for-task on this corpus. Whatever <code>code_finder</code> spends beyond that
+        budget bought nothing measurable here.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Run it again</h2>
+    <div class="prose">
+      <p>
+        Variance is the readout that matters most for infrastructure, so every policy was re-run
+        with nothing changed. Mean recall per repeat on the 20-task corpus, with how many tasks
+        changed score between identical runs:
+      </p>
+    </div>
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr><th>Policy</th><th>r1</th><th>r2</th><th>r3</th>
+              <th>Unstable tasks</th><th>Mean per-task swing</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="name"><span class="dot d-toast"></span>toast-1</td>
+            <td class="lose">0.575</td><td class="lose">0.504</td><td class="lose">0.490</td>
+            <td class="lose">11 / 20</td><td class="lose">0.36</td>
+          </tr>
+          <tr>
+            <td class="name"><span class="dot d-finder"></span>code_finder</td>
+            <td class="win">0.858</td><td>0.729</td><td class="win">0.812</td>
+            <td>7 / 20</td><td>0.16</td>
+          </tr>
+          <tr>
+            <td class="name"><span class="dot d-deep"></span>deepsearch</td>
+            <td>0.804</td><td>0.821</td><td>0.787</td>
+            <td class="win">5 / 20</td><td class="win">0.08</td>
+          </tr>
+          <tr>
+            <td class="name"><span class="dot d-claude"></span>claude-over-adapter</td>
+            <td>0.782*</td><td>0.724*</td><td>blocked*</td>
+            <td>4 / 13</td><td>0.25</td>
+          </tr>
+        </tbody>
+        <caption>
+          * The OpenRouter key hit its spend limit 13 tasks into r2; that row covers those 13 tasks
+          only, which is why its r1 reads 0.782 rather than the 20-task 0.742. Both rows resume
+          from cache once the limit is raised.
+        </caption>
+      </table>
+    </div>
+    <div class="prose">
+      <p>
+        The ranking survives every repeat: Toast-1 never beats <code>code_finder</code> in any run,
+        and since its published number is its best run, the three-repeat means put the gap at 0.523
+        against 0.800, wider than the headline. Toast-1 is also the least stable policy
+        measured, and the hard slice makes that worse, not better: 0.435 and 0.331 across two
+        identical sweeps, zero-recall tasks going from 14 to 26, and 35 of 63 tasks changing score.
+      </p>
+      <p>
+        That matters independently of the mean. A search layer that intermittently misses a
+        required file forces every caller to re-verify everything it returns, which is a worse
+        property for infrastructure than a uniformly lower score. It also sets the floor for
+        reading any single sweep: two policies on this corpus differ by roughly &plusmn;0.13 of
+        run-to-run noise, which is wider than the entire <code>code_finder</code>-to-
+        <code>deepsearch</code> gap on the hard slice.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>code_finder against deepsearch</h2>
+    <div class="prose">
+      <p>
+        The comparison we did not set out to run is the one with a product decision attached. On
+        the leaky corpus <code>code_finder</code> looked clearly ahead. On the hard slice the two
+        converge: 0.627 against 0.633 recall, 0.594 against 0.593 at R@10, inside the repeat noise
+        measured above. They differ in shape rather than in level.
+        <code>code_finder</code> gets more tasks perfectly right (21 against 17);
+        <code>deepsearch</code> fails outright on fewer (5 against 9) and is the more stable of the
+        two.
+      </p>
+      <p>
+        Latency is where they separate, and it is not close: 22 seconds median against 221, 31
+        against 331 at p95. <code>deepsearch</code> also invents the most nonexistent paths of any
+        policy measured. Adding it on top of <code>code_finder</code> does buy the largest
+        complementarity in this study (+0.081 union recall, on 14 of 63 tasks), so the pair has a
+        case; a 10x latency bill for it is the thing to weigh.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Output format instability</h2>
+    <div class="prose">
+      <p>
+        Both MCP policies cite files in three different formats, and which one a response uses
+        varies per call with no field indicating which to expect:
+      </p>
+    </div>
+    <pre>1. a fenced JSON block   <b>{"files": [{"repo": "...", "path": "gcc/passes.def"}]}</b>
+2. markdown blob links   <b>[routing.py](/r/&lt;repo&gt;/-/blob/fastapi/routing.py?L196-L249)</b>
+3. bare inline code      <b>`fastapi/routing.py:227-264`</b></pre>
+    <div class="prose">
+      <p>
+        This cost us two full sweeps. A parser reading only form 1 scored 19 of 20 tasks as zero
+        retrieved files. Adding form 2 still left 6 at zero, all of which had cited their files in
+        form 3. Nothing about a zero-file parse looks like a bug from the caller's side; it looks
+        like a policy that found nothing.
+      </p>
+      <p>
+        Separately, <code>sg_code_finder</code> takes one <code>task</code> string, and these tasks
+        are full agentic prompts. Six responses opened by explaining that the tool could not write
+        <code>/workspace/analysis/IMPACT_REPORT.md</code> because it only has search and read
+        access. It then did the retrieval anyway, so the scores stand, but the tool is partly
+        reading its input as instructions to execute rather than as a retrieval brief.
+      </p>
+    </div>
+    <div class="note">
+      <p>
+        A stable machine-readable field for cited files would remove an entire class of silent
+        integration failure. Any MCP client scoring or chaining on these results is writing the
+        same fragile parser we did, and will get the same quiet zeros.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>What would change these numbers</h2>
+    <ul class="tight">
+      <li>
+        <strong>The access comparison assumes <code>code_finder</code>'s inner model is
+        Claude-class.</strong> It is unconfirmed. If it is materially stronger, the "access lever
+        is small" reading overstates; the model-vs-model half of the ablation (Toast-1 against
+        Claude on identical tools) does not depend on it.
+      </li>
+      <li>
+        <strong>The ablation arm has not run the hard slice.</strong> Its OpenRouter key hit a
+        spend limit mid-repeat. Its numbers are on the 20-task corpus, which is the corpus this
+        study otherwise demotes, so read it as a directional answer to "model or access?" rather
+        than as a fourth column of the headline table.
+      </li>
+      <li>
+        <strong>Retrieval is credited without a trace.</strong> Path existence is verified against
+        the live index, and Toast-1's rate of nonexistent paths is zero, but no runner persists the
+        tool calls. An existing, non-guessable path recalled from training scores the same as one
+        that was searched for. Instrumenting the transcript is the next change to the harness.
+      </li>
+      <li>
+        <strong>The adapter mapping is worth up to 0.12 mean recall.</strong> Three sweeps varying
+        only how Toast-1's retrieval call maps onto Sourcegraph moved recall substantially and
+        changed 13 of 20 task outcomes. Toast-1 is reported at its best measured mapping; the gap
+        to <code>code_finder</code> is roughly 1.6x that confound on the hard slice.
+      </li>
+      <li>
+        <strong>63 tasks, strata of 16 / 35 / 12.</strong> The headline gap and the instability
+        result clear that sample comfortably. The per-stratum magnitudes and the +0.064
+        complementarity are indicative, which is why the complementarity was checked against a
+        second independent run rather than reported from one.
+      </li>
+      <li>
+        <strong>Toast-1 token counts are exact.</strong> Mixedbread's API reports real usage per
+        call, and dual accounting shows the reported totals match the provider's ledger
+        integer-for-integer. The MCP policies' internal token spend is Sourcegraph-side and
+        unobservable; their cost is measured as wall clock.
+      </li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>
+      Method: each policy received the same task text and repo scope, and returned a set of files.
+      Sets were scored with EnterpriseBench's IR functions against pre-existing file-level ground
+      truth, read through a single shared extractor so no policy is advantaged by how ground truth
+      is parsed, and through one path matcher applied identically to every arm.
+    </p>
+    <p>
+      Runners, per-task reports with raw responses and full ablation transcripts, the disclosure
+      gate, the path-existence audit, the re-scorer, and their tests are in
+      <span class="mono">experiments/toast_retrieval/</span>. Neither MCP policy needs a container
+      or an agent account; both are direct tool calls, and the ablation arm runs over OpenRouter.
+    </p>
+  </footer>
+
+</div>

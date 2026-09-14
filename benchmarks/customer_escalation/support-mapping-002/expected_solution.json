@@ -1,0 +1,40 @@
+{
+  "task_id": "support-map-llvm-assertion-002",
+  "checkpoints": {
+    "code_paths": {
+      "expected_solution": "Core code paths: (1) llvm/lib/CodeGen/SelectionDAG/LegalizeDAG.cpp \u2014 LegalizeDAG orchestrates type legalization \u2014 contains 'Cannot expand' assertion paths. (2) llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.cpp \u2014 Type legalization expansion logic \u2014 handles type promotion/expansion cases. (3) llvm/include/llvm/CodeGen/ValueTypes.h \u2014 EVT class definition \u2014 extended value type used in type legalization decisions.",
+      "evaluation_criteria": [
+        "Must identify llvm/lib/CodeGen/SelectionDAG/LegalizeDAG.cpp as part of the core code path",
+        "Must identify llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.cpp as part of the core code path",
+        "Must identify llvm/include/llvm/CodeGen/ValueTypes.h as part of the core code path",
+        "Must reference specific functions, types, or methods from the cited files",
+        "Must explain how llvm/lib/CodeGen/SelectionDAG/LegalizeDAG.cpp interacts with llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.cpp"
+      ]
+    },
+    "ownership": {
+      "expected_solution": "Ownership: the code lives under llvm/include/llvm, llvm/lib/CodeGen. Subsystem keywords: type-legalization, code-generation, SelectionDAG, value-types, expansion.",
+      "evaluation_criteria": [
+        "Must identify the owning subsystem (e.g. directory 'llvm/lib/CodeGen')",
+        "Must reference the secondary subsystem 'llvm/lib/CodeGen'",
+        "Must reference at least one of the ownership keywords: type-legalization, code-generation, SelectionDAG"
+      ]
+    },
+    "severity": {
+      "expected_solution": "Severity: CRITICAL. The reported symptom blocks core functionality, causes data loss, or affects security; immediate fix needed. In this case: Map CI build crash with 'Cannot expand this type' to LLVM type legalization code paths.",
+      "evaluation_criteria": [
+        "Must assess severity as CRITICAL",
+        "Must justify the severity rating with reference to user impact or blast radius",
+        "Must align severity with the type of failure (e.g. crash vs incorrect-result vs degraded behavior)"
+      ]
+    },
+    "related_issues": {
+      "expected_solution": "Related files and references: (1) llvm/lib/CodeGen/SelectionDAG/LegalizeIntegerTypes.cpp \u2014 Integer type legalization \u2014 may contain specific expansion paths that fail. (2) llvm/lib/CodeGen/SelectionDAG/LegalizeFloatTypes.cpp \u2014 Float type legalization \u2014 parallel expansion logic. (3) llvm/lib/CodeGen/SelectionDAG/SelectionDAGISel.cpp \u2014 Instruction selection entry point that triggers legalization phase.",
+      "evaluation_criteria": [
+        "Must reference llvm/lib/CodeGen/SelectionDAG/LegalizeIntegerTypes.cpp as a related file",
+        "Must reference llvm/lib/CodeGen/SelectionDAG/LegalizeFloatTypes.cpp as a related file",
+        "Must reference llvm/lib/CodeGen/SelectionDAG/SelectionDAGISel.cpp as a related file",
+        "Related files should extend beyond the strict required_files set"
+      ]
+    }
+  }
+}

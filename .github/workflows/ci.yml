@@ -30,6 +30,12 @@ jobs:
         run: python3 -m pytest tests/integrity/ -v --tb=short
       - name: Audit task consistency
         run: python3 scripts/audit_consistency.py
+      - name: Prompt->GT disclosure gate (retrieval-scored tasks)
+        # A task scored on retrieval must not hand the answer's file names to
+        # a lexical search policy via its own prompt. Tiered check (full path
+        # / basename / stem) -- audit_instructions.py's exact-path check
+        # cannot see the lower tiers. Bead: EnterpriseBench-vkhav.
+        run: python3 scripts/audit_disclosure.py --gate configs/retrieval_slice.json
       - name: Validate shell scripts
         run: |
           find benchmarks -name "*.sh" -not -path "*/_archived/*" | while read f; do

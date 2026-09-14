@@ -1,0 +1,70 @@
+{
+  "task_id": "support-mapping-dual-openssl-curl-cipher-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/curl/curl",
+      "rev": "curl-8_6_0",
+      "path": "curl"
+    },
+    {
+      "url": "https://github.com/openssl/openssl",
+      "rev": "openssl-3.0.13",
+      "path": "openssl"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "curl/lib/vtls/openssl.c",
+      "repo": "curl",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "curl/lib/vtls/openssl.h",
+      "repo": "curl",
+      "confidence": 0.75,
+      "source": "deterministic"
+    },
+    {
+      "path": "openssl/ssl/ssl_ciph.c",
+      "repo": "openssl",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "openssl/ssl/t1_lib.c",
+      "repo": "openssl",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "curl/lib/vtls/vtls.c",
+      "repo": "curl",
+      "confidence": 0.7
+    },
+    {
+      "path": "openssl/providers/defltprov.c",
+      "repo": "openssl",
+      "confidence": 0.75
+    }
+  ],
+  "error_chain": [
+    "libcurl's vtls/openssl.c builds an SSL_CTX and calls SSL_CTX_set_cipher_list with the cipher string from the curl handle (default or user-supplied)",
+    "openssl 3.0's ssl_ciph.c filters the requested cipher list against the SSL_CTX's security level, which defaults to 2 (vs 1 in 1.1.1)",
+    "Security level 2 disqualifies RSA key exchange, SHA1 signatures, and ciphers using <2048-bit RSA keys; if the partner's certificate or cipher prefs hit any of these, the cipher list collapses to empty",
+    "openssl returns SSL_R_NO_CIPHER_MATCH from t1_lib.c during the ClientHello build; libcurl's openssl.c surfaces it as the user-facing 'no cipher match' error without naming the security level"
+  ],
+  "trigger_conditions": [
+    "Partner endpoint's TLS configuration includes RSA key exchange or SHA1 signed certificates that openssl 3.0 default level 2 rejects",
+    "libcurl's openssl backend does not explicitly call SSL_CTX_set_security_level so it inherits openssl's compiled-in default",
+    "openssl 3.0 raised the compiled-in default from 1 to 2, breaking compatibility with deployments that rely on legacy ciphers"
+  ],
+  "expected_answer": {
+    "error_origin": "openssl 3.0's default security level 2 filtering out RSA/SHA1 ciphers that libcurl's openssl backend requests via SSL_CTX_set_cipher_list",
+    "bypass_reason": "libcurl does not set SSL_CTX_set_security_level explicitly and inherits the openssl 3.0 default of 2; 1.1.1 was 1",
+    "correct_config": "Lower the security level via curl --ciphers '@SECLEVEL=1:...' or rebuild libcurl/openssl with security_level=1, or upgrade the partner endpoint to ciphers acceptable at level 2"
+  }
+}

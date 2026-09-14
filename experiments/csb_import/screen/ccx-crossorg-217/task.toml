@@ -1,0 +1,70 @@
+# Imported from CodeScaleBench CCX-crossorg-217 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-crossorg-217"
+suite = "platform_engineering"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Django vs Flask Middleware Chain Implementation Comparison"
+
+[[repos]]
+url = "https://github.com/django/django"
+rev = "674eda1c"
+path = "django"
+role = "primary"
+
+[metadata]
+languages = ["python"]
+csb_mirror = "sg-evals/django--674eda1c"
+csb_commit = "674eda1c03a3187905f48afee0f15226aa62fdf3"
+csb_family = "csb_org_crossorg"
+csb_category = "cross-org-discovery"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "django/core/handlers/base.py"
+repo = "django"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "django/core/handlers/exception.py"
+repo = "django"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "django/core/handlers/wsgi.py"
+repo = "django"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "django/core/handlers/asgi.py"
+repo = "django"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "django/utils/deprecation.py"
+repo = "django"
+confidence = 0.9
+source = "deterministic"

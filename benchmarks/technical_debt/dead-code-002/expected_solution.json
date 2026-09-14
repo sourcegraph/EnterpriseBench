@@ -1,0 +1,30 @@
+{
+  "task_id": "dead-code-002",
+  "checkpoints": {
+    "check_dead_code": {
+      "expected_solution": "The enableRenderableContext feature flag is permanently true at facebook/react@56408a5, so every else-branch that handles the legacy REACT_PROVIDER_TYPE wrapper is dead. The dead branches span packages/react/src/ReactContext.js (createContext else-branch, ~73 lines), packages/react-reconciler/src/ReactFiber.js (createFiberFromTypeAndProps REACT_PROVIDER_TYPE case), packages/react-reconciler/src/ReactFiberBeginWork.js, packages/react-reconciler/src/ReactFiberCompleteWork.js, packages/react-reconciler/src/ReactFiberNewContext.js, packages/react-reconciler/src/ReactFiberScope.js, packages/react-reconciler/src/ReactFiberUnwindWork.js, packages/react-reconciler/src/getComponentNameFromFiber.js, packages/react-server/src/ReactFizzServer.js, packages/react-is/src/ReactIs.js, packages/react-client/src/ReactFlightReplyClient.js, packages/react-devtools-shared/src/utils.js, and packages/shared/getComponentNameFromType.js. Two dead exports anchor the cluster: REACT_PROVIDER_TYPE in packages/shared/ReactSymbols.js (only referenced by the dead branches) and the enableRenderableContext entry in packages/shared/ReactFeatureFlags.js itself. Live anchors that must NOT be flagged: createContext in packages/react/src/ReactContext.js, beginWork in packages/react-reconciler/src/ReactFiberBeginWork.js, createFiberFromTypeAndProps in packages/react-reconciler/src/ReactFiber.js, renderNodeDestructive in packages/react-server/src/ReactFizzServer.js, and isValidElementType in packages/react-is/src/ReactIs.js.",
+      "evaluation_criteria": [
+        "Must identify dead REACT_PROVIDER_TYPE branches in packages/react/src/ReactContext.js, packages/react-reconciler/src/ReactFiber.js, packages/react-reconciler/src/ReactFiberBeginWork.js, packages/react-reconciler/src/ReactFiberCompleteWork.js, and packages/react-reconciler/src/ReactFiberNewContext.js",
+        "Must identify the dead REACT_PROVIDER_TYPE export in packages/shared/ReactSymbols.js and the dead enableRenderableContext flag declaration in packages/shared/ReactFeatureFlags.js",
+        "Must NOT flag live anchors as dead: createContext in packages/react/src/ReactContext.js, beginWork in packages/react-reconciler/src/ReactFiberBeginWork.js, createFiberFromTypeAndProps in packages/react-reconciler/src/ReactFiber.js, or renderNodeDestructive in packages/react-server/src/ReactFizzServer.js",
+        "Must achieve precision >= 0.9 and recall >= 0.6 across the union of dead branches and dead exports"
+      ]
+    },
+    "check_feature_flags": {
+      "expected_solution": "The driving flag is enableRenderableContext, permanently on at this revision. The answer must mention the flag name in at least one entry's evidence/symbol/file fields so check_feature_flags.sh can grep for it. The flag affects 13+ files across packages/react, packages/react-reconciler, packages/react-server, packages/react-is, packages/react-client, packages/react-devtools-shared, and packages/shared — all REACT_PROVIDER_TYPE-related else-branches.",
+      "evaluation_criteria": [
+        "At least one entry must mention 'enableRenderableContext' in its evidence/symbol/file fields — check_feature_flags.sh greps these three fields case-insensitively",
+        "Must explain that the flag is permanently_on (not permanently_off) so the dead branches are the legacy REACT_PROVIDER_TYPE handling, not the new path",
+        "Should locate the flag declaration in packages/shared/ReactFeatureFlags.js and note that REACT_PROVIDER_TYPE in packages/shared/ReactSymbols.js is dead because only the legacy branches reference it"
+      ]
+    },
+    "check_evidence": {
+      "expected_solution": "Each entry in dead_code_report.json must carry a non-empty evidence field. For branches the evidence should cite the flag check (e.g., 'enableRenderableContext is true here, so the else branch creating REACT_PROVIDER_TYPE is unreachable'). For dead exports (REACT_PROVIDER_TYPE in packages/shared/ReactSymbols.js, enableRenderableContext in packages/shared/ReactFeatureFlags.js) the evidence should show that all consumers are inside the dead branches. The verifier passes when at least 50% of items carry evidence; high-quality answers reference the flag declaration in packages/shared/ReactFeatureFlags.js and explain reachability per file.",
+      "evaluation_criteria": [
+        "At least 50% of items must carry a non-empty evidence string (the verifier's pass threshold)",
+        "Evidence for dead branches must reference the controlling flag check (enableRenderableContext) and explain why the branch is unreachable, not just say 'old code'",
+        "Evidence for dead exports must show that consumers live exclusively inside the dead branches — e.g., grep for REACT_PROVIDER_TYPE finds only references in the legacy branches"
+      ]
+    }
+  }
+}

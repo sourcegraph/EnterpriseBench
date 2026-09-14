@@ -1,0 +1,200 @@
+{
+  "task_id": "error-prov-dual-tokio-tower-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/tokio--tokio-1.35.0",
+    "github.com/sg-evals/tower--tower-0.4.13"
+  ],
+  "retrieved_paths": [
+    "tokio/src/runtime/task/harness.rs",
+    "tokio/src/runtime/task/error.rs",
+    "tower/src/spawn_ready/service.rs",
+    "tower/src/buffer/worker.rs",
+    "tower/src/buffer/service.rs",
+    "tokio/src/runtime/builder.rs",
+    "tower/src/buffer/error.rs",
+    "tower/src/spawn_ready/future.rs",
+    "tokio/src/runtime/task/join.rs",
+    "tower/src/util/map_err.rs",
+    "spawn_ready/service.rs",
+    "buffer/worker.rs"
+  ],
+  "retrieved_paths_union": [
+    "tokio/src/runtime/task/harness.rs",
+    "tokio/src/runtime/task/error.rs",
+    "tower/src/spawn_ready/service.rs",
+    "tower/src/buffer/worker.rs",
+    "tower/src/buffer/service.rs",
+    "tokio/src/runtime/builder.rs",
+    "tower/src/buffer/error.rs",
+    "tower/src/spawn_ready/future.rs",
+    "tokio/src/runtime/task/join.rs",
+    "tower/src/util/map_err.rs",
+    "spawn_ready/service.rs",
+    "buffer/worker.rs"
+  ],
+  "required_files": [
+    "tokio/tokio/src/task/join.rs",
+    "tower/tower/src/util/mod.rs"
+  ],
+  "ir_scores": {
+    "task_id": "error-prov-dual-tokio-tower-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 12,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "ir_scores_union": {
+    "task_id": "error-prov-dual-tokio-tower-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 12,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "elapsed_seconds": 220.4,
+  "response_chars": 6695,
+  "raw_response": "---\ntitle: Tracing panic context loss from tokio spawned tasks through tower service layers\nshare_url: https://demo.sourcegraph.com/deepsearch/991cd8e8-9ddc-44b1-a346-c5e0d66b8ae5\nurl: https://demo.sourcegraph.com/deepsearch/2207\ncreated: 2026-08-18T01:51:10Z\nupdated: 2026-08-18T01:54:21Z\n---\n\n#         # error-prov-dual-tokio-tower-001\n\n        **Suite:** customer_escalation | **Type:** error_provenance | **Difficulty:** expert\n        **Repos:** tokio + tower\n\n        ## Context\n\n        A production gRPC service is panicking inside a tokio::spawn'd task\nwithin a tower service layer. The panic message surfaces as a generic\n\"task panicked\" error, losing the original context.\n\nYour task:\n1. Find how tokio handles panics in spawned tasks (JoinError, panic hook)\n2. Find how tower Service layers propagate errors from inner services\n3. Trace the error path from a tokio task panic through tower layers\n4. Identify where error context is lost and document a fix\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into implementation\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/tokio--tokio-1.35.0, github.com/sg-evals/tower--tower-0.4.13\n\nThe report is written. Here is a summary of the findings:\n\n---\n\n## Summary\n\n### How tokio captures panics\n\nIn [`tokio/src/runtime/task/harness.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.35.0/-/blob/tokio/src/runtime/task/harness.rs?L469-517), `poll_future` wraps every task poll in `std::panic::catch_unwind`. A panic is converted by `panic_to_error` into a [`JoinError::Panic`](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.35.0/-/blob/tokio/src/runtime/task/error.rs?L28-L33) that holds the raw `Box<dyn Any + Send>` payload \u2014 but only if the `JoinHandle` is awaited.\n\n### Where context is irreversibly lost\n\nThere are **five loss points**, in order of severity:\n\n| # | Site | File | What is lost |\n|---|---|---|---|\n| 1 | `JoinHandle` dropped (fire-and-forget) | [`harness.rs:285-305`](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.35.0/-/blob/tokio/src/runtime/task/harness.rs?L285-305) | Entire panic silently swallowed |\n| 2 | `From<JoinError> for io::Error` | [`error.rs:159-169`](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.35.0/-/blob/tokio/src/runtime/task/error.rs?L159-169) | Payload replaced with static `\"task panicked\"` |\n| 3 | `SpawnReady::poll_ready` double-`??` | [`spawn_ready/service.rs:67-69`](https://demo.sourcegraph.com/r/github.com/sg-evals/tower--tower-0.4.13/-/blob/tower/src/spawn_ready/service.rs?L67-69) | `JoinError` erased to `BoxError` via its `Display` |\n| 4 | `Buffer` worker panic | [`buffer/worker.rs:134-165`](https://demo.sourcegraph.com/r/github.com/sg-evals/tower--tower-0.4.13/-/blob/tower/src/buffer/worker.rs?L134-165) | `Worker::failed` never set; callers get generic `Closed` |\n| 5 | `JoinError::Display` | [`error.rs:139-145`](https://demo.sourcegraph.com/r/github.com/sg-evals/tokio--tokio-1.35.0/-/blob/tokio/src/runtime/task/error.rs?L139-145) | Only prints task id, not the panic message |\n\n### Key fix\n\nThe core issue is that `SpawnReady` (tower's mechanism for driving a service to readiness in a background task) uses `??` to unwrap `JoinHandle<Result<S, BoxError>>`. The outer `?` silently converts a `JoinError::Panic` to `BoxError` via `Display`, losing the payload. The fix is to match on the `JoinError` explicitly \u2014 use `JoinError::is_panic()` / `into_panic()` and either `resume_unwind` or downcast the payload to produce a meaningful error string before type-erasing it to `BoxError`.\n\n## Sources\n\n- [github.com/sg-evals/tokio--tokio-1.35.0/tokio/src/runtime/task/harness.rs@550299b?L469-517](/github.com/sg-evals/tokio--tokio-1.35.0@550299b9d3cc319a872606c28414a93223aaaa43/-/blob/tokio/src/runtime/task/harness.rs?L469-517)\n- [github.com/sg-evals/tokio--tokio-1.35.0/tokio/src/runtime/task/error.rs@550299b](/github.com/sg-evals/tokio--tokio-1.35.0@550299b9d3cc319a872606c28414a93223aaaa43/-/blob/tokio/src/runtime/task/error.rs)\n- [github.com/sg-evals/tower--tower-0.4.13/tower/src/buffer/service.rs@2b06e5c?L90-140](/github.com/sg-evals/tower--tower-0.4.13@2b06e5caf42ceba7feff497933f12fe6183b08e8/-/blob/tower/src/buffer/service.rs?L90-140)\n- [github.com/sg-evals/tower--tower-0.4.13/tower/src/spawn_ready/service.rs@2b06e5c](/github.com/sg-evals/tower--tower-0.4.13@2b06e5caf42ceba7feff497933f12fe6183b08e8/-/blob/tower/src/spawn_ready/service.rs)\n- [github.com/sg-evals/tokio--tokio-1.35.0/tokio/src/runtime/task/harness.rs@550299b?L280-310](/github.com/sg-evals/tokio--tokio-1.35.0@550299b9d3cc319a872606c28414a93223aaaa43/-/blob/tokio/src/runtime/task/harness.rs?L280-310)\n- [github.com/sg-evals/tower--tower-0.4.13/tower/src/buffer/worker.rs@2b06e5c](/github.com/sg-evals/tower--tower-0.4.13@2b06e5caf42ceba7feff497933f12fe6183b08e8/-/blob/tower/src/buffer/worker.rs)\n- [github.com/sg-evals/tokio--tokio-1.35.0/tokio/src/runtime/builder.rs@550299b?L800-830](/github.com/sg-evals/tokio--tokio-1.35.0@550299b9d3cc319a872606c28414a93223aaaa43/-/blob/tokio/src/runtime/builder.rs?L800-830)\n- [github.com/sg-evals/tower--tower-0.4.13/tower/src/buffer/error.rs@2b06e5c](/github.com/sg-evals/tower--tower-0.4.13@2b06e5caf42ceba7feff497933f12fe6183b08e8/-/blob/tower/src/buffer/error.rs)\n- [github.com/sg-evals/tower--tower-0.4.13/tower/src/spawn_ready/future.rs@2b06e5c](/github.com/sg-evals/tower--tower-0.4.13@2b06e5caf42ceba7feff497933f12fe6183b08e8/-/blob/tower/src/spawn_ready/future.rs)\n- [github.com/sg-evals/tokio--tokio-1.35.0/tokio/src/runtime/task/join.rs@550299b?L86-174](/github.com/sg-evals/tokio--tokio-1.35.0@550299b9d3cc319a872606c28414a93223aaaa43/-/blob/tokio/src/runtime/task/join.rs?L86-174)\n- [github.com/sg-evals/tower--tower-0.4.13/tower/src/util/map_err.rs@2b06e5c](/github.com/sg-evals/tower--tower-0.4.13@2b06e5caf42ceba7feff497933f12fe6183b08e8/-/blob/tower/src/util/map_err.rs)\n\n\nGenerated files:\n- files/IMPACT_REPORT.json: /.api/agent-files/v1/deep-search/991cd8e8-9ddc-44b1-a346-c5e0d66b8ae5/files/IMPACT_REPORT.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "error-prov-dual-tokio-tower-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 12,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "tokio/src/runtime/task/harness.rs",
+    "tokio/src/runtime/task/error.rs",
+    "tower/src/spawn_ready/service.rs",
+    "tower/src/buffer/worker.rs",
+    "tower/src/buffer/service.rs",
+    "tokio/src/runtime/builder.rs",
+    "tower/src/buffer/error.rs",
+    "tower/src/spawn_ready/future.rs",
+    "tokio/src/runtime/task/join.rs",
+    "tower/src/util/map_err.rs",
+    "spawn_ready/service.rs",
+    "buffer/worker.rs"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "error-prov-dual-tokio-tower-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 12,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

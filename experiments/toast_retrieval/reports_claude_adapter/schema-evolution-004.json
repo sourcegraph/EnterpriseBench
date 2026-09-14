@@ -1,0 +1,274 @@
+{
+  "task_id": "schema-evolution-004",
+  "policy": "claude_adapter",
+  "model": "anthropic/claude-sonnet-5",
+  "suite": "feature_delivery",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/zulip--f2a5dc94"
+  ],
+  "retrieved_paths": [
+    "zerver/migrations/0776_realm_default_avatar_source.py",
+    "zerver/models/realms.py",
+    "zerver/models/users.py",
+    "zerver/lib/avatar.py",
+    "zerver/lib/create_user.py",
+    "zerver/actions/user_settings.py",
+    "zerver/views/realm.py",
+    "zerver/lib/types.py",
+    "zerver/lib/event_types.py",
+    "zerver/lib/transfer.py",
+    "zerver/data_import/slack.py",
+    "zerver/data_import/mattermost.py",
+    "zerver/data_import/rocketchat.py",
+    "web/src/settings_config.ts",
+    "web/src/admin.ts",
+    "web/src/settings_org.ts",
+    "web/src/settings_components.ts",
+    "web/src/state_data.ts",
+    "web/styles/settings.css",
+    "web/webpack.config.ts",
+    "api_docs/changelog.md",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_audit_log.py"
+  ],
+  "required_files": [
+    "zerver/models/realms.py",
+    "zerver/models/users.py",
+    "zerver/lib/avatar.py"
+  ],
+  "ir_scores": {
+    "task_id": "schema-evolution-004",
+    "config_name": "claude_adapter",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.7328,
+      "10": 0.7328
+    },
+    "mrr": 0.5,
+    "map_score": 0.6389,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1304,
+    "n_retrieved": 23,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "rounds_executed": 4,
+  "input_tokens": 30116,
+  "output_tokens": 1892,
+  "token_counting": "provider_reported",
+  "elapsed_seconds": 22.5,
+  "transcript": [
+    {
+      "role": "system",
+      "content": "You are a code retrieval policy. Given a task, find the source files required to carry it out. Search only these repositories: github.com/sg-evals/zulip--f2a5dc94. When you are confident, call submit_files with every required file, most important first, using repo-relative paths exactly as the tools returned them."
+    },
+    {
+      "role": "user",
+      "content": "# Schema Change: Move Avatar Source from User to Realm Level\n\n## Context\n\nWe're changing how default avatar sources work. Currently `default_avatar_source` lives on each `UserProfile`, but it should really be a realm-level setting \u2014 organizations choose whether to use Gravatar or generated avatars, not individual users.\n\nThe migration `zerver/migrations/0776_realm_default_avatar_source.py` adds the field to Realm and the corresponding removal happens from UserProfile.\n\n## What I Need\n\nThis field is referenced in more places than you'd expect. I need the full picture:\n\n1. **Schema change**: The migration file and both model files (`realms.py` for the addition, `users.py` for the removal).\n\n2. **Direct references**: The core avatar logic in `lib/avatar.py` that reads this field. Also check the API examples \u2014 some may reference avatar source in example payloads.\n\n3. **Indirect references**: This is where it gets interesting. We have importers for migrating from other chat platforms (Slack, Mattermost, Rocket.Chat) and each one sets `default_avatar_source` during import. All of them need updating. Also check frontend templates and any dependency changes (we're patching a JavaScript library for avatar generation).\n\n4. **Test coverage**: We need updates in upload tests, importer tests, and event tests.\n\nWrite your findings to `/workspace/zulip/SCHEMA_IMPACT.md`.\n"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_015gCsUJvNXdkotdkzphYHex",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"default_avatar_source\", \"top_k\": 100}"
+          }
+        },
+        {
+          "id": "toolu_01PVCqSj5RiWfNBTk84yDsaQ",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0776_realm_default_avatar_source.py\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_015gCsUJvNXdkotdkzphYHex",
+      "content": "[{\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/models/users.py\", \"chunk_index\": 11, \"score\": 1.0, \"text\": \"    DEFAULT_AVATAR_SOURCE = AVATAR_FROM_GRAVATAR\\n        default=DEFAULT_AVATAR_SOURCE, choices=AVATAR_SOURCES, max_length=1\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/models/realms.py\", \"chunk_index\": 12, \"score\": 0.5, \"text\": \"    default_avatar_source = models.CharField(\\n        default_avatar_source=str,\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/styles/settings.css\", \"chunk_index\": 21, \"score\": 0.3333, \"text\": \".default_avatar_source_values {\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/settings_config.ts\", \"chunk_index\": 23, \"score\": 0.25, \"text\": \"export const default_avatar_source_values = {\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/admin.ts\", \"chunk_index\": 1, \"score\": 0.2, \"text\": \"    realm_default_avatar_source: $t({defaultMessage: \\\"Default profile pictures for new users\\\"}),\\n        default_avatar_source_values: settings_config.default_avatar_source_values,\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/views/realm.py\", \"chunk_index\": 1, \"score\": 0.1667, \"text\": \"DEFAULT_AVATAR_SOURCES = [key for key, _ in Realm.AVATAR_SOURCES]\\n    default_avatar_source: Annotated[str, check_string_in_validator(DEFAULT_AVATAR_SOURCES)]\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/settings_org.ts\", \"chunk_index\": 4, \"score\": 0.1429, \"text\": \"function set_default_avatar_source_setting(): void {\\n    const setting_value = realm.realm_default_avatar_source;\\n    $(`#id_realm_default_avatar_source input[value='${CSS.escape(setting_value)}']`).prop(\\n        case \\\"realm_default_avatar_source\\\":\\n            set_default_avatar_source_setting();\\n    set_default_avatar_source_setting();\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0776_realm_default_avatar_source.py\", \"chunk_index\": 0, \"score\": 0.125, \"text\": \"            name=\\\"default_avatar_source\\\",\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/state_data.ts\", \"chunk_index\": 8, \"score\": 0.1111, \"text\": \"    realm_default_avatar_source: z.enum([\\\"G\\\", \\\"J\\\"]),\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"api_docs/changelog.md\", \"chunk_index\": 2, \"score\": 0.1, \"text\": \"  `default_avatar_source` realm setting.\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/lib/create_user.py\", \"chunk_index\": 3, \"score\": 0.0909, \"text\": \"        avatar_source = realm.default_avatar_source\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/data_import/slack.py\", \"chunk_index\": 8, \"score\": 0.0833, \"text\": \"    avatar_source = UserProfile.DEFAULT_AVATAR_SOURCE\\n            avatar_source = UserProfile.DEFAULT_AVATAR_SOURCE\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/settings_components.ts\", \"chunk_index\": 15, \"score\": 0.0769, \"text\": \"        case \\\"realm_default_avatar_source\\\":\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/actions/user_settings.py\", \"chunk_index\": 7, \"score\": 0.0714, \"text\": \"    # avatar when default_avatar_source is jdenticon.\\n        user, user.realm.default_avatar_source, skip_notify=True, acting_user=acting_user\\n    default_avatar_source = user_profile.realm.default_avatar_source\\n    if user_profile.avatar_source == default_avatar_source:  # nocoverage\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01PVCqSj5RiWfNBTk84yDsaQ",
+      "content": "{\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0776_realm_default_avatar_source.py\", \"content\": \"# Generated by Django 5.2.10 on 2026-01-22 08:43\\n\\nfrom django.db import migrations, models\\n\\n\\nclass Migration(migrations.Migration):\\n    dependencies = [\\n        (\\\"zerver\\\", \\\"0775_customprofilefield_use_for_user_matching\\\"),\\n    ]\\n\\n    operations = [\\n        migrations.AddField(\\n            model_name=\\\"realm\\\",\\n            name=\\\"default_avatar_source\\\",\\n            field=models.CharField(\\n                choices=[(\\\"G\\\", \\\"Hosted by Gravatar\\\"), (\\\"J\\\", \\\"Generated using Jdenticon\\\")],\\n                default=\\\"G\\\",\\n                max_length=1,\\n            ),\\n        ),\\n    ]\"}"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_bdrk_01HAmjmWaaNKY6riUvUvVnhx",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"avatar_source\", \"top_k\": 150}"
+          }
+        },
+        {
+          "id": "toolu_bdrk_01BBsdDo87XLfGuHCA233CU6",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"jdenticon\", \"top_k\": 50, \"case_sensitive\": false}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_bdrk_01HAmjmWaaNKY6riUvUvVnhx",
+      "content": "[{\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/lib/types.py\", \"chunk_index\": 6, \"score\": 1.0, \"text\": \"    avatar_source: str\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/models/users.py\", \"chunk_index\": 11, \"score\": 0.5, \"text\": \"    DEFAULT_AVATAR_SOURCE = AVATAR_FROM_GRAVATAR\\n    avatar_source = models.CharField(\\n        default=DEFAULT_AVATAR_SOURCE, choices=AVATAR_SOURCES, max_length=1\\n    AVATAR_SOURCES = (\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/lib/event_types.py\", \"chunk_index\": 11, \"score\": 0.3333, \"text\": \"    avatar_source: str\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/tests/test_events.py\", \"chunk_index\": 57, \"score\": 0.25, \"text\": \"    def test_change_bot_avatar_source(self) -> None:\\n        self.assertEqual(hamlet.avatar_source, UserProfile.AVATAR_FROM_GRAVATAR)\\n            \\\"default_avatar_source\\\",\\n        self.assertEqual(self.user_profile.avatar_source, UserProfile.AVATAR_FROM_GRAVATAR)\\n        self.assertEqual(self.user_profile.avatar_source, UserProfile.AVATAR_FROM_GRAVATAR)\\n            default_avatar_source=[\\\"G\\\", \\\"J\\\"],\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/tests/test_audit_log.py\", \"chunk_index\": 5, \"score\": 0.2, \"text\": \"    def test_change_avatar_source(self) -> None:\\n        avatar_source = \\\"G\\\"\\n        do_change_avatar_fields(user, avatar_source, acting_user=user)\\n                event_type=AuditLogEventType.USER_AVATAR_SOURCE_CHANGED,\\n        self.assertEqual(avatar_source, user.avatar_source)\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/models/realms.py\", \"chunk_index\": 12, \"score\": 0.1667, \"text\": \"    default_avatar_source = models.CharField(\\n        default=AVATAR_FROM_GRAVATAR, choices=AVATAR_SOURCES, max_length=1\\n    AVATAR_SOURCES = (\\n        default_avatar_source=str,\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/admin.ts\", \"chunk_index\": 1, \"score\": 0.1429, \"text\": \"    realm_default_avatar_source: $t({defaultMessage: \\\"Default profile pictures for new users\\\"}),\\n        default_avatar_source_values: settings_config.default_avatar_source_values,\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/styles/settings.css\", \"chunk_index\": 21, \"score\": 0.125, \"text\": \".default_avatar_source_values {\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0615_system_bot_avatars.py\", \"chunk_index\": 0, \"score\": 0.1111, \"text\": \"def set_system_bot_avatar_source_user(\\ndef set_system_bot_avatar_source_gravatar(\\n    ).update(avatar_source=\\\"U\\\")\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_bdrk_01BBsdDo87XLfGuHCA233CU6",
+      "content": "[{\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/webpack.config.ts\", \"chunk_index\": 4, \"score\": 1.0, \"text\": \"            jdenticon: \\\"shebang-loader!../node_modules/jdenticon/bin/jdenticon.js\\\",\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/settings_config.ts\", \"chunk_index\": 23, \"score\": 0.5, \"text\": \"    jdenticon: {\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/lib/avatar.py\", \"chunk_index\": 3, \"score\": 0.3333, \"text\": \"def generate_avatar_jdenticon(input: str, medium: bool) -> bytes:\\ndef generate_and_upload_jdenticon_avatar(\\nfrom zerver.lib.upload import get_avatar_url, write_jdenticon_avatars\\n    if avatar_source in [UserProfile.AVATAR_FROM_USER, UserProfile.AVATAR_FROM_JDENTICON]:\\n    jdenticon_path = (\\n        static_path(\\\"webpack-bundles/jdenticon.js\\\")\\n        else os.path.join(settings.DEPLOY_ROOT, \\\"node_modules/jdenticon/bin/jdenticon.js\\\")\\n    command = [\\\"node\\\", jdenticon_path, input, \\\"-s\\\", size, \\\"-p\\\", \\\"0\\\"]\\n        logger.exception(\\\"Jdenticon generation failed for user_id:{input}\\\")\\n    # for Jdenticon generation, so that clients that prefer to use computation\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/models/users.py\", \"chunk_index\": 10, \"score\": 0.25, \"text\": \"    AVATAR_FROM_JDENTICON = \\\"J\\\"\\n        (AVATAR_FROM_JDENTICON, \\\"Generated using Jdenticon\\\"),\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/models/realms.py\", \"chunk_index\": 12, \"score\": 0.2, \"text\": \"    AVATAR_FROM_JDENTICON = \\\"J\\\"\\n        (AVATAR_FROM_JDENTICON, \\\"Generated using Jdenticon\\\"),\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"static/images/jdenticon-1.png\", \"chunk_index\": 0, \"score\": 0.1667, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"static/images/jdenticon-2.png\", \"chunk_index\": 0, \"score\": 0.1429, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"static/images/jdenticon-3.png\", \"chunk_index\": 0, \"score\": 0.125, \"text\": \"\"}]"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_bdrk_018xL6FASRvLPeZDGu17twDT",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"AVATAR_FROM_GRAVATAR|DEFAULT_AVATAR_SOURCE\", \"top_k\": 100}"
+          }
+        },
+        {
+          "id": "toolu_bdrk_016BgFPQ18xW6qQtjRvPo9k6",
+          "type": "function",
+          "function": {
+            "name": "search_corpus",
+            "arguments": "{\"query\": \"default_avatar_source importer mattermost rocketchat\"}"
+          }
+        },
+        {
+          "id": "toolu_bdrk_01LPKpxRxejaHcBeLBhuJP8z",
+          "type": "function",
+          "function": {
+            "name": "search_corpus",
+            "arguments": "{\"query\": \"avatar_source in test_upload.py test_import_export.py\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_bdrk_018xL6FASRvLPeZDGu17twDT",
+      "content": "[{\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/models/users.py\", \"chunk_index\": 10, \"score\": 1.0, \"text\": \"    AVATAR_FROM_GRAVATAR = \\\"G\\\"\\n    DEFAULT_AVATAR_SOURCE = AVATAR_FROM_GRAVATAR\\n        default=DEFAULT_AVATAR_SOURCE, choices=AVATAR_SOURCES, max_length=1\\n        (AVATAR_FROM_GRAVATAR, \\\"Hosted by Gravatar\\\"),\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/models/realms.py\", \"chunk_index\": 12, \"score\": 0.5, \"text\": \"    AVATAR_FROM_GRAVATAR = \\\"G\\\"\\n    default_avatar_source = models.CharField(\\n        default=AVATAR_FROM_GRAVATAR, choices=AVATAR_SOURCES, max_length=1\\n        (AVATAR_FROM_GRAVATAR, \\\"Hosted by Gravatar\\\"),\\n        default_avatar_source=str,\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/styles/settings.css\", \"chunk_index\": 21, \"score\": 0.3333, \"text\": \".default_avatar_source_values {\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/settings_config.ts\", \"chunk_index\": 23, \"score\": 0.25, \"text\": \"export const default_avatar_source_values = {\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/admin.ts\", \"chunk_index\": 1, \"score\": 0.2, \"text\": \"    realm_default_avatar_source: $t({defaultMessage: \\\"Default profile pictures for new users\\\"}),\\n        default_avatar_source_values: settings_config.default_avatar_source_values,\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/views/realm.py\", \"chunk_index\": 1, \"score\": 0.1667, \"text\": \"DEFAULT_AVATAR_SOURCES = [key for key, _ in Realm.AVATAR_SOURCES]\\n    default_avatar_source: Annotated[str, check_string_in_validator(DEFAULT_AVATAR_SOURCES)]\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/settings_org.ts\", \"chunk_index\": 4, \"score\": 0.1429, \"text\": \"function set_default_avatar_source_setting(): void {\\n    const setting_value = realm.realm_default_avatar_source;\\n    $(`#id_realm_default_avatar_source input[value='${CSS.escape(setting_value)}']`).prop(\\n        case \\\"realm_default_avatar_source\\\":\\n            set_default_avatar_source_setting();\\n    set_default_avatar_source_setting();\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/actions/user_settings.py\", \"chunk_index\": 2, \"score\": 0.125, \"text\": \"    if user_profile.avatar_source == UserProfile.AVATAR_FROM_GRAVATAR:\\n    # avatar when default_avatar_source is jdenticon.\\n        user, user.realm.default_avatar_source, skip_notify=True, acting_user=acting_user\\n    default_avatar_source = user_profile.realm.default_avatar_source\\n    if user_profile.avatar_source == default_avatar_source:  # nocoverage\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_bdrk_016BgFPQ18xW6qQtjRvPo9k6",
+      "content": "[{\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"docs/production/install.md\", \"chunk_index\": 0, \"score\": 1.0, \"text\": \"\\nTo **import data** from [Slack][slack-import], [Mattermost][mattermost-import], [Rocket.Chat][rocketchat-import], [Zulip Cloud][zulip-cloud-import], or [another Zulip\\nserver][zulip-server-import], follow the linked instructions.\\n\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"docs/production/install.md\", \"chunk_index\": 2, \"score\": 0.5, \"text\": \"\\n:::{important}\\n\\nIf you are importing data, stop here and return to the import instructions for\\n[Slack][slack-import], [Mattermost][mattermost-import],\\n[Rocket.Chat][rocketchat-import], [Zulip Cloud][zulip-cloud-import], [a server backup][zulip-backups], or [another Zulip server][zulip-server-import].\\n\\n\\n[doc-deployment-options]: deployment.md#advanced-installer-options\\n[zulip-backups]: export-and-import.md#backups\\n[reverse-proxy]: reverse-proxies.md\\n[slack-import]: https://zulip.com/help/import-from-slack\\n[mattermost-import]: https://zulip.com/help/import-from-mattermost\\n[rocketchat-import]: https://zulip.com/help/import-from-rocketchat\\n[zulip-cloud-import]: export-and-import.md#import-into-a-new-zulip-server\\n[zulip-server-import]: export-and-import.md#import-into-a-new-zulip-server\\n\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"templates/zerver/create_realm/realm_creation_import_form_field.html\", \"chunk_index\": 0, \"score\": 0.3333, \"text\": \"            {% if not user_registration_form %}\\n            <p class=\\\"extra-info-realm-creation-import-from registration-form-hint\\\">\\n                {% trans %}\\n                Learn how to import from\\n                <a href=\\\"/help/import-from-mattermost\\\">Mattermost</a> or\\n                <a href=\\\"/help/import-from-rocketchat\\\">Rocket.Chat</a>.\\n                {% endtrans %}\\n\\n    <div class=\\\"input-box\\\">\\n        <div class=\\\"inline-block\\\" id=\\\"realm-creation-import-from-wrapper\\\">\\n            <select id=\\\"import_from\\\" name=\\\"import_from\\\"\\n              {% if user_registration_form %}\\n\\n        </div>\\n        <label for=\\\"import_from\\\" class=\\\"inline-block\\\">\\n            {{ _('Import chat history?') }}\\n        </label>\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"starlight_help/src/content/docs/migrating-from-other-chat-tools.mdx\", \"chunk_index\": 0, \"score\": 0.25, \"text\": \"* [Moving from **Discord**](/help/moving-from-discord).\\n* [Import from **Mattermost**](/help/import-from-mattermost), then follow the\\n  general [guide on moving to Zulip](/help/moving-to-zulip).\\n* [Import from **Rocket.Chat**](/help/import-from-rocketchat), then follow the\\n  general [guide on moving to Zulip](/help/moving-to-zulip).\\n\\n<ZulipNote>\\n  You can import data from Slack, Mattermost, and Rocket.Chat. **You can only\\n  import a workspace as a new Zulip organization.** Your imported message history\\n  cannot be added into an existing Zulip organization.\\n\\n\\nimport ZulipNote from \\\"../../components/ZulipNote.astro\\\";\\n\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"starlight_help/src/content/docs/moving-to-zulip.mdx\", \"chunk_index\": 1, \"score\": 0.2, \"text\": \"         [Render](https://render.com/docs/deploy-zulip).\\n      1. To import data, follow the steps in the detailed import guides:\\n         * [Import from Slack](/help/import-from-slack)\\n         * [Import from Mattermost](/help/import-from-mattermost)\\n         * [Import from Rocket.Chat](/help/import-from-rocketchat)\\n    </Steps>\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"starlight_help/src/content/docs/moving-to-zulip.mdx\", \"chunk_index\": 0, \"score\": 0.1667, \"text\": \"\\nZulip has import tools for [Slack](/help/import-from-slack),\\n[Mattermost](/help/import-from-mattermost) and\\n[Rocket.Chat](/help/import-from-rocketchat). You can import your organization's\\nchat data, including message history, users, channels, and custom emoji. To\\ninquire about importing data from another product, [contact Zulip\\nsupport](/help/contact-support).\\n\\n\\nimport {Steps, TabItem, Tabs} from \\\"@astrojs/starlight/components\\\";\\n\\nimport FlattenedSteps from \\\"../../components/FlattenedSteps.astro\\\";\\nimport ZulipNote from \\\"../../components/ZulipNote.astro\\\";\\nimport ZulipTip from \\\"../../components/ZulipTip.astro\\\";\\nimport CommunicationPoliciesIntro from \\\"../include/_CommunicationPoliciesIntro.mdx\\\";\\nimport CommunicationPoliciesList from \\\"../include/_CommunicationPoliciesList.mdx\\\";\\nimport ConfigureYourOrganization from \\\"../include/_ConfigureYourOrganization.mdx\\\";\\nimport HowToInviteUsersToJoinImport from \\\"../include/_HowToInviteUsersToJoinImport.mdx\\\";\\nimport HowToInviteUsersToJoinNoImport from \\\"../include/_HowToInviteUsersToJoinNoImport.mdx\\\";\\nimport MovingToZulipIntro from \\\"../include/_MovingToZulipIntro.mdx\\\";\\nimport PrepareForTransition1 from \\\"../include/_PrepareForTransition1.mdx\\\"\\nimport PrepareForTransition2 from \\\"../include/_PrepareForTransition2.mdx\\\"\\nimport SignUpForAPlan from \\\"../include/_SignUpForAPlan.mdx\\\";\\n\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"starlight_help/src/content/docs/create-an-organization.mdx\", \"chunk_index\": 0, \"score\": 0.1429, \"text\": \"    <ZulipNote>\\n      To import data from another app, follow the import instructions for\\n      [Slack](/help/import-from-slack), [Mattermost](/help/import-from-mattermost)\\n      or [Rocket.Chat](/help/import-from-rocketchat).\\n    </ZulipNote>\\n\\n\\nimport {TabItem, Tabs} from \\\"@astrojs/starlight/components\\\";\\n\\nimport ZulipNote from \\\"../../components/ZulipNote.astro\\\";\\nimport CreateADemoOrganization from \\\"../include/_CreateADemoOrganization.mdx\\\";\\nimport DemoOrgsConversion from \\\"../include/_DemoOrgsConversion.mdx\\\";\\nimport DemoOrgsIntro from \\\"../include/_DemoOrgsIntro.mdx\\\";\\nimport ZulipCloudOnly from \\\"../include/_ZulipCloudOnly.mdx\\\";\\n\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"templates/zerver/create_realm/create_realm.html\", \"chunk_index\": 1, \"score\": 0.125, \"text\": \"                {% trans %}\\n                Or import\\n                from <a href=\\\"/help/import-from-slack\\\">Slack</a>, <a href=\\\"/help/import-from-mattermost\\\">Mattermost</a>,\\n                or <a href=\\\"/help/import-from-rocketchat\\\">Rocket.Chat</a>.\\n                {% endtrans %}\\n\\n            </div>\\n            {% if not is_realm_import_enabled %}\\n            <div class=\\\"bottom-text\\\">\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"templates/zerver/create_realm/create_realm.html\", \"chunk_index\": 0, \"score\": 0.1111, \"text\": \"                    {% include 'zerver/create_realm/realm_creation_subdomain_form_field.html' %}\\n                    {% if is_realm_import_enabled %}\\n                    {% include 'zerver/create_realm/realm_creation_import_form_field.html' %}\\n                    {% endif %}\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/data_import/mattermost.py\", \"chunk_index\": 8, \"score\": 0.1, \"text\": \"\\n        topic_name = \\\"imported from mattermost\\\"\\n\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/data_import/mattermost.py\", \"chunk_index\": 0, \"score\": 0.0909, \"text\": \"\\n    zerver_realm = build_zerver_realm(realm_id, realm_subdomain, NOW, \\\"Mattermost\\\")\\n    realm = build_realm(zerver_realm, realm_id, domain_name, import_source=\\\"mattermost\\\")\\n\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/data_import/mattermost.py\", \"chunk_index\": 14, \"score\": 0.0833, \"text\": \"\\ndef mattermost_data_file_to_dict(mattermost_data_file: str) -> dict[str, Any]:\\n    mattermost_data: dict[str, Any] = {}\\n    mattermost_data[\\\"version\\\"] = []\\n    mattermost_data[\\\"team\\\"] = []\\n    mattermost_data[\\\"channel\\\"] = []\\n    mattermost_data[\\\"user\\\"] = []\\n    mattermost_data[\\\"post\\\"] = {\\\"channel_post\\\": [], \\\"direct_post\\\": []}\\n    mattermost_data[\\\"emoji\\\"] = []\\n    mattermost_data[\\\"direct_channel\\\"] = []\\n\\n    with open(mattermost_data_file, \\\"rb\\\") as fp:\\n        for line in fp:\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"starlight_help/src/content/docs/import-from-mattermost.mdx\", \"chunk_index\": 0, \"score\": 0.0769, \"text\": \"---\\ntitle: Import from Mattermost\\n---\\n\\n<Steps>\\n  1. [Export your Mattermost data](#export-your-mattermost-data).\\n  1. [Import your Mattermost data into Zulip](#import-your-data-into-zulip).\\n  1. [Get your organization started with Zulip](#get-your-organization-started-with-zulip)!\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"starlight_help/src/content/docs/import-from-mattermost.mdx\", \"chunk_index\": 3, \"score\": 0.0714, \"text\": \"         ```\\n         Alternatively, to import into a custom subdomain, run:\\n         ```bash \\\"<team-name>\\\" \\\"<subdomain>\\\"\\n         unzip latest_export.zip -d /tmp/my_mattermost_export\\n         mv /tmp/my_mattermost_export/import.jsonl /tmp/my_mattermost_export/export.json\\n         cd /home/zulip/deployments/current\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/data_import/rocketchat.py\", \"chunk_index\": 0, \"score\": 0.0667, \"text\": \"    zerver_realm = build_zerver_realm(realm_id, realm_subdomain, created_at, \\\"Rocket.Chat\\\")\\n    realm = build_realm(zerver_realm, realm_id, domain_name, import_source=\\\"rocketchat\\\")\\n\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/data_import/rocketchat.py\", \"chunk_index\": 16, \"score\": 0.0625, \"text\": \"\\ndef rocketchat_data_to_dict(\\n    rocketchat_data_dir: str, sections: list[str] | None = None\\n) -> dict[str, Any]:\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/data_import/rocketchat.py\", \"chunk_index\": 2, \"score\": 0.0588, \"text\": \"\\nROCKETCHAT_DEFAULT_ANNOUNCEMENTS_CHANNEL_NAME = \\\"general\\\"\\n\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"starlight_help/src/content/docs/import-from-rocketchat.mdx\", \"chunk_index\": 1, \"score\": 0.0556, \"text\": \"         ./scripts/stop-server\\n         ./manage.py convert_rocketchat_data /tmp/rocketchat_data --output /tmp/converted_rocketchat_data\\n         ./manage.py import '' /tmp/converted_rocketchat_data\\n         ./scripts/start-server\\n\\n         ./scripts/stop-server\\n         ./manage.py convert_rocketchat_data /tmp/rocketchat_data --output /tmp/converted_rocketchat_data\\n         ./manage.py import <subdomain> /tmp/converted_rocketchat_data\\n         ./scripts/start-server\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"starlight_help/src/content/docs/import-from-rocketchat.mdx\", \"chunk_index\": 0, \"score\": 0.0526, \"text\": \"\\nimport {Steps, TabItem, Tabs} from \\\"@astrojs/starlight/components\\\";\\n\\nimport FlattenedSteps from \\\"../../components/FlattenedSteps.astro\\\";\\nimport ImportGetYourOrganizationStarted from \\\"../include/_ImportGetYourOrganizationStarted.mdx\\\";\\nimport ImportHowUsersWillLogIn from \\\"../include/_ImportHowUsersWillLogIn.mdx\\\";\\nimport ImportIntoASelfHostedServerDescription from \\\"../include/_ImportIntoASelfHostedServerDescription.mdx\\\";\\nimport ImportIntoASelfHostedServerInstructions from \\\"../include/_ImportIntoASelfHostedServerInstructions.mdx\\\";\\nimport ImportIntoAZulipCloudOrganization from \\\"../include/_ImportIntoAZulipCloudOrganization.mdx\\\";\\nimport ImportSelfHostedServerTips from \\\"../include/_ImportSelfHostedServerTips.mdx\\\";\\nimport ImportYourDataIntoZulip from \\\"../include/_ImportYourDataIntoZulip.mdx\\\";\\nimport ImportZulipCloudOrganizationWarning from \\\"../include/_ImportZulipCloudOrganizationWarning.mdx\\\";\\n\\nYou can import your current workspace into a Zulip organization. It's a great\\n... [chunk truncated]\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/management/commands/convert_mattermost_data.py\", \"chunk_index\": 0, \"score\": 0.05, \"text\": \"\\nfrom django.core.management.base import CommandError, CommandParser\\n\\nfrom zerver.data_import.mattermost import do_convert_data\\nfrom zerver.lib.management import ZulipBaseCommand\\n\\n\\n\\n    ./manage.py convert_mattermost_data mattermost_fixtures --output mm_export\\n    ./manage.py import --destroy-rebuild-database mattermost mm_export/gryffindor\\n\\n\\nimport argparse\\nimport os\\nfrom typing import Any\\n\\nfrom typing_extensions import override\\n\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/management/commands/convert_rocketchat_data.py\", \"chunk_index\": 0, \"score\": 0.0476, \"text\": \"import argparse\\nimport os\\nfrom typing import Any\\n\\nfrom django.core.management.base import CommandError, CommandParser\\nfrom typing_extensions import override\\n\\nfrom zerver.data_import.rocketchat import do_convert_data\\nfrom zerver.lib.management import ZulipBaseCommand\\n\\n\\n    def add_arguments(self, parser: CommandParser) -> None:\\n        dir_help = \\\"Directory containing all the `bson` files from mongodb dump of rocketchat.\\\"\\n        parser.add_argument(\\n            \\\"rocketchat_data_dir\\\", metavar=\\\"<rocketchat data directory>\\\", help=dir_help\\n        )\\n\\n\\n        data_dir = options[\\\"rocketchat_data_dir\\\"]\\n        if not os.path.exists(data_dir):\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0776_realm_default_avatar_source.py\", \"chunk_index\": 0, \"score\": 0.0455, \"text\": \"\\nfrom django.db import migrations, models\\n\\n\\n            model_name=\\\"realm\\\",\\n            name=\\\"default_avatar_source\\\",\\n            field=models.CharField(\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/admin.ts\", \"chunk_index\": 1, \"score\": 0.0435, \"text\": \"    }),\\n    realm_default_avatar_source: $t({defaultMessage: \\\"Default profile pictures for new users\\\"}),\\n\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/admin.ts\", \"chunk_index\": 0, \"score\": 0.0417, \"text\": \"import $ from \\\"jquery\\\";\\nimport * as tippy from \\\"tippy.js\\\";\\n\\nimport render_admin_tab from \\\"../templates/settings/admin_tab.hbs\\\";\\nimport render_settings_organization_settings_tip from \\\"../templates/settings/organization_settings_tip.hbs\\\";\\n\\nimport * as bot_data from \\\"./bot_data.ts\\\";\\nimport * as demo_organizations_ui from \\\"./demo_organizations_ui.ts\\\";\\nimport {$t, language_list} from \\\"./i18n.ts\\\";\\nimport * as information_density from \\\"./information_density.ts\\\";\\nimport {page_params} from \\\"./page_params.ts\\\";\\nimport * as people from \\\"./people.ts\\\";\\nimport {postprocess_content} from \\\"./postprocess_content.ts\\\";\\nimport {realm_user_settings_defaults} from \\\"./realm_user_settings_defaults.ts\\\";\\nimport * as settings from \\\"./settings.ts\\\";\\nimport * as settings_bots from \\\"./settings_bots.ts\\\";\\nimport * as settings_components from \\\"./settings_components.ts\\\";\\nimport type {AllNotifications} from \\\"./settings_config.ts\\\";\\nimport * as settings_config from \\\"./settings_config.ts\\\";\\n... [chunk truncated]\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/admin.ts\", \"chunk_index\": 5, \"score\": 0.04, \"text\": \"            ),\\n        default_avatar_source_values: settings_config.default_avatar_source_values,\\n    };\\n\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_bdrk_01LPKpxRxejaHcBeLBhuJP8z",
+      "content": "[{\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0615_system_bot_avatars.py\", \"chunk_index\": 0, \"score\": 1.0, \"text\": \"\\ndef set_system_bot_avatar_source_user(\\n    apps: StateApps, schema_editor: BaseDatabaseSchemaEditor\\n\\n\\ndef set_system_bot_avatar_source_gravatar(\\n    apps: StateApps, schema_editor: BaseDatabaseSchemaEditor\\n\\n        ]\\n    ).update(avatar_source=\\\"U\\\")\\n\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0776_realm_default_avatar_source.py\", \"chunk_index\": 0, \"score\": 0.5, \"text\": \"            model_name=\\\"realm\\\",\\n            name=\\\"default_avatar_source\\\",\\n            field=models.CharField(\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0031_remove_system_avatar_source.py\", \"chunk_index\": 0, \"score\": 0.3333, \"text\": \"            model_name=\\\"userprofile\\\",\\n            name=\\\"avatar_source\\\",\\n            field=models.CharField(\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0544_copy_avatar_images.py\", \"chunk_index\": 0, \"score\": 0.25, \"text\": \"def do_remove_avatar(user_profile: Any, apps: StateApps) -> None:\\n    avatar_source = \\\"G\\\"  # UserProfile.AVATAR_FROM_GRAVATAR\\n    user_profile.avatar_source = avatar_source\\n    user_profile.avatar_version += 1\\n    user_profile.save(update_fields=[\\\"avatar_source\\\", \\\"avatar_version\\\"])\\n    RealmAuditLog = apps.get_model(\\\"zerver\\\", \\\"RealmAuditLog\\\")\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0544_copy_avatar_images.py\", \"chunk_index\": 1, \"score\": 0.2, \"text\": \"        modified_user_id=user_profile.id,\\n        event_type=123,  # RealmAuditLog.USER_AVATAR_SOURCE_CHANGED,\\n        extra_data={\\\"avatar_source\\\": avatar_source},\\n        event_time=timezone_now(),\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0544_copy_avatar_images.py\", \"chunk_index\": 3, \"score\": 0.1667, \"text\": \"    users = (\\n        UserProfile.objects.filter(avatar_source=\\\"U\\\")\\n        .only(\\\"id\\\", \\\"realm_id\\\", \\\"avatar_version\\\")\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/actions/user_settings.py\", \"chunk_index\": 7, \"score\": 0.1429, \"text\": \") -> None:\\n    user_profile.avatar_source = avatar_source\\n    user_profile.avatar_version += 1\\n    user_profile.save(update_fields=[\\\"avatar_source\\\", \\\"avatar_version\\\"])\\n    event_time = timezone_now()\\n\\n        modified_user=user_profile,\\n        event_type=AuditLogEventType.USER_AVATAR_SOURCE_CHANGED,\\n        extra_data={\\\"avatar_source\\\": avatar_source},\\n        event_time=event_time,\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/actions/user_settings.py\", \"chunk_index\": 6, \"score\": 0.125, \"text\": \"    payload = dict(\\n        avatar_source=user_profile.avatar_source,\\n        avatar_url=avatar_url(user_profile),\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/lib/create_user.py\", \"chunk_index\": 3, \"score\": 0.1111, \"text\": \"    )\\n    if avatar_source is None:\\n        avatar_source = realm.default_avatar_source\\n    user_profile.avatar_source = avatar_source\\n    user_profile.timezone = timezone\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/lib/create_user.py\", \"chunk_index\": 2, \"score\": 0.1, \"text\": \"    timezone: str = \\\"\\\",\\n    avatar_source: str | None = None,\\n    is_mirror_dummy: bool = False,\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/lib/create_user.py\", \"chunk_index\": 0, \"score\": 0.0909, \"text\": \"\\n    if settings_source.avatar_source == UserProfile.AVATAR_FROM_USER:\\n        from zerver.actions.user_settings import do_change_avatar_fields\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0175_change_realm_audit_log_event_type_tense.py\", \"chunk_index\": 0, \"score\": 0.0833, \"text\": \"    )\\n    RealmAuditLog.objects.filter(event_type=\\\"user_change_avatar_source\\\").update(\\n        event_type=\\\"user_avatar_source_changed\\\"\\n    )\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/lib/avatar.py\", \"chunk_index\": 0, \"score\": 0.0769, \"text\": \"        email=user_profile.delivery_email,\\n        avatar_source=user_profile.avatar_source,\\n        avatar_version=user_profile.avatar_version,\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/lib/avatar.py\", \"chunk_index\": 1, \"score\": 0.0714, \"text\": \"    email: str,\\n    avatar_source: str,\\n    avatar_version: int,\\n\\n    Most of the parameters to this function map to fields\\n    by the same name in UserProfile (avatar_source, realm_id,\\n    email, etc.).\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0032_verify_all_medium_avatar_images.py\", \"chunk_index\": 0, \"score\": 0.0667, \"text\": \"    dependencies = [\\n        (\\\"zerver\\\", \\\"0031_remove_system_avatar_source\\\"),\\n    ]\\n\\n    user_profile_model = apps.get_model(\\\"zerver\\\", \\\"UserProfile\\\")\\n    for user_profile in user_profile_model.objects.filter(avatar_source=\\\"U\\\"):\\n        ensure_avatar_image(user_profile, medium=True)\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/models/realm_audit_logs.py\", \"chunk_index\": 0, \"score\": 0.0625, \"text\": \"    USER_PASSWORD_CHANGED = 122\\n    USER_AVATAR_SOURCE_CHANGED = 123\\n    USER_FULL_NAME_CHANGED = 124\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/migrations/0777_realm_rendered_description.py\", \"chunk_index\": 0, \"score\": 0.0588, \"text\": \"    dependencies = [\\n        (\\\"zerver\\\", \\\"0776_realm_default_avatar_source\\\"),\\n    ]\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/lib/transfer.py\", \"chunk_index\": 0, \"score\": 0.0556, \"text\": \"    try:\\n        if user.avatar_source == UserProfile.AVATAR_FROM_USER:\\n            with open(file_path + \\\".original\\\", \\\"rb\\\") as f:\\n\\n        else:\\n            assert user.avatar_source == UserProfile.AVATAR_FROM_JDENTICON\\n            with (\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/lib/transfer.py\", \"chunk_index\": 1, \"score\": 0.0526, \"text\": \"        _transfer_avatar_to_s3,\\n        UserProfile.objects.exclude(avatar_source=UserProfile.AVATAR_FROM_GRAVATAR),\\n        processes,\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/lib/types.py\", \"chunk_index\": 6, \"score\": 0.05, \"text\": \"    email: str\\n    avatar_source: str\\n    avatar_version: int\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/admin.ts\", \"chunk_index\": 1, \"score\": 0.0476, \"text\": \"    }),\\n    realm_default_avatar_source: $t({defaultMessage: \\\"Default profile pictures for new users\\\"}),\\n\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"web/src/admin.ts\", \"chunk_index\": 5, \"score\": 0.0455, \"text\": \"            ),\\n        default_avatar_source_values: settings_config.default_avatar_source_values,\\n    };\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/models/users.py\", \"chunk_index\": 10, \"score\": 0.0435, \"text\": \"    AVATAR_FROM_USER = \\\"U\\\"\\n    AVATAR_SOURCES = (\\n        (AVATAR_FROM_GRAVATAR, \\\"Hosted by Gravatar\\\"),\\n\"}, {\"repo\": \"github.com/sg-evals/zulip--f2a5dc94\", \"path\": \"zerver/models/users.py\", \"chunk_index\": 11, \"score\": 0.0417, \"text\": \"    )\\n    DEFAULT_AVATAR_SOURCE = AVATAR_FROM_GRAVATAR\\n    avatar_source = models.CharField(\\n        default=DEFAULT_AVATAR_SOURCE, choices=AVATAR_SOURCES, max_length=1\\n    )\\n\"}]"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_bdrk_01LZmcHqbHpCkwuvDz2BaWVq",
+          "type": "function",
+          "function": {
+            "name": "submit_files",
+            "arguments": "{\"files\": [{\"path\":\"zerver/migrations/0776_realm_default_avatar_source.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/models/realms.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/models/users.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/lib/avatar.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/lib/create_user.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/actions/user_settings.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/views/realm.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/lib/types.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/lib/event_types.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/lib/transfer.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/data_import/slack.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/data_import/mattermost.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/data_import/rocketchat.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"web/src/settings_config.ts\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"web/src/admin.ts\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"web/src/settings_org.ts\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"web/src/settings_components.ts\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"web/src/state_data.ts\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"web/styles/settings.css\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"web/webpack.config.ts\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"api_docs/changelog.md\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/tests/test_events.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"},{\"path\":\"zerver/tests/test_audit_log.py\",\"repo\":\"github.com/sg-evals/zulip--f2a5dc94\"}]}"
+          }
+        }
+      ]
+    }
+  ],
+  "ir_scores_unaligned": {
+    "task_id": "schema-evolution-004",
+    "config_name": "claude_adapter",
+    "precision": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.6667,
+      "5": 0.75,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.5307,
+      "5": 0.7328,
+      "10": 0.7328
+    },
+    "mrr": 0.5,
+    "map_score": 0.6389,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1304,
+    "n_retrieved": 23,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "zerver/migrations/0776_realm_default_avatar_source.py",
+    "zerver/models/realms.py",
+    "zerver/models/users.py",
+    "zerver/lib/avatar.py",
+    "zerver/lib/create_user.py",
+    "zerver/actions/user_settings.py",
+    "zerver/views/realm.py",
+    "zerver/lib/types.py",
+    "zerver/lib/event_types.py",
+    "zerver/lib/transfer.py",
+    "zerver/data_import/slack.py",
+    "zerver/data_import/mattermost.py",
+    "zerver/data_import/rocketchat.py",
+    "web/src/settings_config.ts",
+    "web/src/admin.ts",
+    "web/src/settings_org.ts",
+    "web/src/settings_components.ts",
+    "web/src/state_data.ts",
+    "web/styles/settings.css",
+    "web/webpack.config.ts",
+    "api_docs/changelog.md",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_audit_log.py"
+  ],
+  "scoring": "aligned_suffix_v1"
+}

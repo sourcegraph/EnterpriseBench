@@ -1,0 +1,70 @@
+{
+  "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/tiangolo/fastapi",
+      "rev": "0.110.0",
+      "path": "fastapi"
+    },
+    {
+      "url": "https://github.com/pydantic/pydantic",
+      "rev": "v2.6.4",
+      "path": "pydantic"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "fastapi/fastapi/dependencies/utils.py",
+      "repo": "fastapi",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "fastapi/fastapi/routing.py",
+      "repo": "fastapi",
+      "confidence": 0.85,
+      "source": "deterministic"
+    },
+    {
+      "path": "pydantic/pydantic/main.py",
+      "repo": "pydantic",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "pydantic/pydantic/_internal/_discriminated_union.py",
+      "repo": "pydantic",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "fastapi/fastapi/_compat.py",
+      "repo": "fastapi",
+      "confidence": 0.7
+    },
+    {
+      "path": "pydantic/pydantic/functional_validators.py",
+      "repo": "pydantic",
+      "confidence": 0.75
+    }
+  ],
+  "error_chain": [
+    "FastAPI routing.py builds a request handler that calls solve_dependencies in dependencies/utils.py, which in turn validates the request body via Pydantic's model_validate_json",
+    "Pydantic v2 main.py routes model_validate_json into the core schema, where _internal/_discriminated_union.py uses the discriminator field to pick the right variant",
+    "If a model_validator(mode='before') in functional_validators.py returns a dict that omits the discriminator key, the union resolver falls back to the first variant and skips the field",
+    "FastAPI receives the populated model with None on the dropped field and serializes it as the 200 OK response without raising 422 because Pydantic considered validation successful"
+  ],
+  "trigger_conditions": [
+    "The model uses a discriminated union with a model_validator(mode='before') that pre-processes the dict and drops the discriminator key",
+    "Pydantic v2 changed discriminator resolution to silently fall back to the first variant when the discriminator value is missing",
+    "FastAPI does not surface this fallback as a 422; the agent must inspect the dependency-resolution path to detect it"
+  ],
+  "expected_answer": {
+    "error_origin": "Pydantic v2's _internal/_discriminated_union.py fallback when the discriminator key is dropped by a model_validator before-hook",
+    "bypass_reason": "FastAPI's solve_dependencies treats successful Pydantic validation as a 200 OK regardless of which union variant won, so the dropped field shows up as None instead of as a 422",
+    "correct_config": "Move pre-processing into model_validator(mode='after') so the discriminator field is preserved through union resolution, or validate the discriminator field explicitly in the before-hook"
+  }
+}

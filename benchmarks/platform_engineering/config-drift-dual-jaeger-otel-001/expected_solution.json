@@ -1,0 +1,30 @@
+{
+  "task_id": "config-drift-dual-jaeger-otel-001",
+  "checkpoints": {
+    "jaeger_config": {
+      "expected_solution": "Jaeger v1.51.0 collector configuration is defined in cmd/collector/app/flags/flags.go (the AddFlags / InitFromViper functions register every legacy CLI flag and viper key). Companion files include cmd/collector/app/server/grpc.go (gRPC handler config) and cmd/collector/app/options.go (CollectorOptions struct). The legacy schema is built around viper flags such as --collector.queue-size, --collector.num-workers, --collector.grpc-port, --collector.zipkin.host-port, --collector.tags, plus storage backend selection via SPAN_STORAGE_TYPE. These flags are read at startup and converted into a CollectorOptions struct that drives the gRPC and HTTP servers; there is no native YAML config file in the legacy path — configuration is exclusively flags + env vars + a small config.yaml read directly by individual components.",
+      "evaluation_criteria": [
+        "Must identify cmd/collector/app/flags/flags.go as the primary source of Jaeger collector configuration",
+        "Must list at least three concrete legacy flags (e.g., --collector.queue-size, --collector.num-workers, --collector.grpc-port, --collector.zipkin.host-port, SPAN_STORAGE_TYPE)",
+        "Must reference the CollectorOptions struct (or an equivalent options struct) that the flags populate"
+      ]
+    },
+    "otel_config": {
+      "expected_solution": "OpenTelemetry Collector v0.89.0 configuration is YAML-driven and loaded by the service package — service/service.go (the Service struct and New constructor), with the schema defined under config/configtelemetry, config/configgrpc, exporter/otlpexporter, and receiver/otlpreceiver/factory.go. The pipeline is composed of receivers, processors, and exporters; tracing-relevant config knobs include receivers.otlp (with grpc and http endpoints), processors.batch.timeout/send_batch_size, exporters.otlp.endpoint, and the service.pipelines.traces section that wires receivers -> processors -> exporters. Each component is registered via factory.go files and validates its own Config struct via the confmap framework. There are no command-line collector flags equivalent to Jaeger's legacy --collector.* flags; everything goes through the YAML config and the components' factory functions.",
+      "evaluation_criteria": [
+        "Must identify service/service.go as the entry point for OTel Collector configuration",
+        "Must identify receiver/otlpreceiver/factory.go (or an equivalent factory) as the receiver-side schema",
+        "Must list the YAML schema sections (receivers, processors, exporters, service.pipelines.traces) and their key fields",
+        "Must explain that OTel uses YAML + factory-validated Config structs, not CLI flags"
+      ]
+    },
+    "drift_points": {
+      "expected_solution": "Configuration drift between Jaeger v1.51.0 legacy and OTel Collector v0.89.0: (1) Format drift — Jaeger uses CLI flags + env vars (cmd/collector/app/flags/flags.go), OTel uses YAML config files (service/service.go); migration requires translating each --collector.* flag to a YAML entry. (2) Queue/worker drift — Jaeger's --collector.queue-size and --collector.num-workers (in cmd/collector/app/flags/flags.go) map to OTel's processors.batch.send_batch_size and exporter sending_queue.num_consumers, but the semantics differ (Jaeger has a single in-process queue; OTel has per-component queues). (3) Port drift — Jaeger's --collector.grpc-port (default 14250) becomes receivers.jaeger.protocols.grpc.endpoint or receivers.otlp.protocols.grpc.endpoint in receiver/otlpreceiver/factory.go; default ports differ. (4) Storage drift — SPAN_STORAGE_TYPE (jaeger-side) has no direct OTel equivalent; OTel exposes storage via exporter modules (e.g., the otlp/jaeger_storage exporter). (5) Tag/attribute drift — --collector.tags becomes processors.attributes/insert in OTel pipelines; semantic conventions differ between OpenTracing-style tags and OTel attributes.",
+      "evaluation_criteria": [
+        "Must identify the format drift: CLI flags (cmd/collector/app/flags/flags.go) vs YAML config (service/service.go)",
+        "Must call out at least three specific config-key drifts (queue size, gRPC port, storage backend, tags/attributes, batching)",
+        "Must reference receiver/otlpreceiver/factory.go as the OTel-side mapping target for receiver-related drift"
+      ]
+    }
+  }
+}

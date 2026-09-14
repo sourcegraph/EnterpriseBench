@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-axum-tower-middleware-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: axum/axum/src/routing/mod.rs, axum/axum/src/routing/path_router.rs, tower/tower/src/builder/mod.rs, tower/tower/src/layer/layer_fn.rs. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify axum/axum/src/routing/mod.rs as part of the error source",
+        "Must identify axum/axum/src/routing/path_router.rs as part of the error source",
+        "Must identify tower/tower/src/builder/mod.rs as part of the error source",
+        "Must identify tower/tower/src/layer/layer_fn.rs as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) axum's Router stores routes in a path_router and applies layer() globally to the underlying service stack -> (2) route_layer() in axum's Router differs: it wraps only routes currently registered, not routes added later via merge -> (3) tower's ServiceBuilder composes layers in declaration order; the wrapped Service is built from the inner-most layer outward -> (4) When the customer calls Router::merge(sub_router) after Router::route_layer(auth), axum's path_router merges sub_router's routes into the parent without re-applying route_layer, leaving those endpoints unwrapped by the auth layer.",
+      "evaluation_criteria": [
+        "Must describe the step: axum's Router stores routes in a path_router and applies layer() globally to the...",
+        "Must describe the step: route_layer() in axum's Router differs: it wraps only routes currently registere...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Customer's code uses Router::route_layer(auth_layer) followed by Router::merge(sub_router) to attach modular routes; (2) axum's route_layer applies only to routes registered before the merge call; merged routes bypass it; (3) tower's ServiceBuilder is unaware of axum's per-route routing decisions, so the Layer is effectively absent for the merged subset.",
+      "evaluation_criteria": [
+        "Must identify the condition: Customer's code uses Router::route_layer(auth_layer) followed by Router::merge(s...",
+        "Must identify the condition: axum's route_layer applies only to routes registered before the merge call; merg...",
+        "Must identify the condition: tower's ServiceBuilder is unaware of axum's per-route routing decisions, so the ...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

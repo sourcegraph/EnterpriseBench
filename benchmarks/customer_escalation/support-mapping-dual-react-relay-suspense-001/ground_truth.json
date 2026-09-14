@@ -1,0 +1,71 @@
+{
+  "task_id": "support-mapping-dual-react-relay-suspense-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/facebook/react",
+      "rev": "v18.2.0",
+      "path": "react"
+    },
+    {
+      "url": "https://github.com/facebook/relay",
+      "rev": "v16.2.0",
+      "path": "relay"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "react/packages/react-reconciler/src/ReactFiberSuspenseComponent.js",
+      "repo": "react",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "react/packages/react-reconciler/src/ReactFiberBeginWork.js",
+      "repo": "react",
+      "confidence": 0.85,
+      "source": "deterministic"
+    },
+    {
+      "path": "relay/packages/relay-runtime/store/RelayModernEnvironment.js",
+      "repo": "relay",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "relay/packages/react-relay/relay-hooks/useFragmentInternal.js",
+      "repo": "relay",
+      "confidence": 0.9,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "relay/packages/relay-runtime/store/RelayModernStore.js",
+      "repo": "relay",
+      "confidence": 0.8
+    },
+    {
+      "path": "react/packages/use-sync-external-store/src/useSyncExternalStoreShared.js",
+      "repo": "react",
+      "confidence": 0.75
+    }
+  ],
+  "error_chain": [
+    "Relay's RelayModernEnvironment.executeMutation calls store.publish which bumps the store version and fans out to all subscribed snapshots",
+    "useFragmentInternal subscribes via useSyncExternalStore so any version bump triggers React to re-evaluate the snapshot, even if the fragment data did not change",
+    "When Relay's snapshot rebuild encounters a missing record (because an invalidator widened the scope), useFragmentInternal throws a promise to suspend the component",
+    "ReactFiberBeginWork sees the thrown promise and forces the nearest Suspense boundary into pending state; ReactFiberSuspenseComponent discards the previous tree state per the offscreen-mount semantics",
+    "The boundary's children unmount and remount when the mutation settles, dropping all client-side state under the boundary"
+  ],
+  "trigger_conditions": [
+    "A Relay mutation calls commitMutation with an updater that invalidates a record, bumping the global store version",
+    "A useFragment under the Suspense boundary subscribes to the same store and triggers a snapshot rebuild that suspends",
+    "React's Suspense boundary, when its child suspends, discards the concurrent-mode offscreen state because the reconciler treats the remount as a fresh subtree"
+  ],
+  "expected_answer": {
+    "error_origin": "useFragmentInternal throwing a promise after a Relay store version bump, which propagates to React's Suspense boundary",
+    "bypass_reason": "Relay's invalidation API bumps a global version regardless of subscriber scope; React's Suspense lifecycle treats child suspension as a remount",
+    "correct_config": "Constrain Relay invalidation to specific records via invalidateRecord rather than store-wide invalidation, and wrap the boundary content with React.startTransition so suspension preserves offscreen state instead of remounting"
+  }
+}

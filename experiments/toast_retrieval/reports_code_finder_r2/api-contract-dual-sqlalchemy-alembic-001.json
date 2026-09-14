@@ -1,0 +1,188 @@
+{
+  "task_id": "api-contract-dual-sqlalchemy-alembic-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/sqlalchemy--rel_2_0_0",
+    "github.com/sg-evals/alembic--rel_1_12_0"
+  ],
+  "retrieved_paths": [
+    "doc/build/changelog/migration_20.rst",
+    "lib/sqlalchemy/engine/base.py",
+    "lib/sqlalchemy/orm/session.py",
+    "alembic/templates/generic/env.py",
+    "alembic/runtime/migration.py",
+    "alembic/util/sqla_compat.py",
+    "docs/build/cookbook.rst",
+    "docs/build/api/autogenerate.rst"
+  ],
+  "retrieved_paths_union": [
+    "doc/build/changelog/migration_20.rst",
+    "lib/sqlalchemy/engine/base.py",
+    "lib/sqlalchemy/orm/session.py",
+    "alembic/templates/generic/env.py",
+    "alembic/runtime/migration.py",
+    "alembic/util/sqla_compat.py",
+    "docs/build/cookbook.rst",
+    "docs/build/api/autogenerate.rst"
+  ],
+  "required_files": [
+    "sqlalchemy/lib/sqlalchemy/engine/base.py",
+    "alembic/alembic/runtime/migration.py"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-sqlalchemy-alembic-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6241,
+      "10": 0.6241
+    },
+    "mrr": 0.5,
+    "map_score": 0.45,
+    "file_recall": 1.0,
+    "context_efficiency": 0.25,
+    "n_retrieved": 8,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-sqlalchemy-alembic-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6241,
+      "10": 0.6241
+    },
+    "mrr": 0.5,
+    "map_score": 0.45,
+    "file_recall": 1.0,
+    "context_efficiency": 0.25,
+    "n_retrieved": 8,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 25.2,
+  "response_chars": 4612,
+  "raw_response": "I\u2019m unable to write `/workspace/analysis/IMPACT_REPORT.md` through the available search tools. Findings for the report are:\n\n- SQLAlchemy\u2019s 2.0 execute contract is documented in `doc/build/changelog/migration_20.rst`:\n  - Direct strings passed to `Connection.execute()` are removed; use `text()` or `exec_driver_sql()` (L900-L968).\n  - Positional parameters, `**kwargs`, and multiple positional parameter sets are removed. Use one dictionary or a list of dictionaries (L912-L946).\n  - `Connection.execute()` now accepts an `Executable`, optional parameter mapping, and keyword-only `execution_options` (L1350-L1418 in `lib/sqlalchemy/engine/base.py`).\n  - `Session.execute()` has the corresponding 2.0-style signature and requires an executable SQL construct plus dictionary/list parameters (L2142-L2236 in `lib/sqlalchemy/orm/session.py`).\n  - The migration guide also recommends `engine.begin()` / `engine.connect()` with explicit connections rather than `engine.execute()` (L284-L297).\n\n- Alembic\u2019s dependency declaration is broad: `SQLAlchemy>=1.3.0`, with no upper bound, in `setup.cfg` L35-L46. Therefore Alembic 1.12.0 can install SQLAlchemy 2.0, but must bridge both API generations.\n\n- Alembic\u2019s migration runner is connection-based, not Session-based:\n  - `alembic/templates/generic/env.py` creates an Engine, obtains a `Connection` with `connectable.connect()`, passes it to `context.configure()`, then calls `context.begin_transaction()` and `context.run_migrations()` (L53-L72).\n  - `alembic/runtime/migration.py` documents and stores the SQLAlchemy `Connection`; transaction handling uses `_safe_begin_connection_transaction()` and explicitly accounts for SQLAlchemy future/autobegin behavior (L430-L471).\n  - Version-table reads and writes call `self.connection.execute()` with SQLAlchemy Core constructs (`select`, `delete`) (L518-L554).\n  - `alembic/ddl/impl.py::_exec()` invokes `conn.execute(construct, multiparams)` and `execute()` accepts `ClauseElement | str` (L175-L202).\n  - `alembic/util/sqla_compat.py` detects SQLAlchemy versions via `sqla_2`, and provides compatibility helpers for transactions and connection behavior (L59-L68, L150-L187).\n\nBreaking contract points and impact:\n\n1. Alembic\u2019s internal Core statements (`Table.select()`, `Table.delete()`, DDL, inserts/updates) are executable constructs and generally remain compatible with SQLAlchemy 2.0.\n2. Alembic\u2019s `_exec()` passes `multiparams` as a second positional argument. This is compatible only when it is a dictionary/list of dictionaries; legacy positional tuples or multiple parameter arguments will fail under SQLAlchemy 2.0.\n3. Alembic exposes `op.execute()` / implementation APIs accepting raw `str`. Raw strings must be converted to `sqlalchemy.text()` before reaching `Connection.execute()`; otherwise SQLAlchemy 2.0 raises `ObjectNotExecutableError`. The Alembic cookbook already demonstrates `connection.execute(text(...))` for SQLAlchemy 2.x (`docs/build/cookbook.rst` L846-L849).\n4. Migration scripts or autogenerate code using raw strings directly with a connection are breaking cases; `docs/build/api/autogenerate.rst` contains a raw-string `connection.execute()` example around L481-L484 that should be changed to `text(...)`.\n5. SQLAlchemy 2.0\u2019s autobegin and removal of implicit execution make transaction boundaries observable. Alembic\u2019s explicit `begin_transaction()` and compatibility helpers mitigate this, but custom migration code must not rely on implicit autocommit.\n6. Alembic does not use `Session.execute()` for migration execution. The relevant contract is SQLAlchemy Core `Connection.execute()`; ORM Session changes matter only to applications or custom migration integrations that introduce a Session.\n\nMigration recommendations:\n\n- Pin or constrain tested SQLAlchemy versions explicitly in deployment environments.\n- Replace every raw `connection.execute(\"...\")` with `connection.execute(text(\"...\"))`, or use `exec_driver_sql()` when driver-level SQL and positional parameters are intentional.\n- Replace positional parameters and keyword parameters with named dictionaries; use a list of dictionaries for executemany.\n- Prefer SQLAlchemy Core constructs (`select()`, `insert()`, `update()`, `delete()`) and pass them to `op.execute()` / `Connection.execute()`.\n- Use `engine.connect()` / `engine.begin()` and Alembic\u2019s `context.begin_transaction()` rather than removed implicit `Engine.execute()` or autocommit behavior.\n- Preserve Alembic\u2019s version-aware compatibility layer and run migration tests against both SQLAlchemy 1.4 and 2.0.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-sqlalchemy-alembic-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.125,
+    "n_retrieved": 8,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "doc/build/changelog/migration_20.rst",
+    "sqlalchemy/lib/sqlalchemy/engine/base.py",
+    "lib/sqlalchemy/orm/session.py",
+    "alembic/templates/generic/env.py",
+    "alembic/alembic/runtime/migration.py",
+    "alembic/util/sqla_compat.py",
+    "docs/build/cookbook.rst",
+    "docs/build/api/autogenerate.rst"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-sqlalchemy-alembic-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.3869,
+      "10": 0.3869
+    },
+    "mrr": 0.5,
+    "map_score": 0.25,
+    "file_recall": 0.5,
+    "context_efficiency": 0.125,
+    "n_retrieved": 8,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

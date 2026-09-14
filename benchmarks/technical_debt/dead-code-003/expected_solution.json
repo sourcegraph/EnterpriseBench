@@ -1,0 +1,30 @@
+{
+  "task_id": "dead-code-003",
+  "checkpoints": {
+    "check_dead_code": {
+      "expected_solution": "Three feature removals (retryCompileFunction, enableFire, inferEffectDependencies) leave dead code throughout the React Compiler pipeline at facebook/react@ab18f33. The largest dead artifact is compiler/packages/babel-plugin-react-compiler/src/Entrypoint/ValidateNoUntransformedReferences.ts — the entire file is a no-op pass after retryCompileFunction removal (~162 lines). Inside compiler/packages/babel-plugin-react-compiler/src/Entrypoint/Program.ts, the CompileProgramMetadata type and the retryErrors field on ProgramContext are dead, and the inferEffectDependencies handling branch is unreachable. compiler/packages/babel-plugin-react-compiler/src/Entrypoint/Options.ts still declares the 'client-no-memo' output mode that nothing emits any more. compiler/packages/babel-plugin-react-compiler/src/Babel/BabelPlugin.ts retains a retryCompileFunction handling branch (~9 lines) that can never execute. The fire feature leaves dead branches in compiler/packages/babel-plugin-react-compiler/src/Entrypoint/Imports.ts (fire import handling) and compiler/packages/babel-plugin-react-compiler/src/HIR/Environment.ts (enableFire config). Live anchors that must NOT be flagged: compileProgram in compiler/packages/babel-plugin-react-compiler/src/Entrypoint/Program.ts, BabelPlugin in compiler/packages/babel-plugin-react-compiler/src/Babel/BabelPlugin.ts, and Environment in compiler/packages/babel-plugin-react-compiler/src/HIR/Environment.ts.",
+      "evaluation_criteria": [
+        "Must identify compiler/packages/babel-plugin-react-compiler/src/Entrypoint/ValidateNoUntransformedReferences.ts as a wholly-dead file (this is the headline pass the task asks for by name)",
+        "Must identify the dead CompileProgramMetadata type and retryErrors field in compiler/packages/babel-plugin-react-compiler/src/Entrypoint/Program.ts, plus the dead 'client-no-memo' output mode in compiler/packages/babel-plugin-react-compiler/src/Entrypoint/Options.ts",
+        "Must NOT flag live anchors: compileProgram in compiler/packages/babel-plugin-react-compiler/src/Entrypoint/Program.ts, BabelPlugin in compiler/packages/babel-plugin-react-compiler/src/Babel/BabelPlugin.ts, or Environment in compiler/packages/babel-plugin-react-compiler/src/HIR/Environment.ts",
+        "Must achieve precision >= 0.9 and recall >= 0.6 across files, types, exports, and dead branches"
+      ]
+    },
+    "check_feature_flags": {
+      "expected_solution": "Three removed features must be named in evidence so check_feature_flags.sh can match them: retryCompileFunction (drives the dead ValidateNoUntransformedReferences pass and the BabelPlugin.ts retry branch), enableFire (drives the dead Imports.ts fire branch and the Environment.ts enableFire config), and inferEffectDependencies (drives the dead Program.ts handling branch). All three are 'removed' (no longer declared as flags), not 'permanently_on' or 'permanently_off'.",
+      "evaluation_criteria": [
+        "Evidence/symbol/file fields collectively must mention 'retryCompileFunction', 'enableFire', and 'inferEffectDependencies' (each name appears in check_feature_flags.sh's grep targets)",
+        "Must classify all three as removed features (not permanently_on/off) and trace each to the specific dead artifact: ValidateNoUntransformedReferences.ts pass, fire-related Imports/Environment branches, and the Program.ts inferEffectDependencies branch",
+        "Evidence should cite at least one concrete file per removed feature: compiler/packages/babel-plugin-react-compiler/src/Entrypoint/ValidateNoUntransformedReferences.ts, compiler/packages/babel-plugin-react-compiler/src/Entrypoint/Imports.ts, compiler/packages/babel-plugin-react-compiler/src/HIR/Environment.ts, and compiler/packages/babel-plugin-react-compiler/src/Entrypoint/Program.ts"
+      ]
+    },
+    "check_evidence": {
+      "expected_solution": "Each entry must carry a non-empty evidence field tying the dead artifact to the removed feature. For ValidateNoUntransformedReferences.ts the evidence should note that the pass is now a no-op after retryCompileFunction removal. For dead types/fields (CompileProgramMetadata, retryErrors) evidence should show no remaining consumers. For dead output modes ('client-no-memo' in Options.ts) evidence should show no producer emits the value. The verifier passes at >= 50% items with evidence; high-quality answers cite the search command (grep within compiler/packages/babel-plugin-react-compiler/src/) and the removal commit signal.",
+      "evaluation_criteria": [
+        "At least 50% of items must carry a non-empty evidence string (the verifier's pass threshold)",
+        "Evidence must connect each dead artifact to the specific removed feature (retryCompileFunction / enableFire / inferEffectDependencies), not just say 'unused'",
+        "Evidence should describe the verification mechanism — e.g., grep across compiler/packages/babel-plugin-react-compiler/src/ for the symbol returns only its definition site"
+      ]
+    }
+  }
+}

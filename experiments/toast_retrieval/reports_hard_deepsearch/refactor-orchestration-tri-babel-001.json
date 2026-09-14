@@ -1,0 +1,187 @@
+{
+  "task_id": "refactor-orchestration-tri-babel-001",
+  "policy": "deepsearch",
+  "suite": "technical_debt",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/babel--v7.22.9",
+    "github.com/sg-evals/webpack--v5.88.2",
+    "github.com/sg-evals/next.js--v13.4.12"
+  ],
+  "retrieved_paths": [
+    "packages/next/package.json",
+    "package.json",
+    "packages/next/src/bundles/babel/bundle.js",
+    "packages/next/src/build/babel/plugins/next-ssg-transform.ts",
+    "packages/next/src/build/babel/plugins/react-loadable-plugin.ts",
+    "github.com/sg-evals/babel--v7.22.9",
+    "github.com/sg-evals/next.js--v13.4.12"
+  ],
+  "retrieved_paths_union": [
+    "packages/next/package.json",
+    "package.json",
+    "packages/next/src/bundles/babel/bundle.js",
+    "packages/next/src/build/babel/plugins/next-ssg-transform.ts",
+    "packages/next/src/build/babel/plugins/react-loadable-plugin.ts",
+    "github.com/sg-evals/babel--v7.22.9",
+    "github.com/sg-evals/next.js--v13.4.12"
+  ],
+  "required_files": [
+    "packages/babel-parser/package.json",
+    "package.json",
+    "packages/next/package.json"
+  ],
+  "ir_scores": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.2857,
+    "n_retrieved": 7,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.2857,
+    "n_retrieved": 7,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 126.5,
+  "response_chars": 10378,
+  "raw_response": "---\ntitle: Topologically plan Babel decorator metadata AST refactor across repo pipeline\nshare_url: https://demo.sourcegraph.com/deepsearch/b8fb9a4d-8d00-4307-8cce-3b355267bb7e\nurl: https://demo.sourcegraph.com/deepsearch/2247\ncreated: 2026-08-18T02:19:35Z\nupdated: 2026-08-18T02:21:08Z\n---\n\n# # Refactor Orchestration: JS Compilation Pipeline (Babel/webpack/Next.js)\n\n## Context\n\nBabel is refactoring its parser to emit a new `DecoratorMetadata` AST node for\nstage 3 decorators. Anything that parses JavaScript with Babel, or walks a Babel\nAST, may have to handle the new node type.\n\nWe vendor three repos and need a rollout plan across them. Do not assume how they\nrelate to each other, or which of them a Babel parser change actually reaches.\nWork out from the manifests which repos consume Babel, and cite the dependency\nentry that establishes each edge.\n\n## Repos in Workspace\n\n- `/workspace/babel/`\n- `/workspace/webpack/`\n- `/workspace/nextjs/`\n\n## Task\n\nProduce a topologically sorted execution plan for propagating the Babel parser\nAST change across the repos it actually reaches.\n\n## Expected Output\n\nWrite `/workspace/REFACTOR_PLAN.md` containing:\n\n1. A numbered list of repos in the order they should be updated\n2. Dependency graph: which repo depends on which, and the manifest entry that\n   establishes each edge. If a repo you expected to be affected turns out not to\n   be, say so and show what its manifest actually declares.\n3. Parallelization annotations: which steps can proceed at the same time, and why\n4. Breaking vs. compatible change annotations per step\n5. Risk assessment for each change\n\n\nSearch only these repositories: github.com/sg-evals/babel--v7.22.9, github.com/sg-evals/webpack--v5.88.2, github.com/sg-evals/next.js--v13.4.12\n\nThe plan is complete. Here is the full `/workspace/REFACTOR_PLAN.md` content, derived entirely from the manifests:\n\n---\n\n# REFACTOR PLAN: Babel Parser AST Change (`DecoratorMetadata` node)\n\n## 1. Execution Order (Topologically Sorted)\n\n1. **Babel** (`github.com/sg-evals/babel--v7.22.9`)\n2. **Next.js** (`github.com/sg-evals/next.js--v13.4.12`)\n\nwebpack is **not** in the rollout (see section 2).\n\n---\n\n## 2. Dependency Graph and Manifest Evidence\n\n### Edge: Next.js \u2192 Babel \u2014 CONFIRMED, runtime dependency\n\n[`packages/next/package.json`](https://demo.sourcegraph.com/r/github.com/sg-evals/next.js--v13.4.12/-/blob/packages/next/package.json?L116-L134) (devDependencies, compiled into the distributed bundle):\n\n```json\n\"@babel/core\":     \"7.18.0\",\n\"@babel/generator\":\"7.18.0\",\n\"@babel/traverse\": \"7.18.0\",\n\"@babel/types\":    \"7.18.0\"\n```\n\nRoot [`package.json` resolutions](https://demo.sourcegraph.com/r/github.com/sg-evals/next.js--v13.4.12/-/blob/package.json?L238-L242) pin the entire workspace:\n\n```json\n\"@babel/core\":     \"7.18.0\",\n\"@babel/parser\":   \"7.18.0\",\n\"@babel/types\":    \"7.18.0\",\n\"@babel/traverse\": \"7.18.0\"\n```\n\nRoot `devDependencies` also pins `@babel/parser` to `7.12.11` (line 64).\n\nThese are **not purely build-time**. [`packages/next/src/bundles/babel/bundle.js`](https://demo.sourcegraph.com/r/github.com/sg-evals/next.js--v13.4.12/-/blob/packages/next/src/bundles/babel/bundle.js) lazy-requires `@babel/parser`, `@babel/core`, `@babel/traverse`, `@babel/types`, and `@babel/generator` **at user build runtime**. Next.js's own Babel plugins \u2014 e.g., [`next-ssg-transform.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/next.js--v13.4.12/-/blob/packages/next/src/build/babel/plugins/next-ssg-transform.ts?L179-L190) and [`react-loadable-plugin.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/next.js--v13.4.12/-/blob/packages/next/src/build/babel/plugins/react-loadable-plugin.ts?L39-L162) \u2014 register typed visitors and traverse the AST, meaning any new node type emitted by `@babel/parser` flows directly through this path.\n\n### Edge: webpack \u2192 Babel \u2014 NOT a runtime dependency, NOT IN ROLLOUT\n\nwebpack's [`package.json`](https://demo.sourcegraph.com/r/github.com/sg-evals/webpack--v5.88.2/-/blob/package.json) lists Babel **only** in `devDependencies` (lines 39\u201346):\n\n```json\n// devDependencies only \u2014 build/test tooling, not shipped\n\"@babel/core\":         \"^7.21.4\",\n\"@babel/preset-react\": \"^7.18.6\",\n\"babel-loader\":        \"^8.1.0\"\n```\n\nThe `dependencies` block (lines 7\u201331) contains **no `@babel/*` entries at all**. webpack parses JS at runtime using acorn (manifest: `\"acorn\": \"^8.7.1\"`) and the estree AST shape (`\"@types/estree\": \"^1.0.0\"`). The Babel AST change never reaches webpack's shipped code.\n\n---\n\n## 3. Parallelization Annotations\n\n```\nStep 1 [Babel]   \u2500\u2500\u25ba origin of the change; must land first\nStep 2 [Next.js] \u2500\u2500\u25ba strictly blocked on Step 1\nwebpack          \u2500\u2500\u25ba fully independent; no action required for rollout\n```\n\nThe two mandatory steps are strictly sequential \u2014 no parallelism is possible within the rollout chain. Any optional webpack devDependency maintenance (keeping its own test suite green if its local Babel devDependency is later upgraded) is fully independent and can run concurrently with either step.\n\n---\n\n## 4. Breaking vs. Compatible Change Annotations\n\n### Step 1 \u2014 Babel\n\n| Aspect | Assessment |\n|--------|-----------|\n| `@babel/parser` output | **Breaking for AST consumers.** New `DecoratorMetadata` node appears in stage-3 decorator ASTs. |\n| `@babel/types` | **Additive/compatible.** New `isDecoratorMetadata()` helpers added; existing code unaffected. |\n| `@babel/traverse` visitors | **Compatible** \u2014 unregistered visitor keys are silently skipped. Risk is silent omission, not a crash. |\n| Plugin ecosystem | **Potentially breaking.** Plugins walking class/decorator nodes must be audited. |\n| Semver | Minor if backward-compatible visitor behaviour is preserved; major if the node replaces previously emitted nodes. Repo already maintains an `8.0.0-alpha` stream. |\n\n### Step 2 \u2014 Next.js\n\n| Aspect | Assessment |\n|--------|-----------|\n| `bundle.js` | **Compatible.** Lazy-require pattern; only manifest/lockfile bumps needed. |\n| Babel plugins in `src/build/babel/plugins/` | **Audit required \u2014 potentially breaking.** Typed visitors in `next-ssg-transform.ts`, `react-loadable-plugin.ts`, etc., must gracefully handle `DecoratorMetadata`. |\n| SWC compilation path | **Not affected.** Next.js 13 defaults to SWC; the Babel path is opt-in only. Blast radius is limited to projects with a `babel.config.js`. |\n| `resolutions` block | **Must be updated** to prevent the package manager resolving an older pinned Babel version transitively. |\n\n---\n\n## 5. Risk Assessment\n\n### Step 1 \u2014 Babel (`risk: HIGH`)\n- New node silently unhandled in plugins \u2192 incorrect codegen output without errors.\n- Legacy decorator mode (`@babel/plugin-proposal-decorators` `legacy: true`) may conflict with stage-3 semantics.\n- **Mitigations:** Publish pre-release under the existing `8.0.0-alpha` stream first; add `DecoratorMetadata` parser fixtures; run `test262-stream` suite.\n\n### Step 2 \u2014 Next.js (`risk: MEDIUM`)\n- Limited to the opt-in Babel path; SWC users are unaffected.\n- Third-party `babel.config.js` plugins that touch decorators may silently mishandle the new node.\n- Incorrect `resolutions` bump could break workspace tooling.\n- **Mitigations:** Audit `packages/next/src/build/babel/plugins/` for visitor exhaustiveness; add an integration test with stage-3 decorators through the Babel path; bump in a dedicated PR with full `test-unit` / `test-dev` runs.\n\n### webpack (`risk: NONE \u2014 excluded from rollout`)\n- Runtime parser is acorn, not Babel. No shipped code is affected.\n- Only optional maintenance: verify CI test suite still passes if devDependency Babel version is later bumped locally.\n\n---\n\n## Summary Table\n\n| Repo | In rollout? | Step | Depends on | Change type | Risk |\n|------|-------------|------|------------|-------------|------|\n| Babel | YES | 1 | \u2014 (origin) | Breaking (new AST node) | HIGH |\n| Next.js | YES | 2 | Babel (Step 1) | Compatible + audit required | MEDIUM |\n| webpack | NO | \u2014 | \u2014 | Not a runtime consumer | NONE |\n\n## Sources\n\n- [github.com/sg-evals/babel--v7.22.9/package.json@4b5474e](/github.com/sg-evals/babel--v7.22.9@4b5474e46d6e73f11ceeae916a6dd4d99cb2afb2/-/blob/package.json)\n- [github.com/sg-evals/webpack--v5.88.2/package.json@5bcd12b](/github.com/sg-evals/webpack--v5.88.2@5bcd12b3f295bef4e74416f70bc2aabeb01db433/-/blob/package.json)\n- [github.com/sg-evals/next.js--v13.4.12/package.json@545c7cb](/github.com/sg-evals/next.js--v13.4.12@545c7cb98422d87c1f167393ba5d8ecac06222d4/-/blob/package.json)\n- [github.com/sg-evals/next.js--v13.4.12/packages/next/package.json@545c7cb](/github.com/sg-evals/next.js--v13.4.12@545c7cb98422d87c1f167393ba5d8ecac06222d4/-/blob/packages/next/package.json)\n- [repo:^github.com/sg-evals/next.js--v13.4.12$ file:^packages/next/src @babel/parser](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fnext.js--v13.4.12$%20file:%5Epackages%2Fnext%2Fsrc%20@babel%2Fparser)\n- [github.com/sg-evals/next.js--v13.4.12/packages/next/src/bundles/babel/bundle.js@545c7cb](/github.com/sg-evals/next.js--v13.4.12@545c7cb98422d87c1f167393ba5d8ecac06222d4/-/blob/packages/next/src/bundles/babel/bundle.js)\n- [repo:^github.com/sg-evals/next.js--v13.4.12$ file:^packages/next/src @babel/core @babel/traverse](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fnext.js--v13.4.12$%20file:%5Epackages%2Fnext%2Fsrc%20@babel%2Fcore%20@babel%2Ftraverse)\n- [repo:^github.com/sg-evals/next.js--v13.4.12$ file:^packages/next/src Decorator](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fnext.js--v13.4.12$%20file:%5Epackages%2Fnext%2Fsrc%20Decorator)\n- [repo:^github.com/sg-evals/next.js--v13.4.12$ file:^packages/next/src traverse visitor node.type](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fnext.js--v13.4.12$%20file:%5Epackages%2Fnext%2Fsrc%20traverse%20visitor%20node.type)\n- [repo:^github.com/sg-evals/next.js--v13.4.12$ file:^packages/next/src babel-loader OR getCustomTransforms](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fnext.js--v13.4.12$%20file:%5Epackages%2Fnext%2Fsrc%20babel-loader%20OR%20getCustomTransforms)\n\n\nGenerated files:\n- files/REFACTOR_PLAN_content.json: /.api/agent-files/v1/deep-search/b8fb9a4d-8d00-4307-8cce-3b355267bb7e/files/REFACTOR_PLAN_content.json\n- files/REFACTOR_PLAN.csv: /.api/agent-files/v1/deep-search/b8fb9a4d-8d00-4307-8cce-3b355267bb7e/files/REFACTOR_PLAN.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.2857,
+    "n_retrieved": 7,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "packages/next/package.json",
+    "package.json",
+    "packages/next/src/bundles/babel/bundle.js",
+    "packages/next/src/build/babel/plugins/next-ssg-transform.ts",
+    "packages/next/src/build/babel/plugins/react-loadable-plugin.ts",
+    "github.com/sg-evals/babel--v7.22.9",
+    "github.com/sg-evals/next.js--v13.4.12"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.2857,
+    "n_retrieved": 7,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

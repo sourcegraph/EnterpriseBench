@@ -1,0 +1,30 @@
+{
+  "task_id": "config-drift-dual-tokio-hyper-001",
+  "checkpoints": {
+    "config_valid": {
+      "expected_solution": "Valid drift report covers tokio tokio-1.29.1 and hyper v1.0.0-rc.4. Each drift_points entry must include config_key, tokio_default with tokio_source_file (tokio/src/runtime/builder.rs or tokio/src/runtime/config.rs), hyper_assumption with hyper_source_file (src/server/conn/http1.rs or src/server/conn/http2.rs), and an impact statement. The report must be valid JSON.",
+      "evaluation_criteria": [
+        "Must produce valid JSON parsable by json.loads with a top-level drift_points array",
+        "Must reference both repos: tokio paths under tokio/src/runtime/ and hyper paths under src/server/conn/",
+        "Each drift_point must contain config_key, tokio_default, tokio_source_file, hyper_assumption, hyper_source_file, impact"
+      ]
+    },
+    "drift_points": {
+      "expected_solution": "Drift points between tokio tokio-1.29.1 multi-thread runtime defaults and hyper v1.0.0-rc.4 server connection defaults. (1) Worker threads vs accept loop: tokio/src/runtime/builder.rs sets the default worker_threads to num_cpus::get() and the default blocking pool to 512 (max_blocking_threads). hyper's src/server/conn/http1.rs spawns one task per connection on the runtime; under load the accept loop can saturate worker threads while blocking-pool tasks (e.g., ones launched via spawn_blocking inside a handler) compete for the same scheduler. (2) Keep-alive timeout: hyper's Builder default for HTTP/1 keep_alive timeout is None (keep-alive enabled, no timeout); tokio's runtime has no notion of connection lifetime. With many idle keep-alive connections, hyper holds tokio tasks indefinitely, blocking the worker pool. (3) Connection limits: hyper has no built-in max_connections at the http1 builder level — src/server/conn/http1.rs accepts unlimited connections, while tokio's worker pool is fixed; the asymmetry means hyper can queue more tasks than the pool can drain. (4) HTTP/2 stream concurrency: src/server/conn/http2.rs defaults to ~200 max concurrent streams per connection; tokio cannot prevent a single h2 connection from saturating the scheduler if all 200 streams do work simultaneously. (5) Blocking calls in handlers: tokio/src/runtime/blocking pool defaults push blocking work to a separate pool, but hyper handlers that accidentally block (e.g., synchronous I/O) starve the worker threads — there is no diagnostic from either side.",
+      "evaluation_criteria": [
+        "Must reference tokio/src/runtime/builder.rs as the source of worker_threads / blocking-pool defaults",
+        "Must reference src/server/conn/http1.rs and src/server/conn/http2.rs as hyper's server-side connection defaults",
+        "Must call out at least three drift mechanisms (worker_threads vs accept-loop, keep-alive timeout, no max_connections, h2 stream concurrency, blocking calls in handlers)",
+        "Must explain the impact in terms of dropped/starved connections under load"
+      ]
+    },
+    "expected_values": {
+      "expected_solution": "Expected defaults — tokio side (tokio/src/runtime/builder.rs and tokio/src/runtime/config.rs): worker_threads = num_cpus::get(); max_blocking_threads = 512; thread_keep_alive = 10s for blocking pool; event_interval = 61. hyper side (src/server/conn/http1.rs / http2.rs): keep_alive = true with no built-in max idle timeout; max_buf_size ~ 8KB read buffer; HTTP/2 max_concurrent_streams = 200 by default. Operationally the platform should: (a) cap worker_threads explicitly (do not rely on num_cpus on cgroup-limited containers); (b) set a hyper http1 keep_alive_timeout via the builder so idle connections release tasks; (c) impose an application-level semaphore for max in-flight requests to bound the tokio task count; (d) wrap any blocking call in spawn_blocking so it lands on the blocking pool, not the worker pool. The override chain is platform/CLI args -> Runtime::Builder (tokio/src/runtime/builder.rs) -> spawned tasks per connection (src/server/conn/http1.rs) -> request handler -> tokio scheduler queue.",
+      "evaluation_criteria": [
+        "Must specify tokio's default worker_threads = num_cpus::get() and max_blocking_threads = 512 with source tokio/src/runtime/builder.rs",
+        "Must specify hyper's HTTP/1 keep-alive default and HTTP/2 max_concurrent_streams default with source src/server/conn/http1.rs and src/server/conn/http2.rs",
+        "Must recommend at least two operational fixes (explicit worker_threads cap, keep_alive timeout, app-level semaphore, spawn_blocking)"
+      ]
+    }
+  }
+}

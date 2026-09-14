@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-ansible-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "Primary error source: lib/ansible/template/__init__.py. Supporting: src/jinja2/lexer.py. Surface error: Map customer Jinja2 template rendering error to code across Ansible core and Jinja2 template engine.",
+      "evaluation_criteria": [
+        "Must identify lib/ansible/template/__init__.py as part of the error source",
+        "Must identify src/jinja2/lexer.py as part of the error source",
+        "Must reference the surface error message ('Map customer Jinja2 template rendering error to code across Ansible core and Jin') or its origin",
+        "Must reference a specific function, type, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Error propagation chain: (1) Ansible lookup('file') plugin reads binary file content from disk \u2192 (2) Ansible Templar class receives template string with embedded binary lookup result \u2192 (3) Ansible passes the full template expression to Jinja2 Environment.parse() \u2192 (4) Jinja2 lexer tokenizes the template and encounters non-UTF-8 bytes \u2192 (5) Jinja2 raises TemplateSyntaxError for unexpected character \u2192 (6) Ansible catches and wraps the error with template context information.",
+      "evaluation_criteria": [
+        "Must describe the step: 'Ansible lookup('file') plugin reads binary file content from disk'",
+        "Must describe the propagation: 'Ansible catches and wraps the error with template context information'",
+        "Must include all intermediate steps in the correct order",
+        "Must reference the chain in causal order (source \u2192 surface)",
+        "Must cite at least one file from the propagation path (e.g. lib/ansible/template/__init__.py)"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Ansible lookup plugin returns binary (non-UTF-8) content that gets embedded in template string before Jinja2 processing; (2) Jinja2 lexer validates all characters in template source before filter evaluation occurs; (3) The b64encode filter would handle binary data correctly but is never reached because lexer fails first.",
+      "evaluation_criteria": [
+        "Must identify the condition: 'Ansible lookup plugin returns binary (non-UTF-8) content that gets embedded in t'",
+        "Must identify the condition: 'Jinja2 lexer validates all characters in template source before filter evaluatio'",
+        "Must identify the condition: 'The b64encode filter would handle binary data correctly but is never reached bec'",
+        "Must explain the combined conditions necessary to reproduce the error"
+      ]
+    }
+  }
+}

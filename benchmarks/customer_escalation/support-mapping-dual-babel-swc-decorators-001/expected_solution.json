@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-babel-swc-decorators-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: babel/packages/babel-plugin-proposal-decorators/src/index.ts, babel/packages/babel-plugin-transform-typescript/src/index.ts, swc/crates/swc_ecma_transforms_proposal/src/decorators.rs, swc/crates/swc_ecma_transforms_typescript/src/lib.rs. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify babel/packages/babel-plugin-proposal-decorators/src/index.ts as part of the error source",
+        "Must identify babel/packages/babel-plugin-transform-typescript/src/index.ts as part of the error source",
+        "Must identify swc/crates/swc_ecma_transforms_proposal/src/decorators.rs as part of the error source",
+        "Must identify swc/crates/swc_ecma_transforms_typescript/src/lib.rs as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) Babel preset-typescript runs plugin-transform-typescript which strips type annotations but defers decorator emission to plugin-proposal-decorators -> (2) plugin-proposal-decorators with legacy=true emits the stage-2 form: decorators run as functions wrapping the class and Reflect.metadata('design:paramtypes', ...) side effects fire, which Nest's IoC depends on -> (3) SWC's swc_ecma_transforms_typescript strips type annotations in the same logical step as decorators.rs, but decoratorMetadata defaults to false unless explicitly set in jsc.transform -> (4) Without decoratorMetadata, SWC emits the wrapped class without the Reflect.metadata side effects, so Nest's container has no design:paramtypes entry for the constructor and DI resolution fails.",
+      "evaluation_criteria": [
+        "Must describe the step: Babel preset-typescript runs plugin-transform-typescript which strips type annot...",
+        "Must describe the step: plugin-proposal-decorators with legacy=true emits the stage-2 form: decorators r...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Customer's swc config sets jsc.parser.decorators=true and jsc.transform.legacyDecorator=true but omits decoratorMetadata=true, so Reflect.metadata calls are never emitted; (2) Babel's plugin-proposal-decorators emits the metadata side effects for free under legacy mode; SWC requires them to be opted in; (3) Nest's IoC silently fails when getMetadata returns undefined, presenting as a runtime undefined-access rather than a clear DI error.",
+      "evaluation_criteria": [
+        "Must identify the condition: Customer's swc config sets jsc.parser.decorators=true and jsc.transform.legacyDe...",
+        "Must identify the condition: Babel's plugin-proposal-decorators emits the metadata side effects for free unde...",
+        "Must identify the condition: Nest's IoC silently fails when getMetadata returns undefined, presenting as a ru...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

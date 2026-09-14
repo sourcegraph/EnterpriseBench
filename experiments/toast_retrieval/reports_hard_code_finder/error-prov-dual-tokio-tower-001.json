@@ -1,0 +1,194 @@
+{
+  "task_id": "error-prov-dual-tokio-tower-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/tokio--tokio-1.35.0",
+    "github.com/sg-evals/tower--tower-0.4.13"
+  ],
+  "retrieved_paths": [
+    "tokio/src/runtime/task/error.rs",
+    "tokio/src/runtime/task/harness.rs",
+    "tokio/src/runtime/handle.rs",
+    "tower-service/src/lib.rs",
+    "tower/src/spawn_ready/service.rs",
+    "tower/src/spawn_ready/future.rs",
+    "tower/src/util/map_err.rs",
+    "tower/src/util/then.rs",
+    "tower/src/util/boxed/sync.rs",
+    "tower/Cargo.toml"
+  ],
+  "retrieved_paths_union": [
+    "tokio/src/runtime/task/error.rs",
+    "tokio/src/runtime/task/harness.rs",
+    "tokio/src/runtime/handle.rs",
+    "tower-service/src/lib.rs",
+    "tower/src/spawn_ready/service.rs",
+    "tower/src/spawn_ready/future.rs",
+    "tower/src/util/map_err.rs",
+    "tower/src/util/then.rs",
+    "tower/src/util/boxed/sync.rs",
+    "tower/Cargo.toml"
+  ],
+  "required_files": [
+    "tokio/tokio/src/task/join.rs",
+    "tower/tower/src/util/mod.rs"
+  ],
+  "ir_scores": {
+    "task_id": "error-prov-dual-tokio-tower-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "ir_scores_union": {
+    "task_id": "error-prov-dual-tokio-tower-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "elapsed_seconds": 19.0,
+  "response_chars": 3595,
+  "raw_response": "I\u2019m unable to write `/workspace/analysis/IMPACT_REPORT.md` because this interface only provides repository search/read tools, not filesystem write access. Relevant findings:\n\n- [sg-evals/tokio--tokio-1.35.0:tokio/src/runtime/task/error.rs?L8-L18](/r/github.com/sg-evals/tokio--tokio-1.35.0/-/blob/tokio/src/runtime/task/error.rs?L8-L18) - `JoinError` stores either cancellation or the original panic payload.\n- [sg-evals/tokio--tokio-1.35.0:tokio/src/runtime/task/error.rs?L44-L61](/r/github.com/sg-evals/tokio--tokio-1.35.0/-/blob/tokio/src/runtime/task/error.rs?L44-L61) - `is_panic`.\n- [sg-evals/tokio--tokio-1.35.0:tokio/src/runtime/task/error.rs?L64-L120](/r/github.com/sg-evals/tokio--tokio-1.35.0/-/blob/tokio/src/runtime/task/error.rs?L64-L120) - `into_panic`/`try_into_panic` recover the original payload.\n- [sg-evals/tokio--tokio-1.35.0:tokio/src/runtime/task/error.rs?L139-L168](/r/github.com/sg-evals/tokio--tokio-1.35.0/-/blob/tokio/src/runtime/task/error.rs?L139-L168) - `Display` and `From<JoinError> for io::Error` reduce the message to generic \u201ctask panicked\u201d.\n- [sg-evals/tokio--tokio-1.35.0:tokio/src/runtime/task/harness.rs?L469-L517](/r/github.com/sg-evals/tokio--tokio-1.35.0/-/blob/tokio/src/runtime/task/harness.rs?L469-L517) - Tokio catches task panics and converts them to `JoinError`; scheduler panic handling is invoked.\n- [sg-evals/tokio--tokio-1.35.0:tokio/src/runtime/handle.rs?L185-L192](/r/github.com/sg-evals/tokio--tokio-1.35.0/-/blob/tokio/src/runtime/handle.rs?L185-L192) - `Handle::spawn` returns `JoinHandle`, whose await result is nested `Result`.\n- [sg-evals/tower--tower-0.4.13:tower-service/src/lib.rs?L311-L354](/r/github.com/sg-evals/tower--tower-0.4.13/-/blob/tower-service/src/lib.rs?L311-L354) - `Service` contract: `poll_ready`, then `call`, with future output `Result<Response, Error>`.\n- [sg-evals/tower--tower-0.4.13:tower/src/spawn_ready/service.rs?L45-L82](/r/github.com/sg-evals/tower--tower-0.4.13/-/blob/tower/src/spawn_ready/service.rs?L45-L82) - Tower\u2019s `SpawnReady` layer uses `tokio::spawn`; the spawned `JoinHandle` is polled through `ready!` and `??`.\n- [sg-evals/tower--tower-0.4.13:tower/src/spawn_ready/future.rs?L1-L8](/r/github.com/sg-evals/tower--tower-0.4.13/-/blob/tower/src/spawn_ready/future.rs?L1-L8) - response future maps inner errors into `BoxError`.\n- [sg-evals/tower--tower-0.4.13:tower/src/util/map_err.rs?L59-L76](/r/github.com/sg-evals/tower--tower-0.4.13/-/blob/tower/src/util/map_err.rs?L59-L76) - `MapErr` transforms inner service errors.\n- [sg-evals/tower--tower-0.4.13:tower/src/util/then.rs?L62-L81](/r/github.com/sg-evals/tower--tower-0.4.13/-/blob/tower/src/util/then.rs?L62-L81) - `Then` propagates and transforms inner results.\n- [sg-evals/tower--tower-0.4.13:tower/src/util/boxed/sync.rs?L22-L40](/r/github.com/sg-evals/tower--tower-0.4.13/-/blob/tower/src/util/boxed/sync.rs?L22-L40) - boxing preserves only the declared error type.\n- [sg-evals/tower--tower-0.4.13:tower/Cargo.toml?L52-L80](/r/github.com/sg-evals/tower--tower-0.4.13/-/blob/tower/Cargo.toml?L52-L80) - `spawn-ready` depends on Tokio runtime features; declared Tokio constraint is `version = \"1.6\"`, compatible with Tokio 1.35.0.\n\nFix recommendation: at the boundary where the `JoinHandle` is awaited, inspect `JoinError::is_panic()` and call `try_into_panic()`; downcast the payload to `&str`/`String`, then wrap it in an application error preserving task identity and source context. Avoid `JoinError -> io::Error` or immediate `BoxError` conversion before extraction, since those conversions intentionally discard the panic payload.",
+  "ir_scores_unaligned": {
+    "task_id": "error-prov-dual-tokio-tower-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "tokio/src/runtime/task/error.rs",
+    "tokio/src/runtime/task/harness.rs",
+    "tokio/src/runtime/handle.rs",
+    "tower-service/src/lib.rs",
+    "tower/src/spawn_ready/service.rs",
+    "tower/src/spawn_ready/future.rs",
+    "tower/src/util/map_err.rs",
+    "tower/src/util/then.rs",
+    "tower/src/util/boxed/sync.rs",
+    "tower/Cargo.toml"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "error-prov-dual-tokio-tower-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 10,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

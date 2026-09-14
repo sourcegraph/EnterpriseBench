@@ -1,0 +1,33 @@
+{
+  "task_id": "monorepo-boundary-babel-ts-init-001",
+  "checkpoints": {
+    "identify_affected_packages": {
+      "expected_solution": "Removing the `initializer` field from the `TSPropertySignature` AST node in `@babel/types` (changed in `packages/babel-types/src/definitions/typescript.ts`, with regenerated artifacts in `packages/babel-types/src/ast-types/generated/index.ts` and `packages/babel-types/src/builders/generated/index.ts`) propagates to two sibling packages in the babel monorepo: (1) `@babel/parser` (`packages/babel-parser`), whose hand-written TypeScript declarations in `packages/babel-parser/src/types.d.ts` re-declare the TS AST shape and must drop the field, and (2) `@babel/generator` (`packages/babel-generator`), whose TypeScript node printer in `packages/babel-generator/src/generators/typescript.ts` previously emitted the initializer expression. PR #16154 in the v7.23.6 release confirms these are the only sibling packages with non-test changes.",
+      "evaluation_criteria": [
+        "Must identify @babel/parser as affected and reference packages/babel-parser/src/types.d.ts",
+        "Must identify @babel/generator as affected and reference packages/babel-generator/src/generators/typescript.ts",
+        "Must cite the source change in packages/babel-types/src/definitions/typescript.ts",
+        "Should mention regenerated barrels packages/babel-types/src/ast-types/generated/index.ts or packages/babel-types/src/builders/generated/index.ts"
+      ]
+    },
+    "classify_change_impact": {
+      "expected_solution": "The overall change is classified as a **patch** semver bump for the v7.23.6 release. Rationale: removing `initializer` from `TSPropertySignature` is a bug-fix alignment with the TypeScript spec (interface/object-type property signatures cannot have initializers), not a new feature. Per-package classification: `@babel/types` = patch (corrects an invalid type definition), `@babel/parser` = patch (drops a field that was never produced by valid input — only stale fixture-only field), `@babel/generator` = patch (no longer emits an unreachable branch). No public API method signatures change; the field simply disappears from the AST node interface.",
+      "evaluation_criteria": [
+        "Must classify the overall change as `patch` (not minor or major)",
+        "Must classify @babel/parser impact as patch and explain that no public API surface changes",
+        "Must classify @babel/generator impact as patch with reasoning that emitted output was unreachable for valid inputs",
+        "Should note that the change aligns @babel/types with the TypeScript spec rather than introducing new behavior"
+      ]
+    },
+    "identify_boundary_violations": {
+      "expected_solution": "Concrete boundary violations — places where code or type definitions still reference the removed `initializer` field — are: (1) `packages/babel-types/src/definitions/typescript.ts` in the `TSPropertySignature` definition's `fields` block (the source-of-truth schema entry that must be deleted); (2) `packages/babel-parser/src/types.d.ts` where the hand-written `TSPropertySignature` interface enumerates `initializer?: N.Expression`; (3) `packages/babel-generator/src/generators/typescript.ts` inside the `TSPropertySignature` printer function which emits ` = ` followed by the initializer; (4) `packages/babel-types/src/ast-types/generated/index.ts` and `packages/babel-types/src/builders/generated/index.ts`, both regenerated from the definitions file and therefore carry the field through builder signatures and node-type interfaces until regeneration; (5) parser test fixture `packages/babel-parser/test/fixtures/typescript/interface/property-initializer/input.ts` plus its `options.json`, which exercise a now-impossible AST and must be updated or removed.",
+      "evaluation_criteria": [
+        "Must cite packages/babel-types/src/definitions/typescript.ts as the schema-of-record violation",
+        "Must cite packages/babel-parser/src/types.d.ts where the field is re-declared in TS",
+        "Must cite packages/babel-generator/src/generators/typescript.ts where the field is consumed during printing",
+        "Should mention the generated barrels packages/babel-types/src/ast-types/generated/index.ts or packages/babel-types/src/builders/generated/index.ts",
+        "Should mention that test fixtures under packages/babel-parser/test/fixtures/typescript/interface/property-initializer/ are also affected"
+      ]
+    }
+  }
+}

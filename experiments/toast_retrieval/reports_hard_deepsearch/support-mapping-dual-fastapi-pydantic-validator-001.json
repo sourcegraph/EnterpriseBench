@@ -1,0 +1,184 @@
+{
+  "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/fastapi--0.110.0",
+    "github.com/sg-evals/pydantic--v2.6.4"
+  ],
+  "retrieved_paths": [
+    "fastapi/routing.py",
+    "fastapi/dependencies/utils.py",
+    "fastapi/_compat.py",
+    "pydantic/_internal/_generate_schema.py",
+    "pydantic/_internal/_discriminated_union.py",
+    "pydantic/functional_validators.py"
+  ],
+  "retrieved_paths_union": [
+    "fastapi/routing.py",
+    "fastapi/dependencies/utils.py",
+    "fastapi/_compat.py",
+    "pydantic/_internal/_generate_schema.py",
+    "pydantic/_internal/_discriminated_union.py",
+    "pydantic/functional_validators.py"
+  ],
+  "required_files": [
+    "fastapi/fastapi/dependencies/utils.py",
+    "fastapi/fastapi/routing.py",
+    "pydantic/pydantic/main.py",
+    "pydantic/pydantic/_internal/_discriminated_union.py"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.75,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.6667,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7877,
+      "10": 0.7877
+    },
+    "mrr": 1.0,
+    "map_score": 0.65,
+    "file_recall": 0.75,
+    "context_efficiency": 0.5,
+    "n_retrieved": 6,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.75,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.6667,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7877,
+      "10": 0.7877
+    },
+    "mrr": 1.0,
+    "map_score": 0.65,
+    "file_recall": 0.75,
+    "context_efficiency": 0.5,
+    "n_retrieved": 6,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 119.7,
+  "response_chars": 15844,
+  "raw_response": "---\ntitle: Debugging FastAPI request-body discriminator drops after Pydantic v2 model_validator\nshare_url: https://demo.sourcegraph.com/deepsearch/4dcf083b-1e8e-419f-9861-bb947a7cbe91\nurl: https://demo.sourcegraph.com/deepsearch/2212\ncreated: 2026-08-18T01:54:46Z\nupdated: 2026-08-18T01:55:50Z\n---\n\n# # Map customer FastAPI request-body field-drop to the Pydantic v2 model_validator chain integration boundary\n\nA customer reports that after upgrading from Pydantic v1 to Pydantic v2\ntheir FastAPI POST endpoint silently drops a discriminated-union field on\nthe request body. The endpoint returns 200 OK, the response body shows the\nfield as None, but the client clearly sent it. No 422 error is raised.\n\nYour task:\n1. Find where FastAPI builds a request-body parameter from a Pydantic\n   model and validates it before invoking the route handler.\n2. Find where Pydantic v2 evaluates a discriminated union and how\n   model_validator(mode='before') interacts with discriminator field\n   resolution.\n3. Trace the cross-repo flow: FastAPI dependency injection -> body\n   parameter solving -> Pydantic model_validate_json -> discriminator\n   resolution -> field assignment. Cite each file and function.\n4. Identify why a model_validator(mode='before') that pre-processes\n   incoming JSON can silently strip the discriminator key, leading to\n   the union resolving to its default variant with the field set to None.\n\n\nSearch only these repositories: github.com/sg-evals/fastapi--0.110.0, github.com/sg-evals/pydantic--v2.6.4\n\nHere is the full end-to-end trace, with the exact integration boundary where the silent drop occurs.\n\n---\n\n## 1. FastAPI Request-Body Construction and Validation\n\n### Route registration and body field discovery\n\n[`fastapi/routing.py` `APIRoute.__init__`](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/routing.py?L500-L526) calls `get_dependant()` then `get_body_field()`. The `analyze_param()` function in [`fastapi/dependencies/utils.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/dependencies/utils.py?L317-L451) inspects every route-handler parameter; non-scalar Pydantic-model annotations are classified as `params.Body` and stored in `dependant.body_params` as `ModelField` instances.\n\nFor the Pydantic v2 path, `ModelField` is defined in [`fastapi/_compat.py` L83-L161](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/_compat.py?L83-L161). On construction it immediately builds a `TypeAdapter`:\n\n```python\n# fastapi/_compat.py  L107-L109\ndef __post_init__(self) -> None:\n    self._type_adapter: TypeAdapter[Any] = TypeAdapter(\n        Annotated[self.field_info.annotation, self.field_info]\n    )\n```\n\nThis is where Pydantic v2's full schema \u2014 including the discriminated-union and any `model_validator` decorators \u2014 is compiled and frozen at startup time.\n\n### Request handling\n\n[`get_request_handler()`](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/routing.py?L196-L244) reads the raw bytes and parses JSON with `await request.json()`, producing a plain Python dict, then passes it to `solve_dependencies()`.\n\n### Dependency solving and body validation\n\n[`solve_dependencies()`](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/dependencies/utils.py?L622-L630) calls `request_body_to_args()`. Inside [`request_body_to_args()`](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/dependencies/utils.py?L685-L764) the critical line is:\n\n```python\n# dependencies/utils.py  L756\nv_, errors_ = field.validate(value, values, loc=loc)\n```\n\n### ModelField.validate delegates to TypeAdapter\n\n[`ModelField.validate()`](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/_compat.py?L116-L131) calls:\n\n```python\n# _compat.py  L124-L126\nreturn (\n    self._type_adapter.validate_python(value, from_attributes=True),\n    None,\n)\n```\n\nAny `ValidationError` is caught and re-raised as FastAPI validation errors. But if validation **succeeds** (even with wrong data), no error propagates \u2014 this is the silent path.\n\n---\n\n## 2. Pydantic v2 Schema Construction for Discriminated Unions\n\n### Schema generation order\n\nIn [`_generate_schema.py` `_model_schema()`](https://demo.sourcegraph.com/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/_internal/_generate_schema.py?L504-L591), schema construction follows this sequence:\n\n```python\n# _generate_schema.py  L562-L575\nfields_schema = core_schema.model_fields_schema(...)       # 1. field schemas\ninner_schema = apply_validators(fields_schema, ...)         # 2. root validators\ninner_schema = apply_model_validators(inner_schema, model_validators, 'inner')  # 3. BEFORE validators\nmodel_schema = core_schema.model_schema(cls, inner_schema, ...)\nschema = apply_model_validators(schema, model_validators, 'outer')  # 4. AFTER/WRAP validators\n```\n\n### `apply_model_validators` and `mode='before'`\n\n[`apply_model_validators()`](https://demo.sourcegraph.com/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/_internal/_generate_schema.py?L2018-L2062) wraps the `inner_schema` (i.e., the `model_fields_schema`) with a `before_validator_function` when `mode == 'inner'`:\n\n```python\n# _generate_schema.py  L2049-L2053\nelif validator.info.mode == 'before':\n    if info_arg:\n        schema = core_schema.with_info_before_validator_function(function=validator.func, schema=schema)\n    else:\n        schema = core_schema.no_info_before_validator_function(function=validator.func, schema=schema)\n```\n\nThis means the compiled CoreSchema is: `before_validator_fn( model_fields_schema(...) )`. The `before` validator **wraps the entire fields schema**, so it runs before individual field parsing.\n\n### Discriminator is applied at the outer Union level, not the model level\n\nWhen a field on the **containing** model is declared as `Union[VariantA, VariantB] = Field(discriminator=\"type\")`, the discriminator is applied in [`_generate_schema.py` `_apply_discriminator_to_union()`](https://demo.sourcegraph.com/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/_internal/_generate_schema.py?L403-L419), which calls [`apply_discriminator()`](https://demo.sourcegraph.com/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/_internal/_discriminated_union.py?L59-L95), which builds a `tagged-union` CoreSchema via [`_ApplyInferredDiscriminator.apply()`](https://demo.sourcegraph.com/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/_internal/_discriminated_union.py?L165-L254):\n\n```python\n# _discriminated_union.py  L243-L254\nreturn core_schema.tagged_union_schema(\n    choices=self._tagged_union_choices,\n    discriminator=discriminator,\n    ...\n)\n```\n\nThe `tagged-union` schema is a **pydantic-core** construct: it first reads the discriminator key from the raw input, selects the matching CoreSchema for that variant, then passes the raw input to **that variant's CoreSchema** for full validation.\n\n---\n\n## 3. The Integration Boundary \u2014 Where the Drop Happens\n\nThe containing model's field declaration looks like:\n\n```python\nclass RequestBody(BaseModel):\n    payload: Union[VariantA, VariantB] = Field(discriminator=\"type\")\n```\n\nAnd `VariantA` (or `VariantB`) has:\n\n```python\nclass VariantA(BaseModel):\n    type: Literal[\"a\"]\n    extra_field: str\n\n    @model_validator(mode='before')\n    @classmethod\n    def pre_process(cls, data):\n        # customer's intent: normalise keys\n        return {k.lower(): v for k, v in data.items()}\n        # OR: they reconstruct the dict and forget to forward \"type\"\n```\n\nThe compiled CoreSchema for `payload` is (inside pydantic-core):\n\n```\ntagged-union(discriminator=\"type\")\n  \"a\" --> before_fn( model_fields_schema(VariantA) )\n  \"b\" --> before_fn( model_fields_schema(VariantB) )\n```\n\n**Execution order** when `validate_python` is called with `{\"type\": \"a\", \"extra_field\": \"x\"}`:\n\n1. pydantic-core reads `data[\"type\"]` == `\"a\"` at the tagged-union level.\n2. pydantic-core routes to `VariantA`'s schema.\n3. pydantic-core invokes the `before_fn` (the `model_validator(mode='before')`) **with the same raw dict**.\n4. The `before_fn` returns a new dict \u2014 if it omits `\"type\"`, pydantic-core continues validating `VariantA`'s `model_fields_schema` without the discriminator key.\n5. `VariantA.type` is a `Literal[\"a\"]` field with no default, so it becomes `None` (or uses its declared default if any). No `ValidationError` is raised because the **union branch was already selected at step 1** \u2014 there is nothing left to re-check the discriminator against.\n\n---\n\n## 4. Why No 422 Is Raised\n\nThe key insight is that **discriminator resolution and field validation are two separate pydantic-core passes**:\n\n- **Pass 1 (tagged-union level):** pydantic-core reads the discriminator key from the *original* raw dict to select the branch. This succeeds because the client sent `\"type\": \"a\"`.\n- **Pass 2 (within the chosen branch):** pydantic-core calls the `before` validator, which transforms the dict. The `before` validator's return value is what gets field-validated. If `\"type\"` is absent from the returned dict, the `Literal[\"a\"]` field receives no input.\n\nBecause `Literal[\"a\"]` has no `default=`, pydantic **would** normally raise a `missing` error \u2014 **unless** the model declares `model_config = ConfigDict(populate_by_name=True)` with a default, or the field has `Optional` wrapping, or the customer's `before` validator returns a value but strips the key from an `Optional[Literal[\"a\"]] = None` field. In practice, customers often write `type: Optional[Literal[\"a\"]] = None` as a convenience, making the missing key silently coerce to `None` with no error. The result is:\n\n- No `422` (pydantic-core never re-evaluates discriminator correctness after the `before` validator runs).\n- No branch mismatch error (the union branch was already committed).\n- `field = None` in the response body.\n\n### Summary table\n\n| Step | File | Function | What happens |\n|---|---|---|---|\n| 1. Body parsed | [`routing.py:228-242`](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/routing.py?L228-L242) | `get_request_handler / app()` | `request.json()` yields raw Python dict |\n| 2. Body validated | [`utils.py:622-630`](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/dependencies/utils.py?L622-L630) | `solve_dependencies` | calls `request_body_to_args` |\n| 3. Field.validate | [`utils.py:756`](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/dependencies/utils.py?L756) | `request_body_to_args` | `field.validate(value, ...)` |\n| 4. TypeAdapter | [`_compat.py:124-126`](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/_compat.py?L124-L126) | `ModelField.validate` | `TypeAdapter.validate_python(value, from_attributes=True)` |\n| 5. Discriminator read | [`_discriminated_union.py:243-254`](https://demo.sourcegraph.com/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/_internal/_discriminated_union.py?L243-L254) | `_ApplyInferredDiscriminator._apply_to_root` | tagged-union reads `data[\"type\"]`, selects variant |\n| 6. `before` validator | [`_generate_schema.py:2049-2053`](https://demo.sourcegraph.com/r/github.com/sg-evals/pydantic--v2.6.4/-/blob/pydantic/_internal/_generate_schema.py?L2049-L2053) | `apply_model_validators` (mode='inner') | `model_validator(mode='before')` transforms the dict, may strip `\"type\"` |\n| **7. Silent drop** | pydantic-core (Rust) | `tagged_union_schema` executor | Branch already committed; missing `\"type\"` sets field to `None` with no error |\n| 8. 200 returned | [`routing.py:277-307`](https://demo.sourcegraph.com/r/github.com/sg-evals/fastapi--0.110.0/-/blob/fastapi/routing.py?L277-L307) | `get_request_handler / app()` | `errors=[]`, response serialized normally |\n\n### Fix\n\nThe `model_validator(mode='before')` must **preserve the discriminator key** in its return value:\n\n```python\n@model_validator(mode='before')\n@classmethod\ndef pre_process(cls, data: Any) -> Any:\n    if isinstance(data, dict):\n        result = {k.lower(): v for k, v in data.items()}\n        # Ensure the discriminator key is forwarded\n        # (it was already used to reach this branch, but must survive for field assignment)\n        return result\n    return data\n```\n\nOr, declare the discriminator field non-optional with no default so pydantic raises `missing` instead of silently using `None`:\n\n```python\ntype: Literal[\"a\"]   # not Optional, no default\n```\n\n## Sources\n\n- [github.com/sg-evals/fastapi--0.110.0/fastapi/dependencies/utils.py@4860545?L685-764](/github.com/sg-evals/fastapi--0.110.0@4860545d04f37c39ab279dc05f98c875b8150985/-/blob/fastapi/dependencies/utils.py?L685-764)\n- [github.com/sg-evals/fastapi--0.110.0/fastapi/routing.py@4860545?L196-260](/github.com/sg-evals/fastapi--0.110.0@4860545d04f37c39ab279dc05f98c875b8150985/-/blob/fastapi/routing.py?L196-260)\n- [github.com/sg-evals/pydantic--v2.6.4/pydantic/_internal/_discriminated_union.py@23b7e1a?L38-165](/github.com/sg-evals/pydantic--v2.6.4@23b7e1ab806a8903e025a04b14e3cfa1ba29c5de/-/blob/pydantic/_internal/_discriminated_union.py?L38-165)\n- [github.com/sg-evals/pydantic--v2.6.4/pydantic/_internal/_generate_schema.py@23b7e1a?L395-430](/github.com/sg-evals/pydantic--v2.6.4@23b7e1ab806a8903e025a04b14e3cfa1ba29c5de/-/blob/pydantic/_internal/_generate_schema.py?L395-430)\n- [github.com/sg-evals/fastapi--0.110.0/fastapi/routing.py@4860545?L260-320](/github.com/sg-evals/fastapi--0.110.0@4860545d04f37c39ab279dc05f98c875b8150985/-/blob/fastapi/routing.py?L260-320)\n- [github.com/sg-evals/pydantic--v2.6.4/pydantic/_internal/_discriminated_union.py@23b7e1a?L165-260](/github.com/sg-evals/pydantic--v2.6.4@23b7e1ab806a8903e025a04b14e3cfa1ba29c5de/-/blob/pydantic/_internal/_discriminated_union.py?L165-260)\n- [github.com/sg-evals/pydantic--v2.6.4/pydantic/_internal/_generate_schema.py@23b7e1a?L1055-1080](/github.com/sg-evals/pydantic--v2.6.4@23b7e1ab806a8903e025a04b14e3cfa1ba29c5de/-/blob/pydantic/_internal/_generate_schema.py?L1055-1080)\n- [github.com/sg-evals/pydantic--v2.6.4/pydantic/functional_validators.py@23b7e1a?L474-540](/github.com/sg-evals/pydantic--v2.6.4@23b7e1ab806a8903e025a04b14e3cfa1ba29c5de/-/blob/pydantic/functional_validators.py?L474-540)\n- [github.com/sg-evals/fastapi--0.110.0/fastapi/dependencies/utils.py@4860545?L522-650](/github.com/sg-evals/fastapi--0.110.0@4860545d04f37c39ab279dc05f98c875b8150985/-/blob/fastapi/dependencies/utils.py?L522-650)\n- [github.com/sg-evals/pydantic--v2.6.4/pydantic/_internal/_generate_schema.py@23b7e1a?L490-560](/github.com/sg-evals/pydantic--v2.6.4@23b7e1ab806a8903e025a04b14e3cfa1ba29c5de/-/blob/pydantic/_internal/_generate_schema.py?L490-560)\n- [github.com/sg-evals/pydantic--v2.6.4/pydantic/_internal/_generate_schema.py@23b7e1a?L560-640](/github.com/sg-evals/pydantic--v2.6.4@23b7e1ab806a8903e025a04b14e3cfa1ba29c5de/-/blob/pydantic/_internal/_generate_schema.py?L560-640)\n- [repo:^github.com/sg-evals/fastapi--0.110.0$ _compat validate_python ModelField](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Ffastapi--0.110.0$%20_compat%20validate_python%20ModelField)\n- [github.com/sg-evals/fastapi--0.110.0/fastapi/_compat.py@4860545?L83-200](/github.com/sg-evals/fastapi--0.110.0@4860545d04f37c39ab279dc05f98c875b8150985/-/blob/fastapi/_compat.py?L83-200)\n- [repo:^github.com/sg-evals/pydantic--v2.6.4$ apply_model_validators mode before](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fpydantic--v2.6.4$%20apply_model_validators%20mode%20before)\n- [github.com/sg-evals/pydantic--v2.6.4/pydantic/_internal/_generate_schema.py@23b7e1a?L2018-2070](/github.com/sg-evals/pydantic--v2.6.4@23b7e1ab806a8903e025a04b14e3cfa1ba29c5de/-/blob/pydantic/_internal/_generate_schema.py?L2018-2070)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.3904
+    },
+    "mrr": 1.0,
+    "map_score": 0.25,
+    "file_recall": 0.25,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 6,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "fastapi/fastapi/routing.py",
+    "fastapi/fastapi/dependencies/utils.py",
+    "fastapi/_compat.py",
+    "pydantic/_internal/_generate_schema.py",
+    "pydantic/pydantic/_internal/_discriminated_union.py",
+    "pydantic/functional_validators.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-fastapi-pydantic-validator-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.3904
+    },
+    "mrr": 1.0,
+    "map_score": 0.25,
+    "file_recall": 0.25,
+    "context_efficiency": 0.1667,
+    "n_retrieved": 6,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

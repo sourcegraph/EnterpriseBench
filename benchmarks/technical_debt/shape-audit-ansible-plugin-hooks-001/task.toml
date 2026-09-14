@@ -1,0 +1,81 @@
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+repo_set_id = "ansible-nav"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "shape-audit-ansible-plugin-hooks-001"
+suite = "technical_debt"
+difficulty = "hard"
+estimated_duration_minutes = 15
+session_type = "single"
+task_type = "refactor_orchestration"
+description = "Unimplemented extension points in the plugin system"
+prompt = "See instruction.md"
+
+[[repos]]
+url = "https://github.com/ansible/ansible"
+rev = "v2.16.0"
+path = "ansible"
+role = "primary"
+
+[metadata]
+languages = ["python"]
+frameworks = ["ansible"]
+multi_repo_pattern = "investigate"
+retrieval_categories = ["syntactic_pattern", "interface_implementations", "cross_file", "dynamic_ambiguous"]
+
+[[checkpoints]]
+name = "source_files"
+weight = 1.00
+verifier = "checks/check_source_files.sh"
+description = "Agent lists exactly the source files that qualify"
+timeout_seconds = 60
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "unknown"
+mcp_benefit_rationale = "Authored to measure primitive choice, not to presuppose it; no arm is expected to win a priori."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "lib/ansible/plugins/__init__.py"
+repo = "ansible"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/ansible/plugins/filter/__init__.py"
+repo = "ansible"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/ansible/plugins/loader.py"
+repo = "ansible"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/ansible/plugins/shell/powershell.py"
+repo = "ansible"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/ansible/template/__init__.py"
+repo = "ansible"
+confidence = 1.0
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/ansible/utils/collection_loader/_collection_finder.py"
+repo = "ansible"
+confidence = 1.0
+source = "deterministic"

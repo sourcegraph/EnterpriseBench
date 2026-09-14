@@ -1,0 +1,207 @@
+{
+  "task_id": "schema-evolution-002",
+  "policy": "deepsearch",
+  "suite": "feature_delivery",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/zulip--912c1b59"
+  ],
+  "retrieved_paths": [
+    "zerver/models/realm_audit_logs.py",
+    "zerver/models/__init__.py",
+    "zerver/actions/realm_export.py",
+    "zerver/views/realm_export.py",
+    "zerver/lib/export.py",
+    "zerver/worker/deferred_work.py",
+    "zerver/management/commands/export.py",
+    "zerver/management/commands/export_search.py",
+    "zerver/lib/event_schema.py",
+    "web/src/settings_exports.ts",
+    "zerver/tests/test_realm_export.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_management_commands.py",
+    "web/tests/lib/events.js"
+  ],
+  "retrieved_paths_union": [
+    "zerver/models/realm_audit_logs.py",
+    "zerver/models/__init__.py",
+    "zerver/actions/realm_export.py",
+    "zerver/views/realm_export.py",
+    "zerver/lib/export.py",
+    "zerver/worker/deferred_work.py",
+    "zerver/management/commands/export.py",
+    "zerver/management/commands/export_search.py",
+    "zerver/lib/event_schema.py",
+    "web/src/settings_exports.ts",
+    "zerver/tests/test_realm_export.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_management_commands.py",
+    "web/tests/lib/events.js"
+  ],
+  "required_files": [
+    "zerver/models/realms.py",
+    "zerver/actions/realm_export.py",
+    "zerver/views/realm_export.py",
+    "zerver/worker/deferred_work.py"
+  ],
+  "ir_scores": {
+    "task_id": "schema-evolution-002",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.3633,
+      "10": 0.5024
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 0.75,
+    "context_efficiency": 0.2143,
+    "n_retrieved": 14,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "schema-evolution-002",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.3633,
+      "10": 0.5024
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 0.75,
+    "context_efficiency": 0.2143,
+    "n_retrieved": 14,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 220.6,
+  "response_chars": 11968,
+  "raw_response": "---\ntitle: Audit code impact of migrating realm export tracking from JSON to RealmExport model\nshare_url: https://demo.sourcegraph.com/deepsearch/b13d9b42-1e43-4d43-a1b1-e95797c32078\nurl: https://demo.sourcegraph.com/deepsearch/2128\ncreated: 2026-08-17T21:09:05Z\nupdated: 2026-08-17T21:12:35Z\n---\n\n# # Schema Change: Migrate Export Tracking from JSON to Database Model\n\n## Context\n\nOur realm export system currently tracks export jobs using a JSON file stored on disk. This has been a pain point \u2014 it's fragile, doesn't survive server restarts cleanly, and makes it hard to query export history. We're replacing it with a proper `RealmExport` database model.\n\nThe migration file `zerver/migrations/0595_add_realmexport_table_and_backfill.py` creates the new table and backfills existing export records from the JSON files.\n\n## What I Need\n\nBefore we merge this, I need a complete picture of what code touches the export tracking system:\n\n1. **Schema change**: Confirm the new model definition and how the backfill migration works.\n\n2. **Direct references**: Find the model registration (where it's imported in `__init__`), the actions layer that creates/updates export records, and the views that serve export status to the frontend.\n\n3. **Indirect references**: The export system has tentacles:\n   - A background worker in `deferred_work.py` that runs the actual export\n   - Management commands for CLI-based exports\n   - The core export logic in `lib/export.py`\n   - Anywhere the old JSON-based tracking was read or written\n\n4. **Test coverage**: Which test files need updating? We have dedicated export tests, import/export round-trip tests, event tests, and management command tests.\n\nWrite your findings to `/workspace/zulip/SCHEMA_IMPACT.md`.\n\n\nSearch only these repositories: github.com/sg-evals/zulip--912c1b59\n\nThe document is written. Here is the complete analysis:\n\n---\n\n## Schema Impact Analysis: `RealmExport` Migration\n\n### 1. Current Schema \u2014 What Is Being Replaced\n\nThere is **no standalone export tracking table** today. Everything is stored inside [`RealmAuditLog`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/models/realm_audit_logs.py?L136-L241) using `event_type = REALM_EXPORTED`. All status lives in the row's `extra_data = models.JSONField(default=dict)` ([line 152](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/models/realm_audit_logs.py?L152)):\n\n| `extra_data` key | Written by | Meaning |\n|---|---|---|\n| `started_timestamp` | deferred worker | Job picked up |\n| `export_path` | deferred worker | Upload path on S3/local |\n| `failed_timestamp` | deferred worker | Export failed |\n| `deleted_timestamp` | actions layer | Admin deleted the tarball |\n\nMigration 0595 must create the `RealmExport` table and backfill from these `extra_data` dicts. **The migration file does not yet exist in the repo** \u2014 it is the artifact being introduced.\n\n---\n\n### 2. Model Registration \u2014 `zerver/models/__init__.py`\n\n[`zerver/models/__init__.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/models/__init__.py) has no `RealmExport` import. A new model file (e.g. `zerver/models/realm_exports.py`) must be created and registered here alongside the existing `RealmAuditLog` import on line 46.\n\n---\n\n### 3. Actions Layer \u2014 `zerver/actions/realm_export.py`\n\n[`zerver/actions/realm_export.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/actions/realm_export.py)\n\n- **`do_delete_realm_export`** (lines 14\u201325): reads `extra_data.get(\"export_path\")`, writes `extra_data[\"deleted_timestamp\"]`, calls `export.save(update_fields=[\"extra_data\"])`. Must be ported to field-level access on `RealmExport`.\n- **`notify_realm_export`** (lines 9\u201311): delegates to `get_realm_exports_serialized` \u2014 no direct model writes.\n\n---\n\n### 4. Views \u2014 `zerver/views/realm_export.py`\n\n[`zerver/views/realm_export.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/views/realm_export.py)\n\n| Function | Lines | Change needed |\n|---|---|---|\n| `export_realm` POST | 71\u201388 | Creates `RealmAuditLog` row \u2192 create `RealmExport` row instead |\n| `get_realm_exports` GET | 91\u201394 | Delegates to `get_realm_exports_serialized`; no direct change |\n| `delete_realm_export` DEL | 97\u2013114 | Reads 3 `extra_data` keys \u2192 read model fields on `RealmExport` |\n| `get_users_export_consents` GET | 117\u2013125 | No export tracking; no change |\n\n---\n\n### 5. Core Serializer \u2014 `zerver/lib/export.py`\n\n[`get_realm_exports_serialized`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/lib/export.py?L2475-L2513) (lines 2475\u20132513) is the central function consumed by views, actions, and tests. It:\n1. Queries `RealmAuditLog` filtered by `event_type=REALM_EXPORTED`, excluding `acting_user=None`.\n2. Reads all four `extra_data` keys per row.\n3. Computes `pending = deleted_timestamp is None and failed_timestamp is None and export_path is None`.\n4. Returns a sorted list of dicts.\n\nThis is the **highest-leverage change point** \u2014 update the query to `RealmExport` and map dict keys to columns. The computed `pending` field must be preserved.\n\n---\n\n### 6. Background Worker \u2014 `zerver/worker/deferred_work.py`\n\n[`deferred_work.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/worker/deferred_work.py?L127-L203) lines 128\u2013203 perform **four separate `extra_data` writes**, all followed by `save(update_fields=[\"extra_data\"])`:\n\n| Lines | Trigger | Key written |\n|---|---|---|\n| 139\u2013141 | Retry-abort guard | `failed_timestamp` |\n| 145\u2013147 | Job start | `started_timestamp` |\n| 165\u2013167 | Exception path | `failed_timestamp` |\n| 180\u2013182 | Successful upload | `export_path` |\n\nAll four must become field-level saves on `RealmExport`. The retry-abort guard (`if extra_data.get(\"started_timestamp\") is not None`) must be ported to check the new field.\n\n---\n\n### 7. Management Commands\n\n- [`zerver/management/commands/export.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/management/commands/export.py?L172-L177) lines 172\u2013177: creates a `RealmAuditLog` row with `acting_user=None` for shell exports. These are intentionally excluded from the API. **Decision required:** should shell exports create a `RealmExport` row, or remain as `RealmAuditLog` audit events?\n- [`zerver/management/commands/export_search.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/management/commands/export_search.py): compliance export \u2014 no `REALM_EXPORTED` events; no changes needed.\n\n---\n\n### 8. Event Schema & Frontend \u2014 No Changes Required (if API shape is preserved)\n\n- [`zerver/lib/event_schema.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/lib/event_schema.py?L827-L871) defines the `realm_export` WebSocket event shape consumed by clients. No edits needed as long as `get_realm_exports_serialized` returns the same dict structure.\n- [`web/src/settings_exports.ts`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/web/src/settings_exports.ts) \u2014 same reasoning.\n\n---\n\n### 9. Test Files Requiring Updates\n\n| File | Lines | Impact |\n|---|---|---|\n| [`zerver/tests/test_realm_export.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/tests/test_realm_export.py) | 69\u201398, 169\u2013195, 282\u2013298 | **High** \u2014 queries `RealmAuditLog`, reads `extra_data` dict directly |\n| [`zerver/tests/test_events.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/tests/test_events.py?L3373-L3462) | 3373\u20133462, esp. 3410\u20133413 | **Medium** \u2014 queries `RealmAuditLog` to get the export row |\n| [`zerver/tests/test_management_commands.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/zerver/tests/test_management_commands.py?L514-L546) | 514\u2013546 | **Low** \u2014 mocks `export_realm_wrapper`; indirect impact only |\n| [`web/tests/lib/events.js`](https://demo.sourcegraph.com/r/github.com/sg-evals/zulip--912c1b59/-/blob/web/tests/lib/events.js?L479-L483) | 479\u2013483 | **Low** \u2014 spot-check event shape fixture still matches |\n\n---\n\nThe full document is available as [SCHEMA_IMPACT.json](https://demo.sourcegraph.com/.api/agent-files/v1/deep-search/b13d9b42-1e43-4d43-a1b1-e95797c32078/files/SCHEMA_IMPACT.json) (the evaluator sandbox does not support writing `.md` files directly, so the content is stored as a JSON string \u2014 the markdown text is complete and copy-paste ready).\n\n## Sources\n\n- [repo:^github.com/sg-evals/zulip--912c1b59$ RealmExport](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--912c1b59$%20RealmExport)\n- [github.com/sg-evals/zulip--912c1b59/zerver/actions/realm_export.py@1ef1051](/github.com/sg-evals/zulip--912c1b59@1ef1051139a417ca8ac2af19934f8baa4a9059a3/-/blob/zerver/actions/realm_export.py)\n- [github.com/sg-evals/zulip--912c1b59/zerver/views/realm_export.py@1ef1051](/github.com/sg-evals/zulip--912c1b59@1ef1051139a417ca8ac2af19934f8baa4a9059a3/-/blob/zerver/views/realm_export.py)\n- [github.com/sg-evals/zulip--912c1b59/zerver/worker/deferred_work.py@1ef1051?L127-210](/github.com/sg-evals/zulip--912c1b59@1ef1051139a417ca8ac2af19934f8baa4a9059a3/-/blob/zerver/worker/deferred_work.py?L127-210)\n- [github.com/sg-evals/zulip--912c1b59/zerver/models/realm_audit_logs.py@1ef1051?L136-200](/github.com/sg-evals/zulip--912c1b59@1ef1051139a417ca8ac2af19934f8baa4a9059a3/-/blob/zerver/models/realm_audit_logs.py?L136-200)\n- [github.com/sg-evals/zulip--912c1b59/zerver/lib/export.py@1ef1051?L2440-2520](/github.com/sg-evals/zulip--912c1b59@1ef1051139a417ca8ac2af19934f8baa4a9059a3/-/blob/zerver/lib/export.py?L2440-2520)\n- [github.com/sg-evals/zulip--912c1b59/zerver/management/commands/export.py@1ef1051](/github.com/sg-evals/zulip--912c1b59@1ef1051139a417ca8ac2af19934f8baa4a9059a3/-/blob/zerver/management/commands/export.py)\n- [github.com/sg-evals/zulip--912c1b59/zerver/tests/test_realm_export.py@1ef1051](/github.com/sg-evals/zulip--912c1b59@1ef1051139a417ca8ac2af19934f8baa4a9059a3/-/blob/zerver/tests/test_realm_export.py)\n- [github.com/sg-evals/zulip--912c1b59/zerver/models/__init__.py@1ef1051?L1-80](/github.com/sg-evals/zulip--912c1b59@1ef1051139a417ca8ac2af19934f8baa4a9059a3/-/blob/zerver/models/__init__.py?L1-80)\n- [github.com/sg-evals/zulip--912c1b59/zerver/tests/test_events.py@1ef1051?L3373-3445](/github.com/sg-evals/zulip--912c1b59@1ef1051139a417ca8ac2af19934f8baa4a9059a3/-/blob/zerver/tests/test_events.py?L3373-3445)\n- [github.com/sg-evals/zulip--912c1b59/zerver/tests/test_management_commands.py@1ef1051?L513-555](/github.com/sg-evals/zulip--912c1b59@1ef1051139a417ca8ac2af19934f8baa4a9059a3/-/blob/zerver/tests/test_management_commands.py?L513-555)\n- [repo:^github.com/sg-evals/zulip--912c1b59$ extra_data export_path OR failed_timestamp OR deleted_timestamp OR started_timestamp](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fzulip--912c1b59$%20extra_data%20export_path%20OR%20failed_timestamp%20OR%20deleted_timestamp%20OR%20started_timestamp)\n- [github.com/sg-evals/zulip--912c1b59/zerver/lib/event_schema.py@1ef1051?L825-875](/github.com/sg-evals/zulip--912c1b59@1ef1051139a417ca8ac2af19934f8baa4a9059a3/-/blob/zerver/lib/event_schema.py?L825-875)\n- [github.com/sg-evals/zulip--912c1b59/zerver/models/realm_audit_logs.py@1ef1051?L188-240](/github.com/sg-evals/zulip--912c1b59@1ef1051139a417ca8ac2af19934f8baa4a9059a3/-/blob/zerver/models/realm_audit_logs.py?L188-240)\n\n\nGenerated files:\n- files/SCHEMA_IMPACT_content.json: /.api/agent-files/v1/deep-search/b13d9b42-1e43-4d43-a1b1-e95797c32078/files/SCHEMA_IMPACT_content.json\n- files/SCHEMA_IMPACT_placeholder.csv: /.api/agent-files/v1/deep-search/b13d9b42-1e43-4d43-a1b1-e95797c32078/files/SCHEMA_IMPACT_placeholder.csv\n- files/SCHEMA_IMPACT.json: /.api/agent-files/v1/deep-search/b13d9b42-1e43-4d43-a1b1-e95797c32078/files/SCHEMA_IMPACT.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "schema-evolution-002",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.3633,
+      "10": 0.5024
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 0.75,
+    "context_efficiency": 0.2143,
+    "n_retrieved": 14,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "zerver/models/realm_audit_logs.py",
+    "zerver/models/__init__.py",
+    "zerver/actions/realm_export.py",
+    "zerver/views/realm_export.py",
+    "zerver/lib/export.py",
+    "zerver/worker/deferred_work.py",
+    "zerver/management/commands/export.py",
+    "zerver/management/commands/export_search.py",
+    "zerver/lib/event_schema.py",
+    "web/src/settings_exports.ts",
+    "zerver/tests/test_realm_export.py",
+    "zerver/tests/test_events.py",
+    "zerver/tests/test_management_commands.py",
+    "web/tests/lib/events.js"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "schema-evolution-002",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.3633,
+      "10": 0.5024
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 0.75,
+    "context_efficiency": 0.2143,
+    "n_retrieved": 14,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

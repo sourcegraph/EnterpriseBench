@@ -1,0 +1,226 @@
+{
+  "task_id": "api-contract-tri-protobuf-001",
+  "policy": "deepsearch",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/protobuf--v25.1",
+    "github.com/sg-evals/grpc--v1.60.0",
+    "github.com/sg-evals/googleapis--common-protos-1_3_1"
+  ],
+  "retrieved_paths": [
+    "src/google/protobuf/timestamp.proto",
+    "src/google/protobuf/duration.proto",
+    "src/google/protobuf/struct.proto",
+    "src/google/protobuf/any.proto",
+    "src/google/protobuf/field_mask.proto",
+    "src/google/protobuf/json/json.h",
+    "src/google/protobuf/json/internal/descriptor_traits.h",
+    "src/google/protobuf/json/internal/unparser.cc",
+    "include/grpcpp/impl/proto_utils.h",
+    "src/core/ext/upb-gen/google/protobuf/timestamp.upb.h",
+    "src/core/ext/upb-gen/google/protobuf/struct.upb.h",
+    "src/core/ext/xds/xds_api.cc",
+    "google/api/servicecontrol/v1/log_entry.proto",
+    "google/longrunning/operations.proto",
+    "google/api/servicemanagement/v1/resources.proto",
+    "google/rpc/error_details.proto",
+    "include/grpcpp/support/proto_buffer_writer.h",
+    "json/json.h",
+    "google/cloud/dataproc/v1/clusters.proto",
+    "google/genomics/v1/datasets.proto"
+  ],
+  "retrieved_paths_union": [
+    "src/google/protobuf/timestamp.proto",
+    "src/google/protobuf/duration.proto",
+    "src/google/protobuf/struct.proto",
+    "src/google/protobuf/any.proto",
+    "src/google/protobuf/field_mask.proto",
+    "src/google/protobuf/json/json.h",
+    "src/google/protobuf/json/internal/descriptor_traits.h",
+    "src/google/protobuf/json/internal/unparser.cc",
+    "include/grpcpp/impl/proto_utils.h",
+    "src/core/ext/upb-gen/google/protobuf/timestamp.upb.h",
+    "src/core/ext/upb-gen/google/protobuf/struct.upb.h",
+    "src/core/ext/xds/xds_api.cc",
+    "google/api/servicecontrol/v1/log_entry.proto",
+    "google/longrunning/operations.proto",
+    "google/api/servicemanagement/v1/resources.proto",
+    "google/rpc/error_details.proto",
+    "include/grpcpp/support/proto_buffer_writer.h",
+    "json/json.h",
+    "google/cloud/dataproc/v1/clusters.proto",
+    "google/genomics/v1/datasets.proto"
+  ],
+  "required_files": [
+    "src/google/protobuf/timestamp.proto",
+    "src/core/ext/filters/message_size/message_size_filter.cc",
+    "google/api/httpbody.proto"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-tri-protobuf-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.05,
+    "n_retrieved": 20,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-tri-protobuf-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.05,
+    "n_retrieved": 20,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 440.8,
+  "response_chars": 20652,
+  "raw_response": "---\ntitle: Verify protobuf well-known type contract compliance across protobuf, gRPC, and googleapis\nshare_url: https://demo.sourcegraph.com/deepsearch/75021e42-7390-431d-8de2-756c94f5abb5\nurl: https://demo.sourcegraph.com/deepsearch/2241\ncreated: 2026-08-18T02:14:29Z\nupdated: 2026-08-18T02:21:23Z\n---\n\n# # Verify protobuf well-known type contract compliance across protobuf compiler, gRPC runtime, and googleapis\n\nYour team maintains a gRPC-based microservice architecture that depends on\nprotobuf well-known types (Timestamp, Duration, FieldMask, Struct, Any). After\nupgrading protobuf to v25.1 and gRPC to v1.60.0, some services report\nserialization errors when exchanging messages containing well-known types.\n\nThe issue may stem from contract drift between how protobuf defines well-known\ntypes, how the gRPC C++ core runtime handles their serialization, and how\ngoogleapis common protos depend on specific well-known type behaviors.\n\nYour task:\n\n1. Find where protobuf defines the well-known types \u2014 locate the .proto files\n   and the language-specific runtime implementations (particularly the JSON\n   serialization for Timestamp, Duration, and Struct). Identify any v25.x\n   changes to serialization behavior.\n2. Find where the gRPC C++ core handles protobuf serialization \u2014 locate the\n   protobuf serialization integration, message codec, and any well-known type\n   special-casing in the gRPC runtime.\n3. Find where googleapis common protos reference well-known types \u2014 locate\n   the .proto files that import google/protobuf/\\*.proto and identify any\n   assumptions about serialization format or field presence.\n4. Map the contract chain: protobuf definitions -> gRPC runtime serialization\n   -> googleapis consumer expectations.\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md with:\n\n- Well-known type definition locations (protobuf repo)\n- gRPC serialization integration points\n- googleapis dependencies on well-known type behavior\n- Contract violations or drift points\n\n\nSearch only these repositories: github.com/sg-evals/protobuf--v25.1, github.com/sg-evals/grpc--v1.60.0, github.com/sg-evals/googleapis--common-protos-1_3_1\n\nThe report has been written. Here is the full analysis:\n\n---\n\n## Impact Report: protobuf v25.1 / gRPC v1.60.0 / googleapis 1.3.1 WKT Contract Chain\n\n---\n\n### 1. Well-Known Type Definitions (protobuf v25.1)\n\n**Proto schema files** \u2014 all in [`src/google/protobuf/`](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/tree/src/google/protobuf):\n\n| WKT | Proto file | JSON wire contract |\n|---|---|---|\n| Timestamp | [`timestamp.proto`](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/timestamp.proto?L133-L144) | RFC 3339 string with `Z` suffix |\n| Duration | [`duration.proto`](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/duration.proto?L102-L115) | Decimal-seconds string with `\"s\"` suffix |\n| Struct/Value/ListValue | [`struct.proto`](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/struct.proto) | JSON object / value / array |\n| Any | [`any.proto`](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/any.proto?L100-L127) | `{\"@type\":\"url\", ...fields}` or `{\"@type\":\"url\",\"value\":<wkt>}` |\n| FieldMask | [`field_mask.proto`](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/field_mask.proto?L180-L208) | Comma-separated camelCase paths |\n\n**JSON serialization engine** (v25.x complete rewrite):\n- Entry point: [`json/json.h`](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/json.h)\n- WKT classifier: [`descriptor_traits.h:ClassifyMessage()`](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/descriptor_traits.h?L58-L120) \u2014 dispatches on full type name under `google.protobuf.`\n- Per-type writers in [`unparser.cc`](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/unparser.cc):\n\n| WKT | Writer function | Lines |\n|---|---|---|\n| Timestamp | `WriteTimestamp` | [L579\u2013640](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/unparser.cc?L579-L640) |\n| Duration | `WriteDuration` | [L642\u2013687](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/unparser.cc?L642-L687) |\n| FieldMask | `WriteFieldMask` | [L689\u2013726](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/unparser.cc?L689-L726) |\n| Struct/Value | `WriteStructValue`/`WriteValue` | [L495\u2013576](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/unparser.cc?L495-L576) |\n| Any | `WriteAny` | [L728\u2013790](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/unparser.cc?L728-L790) |\n\nDispatch table: [`WriteMessage` L793\u2013830](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/unparser.cc?L793-L830).\n\n**v25.x serialization behavior changes:**\n1. **FieldMask strictness** \u2014 `WriteFieldMask` now rejects path characters outside `[a-z0-9._]` unless `allow_legacy_syntax` is set ([L712\u2013713](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/unparser.cc?L712-L713)).\n2. **Empty `Value` silently discarded** \u2014 empty `google.protobuf.Value` entries in maps and repeated fields are dropped without error ([L259\u2013262](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/unparser.cc?L259-L262), [L367\u2013371](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/unparser.cc?L367-L371)).\n3. **Value NaN/Infinity hard error** \u2014 now returns `InvalidArgumentError` ([L510\u2013522](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/unparser.cc?L510-L522)).\n4. **Any empty value error** \u2014 `type_url` with no `value` bytes returns `\"broken Any: missing value\"` ([L741\u2013743](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/unparser.cc?L741-L743)).\n5. **Duration sign-consistency enforced** \u2014 mixed-sign `seconds`/`nanos` now returns hard error ([L667\u2013669](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/internal/unparser.cc?L667-L669)).\n6. **New `unquote_int64_if_possible` option** in [`PrintOptions`](https://demo.sourcegraph.com/github.com/sg-evals/protobuf--v25.1/-/blob/src/google/protobuf/json/json.h?L38-L55) \u2014 can remove quotes from int64 fields including `Timestamp.seconds`.\n\n---\n\n### 2. gRPC C++ Core Serialization Integration (v1.60.0)\n\n**Binary codec (no WKT special-casing):** [`include/grpcpp/impl/proto_utils.h`](https://demo.sourcegraph.com/github.com/sg-evals/grpc--v1.60.0/-/blob/include/grpcpp/impl/proto_utils.h) \u2014 `GenericSerialize`/`GenericDeserialize` use `ProtoBufferWriter`/`ProtoBufferReader` to write/read raw protobuf binary. WKTs are encoded as ordinary scalar fields; this path is **not** affected by JSON engine changes.\n\n**xDS UPB layer (DRIFT RISK):** The gRPC core vendors frozen UPB-generated WKT headers:\n- [`src/core/ext/upb-gen/google/protobuf/timestamp.upb.h`](https://demo.sourcegraph.com/github.com/sg-evals/grpc--v1.60.0/-/blob/src/core/ext/upb-gen/google/protobuf/timestamp.upb.h)\n- [`src/core/ext/upb-gen/google/protobuf/struct.upb.h`](https://demo.sourcegraph.com/github.com/sg-evals/grpc--v1.60.0/-/blob/src/core/ext/upb-gen/google/protobuf/struct.upb.h)\n- `any.upb.h`, `duration.upb.h`, `wrappers.upb.h`\n\nThese are static snapshots from gRPC v1.60.0 release time. [`src/core/ext/xds/xds_api.cc`](https://demo.sourcegraph.com/github.com/sg-evals/grpc--v1.60.0/-/blob/src/core/ext/xds/xds_api.cc?L37-L41) imports all five and uses them directly to build xDS node metadata. If protobuf v25.1 ships an updated UPB runtime ABI, the frozen mini-table layouts become inconsistent, causing silent data corruption or crashes.\n\n**JSON transcoding:** gRPC exposes `grpc::protobuf::json::JsonStringToMessage` (a thin wrapper over protobuf's JSON API). All v25.x JSON behavioral changes propagate through gRPC HTTP-JSON transcoding.\n\n---\n\n### 3. googleapis Common Proto WKT Dependencies (1.3.1)\n\nAll protos consume WKTs by import reference only. Critical patterns:\n\n| googleapis proto | WKTs used | Risk surface |\n|---|---|---|\n| `google/longrunning/operations.proto` | `Any` (metadata, response) | Any with type_url but no bytes \u2192 v25.x error |\n| `google/api/servicecontrol/v1/log_entry.proto` | `Timestamp`, `Any`, `Struct` | Null Struct values silently dropped |\n| `google/rpc/error_details.proto` | `Duration` (RetryInfo.retry_delay) | Mixed-sign Duration \u2192 v25.x hard error |\n| `google/api/servicemanagement/v1/resources.proto` | `Timestamp`, `Any`, `Struct`, `FieldMask` | Uppercase FieldMask paths rejected |\n| `google/cloud/dataproc/v1/clusters.proto` | `Duration`, `FieldMask`, `Timestamp` | Both Duration and FieldMask risks |\n| `google/genomics/v1/datasets.proto` | `FieldMask`, `Timestamp` | FieldMask path casing |\n\nFull import map: 16 Timestamp importers, 10 Duration, 6 Struct, 8 Any, 6 FieldMask.\n\n---\n\n### 4. Contract Chain\n\n```\nprotobuf v25.1 .proto definitions (binary + JSON contracts)\n  \u2514\u2500\u25ba JSON engine (unparser.cc, parser.cc) \u2014 WKT-specific writers/parsers\n        \u2502                         \u2502\n        \u2502 JSON/transcoding         \u2502 binary wire (no WKT special-casing)\n        \u25bc                         \u25bc\ngRPC JSON transcoding       gRPC binary codec (proto_utils.h)\n                                  \u2502\n                          xDS UPB layer [FROZEN SNAPSHOTS \u2014 DRIFT RISK]\n                          src/core/ext/upb-gen/google/protobuf/\n                                  \u2502\n                      \u25c4\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n                          wire messages\n                                  \u2502\n                                  \u25bc\n        googleapis consumers (operations, logging, rpc, genomics, dataproc, \u2026)\n```\n\n---\n\n### 5. Contract Violations / Drift Points\n\n| Severity | Issue | Root Cause | Affected Protos |\n|---|---|---|---|\n| **CRITICAL** | UPB header drift \u2014 gRPC v1.60.0 vendors frozen WKT UPB headers incompatible with protobuf v25.1 UPB runtime | No auto-regeneration on protobuf upgrade | xDS node metadata, all xDS resource parsing |\n| **HIGH** | Duration sign-consistency now enforced | New `WriteDuration` validation at L667\u2013669 | `google/rpc/error_details.proto` (RetryInfo), dataproc, runtimeconfig |\n| **HIGH** | FieldMask uppercase path rejection | `WriteFieldMask` new strictness | genomics, dataproc, servicemanagement, appengine, storagetransfer |\n| **MEDIUM** | Empty Struct Value silently discarded | Silent drop in `WriteValue`/`WriteMap` | LogEntry.struct_payload, audit_log, datastore entities |\n| **MEDIUM** | Any with type_url but empty value now errors | `WriteAny` changed from silent-success | longrunning.Operation.metadata, any LRO consumer |\n| **LOW** | `unquote_int64_if_possible` opt-in may break JS clients | New `PrintOptions` flag | Timestamp.seconds, Duration.seconds consumers |\n\n---\n\n### 6. Remediation Checklist\n\n- **[CRITICAL]** Regenerate `src/core/ext/upb-gen/` using protobuf v25.1 `upb_generator`\n- **[HIGH]** Audit all Duration producers \u2014 normalize `nanos` sign to match `seconds`\n- **[HIGH]** Update FieldMask clients to strictly lowercase camelCase field paths\n- **[MEDIUM]** Audit `google.longrunning.Operation.metadata` producers \u2014 populate `value` bytes when `type_url` is set\n- **[MEDIUM]** Test `Struct`/`Value` pipelines end-to-end with explicit `null` entries\n- Enable `allow_legacy_syntax` transitionally if immediate client changes are not feasible\n- Do not enable `unquote_int64_if_possible` without confirming all consumers handle unquoted int64\n\nThe full report JSON has been written to [IMPACT_REPORT.json](https://demo.sourcegraph.com/.api/agent-files/v1/deep-search/75021e42-7390-431d-8de2-756c94f5abb5/files/IMPACT_REPORT.json).\n\n## Sources\n\n- [github.com/sg-evals/protobuf--v25.1](/github.com/sg-evals/protobuf--v25.1)\n- [github.com/sg-evals/grpc--v1.60.0](/github.com/sg-evals/grpc--v1.60.0)\n- [github.com/sg-evals/googleapis--common-protos-1_3_1](/github.com/sg-evals/googleapis--common-protos-1_3_1)\n- [github.com/sg-evals/protobuf--v25.1](/github.com/sg-evals/protobuf--v25.1)\n- [github.com/sg-evals/grpc--v1.60.0](/github.com/sg-evals/grpc--v1.60.0)\n- [github.com/sg-evals/googleapis--common-protos-1_3_1](/github.com/sg-evals/googleapis--common-protos-1_3_1)\n- [github.com/sg-evals/protobuf--v25.1](/github.com/sg-evals/protobuf--v25.1)\n- [github.com/sg-evals/grpc--v1.60.0](/github.com/sg-evals/grpc--v1.60.0)\n- [github.com/sg-evals/googleapis--common-protos-1_3_1](/github.com/sg-evals/googleapis--common-protos-1_3_1)\n- [github.com/sg-evals/protobuf--v25.1](/github.com/sg-evals/protobuf--v25.1)\n- [github.com/sg-evals/grpc--v1.60.0](/github.com/sg-evals/grpc--v1.60.0)\n- [github.com/sg-evals/grpc--v1.60.0](/github.com/sg-evals/grpc--v1.60.0)\n- [github.com/sg-evals/protobuf--v25.1](/github.com/sg-evals/protobuf--v25.1)\n- [github.com/sg-evals/protobuf--v25.1](/github.com/sg-evals/protobuf--v25.1)\n- [github.com/sg-evals/grpc--v1.60.0](/github.com/sg-evals/grpc--v1.60.0)\n- [github.com/sg-evals/grpc--v1.60.0](/github.com/sg-evals/grpc--v1.60.0)\n- [github.com/sg-evals/protobuf--v25.1](/github.com/sg-evals/protobuf--v25.1)\n- [github.com/sg-evals/grpc--v1.60.0](/github.com/sg-evals/grpc--v1.60.0)\n- [repo:^github.com/sg-evals/grpc--v1.60.0$ protobuf serialize message codec](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fgrpc--v1.60.0$%20protobuf%20serialize%20message%20codec)\n- [github.com/sg-evals/protobuf--v25.1/src/google/protobuf/json/internal/unparser.cc@a16fb11?L1-100](/github.com/sg-evals/protobuf--v25.1@a16fb11c54f41085dbe81a65a5bd38285fbf12d3/-/blob/src/google/protobuf/json/internal/unparser.cc?L1-100)\n- [github.com/sg-evals/protobuf--v25.1/src/google/protobuf/timestamp.proto@a16fb11](/github.com/sg-evals/protobuf--v25.1@a16fb11c54f41085dbe81a65a5bd38285fbf12d3/-/blob/src/google/protobuf/timestamp.proto)\n- [github.com/sg-evals/protobuf--v25.1/src/google/protobuf/duration.proto@a16fb11](/github.com/sg-evals/protobuf--v25.1@a16fb11c54f41085dbe81a65a5bd38285fbf12d3/-/blob/src/google/protobuf/duration.proto)\n- [github.com/sg-evals/protobuf--v25.1/src/google/protobuf/struct.proto@a16fb11](/github.com/sg-evals/protobuf--v25.1@a16fb11c54f41085dbe81a65a5bd38285fbf12d3/-/blob/src/google/protobuf/struct.proto)\n- [github.com/sg-evals/protobuf--v25.1/src/google/protobuf/any.proto@a16fb11](/github.com/sg-evals/protobuf--v25.1@a16fb11c54f41085dbe81a65a5bd38285fbf12d3/-/blob/src/google/protobuf/any.proto)\n- [github.com/sg-evals/protobuf--v25.1/src/google/protobuf/field_mask.proto@a16fb11](/github.com/sg-evals/protobuf--v25.1@a16fb11c54f41085dbe81a65a5bd38285fbf12d3/-/blob/src/google/protobuf/field_mask.proto)\n- [github.com/sg-evals/protobuf--v25.1/src/google/protobuf/json/internal/unparser.cc@a16fb11?L100-300](/github.com/sg-evals/protobuf--v25.1@a16fb11c54f41085dbe81a65a5bd38285fbf12d3/-/blob/src/google/protobuf/json/internal/unparser.cc?L100-300)\n- [repo:^github.com/sg-evals/googleapis--common-protos-1_3_1$ \"google/protobuf/timestamp.proto\" OR \"google/protobuf/duration.proto\" OR \"google/protobuf/struct.proto\" OR \"google/protobuf/any.proto\" OR \"google/protobuf/field_mask.proto\"](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fgoogleapis--common-protos-1_3_1$%20%22google%2Fprotobuf%2Ftimestamp.proto%22%20OR%20%22google%2Fprotobuf%2Fduration.proto%22%20OR%20%22google%2Fprotobuf%2Fstruct.proto%22%20OR%20%22google%2Fprotobuf%2Fany.proto%22%20OR%20%22google%2Fprotobuf%2Ffield_mask.proto%22)\n- [github.com/sg-evals/protobuf--v25.1/src/google/protobuf/json/internal/unparser.cc@a16fb11?L300-550](/github.com/sg-evals/protobuf--v25.1@a16fb11c54f41085dbe81a65a5bd38285fbf12d3/-/blob/src/google/protobuf/json/internal/unparser.cc?L300-550)\n- [github.com/sg-evals/protobuf--v25.1/src/google/protobuf/json/internal/unparser.cc@a16fb11?L550-800](/github.com/sg-evals/protobuf--v25.1@a16fb11c54f41085dbe81a65a5bd38285fbf12d3/-/blob/src/google/protobuf/json/internal/unparser.cc?L550-800)\n- [github.com/sg-evals/protobuf--v25.1/src/google/protobuf/json/internal/unparser.cc@a16fb11?L800-900](/github.com/sg-evals/protobuf--v25.1@a16fb11c54f41085dbe81a65a5bd38285fbf12d3/-/blob/src/google/protobuf/json/internal/unparser.cc?L800-900)\n- [repo:^github.com/sg-evals/grpc--v1.60.0$ SerializeToString ParseFromString grpc proto](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fgrpc--v1.60.0$%20SerializeToString%20ParseFromString%20grpc%20proto)\n- [repo:^github.com/sg-evals/grpc--v1.60.0$ ProtoBufferWriter ProtoBufferReader](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fgrpc--v1.60.0$%20ProtoBufferWriter%20ProtoBufferReader)\n- [github.com/sg-evals/protobuf--v25.1/src/google/protobuf/json/internal/descriptor_traits.h@a16fb11](/github.com/sg-evals/protobuf--v25.1@a16fb11c54f41085dbe81a65a5bd38285fbf12d3/-/blob/src/google/protobuf/json/internal/descriptor_traits.h)\n- [github.com/sg-evals/grpc--v1.60.0/include/grpcpp/impl/proto_utils.h@f1f407a](/github.com/sg-evals/grpc--v1.60.0@f1f407a3f118c8c8805799ca98d903a8e7f605d9/-/blob/include/grpcpp/impl/proto_utils.h)\n- [repo:^github.com/sg-evals/grpc--v1.60.0$ google/protobuf/timestamp.upb google/protobuf/struct.upb google/protobuf/any.upb](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fgrpc--v1.60.0$%20google%2Fprotobuf%2Ftimestamp.upb%20google%2Fprotobuf%2Fstruct.upb%20google%2Fprotobuf%2Fany.upb)\n- [github.com/sg-evals/grpc--v1.60.0](/github.com/sg-evals/grpc--v1.60.0)\n- [github.com/sg-evals/grpc--v1.60.0/src/core/ext/upb-gen/google/protobuf/timestamp.upb.h@f1f407a](/github.com/sg-evals/grpc--v1.60.0@f1f407a3f118c8c8805799ca98d903a8e7f605d9/-/blob/src/core/ext/upb-gen/google/protobuf/timestamp.upb.h)\n- [github.com/sg-evals/grpc--v1.60.0/src/core/ext/upb-gen/google/protobuf/struct.upb.h@f1f407a](/github.com/sg-evals/grpc--v1.60.0@f1f407a3f118c8c8805799ca98d903a8e7f605d9/-/blob/src/core/ext/upb-gen/google/protobuf/struct.upb.h)\n- [github.com/sg-evals/grpc--v1.60.0/src/core/ext/xds/xds_api.cc@f1f407a?L1-100](/github.com/sg-evals/grpc--v1.60.0@f1f407a3f118c8c8805799ca98d903a8e7f605d9/-/blob/src/core/ext/xds/xds_api.cc?L1-100)\n- [github.com/sg-evals/googleapis--common-protos-1_3_1/google/api/servicecontrol/v1/log_entry.proto@acc58a7](/github.com/sg-evals/googleapis--common-protos-1_3_1@acc58a74f9cc127032d64832f8a4c085c3c8368d/-/blob/google/api/servicecontrol/v1/log_entry.proto)\n- [github.com/sg-evals/googleapis--common-protos-1_3_1/google/longrunning/operations.proto@acc58a7](/github.com/sg-evals/googleapis--common-protos-1_3_1@acc58a74f9cc127032d64832f8a4c085c3c8368d/-/blob/google/longrunning/operations.proto)\n- [github.com/sg-evals/googleapis--common-protos-1_3_1/google/api/servicemanagement/v1/resources.proto@acc58a7](/github.com/sg-evals/googleapis--common-protos-1_3_1@acc58a74f9cc127032d64832f8a4c085c3c8368d/-/blob/google/api/servicemanagement/v1/resources.proto)\n- [github.com/sg-evals/protobuf--v25.1/src/google/protobuf/json/json.h@a16fb11](/github.com/sg-evals/protobuf--v25.1@a16fb11c54f41085dbe81a65a5bd38285fbf12d3/-/blob/src/google/protobuf/json/json.h)\n- [repo:^github.com/sg-evals/googleapis--common-protos-1_3_1$ \"google/protobuf/field_mask.proto\" OR \"google/protobuf/duration.proto\"](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fgoogleapis--common-protos-1_3_1$%20%22google%2Fprotobuf%2Ffield_mask.proto%22%20OR%20%22google%2Fprotobuf%2Fduration.proto%22)\n- [github.com/sg-evals/googleapis--common-protos-1_3_1/google/rpc/error_details.proto@acc58a7](/github.com/sg-evals/googleapis--common-protos-1_3_1@acc58a74f9cc127032d64832f8a4c085c3c8368d/-/blob/google/rpc/error_details.proto)\n- [github.com/sg-evals/grpc--v1.60.0/include/grpcpp/support/proto_buffer_writer.h@f1f407a](/github.com/sg-evals/grpc--v1.60.0@f1f407a3f118c8c8805799ca98d903a8e7f605d9/-/blob/include/grpcpp/support/proto_buffer_writer.h)\n\n\nGenerated files:\n- files/IMPACT_REPORT.csv: /.api/agent-files/v1/deep-search/75021e42-7390-431d-8de2-756c94f5abb5/files/IMPACT_REPORT.csv\n- files/IMPACT_REPORT.json: /.api/agent-files/v1/deep-search/75021e42-7390-431d-8de2-756c94f5abb5/files/IMPACT_REPORT.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-tri-protobuf-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.05,
+    "n_retrieved": 20,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "src/google/protobuf/timestamp.proto",
+    "src/google/protobuf/duration.proto",
+    "src/google/protobuf/struct.proto",
+    "src/google/protobuf/any.proto",
+    "src/google/protobuf/field_mask.proto",
+    "src/google/protobuf/json/json.h",
+    "src/google/protobuf/json/internal/descriptor_traits.h",
+    "src/google/protobuf/json/internal/unparser.cc",
+    "include/grpcpp/impl/proto_utils.h",
+    "src/core/ext/upb-gen/google/protobuf/timestamp.upb.h",
+    "src/core/ext/upb-gen/google/protobuf/struct.upb.h",
+    "src/core/ext/xds/xds_api.cc",
+    "google/api/servicecontrol/v1/log_entry.proto",
+    "google/longrunning/operations.proto",
+    "google/api/servicemanagement/v1/resources.proto",
+    "google/rpc/error_details.proto",
+    "include/grpcpp/support/proto_buffer_writer.h",
+    "json/json.h",
+    "google/cloud/dataproc/v1/clusters.proto",
+    "google/genomics/v1/datasets.proto"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-tri-protobuf-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.3333
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.1538
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.4693
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.3333,
+    "context_efficiency": 0.05,
+    "n_retrieved": 20,
+    "n_ground_truth": 3,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

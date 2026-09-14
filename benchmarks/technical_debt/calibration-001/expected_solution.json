@@ -1,0 +1,22 @@
+{
+  "task_id": "cal-dead-click-legacy-001",
+  "checkpoints": {
+    "check_dead_code": {
+      "expected_solution": "Four dead symbols in pallets/click@8.2.1: (1) src/click/_compat.py::isidentifier — Python 2-era helper, no callers in the click tree at this revision; (2) src/click/_compat.py::_default_text_stderr — replaced by get_text_stderr in src/click/utils.py and no longer referenced; (3) src/click/utils.py::safecall — legacy command-callable wrapper, dropped from the public surface; (4) src/click/utils.py::make_str — pre-Py3 string-coercion shim. Live anchors that must NOT be flagged include src/click/core.py::Context, src/click/core.py::BaseCommand, src/click/decorators.py::command, src/click/decorators.py::option, src/click/types.py::STRING, src/click/testing.py::CliRunner, src/click/utils.py::echo, and src/click/utils.py::get_text_stderr. Verification: a `grep -RIn` of each symbol across src/, tests/, and docs/ shows zero internal call sites for the four dead symbols.",
+      "evaluation_criteria": [
+        "Must identify all four dead symbols: isidentifier and _default_text_stderr in src/click/_compat.py, plus safecall and make_str in src/click/utils.py",
+        "Must NOT flag any of the live anchors as dead: Context/BaseCommand in src/click/core.py, command/option in src/click/decorators.py, STRING in src/click/types.py, CliRunner in src/click/testing.py, or echo/get_text_stderr in src/click/utils.py",
+        "Each claimed dead symbol must include evidence of zero internal callers (e.g., grep across src/, tests/, docs/), not just the symbol name",
+        "Precision must be at least 0.8 — false positives on live exports are heavily penalised"
+      ]
+    },
+    "check_evidence": {
+      "expected_solution": "Every entry in answer.json's dead_code array must include a non-empty `evidence` field that explains *how* the agent established zero callers. Acceptable evidence cites a concrete search at the pinned revision — for example, `grep -RIn 'safecall' src/ tests/` returning only the definition in src/click/utils.py, or noting that src/click/_compat.py::isidentifier is unreferenced anywhere in the click package. Vague evidence such as \"unused\" or \"legacy\" is not sufficient. The judge expects at least 50% of items to carry concrete grep/cross-reference evidence and rewards naming the search command and its result.",
+      "evaluation_criteria": [
+        "At least 50% of dead_code entries must carry a non-empty evidence string (the verifier's pass threshold)",
+        "Evidence must describe how the agent verified zero callers — e.g., grep across src/, tests/, docs/ — not a vague label like 'unused' or 'legacy'",
+        "Higher-quality answers cite the specific search command (grep / ripgrep / Sourcegraph query) and the file boundary searched (src/click/, tests/, docs/) at the pinned revision 8.2.1"
+      ]
+    }
+  }
+}

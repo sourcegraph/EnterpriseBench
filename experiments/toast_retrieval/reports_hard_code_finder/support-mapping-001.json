@@ -1,0 +1,201 @@
+{
+  "task_id": "support-mapping-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/envoy--v1.31.2"
+  ],
+  "retrieved_paths": [
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/router/upstream_request.cc",
+    "source/common/upstream/upstream_impl.cc",
+    "api/envoy/config/cluster/v3/circuit_breaker.proto",
+    "source/common/upstream/resource_manager_impl.h",
+    "docs/root/intro/arch_overview/upstream/circuit_breaking.rst",
+    "envoy/http/stream_reset_handler.h",
+    "source/common/stream_info/utility.h",
+    "test/common/http/http1/conn_pool_test.cc",
+    "test/common/http/http2/conn_pool_test.cc",
+    "envoy/upstream/upstream.h",
+    "api/envoy/data/accesslog/v3/accesslog.proto"
+  ],
+  "retrieved_paths_union": [
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/router/upstream_request.cc",
+    "source/common/upstream/upstream_impl.cc",
+    "api/envoy/config/cluster/v3/circuit_breaker.proto",
+    "source/common/upstream/resource_manager_impl.h",
+    "docs/root/intro/arch_overview/upstream/circuit_breaking.rst",
+    "envoy/http/stream_reset_handler.h",
+    "source/common/stream_info/utility.h",
+    "test/common/http/http1/conn_pool_test.cc",
+    "test/common/http/http2/conn_pool_test.cc",
+    "envoy/upstream/upstream.h",
+    "api/envoy/data/accesslog/v3/accesslog.proto"
+  ],
+  "required_files": [
+    "source/common/http/conn_pool_base.cc",
+    "source/common/http/conn_pool_base.h",
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/upstream/conn_pool_map_impl.h"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.3904
+    },
+    "mrr": 1.0,
+    "map_score": 0.25,
+    "file_recall": 0.25,
+    "context_efficiency": 0.0833,
+    "n_retrieved": 12,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.3904
+    },
+    "mrr": 1.0,
+    "map_score": 0.25,
+    "file_recall": 0.25,
+    "context_efficiency": 0.0833,
+    "n_retrieved": 12,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 14.4,
+  "response_chars": 3710,
+  "raw_response": "The error is generated when an upstream connection pool hits a circuit-breaker resource limit\u2014most commonly pending requests, active requests/streams, or connections. Envoy maps `PoolFailureReason::Overflow` to `StreamResetReason::Overflow`, producing the reported reset and `UO` (`UpstreamOverflow`) response flag.\n\nRelevant files:\n\n- [sg-evals/envoy--v1.31.2:source/common/conn_pool/conn_pool_base.cc?L166-L210](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/conn_pool/conn_pool_base.cc?L166-L210) - Rejects streams when `max_requests` is exhausted; increments `upstream_rq_pending_overflow`.\n- [sg-evals/envoy--v1.31.2:source/common/conn_pool/conn_pool_base.cc?L255-L300](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/conn_pool/conn_pool_base.cc?L255-L300) - Rejects new pending streams when `max_pending_requests` is exhausted.\n- [sg-evals/envoy--v1.31.2:source/common/router/upstream_request.cc?L563-L586](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/router/upstream_request.cc?L563-L586) - Converts connection-pool overflow into the HTTP upstream reset.\n- [sg-evals/envoy--v1.31.2:source/common/upstream/upstream_impl.cc?L1958-L2030](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/upstream/upstream_impl.cc?L1958-L2030) - Loads circuit-breaker settings, defaults, per-priority configuration, runtime keys, and per-host connection limits.\n- [sg-evals/envoy--v1.31.2:api/envoy/config/cluster/v3/circuit_breaker.proto?L53-L105](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/api/envoy/config/cluster/v3/circuit_breaker.proto?L53-L105) - Configuration schema for `max_connections`, `max_pending_requests`, `max_requests`, `max_retries`, `max_connection_pools`, and retry budgets.\n- [sg-evals/envoy--v1.31.2:source/common/upstream/resource_manager_impl.h?L74-L102](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/upstream/resource_manager_impl.h?L74-L102) - Maintains the resource limits for connections, pending requests, requests, retries, and pools.\n- [sg-evals/envoy--v1.31.2:docs/root/intro/arch_overview/upstream/circuit_breaking.rst?L12-L72](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/docs/root/intro/arch_overview/upstream/circuit_breaking.rst?L12-L72) - Documents each circuit breaker, overflow counters, per-cluster/per-priority behavior, worker sharing, and defaults.\n- [sg-evals/envoy--v1.31.2:envoy/http/stream_reset_handler.h?L20-L40](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/envoy/http/stream_reset_handler.h?L20-L40) - Defines the `Overflow` stream reset reason.\n- [sg-evals/envoy--v1.31.2:source/common/stream_info/utility.h?L75-L120](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/source/common/stream_info/utility.h?L75-L120) - Defines `UO` / `UpstreamOverflow` response flags.\n- [sg-evals/envoy--v1.31.2:test/common/http/http1/conn_pool_test.cc?L415-L440](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/test/common/http/http1/conn_pool_test.cc?L415-L440) - Verifies pending-request overflow behavior and stats.\n- [sg-evals/envoy--v1.31.2:test/common/http/http2/conn_pool_test.cc?L916-L925](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/test/common/http/http2/conn_pool_test.cc?L916-L925) - Tests enforcement of the pending-request circuit breaker.\n- [sg-evals/envoy--v1.31.2:envoy/upstream/upstream.h?L789-L805](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/envoy/upstream/upstream.h?L789-L805) - Declares cluster circuit-breaker statistics, including open gauges and overflow counters.\n- [sg-evals/envoy--v1.31.2:api/envoy/data/accesslog/v3/accesslog.proto?L296-L318](/r/github.com/sg-evals/envoy--v1.31.2/-/blob/api/envoy/data/accesslog/v3/accesslog.proto?L296-L318) - Access-log field for identifying upstream overflow resets.",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.3904
+    },
+    "mrr": 1.0,
+    "map_score": 0.25,
+    "file_recall": 0.25,
+    "context_efficiency": 0.0833,
+    "n_retrieved": 12,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "source/common/conn_pool/conn_pool_base.cc",
+    "source/common/router/upstream_request.cc",
+    "source/common/upstream/upstream_impl.cc",
+    "api/envoy/config/cluster/v3/circuit_breaker.proto",
+    "source/common/upstream/resource_manager_impl.h",
+    "docs/root/intro/arch_overview/upstream/circuit_breaking.rst",
+    "envoy/http/stream_reset_handler.h",
+    "source/common/stream_info/utility.h",
+    "test/common/http/http1/conn_pool_test.cc",
+    "test/common/http/http2/conn_pool_test.cc",
+    "envoy/upstream/upstream.h",
+    "api/envoy/data/accesslog/v3/accesslog.proto"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.3904
+    },
+    "mrr": 1.0,
+    "map_score": 0.25,
+    "file_recall": 0.25,
+    "context_efficiency": 0.0833,
+    "n_retrieved": 12,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

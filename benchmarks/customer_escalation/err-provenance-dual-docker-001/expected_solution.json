@@ -1,0 +1,33 @@
+{
+  "task_id": "err-provenance-dual-docker-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "Primary error source: cli/command/container/create.go. Supporting: daemon/create.go. Surface error: Trace user-facing Docker 'executable file not found in $PATH' error through CLI to Moby daemon origin.",
+      "evaluation_criteria": [
+        "Must identify cli/command/container/create.go as part of the error source",
+        "Must identify daemon/create.go as part of the error source",
+        "Must reference the surface error message ('Trace user-facing Docker 'executable file not found in $PATH' error through CLI ') or its origin",
+        "Must reference a specific function, type, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Error propagation chain: (1) User runs docker container create with invalid options \u2192 (2) Docker CLI parses command and sends request to Moby daemon via API \u2192 (3) Moby daemon container.go validates container configuration \u2192 (4) Moby daemon returns error response with internal error details \u2192 (5) Docker CLI formats and displays error to user without full context.",
+      "evaluation_criteria": [
+        "Must describe the step: 'User runs docker container create with invalid options'",
+        "Must describe the propagation: 'Docker CLI formats and displays error to user without full context'",
+        "Must include all intermediate steps in the correct order",
+        "Must reference the chain in causal order (source \u2192 surface)",
+        "Must cite at least one file from the propagation path (e.g. cli/command/container/create.go)"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Docker CLI sends a container creation request with conflicting network options; (2) Moby daemon validates the configuration in daemon/create.go; (3) The error message from Moby is wrapped by CLI without preserving the root cause context.",
+      "evaluation_criteria": [
+        "Must identify the condition: 'Docker CLI sends a container creation request with conflicting network options'",
+        "Must identify the condition: 'Moby daemon validates the configuration in daemon/create.go'",
+        "Must identify the condition: 'The error message from Moby is wrapped by CLI without preserving the root cause '",
+        "Must explain the combined conditions necessary to reproduce the error"
+      ]
+    }
+  }
+}

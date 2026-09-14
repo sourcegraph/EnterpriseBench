@@ -1,0 +1,41 @@
+{
+  "task_id": "schema-evolution-001",
+  "checkpoints": {
+    "identify_schema_change": {
+      "expected_solution": "Zulip PR #30504 adds a `deactivated` BooleanField to the `NamedUserGroup` model so groups can be soft-deleted instead of removed. The schema change is in `zerver/models/groups.py` (model definition) and a new Django migration named `0578_namedusergroup_deactivated` is added under zerver/migrations/ (single-column add with default=False). At the pinned base SHA the rename from `UserGroup` to `NamedUserGroup` is already complete, so the migration targets the post-rename table only.",
+      "evaluation_criteria": [
+        "Must identify the schema change as a new BooleanField named `deactivated` on NamedUserGroup",
+        "Must reference zerver/models/groups.py as the model file changed",
+        "Must reference the new migration `0578_namedusergroup_deactivated` added under zerver/migrations/",
+        "Should note that PR #30504 is the source of the change"
+      ]
+    },
+    "find_direct_refs": {
+      "expected_solution": "Direct references to NamedUserGroup that need to be aware of the new `deactivated` field, per the PR diff: (1) `zerver/actions/user_groups.py` — create/update/membership actions must filter or set `deactivated`; (2) `zerver/views/user_groups.py` — REST endpoints for listing/updating groups; (3) `zerver/lib/user_groups.py` — utility helpers for resolving group queries (`get_recursive_subgroups`, `access_user_group_by_id`); (4) `zerver/views/streams.py` — channel access checks read group membership and must skip deactivated groups. The model itself in `zerver/models/groups.py` declares the field; query helpers in `zerver/lib/user_groups.py` are the chokepoint that downstream actions/views go through.",
+      "evaluation_criteria": [
+        "Must cite zerver/actions/user_groups.py as a direct action-layer reference",
+        "Must cite zerver/views/user_groups.py as a direct view-layer reference",
+        "Must cite zerver/lib/user_groups.py as the utility chokepoint for group queries",
+        "Should cite zerver/views/streams.py because channel access checks consult user_groups"
+      ]
+    },
+    "find_indirect_refs": {
+      "expected_solution": "Indirect references — places that don't query NamedUserGroup directly but still must change to track the new column or convey it: (1) `zerver/lib/events.py` — event-system payload for group create/update/delete must carry `deactivated`; (2) `zerver/lib/event_schema.py` — schema validators for outgoing events must accept the new field; (3) `zerver/lib/import_realm.py` — realm import path must restore `deactivated` from JSON exports; (4) `zerver/lib/markdown/__init__.py` — message renderer expands `@*group*` mentions and must skip deactivated groups; (5) `zerver/openapi/zulip.yaml` — public API schema documenting the field; (6) `zerver/openapi/curl_param_value_generators.py` — example value generators for docs; (7) `zerver/models/realm_audit_logs.py` — audit-log entries record group state changes and need a `deactivate`/`reactivate` event type; (8) `zproject/urls.py` — URL routing for any new endpoints added by the change.",
+      "evaluation_criteria": [
+        "Must cite zerver/lib/events.py and zerver/lib/event_schema.py as event-system references",
+        "Must cite zerver/lib/import_realm.py for the import/export path",
+        "Must cite zerver/openapi/zulip.yaml or zerver/openapi/curl_param_value_generators.py for the API schema",
+        "Should cite zerver/lib/markdown/__init__.py and zerver/models/realm_audit_logs.py"
+      ]
+    },
+    "identify_test_impact": {
+      "expected_solution": "Test files that need new cases for deactivation behavior: (1) `zerver/tests/test_user_groups.py` — primary suite for group CRUD must add cases for soft-delete, reactivation, and deactivated groups in member queries; (2) `zerver/tests/test_events.py` — verifies the new `deactivated` field appears in group events and validation rejects malformed payloads; (3) `zerver/tests/test_audit_log.py` — verifies new audit-log entries for deactivate/reactivate; (4) `zerver/tests/test_markdown.py` — verifies `@*group*` mentions of deactivated groups don't render. Also `api_docs/changelog.md` documents the user-visible API change (not a test, but ships in the same PR).",
+      "evaluation_criteria": [
+        "Must cite zerver/tests/test_user_groups.py as the primary test target",
+        "Must cite zerver/tests/test_events.py for event-payload coverage",
+        "Must cite zerver/tests/test_audit_log.py and zerver/tests/test_markdown.py",
+        "Should mention api_docs/changelog.md as the docs companion"
+      ]
+    }
+  }
+}

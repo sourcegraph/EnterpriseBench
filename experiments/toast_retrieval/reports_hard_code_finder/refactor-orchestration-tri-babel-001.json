@@ -1,0 +1,175 @@
+{
+  "task_id": "refactor-orchestration-tri-babel-001",
+  "policy": "code_finder",
+  "suite": "technical_debt",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/babel--v7.22.9",
+    "github.com/sg-evals/webpack--v5.88.2",
+    "github.com/sg-evals/next.js--v13.4.12"
+  ],
+  "retrieved_paths": [
+    "packages/babel-parser/package.json",
+    "packages/next/package.json",
+    "packages/next/src/bundles/babel/bundle.js"
+  ],
+  "retrieved_paths_union": [
+    "packages/babel-parser/package.json",
+    "packages/next/package.json",
+    "packages/next/src/bundles/babel/bundle.js"
+  ],
+  "required_files": [
+    "packages/babel-parser/package.json",
+    "package.json",
+    "packages/next/package.json"
+  ],
+  "ir_scores": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.6667,
+    "n_retrieved": 3,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.6667,
+    "n_retrieved": 3,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 22.6,
+  "response_chars": 1736,
+  "raw_response": "I could not write `/workspace/REFACTOR_PLAN.md` because the available tools only searched/read repository files, not the workspace filesystem. Findings so far:\n\n- **Babel** is the source/parser repository. `packages/babel-parser/package.json` identifies `@babel/parser` version `7.22.7`; its dependencies are workspace-internal, so no edge to webpack or Next.js is declared there.\n- **Webpack does not consume Babel at runtime.** Its `package.json` lists `@babel/core` and `@babel/preset-react` only under `devDependencies` (`package.json:L38-L46`). Webpack\u2019s production parser uses Acorn (`package.json:L13-L14` and parser implementation), so it should not be updated for a Babel AST node change.\n- **Next.js directly consumes Babel packages** as development/build dependencies:\n  - Root `package.json`: `@babel/core`, `@babel/parser`, and related packages (`L60-L65`), with Babel versions pinned in `resolutions` (`L238-L241`).\n  - `packages/next/package.json`: `@babel/core`, `@babel/eslint-parser`, generator, traversal, types, and related packages (`L113-L134`).\n  - Next\u2019s Babel bundle explicitly requires `@babel/parser` (`packages/next/src/bundles/babel/bundle.js:L43-L45`) and `@babel/core` (`L11-L12`), then compiles these into `next/dist/compiled/babel`.\n- **Next.js also consumes webpack independently**, via root `package.json` devDependency `webpack: 5.86.0` and resolution (`L228-L235`), plus `packages/next/package.json`\u2019s webpack entry (`L307-L312`). This is not a Babel dependency edge.\n- Relevant topological plan: **1. Babel \u2192 2. Next.js**. Webpack is excluded from the affected propagation path; its Babel entries are dev/test-only and its parser is Acorn-based.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.6667,
+    "n_retrieved": 3,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "packages/babel-parser/package.json",
+    "packages/next/package.json",
+    "packages/next/src/bundles/babel/bundle.js"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "refactor-orchestration-tri-babel-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.6667,
+      "5": 0.6667,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.6667,
+      "5": 0.5,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7654,
+      "10": 0.7654
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.6667,
+    "n_retrieved": 3,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

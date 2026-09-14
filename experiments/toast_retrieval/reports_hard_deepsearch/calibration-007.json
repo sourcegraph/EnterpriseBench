@@ -1,0 +1,166 @@
+{
+  "task_id": "calibration-007",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/requests--v2.32.3"
+  ],
+  "retrieved_paths": [
+    "src/requests/sessions.py"
+  ],
+  "retrieved_paths_union": [
+    "src/requests/sessions.py"
+  ],
+  "required_files": [
+    "src/requests/utils.py",
+    "src/requests/sessions.py"
+  ],
+  "ir_scores": {
+    "task_id": "calibration-007",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 1.0,
+    "n_retrieved": 1,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "calibration-007",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 1.0,
+    "n_retrieved": 1,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 34.5,
+  "response_chars": 4012,
+  "raw_response": "Here is a precise breakdown of all three questions.\n\n---\n\n## 1. Where `REQUESTS_CA_BUNDLE` is read\n\nIt is read in [`src/requests/sessions.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.32.3/-/blob/src/requests/sessions.py?L750-771) inside `Session.merge_environment_settings()`:\n\n```python\n# L766-771\nif verify is True or verify is None:\n    verify = (\n        os.environ.get(\"REQUESTS_CA_BUNDLE\")\n        or os.environ.get(\"CURL_CA_BUNDLE\")\n        or verify\n    )\n```\n\n`CURL_CA_BUNDLE` is the fallback if `REQUESTS_CA_BUNDLE` is not set.\n\n---\n\n## 2. How `session.verify = False` interacts with the env var\n\nThe env-var block at [L766](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.32.3/-/blob/src/requests/sessions.py?L766) has a **guard condition**:\n\n```python\nif verify is True or verify is None:   # <-- env vars are ONLY checked here\n```\n\nThe `verify` argument passed into `merge_environment_settings` comes from the **per-request** `verify` kwarg (defaulting to `None`). When no per-request `verify` kwarg is given, it is `None`, so the env-var block runs.\n\nAfter the env-var block, `merge_setting` is called ([L776](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.32.3/-/blob/src/requests/sessions.py?L776)):\n\n```python\nverify = merge_setting(verify, self.verify)\n```\n\n`merge_setting` for non-dict values simply returns `request_setting` when it is not `None` ([L73-77](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.32.3/-/blob/src/requests/sessions.py?L73-77)):\n\n```python\n# Bypass if not a dictionary (e.g. verify)\nif not (isinstance(session_setting, Mapping) and isinstance(request_setting, Mapping)):\n    return request_setting   # request_setting wins unconditionally\n```\n\nSo the merge precedence is: **per-request kwarg > env-var-resolved value > session default**.\n\n---\n\n## 3. The precedence logic and why `session.verify = False` does NOT suppress the env var\n\nHere is the execution flow for your exact scenario (`session.verify = False`, no per-request kwarg, `REQUESTS_CA_BUNDLE` set):\n\n| Step | Value of `verify` | Reason |\n|---|---|---|\n| Call `session.get(url)` with no `verify=` kwarg | `None` | Default kwarg value |\n| Enter `merge_environment_settings(verify=None)` | `None` | Passed through |\n| Guard: `verify is True or verify is None` \u2192 **True** | env var path taken | `None` matches the condition |\n| `verify = os.environ.get(\"REQUESTS_CA_BUNDLE\")` | `\"/path/to/ca-bundle\"` | Env var wins |\n| `merge_setting(\"/path/to/ca-bundle\", self.verify=False)` | `\"/path/to/ca-bundle\"` | `request_setting` (env-resolved) is not `None`, so it is returned as-is, ignoring `session.verify=False` |\n\n**The root cause:** `session.verify = False` is the *session default*. It only takes effect via `merge_setting` when the per-request value is `None`. But the env-var resolution happens **before** `merge_setting`, and it replaces `None` with the CA bundle path \u2014 so by the time `merge_setting` runs, `session.verify = False` is discarded because the `request_setting` is now a non-`None` string.\n\n---\n\n## Fix\n\nPass `verify=False` **explicitly on each request call**, not just on the session:\n\n```python\nresponse = session.get(\"https://internal-service:8443/health\", verify=False)\n```\n\nWith an explicit per-request `verify=False`, the guard condition at [L766](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.32.3/-/blob/src/requests/sessions.py?L766) evaluates `False is True or False is None` \u2192 **False**, so the env-var block is skipped entirely, and `merge_setting(False, self.verify)` returns `False`.\n\nAlternatively, set `session.trust_env = False` ([L757](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.32.3/-/blob/src/requests/sessions.py?L757)) to prevent the session from reading any environment variables (proxies and CA bundle alike):\n\n```python\nsession.trust_env = False\nsession.verify = False\n```\n\nLink: https://demo.sourcegraph.com/deepsearch/97098fc2-1718-4050-842f-69f4a3d621ca",
+  "ir_scores_unaligned": {
+    "task_id": "calibration-007",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 1.0,
+    "n_retrieved": 1,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "src/requests/sessions.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "calibration-007",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 1.0,
+    "n_retrieved": 1,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

@@ -1,0 +1,38 @@
+{
+  "task_id": "incident-investigation-dual-opa-001",
+  "checkpoints": {
+    "root_cause_identification": {
+      "expected_solution": "Agent must identify (a) the frameworks rego driver pinning the Rego language version to v0 in constraint/pkg/client/drivers/rego/driver.go (the rego.New(...) call inside eval() that passes rego.SetRegoVersion(ast.RegoV0)) and (b) OPA's parser/topdown layer that honors the per-module Rego version (ast/parser.go and topdown/eval.go). The report must name driver.go::eval as the pin site and reference at least one OPA file that decides v0/v1 syntax handling.",
+      "evaluation_criteria": [
+        "Names constraint/pkg/client/drivers/rego/driver.go (or equivalent path) as the pin site for the Rego language version",
+        "Identifies the call rego.SetRegoVersion(ast.RegoV0) (or equivalent expression) as the specific cause",
+        "References at least one OPA-side file that consumes the version (ast/parser.go or topdown/eval.go)"
+      ]
+    },
+    "error_chain_trace": {
+      "expected_solution": "Agent must trace the failure: user template with `import rego.v1` -> Gatekeeper ConstraintTemplate controller -> framework client AddTemplate -> rego driver compilers.go::addTemplate builds compiler -> driver.go::eval calls rego.New with RegoV0 -> OPA parser rejects v1 syntax -> error returned to status condition. The chain must mention at least three of these hops, including the driver-side pin and the OPA-side rejection.",
+      "evaluation_criteria": [
+        "Mentions the controller submission path (AddTemplate or constrainttemplate_controller.Reconcile)",
+        "Mentions the framework rego driver as the pin site",
+        "Mentions OPA's parser or topdown evaluator as the rejection site",
+        "Notes that the symptom only manifests for templates declaring `import rego.v1`"
+      ]
+    },
+    "affected_components": {
+      "expected_solution": "Agent must identify all three layers: the frameworks rego driver, OPA's ast/topdown internals, and Gatekeeper's ConstraintTemplate controller. The report must name each by repo or package.",
+      "evaluation_criteria": [
+        "Names the constraint framework rego driver (drivers/rego)",
+        "Names OPA's ast or topdown package",
+        "Names Gatekeeper's ConstraintTemplate controller"
+      ]
+    },
+    "remediation_proposal": {
+      "expected_solution": "Agent must propose a concrete fix in the framework driver: read the module's declared Rego version (from package or `import rego.v1` directive) and pass the matching ast.RegoVersion to the compiler and to rego.SetRegoVersion; OR expose a driver option (DriverOpt) for callers to override the version; OR default the driver to ast.RegoV1 with backward-compat for v0 modules.",
+      "evaluation_criteria": [
+        "Proposes either reading the module's declared version, exposing a configurable option, or defaulting to RegoV1",
+        "Indicates the fix should live in the frameworks rego driver, not OPA itself",
+        "Notes backward-compat for templates that still rely on v0 syntax"
+      ]
+    }
+  }
+}

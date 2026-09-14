@@ -1,0 +1,33 @@
+{
+  "task_id": "err-provenance-dual-grafana-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "Primary error source: pkg/api/pluginproxy/ds_proxy.go. Supporting: web/api/v1/api.go. Surface error: Trace Grafana dashboard 'Bad Gateway' datasource proxy error to Prometheus query engine timeout origin.",
+      "evaluation_criteria": [
+        "Must identify pkg/api/pluginproxy/ds_proxy.go as part of the error source",
+        "Must identify web/api/v1/api.go as part of the error source",
+        "Must reference the surface error message ('Trace Grafana dashboard 'Bad Gateway' datasource proxy error to Prometheus query') or its origin",
+        "Must reference a specific function, type, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Error propagation chain: (1) Prometheus PromQL engine evaluates query and hits context deadline timeout in promql/engine.go \u2192 (2) Prometheus v1 API handler catches engine error and returns HTTP 503 with error body in web/api/v1/api.go \u2192 (3) Grafana datasource proxy receives HTTP 503 from upstream Prometheus in pkg/api/datasource_proxy.go \u2192 (4) Grafana proxy translates non-2xx upstream response to generic Bad Gateway error for the frontend \u2192 (5) Grafana frontend displays Bad Gateway message without original Prometheus timeout context.",
+      "evaluation_criteria": [
+        "Must describe the step: 'Prometheus PromQL engine evaluates query and hits context deadline timeout in pr'",
+        "Must describe the propagation: 'Grafana frontend displays Bad Gateway message without original Prometheus timeou'",
+        "Must include all intermediate steps in the correct order",
+        "Must reference the chain in causal order (source \u2192 surface)",
+        "Must cite at least one file from the propagation path (e.g. pkg/api/pluginproxy/ds_proxy.go)"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) PromQL query with high cardinality regex matcher causes evaluation timeout in engine; (2) Grafana datasource proxy timeout is shorter than Prometheus query timeout causing context deadline exceeded; (3) Prometheus server is under heavy query load and cannot evaluate within timeout; (4) Grafana proxy discards upstream error response body when translating to frontend error format.",
+      "evaluation_criteria": [
+        "Must identify the condition: 'PromQL query with high cardinality regex matcher causes evaluation timeout in en'",
+        "Must identify the condition: 'Grafana datasource proxy timeout is shorter than Prometheus query timeout causin'",
+        "Must identify the condition: 'Prometheus server is under heavy query load and cannot evaluate within timeout'",
+        "Must explain the combined conditions necessary to reproduce the error"
+      ]
+    }
+  }
+}

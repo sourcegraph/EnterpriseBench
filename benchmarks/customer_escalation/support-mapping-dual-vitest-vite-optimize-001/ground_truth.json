@@ -1,0 +1,70 @@
+{
+  "task_id": "support-mapping-dual-vitest-vite-optimize-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/vitest-dev/vitest",
+      "rev": "v1.4.0",
+      "path": "vitest"
+    },
+    {
+      "url": "https://github.com/vitejs/vite",
+      "rev": "v5.2.6",
+      "path": "vite"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "vitest/packages/vitest/src/runtime/runVmTests.ts",
+      "repo": "vitest",
+      "confidence": 0.85,
+      "source": "deterministic"
+    },
+    {
+      "path": "vitest/packages/vitest/src/node/pool.ts",
+      "repo": "vitest",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "vite/packages/vite/src/node/optimizer/index.ts",
+      "repo": "vite",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "vite/packages/vite/src/node/server/moduleGraph.ts",
+      "repo": "vite",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "vitest/packages/vitest/src/node/core.ts",
+      "repo": "vitest",
+      "confidence": 0.75
+    },
+    {
+      "path": "vite/packages/vite/src/node/optimizer/optimizer.ts",
+      "repo": "vite",
+      "confidence": 0.85
+    }
+  ],
+  "error_chain": [
+    "Vitest's pool runs tests in worker threads that import modules via Vite's transform pipeline; the worker reuses Vite's moduleGraph for cache hits",
+    "On file save, Vite's chokidar handler invalidates the source module in moduleGraph and triggers optimizeDeps to re-pre-bundle if a pre-bundled dependency changed",
+    "optimizeDeps writes a new chunk to node_modules/.vite/deps with an updated metadata.json, but the chunk filename can collide with the previous build until cache key recomputes",
+    "Vitest's worker imports the pre-bundled chunk via the cached URL from moduleGraph; if the worker's previous import handle is still live, it reuses the stale chunk in memory and resolves re-exported symbols against the old binding"
+  ],
+  "trigger_conditions": [
+    "Customer's tests import a re-exported symbol from a pre-bundled dependency that changes between saves",
+    "Vite's optimizeDeps recomputes cache key per content hash; if the hash skips because the change is in a transitive re-export, the chunk is not rewritten",
+    "Vitest's worker holds the previous chunk in module cache and does not invalidate it on the new optimizeDeps build"
+  ],
+  "expected_answer": {
+    "error_origin": "Vitest's worker thread retaining the previous pre-bundled chunk after Vite's optimizeDeps regenerates it",
+    "bypass_reason": "Vite's optimizeDeps does not signal individual workers to purge their module cache; Vitest's pool relies on import freshness from Vite's moduleGraph",
+    "correct_config": "Set test.pool='forks' and pass --no-isolate=false so each test run uses a fresh process, or pin optimizeDeps.exclude on the re-exporting module so it is loaded from source"
+  }
+}

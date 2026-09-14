@@ -1,0 +1,263 @@
+{
+  "task_id": "ccx-dep-trace-106",
+  "policy": "claude_adapter",
+  "model": "anthropic/claude-sonnet-5",
+  "suite": "dependency_management",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/gcc--releases_gcc-14.2.0"
+  ],
+  "retrieved_paths": [
+    "gcc/passes.def",
+    "gcc/passes.cc",
+    "gcc/pass_manager.h",
+    "gcc/tree-pass.h",
+    "gcc/tree-ssa-dce.cc",
+    "gcc/Makefile.in",
+    "gcc/doc/passes.texi",
+    "gcc/cgraphunit.cc",
+    "gcc/context.h",
+    "gcc/dumpfile.h"
+  ],
+  "required_files": [
+    "gcc/passes.def",
+    "gcc/passes.cc",
+    "gcc/pass_manager.h",
+    "gcc/tree-ssa-dce.cc",
+    "gcc/tree-pass.h"
+  ],
+  "ir_scores": {
+    "task_id": "ccx-dep-trace-106",
+    "config_name": "claude_adapter",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.6,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 0.6667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.5,
+    "n_retrieved": 10,
+    "n_ground_truth": 5,
+    "n_overlap": 5
+  },
+  "rounds_executed": 4,
+  "input_tokens": 45554,
+  "output_tokens": 1258,
+  "token_counting": "provider_reported",
+  "elapsed_seconds": 20.5,
+  "transcript": [
+    {
+      "role": "system",
+      "content": "You are a code retrieval policy. Given a task, find the source files required to carry it out. Search only these repositories: github.com/sg-evals/gcc--releases_gcc-14.2.0. When you are confident, call submit_files with every required file, most important first, using repo-relative paths exactly as the tools returned them."
+    },
+    {
+      "role": "user",
+      "content": "# GCC Optimization Pass Registration and Execution Chain\n\n## Your Task\n\nA team member is onboarding to the GCC compiler internals and needs to understand how optimization passes are structured and executed. Trace the optimization pass pipeline in `gcc-mirror/gcc`:\n\n1. Where is the master list that defines the ordering and registration of all optimization passes?\n2. Which source file implements the pass manager that orchestrates pass execution?\n3. Where is the base class for optimization passes and the pass manager interface defined?\n4. Find an example of a concrete GIMPLE optimization pass \u2014 specifically one that performs dead code elimination on the tree-SSA representation.\n5. Where are the pass registration macros and tree-SSA pass declarations defined?\n\nReport the repo, file path, and key struct/function name for each file you identify.\n\n## Context\n\nYou are working on a codebase task involving repos from the crossrepo domain. The GCC source tree is large; focus your investigation on the `gcc/` subdirectory where the compiler core lives.\n\n## Available Resources\n\n## Output Format\n\nUse the published task contract:\n\n- `TASK_WORKDIR=/workspace`\n- `TASK_REPO_ROOT=/workspace`\n- `TASK_OUTPUT=/workspace/agent_output/answer.json`\n\nCreate a file at `TASK_OUTPUT` (`/workspace/agent_output/answer.json`) with your findings in the following structure:\n\n```json\n{\n  \"files\": [{ \"repo\": \"repo-name\", \"path\": \"relative/path/to/file.go\" }],\n  \"symbols\": [\n    {\n      \"repo\": \"repo-name\",\n      \"path\": \"relative/path/to/file.go\",\n      \"symbol\": \"SymbolName\"\n    }\n  ],\n  \"chain\": [\n    {\n      \"repo\": \"repo-name\",\n      \"path\": \"relative/path/to/file.go\",\n      \"symbol\": \"FunctionName\"\n    }\n  ],\n  \"text\": \"Narrative explanation of your findings, citing repos and file paths.\"\n}\n```\n\nInclude only the fields relevant to this task. Your answer is evaluated against a closed-world oracle \u2014 completeness matters.\n\n## Evaluation\n\nYour answer will be scored on:\n\n- **File recall and precision**: Did you find all relevant files?\n"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_01S1TPRjSzjqggAXAgUx3kZm",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"pass-instances\\\\.def|passes\\\\.def\", \"top_k\": 20}"
+          }
+        },
+        {
+          "id": "toolu_019fVEJXn5PyrKcJzq5ANJAg",
+          "type": "function",
+          "function": {
+            "name": "search_corpus",
+            "arguments": "{\"query\": \"pass manager class definition execute_pass\"}"
+          }
+        },
+        {
+          "id": "toolu_019GN6WeEJTSrh65BGgJPyQ1",
+          "type": "function",
+          "function": {
+            "name": "search_corpus",
+            "arguments": "{\"query\": \"tree-ssa dead code elimination pass GIMPLE\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01S1TPRjSzjqggAXAgUx3kZm",
+      "content": "[{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/passes.def\", \"chunk_index\": 0, \"score\": 1.0, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/bpf/bpf-passes.def\", \"chunk_index\": 0, \"score\": 0.5, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/arm/arm-passes.def\", \"chunk_index\": 0, \"score\": 0.3333, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/arc/arc-passes.def\", \"chunk_index\": 0, \"score\": 0.25, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/avr/avr-passes.def\", \"chunk_index\": 0, \"score\": 0.2, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/s390/s390-passes.def\", \"chunk_index\": 0, \"score\": 0.1667, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/cris/cris-passes.def\", \"chunk_index\": 0, \"score\": 0.1429, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/i386/i386-passes.def\", \"chunk_index\": 0, \"score\": 0.125, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/alpha/alpha-passes.def\", \"chunk_index\": 0, \"score\": 0.1111, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/riscv/riscv-passes.def\", \"chunk_index\": 0, \"score\": 0.1, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/sparc/sparc-passes.def\", \"chunk_index\": 0, \"score\": 0.0909, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/visium/visium-passes.def\", \"chunk_index\": 0, \"score\": 0.0833, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/rs6000/rs6000-passes.def\", \"chunk_index\": 0, \"score\": 0.0769, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/aarch64/aarch64-passes.def\", \"chunk_index\": 0, \"score\": 0.0714, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/ChangeLog\", \"chunk_index\": 86, \"score\": 0.0667, \"text\": \"\\t* config/avr/avr-passes.def (avr_pass_fuse_add): Insert new pass.\\n\\t* config/aarch64/aarch64-passes.def (pass_late_track_speculation):\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/passes.cc\", \"chunk_index\": 26, \"score\": 0.0625, \"text\": \"#include \\\"pass-instances.def\\\"\\n#include \\\"pass-instances.def\\\"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/Makefile.in\", \"chunk_index\": 41, \"score\": 0.0588, \"text\": \"pass-instances.def: $(srcdir)/passes.def $(PASSES_EXTRA) \\\\\\n\\t  $(srcdir)/passes.def $(PASSES_EXTRA) > pass-instances.def\\n       common/common-target-hooks-def.h pass-instances.def \\\\\\n  pass-instances.def params.list $(srcdir)/../include/gomp-constants.h \\\\\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/gdbhooks.py\", \"chunk_index\": 10, \"score\": 0.0556, \"text\": \"    \\\"\\\"\\\"Parse passes.def, gathering a list of pass class names\\\"\\\"\\\"\\n        with open(os.path.join(srcdir, 'passes.def')) as f:\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/bpf/t-bpf\", \"chunk_index\": 0, \"score\": 0.0526, \"text\": \"PASSES_EXTRA += $(srcdir)/config/bpf/bpf-passes.def\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/arc/t-arc\", \"chunk_index\": 0, \"score\": 0.05, \"text\": \"PASSES_EXTRA += $(srcdir)/config/arc/arc-passes.def\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_019fVEJXn5PyrKcJzq5ANJAg",
+      "content": "[{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/passes.cc\", \"chunk_index\": 2, \"score\": 1.0, \"text\": \"unsigned int\\npass_manager::execute_pass_mode_switching ()\\n{\\n  return pass_mode_switching_1->execute (cfun);\\n}\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/passes.cc\", \"chunk_index\": 27, \"score\": 0.5, \"text\": \"\\npass_manager::~pass_manager ()\\n{\\n  XDELETEVEC (passes_by_id);\\n\\n  /* Call delete_pass_tree on each of the pass_lists.  */\\n#define DEF_PASS_LIST(LIST) \\\\\\n    delete_pass_tree (*pass_lists[PASS_LIST_NO_##LIST]);\\n  GCC_PASS_LISTS\\n#undef DEF_PASS_LIST\\n\\n  delete m_name_to_pass_map;\\n}\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/passes.cc\", \"chunk_index\": 26, \"score\": 0.3333, \"text\": \"\\npass_manager::pass_manager (context *ctxt)\\n: all_passes (NULL), all_small_ipa_passes (NULL), all_lowering_passes (NULL),\\n  all_regular_ipa_passes (NULL),\\n  all_late_ipa_passes (NULL), passes_by_id (NULL), passes_by_id_size (0),\\n  m_ctxt (ctxt), m_name_to_pass_map (NULL)\\n{\\n  opt_pass **p;\\n\\n  /* Zero-initialize pass members.  */\\n#define INSERT_PASSES_AFTER(PASS)\\n#define PUSH_INSERT_PASSES_WITHIN(PASS)\\n#define POP_INSERT_PASSES()\\n#define NEXT_PASS(PASS, NUM) PASS ## _ ## NUM = NULL\\n#define NEXT_PASS_WITH_ARG(PASS, NUM, ARG) NEXT_PASS (PASS, NUM)\\n#define TERMINATE_PASS_LIST(PASS)\\n#include \\\"pass-instances.def\\\"\\n#undef INSERT_PASSES_AFTER\\n#undef PUSH_INSERT_PASSES_WITHIN\\n#undef POP_INSERT_PASSES\\n#undef NEXT_PASS\\n#undef NEXT_PASS_WITH_ARG\\n#undef TERMINATE_PASS_LIST\\n\\n  /* Initialize the pass_lists array.  */\\n#define DEF_PASS_LIST(LIST) pass_lists[PASS_LIST_NO_##LIST] = &LIST;\\n... [chunk truncated]\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/pass_manager.h\", \"chunk_index\": 0, \"score\": 0.25, \"text\": \"\\nclass context;\\n\\nclass pass_manager\\n{\\n\\n\\n#ifndef GCC_PASS_MANAGER_H\\n#define GCC_PASS_MANAGER_H\\n\\nclass opt_pass;\\nstruct register_pass_info;\\n\\n/* Define a list of pass lists so that both passes.cc and plugins can easily\\n   find all the pass lists.  */\\n#define GCC_PASS_LISTS \\\\\\n  DEF_PASS_LIST (all_lowering_passes) \\\\\\n  DEF_PASS_LIST (all_small_ipa_passes) \\\\\\n  DEF_PASS_LIST (all_regular_ipa_passes) \\\\\\n  DEF_PASS_LIST (all_late_ipa_passes) \\\\\\n  DEF_PASS_LIST (all_passes)\\n\\n#define DEF_PASS_LIST(LIST) PASS_LIST_NO_##LIST,\\nenum pass_list\\n{\\n  GCC_PASS_LISTS\\n  PASS_LIST_NUM\\n};\\n#undef DEF_PASS_LIST\\n\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/pass_manager.h\", \"chunk_index\": 1, \"score\": 0.2, \"text\": \"     Similarly, the various:\\n        NEXT_PASS (pass_copy_prop, 1);\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/pass_manager.h\", \"chunk_index\": 2, \"score\": 0.1667, \"text\": \"        ...\\n        NEXT_PASS (pass_copy_prop, 8);\\n     in pass-instances.def lead to fields:\\n        opt_pass *pass_copy_prop_1;\\n        ...\\n        opt_pass *pass_copy_prop_8;  */\\n\\n#define INSERT_PASSES_AFTER(PASS)\\n#define PUSH_INSERT_PASSES_WITHIN(PASS)\\n#define POP_INSERT_PASSES()\\n#define NEXT_PASS(PASS, NUM) opt_pass *PASS ## _ ## NUM\\n#define NEXT_PASS_WITH_ARG(PASS, NUM, ARG) NEXT_PASS (PASS, NUM)\\n#define TERMINATE_PASS_LIST(PASS)\\n\\n#include \\\"pass-instances.def\\\"\\n\\n#undef INSERT_PASSES_AFTER\\n#undef PUSH_INSERT_PASSES_WITHIN\\n#undef POP_INSERT_PASSES\\n#undef NEXT_PASS\\n#undef NEXT_PASS_WITH_ARG\\n#undef TERMINATE_PASS_LIST\\n\\n}; // class pass_manager\\n\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/doc/gty.texi\", \"chunk_index\": 12, \"score\": 0.1429, \"text\": \"and sweep garbage collector (so it does not scan the call stack for\\npointers).  In practice GCC passes don't often call @code{ggc_collect}\\nthemselves, because it is called by the pass manager between passes.\\n\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/doc/gty.texi\", \"chunk_index\": 1, \"score\": 0.125, \"text\": \"@item\\nType definitions inside classes/structures are not supported.\\n@item\\nEnumerations inside classes/structures are not supported.\\n@end itemize\\n\\n\\nIt is always valid to include function definitions inside classes.\\nThose are always ignored by @code{gengtype}, as it only cares about\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/i386/i386-features.cc\", \"chunk_index\": 45, \"score\": 0.1111, \"text\": \"\\nclass pass_stv : public rtl_opt_pass\\n{\\n\\n{\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/i386/i386-features.cc\", \"chunk_index\": 44, \"score\": 0.1, \"text\": \"\\nclass pass_insert_vzeroupper : public rtl_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/i386/i386-features.cc\", \"chunk_index\": 53, \"score\": 0.0909, \"text\": \"\\nclass pass_remove_partial_avx_dependency : public rtl_opt_pass\\n{\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/go/gofrontend/export.h\", \"chunk_index\": 5, \"score\": 0.0833, \"text\": \"\\n// Class to manage exporting a function body.  This is passed around\\n// to Statements and Expressions.  It builds up the export data for\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/go/gofrontend/export.h\", \"chunk_index\": 1, \"score\": 0.0769, \"text\": \"\\n// This class manages exporting Go declarations.  It handles the main\\n// loop of exporting.  A pointer to this class is also passed to the\\n// various specific export implementations.\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/go/gofrontend/export.h\", \"chunk_index\": 0, \"score\": 0.0714, \"text\": \"\\nclass Go_sha1_helper;\\nclass Gogo;\\nclass Named_object;\\nclass Export_function_body;\\nclass Import_init;\\nclass Named_object;\\nclass Bindings;\\nclass Type;\\nclass Package;\\nclass Import_init_set;\\nclass Backend;\\nclass Temporary_statement;\\nclass Unnamed_label;\\nstruct Export_impl;\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/dumpfile.h\", \"chunk_index\": 11, \"score\": 0.0667, \"text\": \"\\n/* A class for managing all of the various dump files used by the\\n   optimization passes.  */\\n\\nclass dump_manager\\n{\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/dumpfile.h\", \"chunk_index\": 10, \"score\": 0.0625, \"text\": \"\\nclass opt_pass;\\n\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/dumpfile.h\", \"chunk_index\": 12, \"score\": 0.0588, \"text\": \"\\n}; // class dump_manager\\n\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/analyzer/ChangeLog\", \"chunk_index\": 69, \"score\": 0.0556, \"text\": \"\\t(impl_run_checkers): Update plugin callback invocation to use\\n\\teng's known_function_manager.\\n\\t* known-function-manager.cc: New file.\\n\\t* known-function-manager.h: New file.\\n\\t* region-model-manager.cc\\n\\t(region_model_manager::region_model_manager): Pass logger to\\n\\tm_known_fn_mgr's ctor.\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/analyzer/ChangeLog\", \"chunk_index\": 123, \"score\": 0.0526, \"text\": \"\\t* checker-path.cc (checker_path::fixup_locations): Likewise.\\n\\t* constraint-manager.cc (equiv_class::equiv_class): Likewise.\\n\\t(equiv_class::to_json): Likewise.\\n\\t(equiv_class::hash): Likewise.\\n\\t(constraint_manager::to_json): Likewise.\\n\\t* engine.cc (impl_region_model_context::on_svalue_leak):\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/analyzer/ChangeLog\", \"chunk_index\": 175, \"score\": 0.05, \"text\": \"\\t(template <> struct default_hash_traits<cast_region::key_t>): New.\\n\\t(class heap_allocated_region): New.\\n\\t(class alloca_region): New.\\n\\t(class string_region): New.\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/analyzer/ChangeLog\", \"chunk_index\": 176, \"score\": 0.0476, \"text\": \"\\t(is_a_helper <const string_region *>::test): New.\\n\\t(class unknown_region): New.\\n\\t(class region_model_manager): New.\\n\\t(struct append_ssa_names_cb_data): New.\\n\\t(class call_details): New.\\n\\t(region_model::region_model): Add region_model_manager param.\\n\\t(region_model::print_svalue): Delete.\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/cgraphunit.cc\", \"chunk_index\": 36, \"score\": 0.0455, \"text\": \"static void\\nipa_passes (void)\\n{\\n  gcc::pass_manager *passes = g->get_passes ();\\n\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/cgraphunit.cc\", \"chunk_index\": 8, \"score\": 0.0435, \"text\": \"{\\n  gcc::pass_manager *passes = g->get_passes ();\\n  cgraph_node *node;\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/cgraphunit.cc\", \"chunk_index\": 3, \"score\": 0.0417, \"text\": \"#include \\\"context.h\\\"\\n#include \\\"pass_manager.h\\\"\\n#include \\\"tree-nested.h\\\"\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/rust/ChangeLog\", \"chunk_index\": 96, \"score\": 0.04, \"text\": \"\\t(MetaListNameValueStr::to_attribute): Likewise.\\n\\t(operator<<): Change Identifier class <<\\n\\toperator overload for standard output stream.\\n\\t* ast/rust-ast.h (class Identifier): Change typedef to proper\\n\\tclass definition.\\n\\t(operator<<): Add prototype for operator overload.\\n\\t(class Token): Change getter identifier.\\n\\t(class MetaListNameValueStr): Likewise.\\n\\t(class PathExpr): Likewise.\\n\\t* ast/rust-expr.h: Likewise.\\n\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_019GN6WeEJTSrh65BGgJPyQ1",
+      "content": "[{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/doc/passes.texi\", \"chunk_index\": 13, \"score\": 1.0, \"text\": \"\\nThis pass identifies critical edges and inserts empty basic blocks\\nsuch that the edge is no longer critical.  The pass is located in\\n@file{tree-cfg.cc} and is described by @code{pass_split_crit_edges}.\\n\\n@item Control dependence dead code elimination\\n\\nThis pass is a stronger form of dead code elimination that can\\neliminate unnecessary control flow statements.   It is located\\nin @file{tree-ssa-dce.cc} and is described by @code{pass_cd_dce}.\\n\\n@item Tail call elimination\\n\\nThis pass identifies function calls that may be rewritten into\\njumps.  No code transformation is actually applied here, but the\\ndata and control flow problem is solved.  The code transformation\\nrequires target support, and so is delayed until RTL@.  In the\\nmeantime @code{CALL_EXPR_TAILCALL} is set indicating the possibility.\\nThe pass is located in @file{tree-tailcall.cc} and is described by\\n@code{pass_tail_calls}.  The RTL transformation is handled by\\n... [chunk truncated]\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/doc/passes.texi\", \"chunk_index\": 8, \"score\": 0.5, \"text\": \"\\nThis pass scans the function for uses of @code{SSA_NAME}s that\\nare fed by default definition.  For non-parameter variables, such\\nuses are uninitialized.  The pass is run twice, before and after\\noptimization (if turned on).  In the first pass we only warn for uses that are\\npositively uninitialized; in the second pass we warn for uses that\\nare possibly uninitialized.  The pass is located in @file{tree-ssa.cc}\\nand is defined by @code{pass_early_warn_uninitialized} and\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/doc/passes.texi\", \"chunk_index\": 9, \"score\": 0.3333, \"text\": \"@code{pass_late_warn_uninitialized}.\\n\\n@item Dead code elimination\\n\\nThis pass scans the function for statements without side effects whose\\nresult is unused.  It does not do memory lifetime analysis, so any value\\nthat is stored in memory is considered used.  The pass is run multiple\\ntimes throughout the optimization process.  It is located in\\n@file{tree-ssa-dce.cc} and is described by @code{pass_dce}.\\n\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/doc/passes.texi\", \"chunk_index\": 10, \"score\": 0.25, \"text\": \"\\nThis pass rewrites suitable non-aliased local aggregate variables into\\na set of scalar variables.  The resulting scalar variables are\\nrewritten into SSA form, which allows subsequent optimization passes\\nto do a significantly better job with them.  The pass is located in\\n@file{tree-sra.cc} and is described by @code{pass_sra}.\\n\\n@item Dead store elimination\\n\\nThis pass eliminates stores to memory that are subsequently overwritten\\nby another store, without any intervening loads.  The pass is located\\nin @file{tree-ssa-dse.cc} and is described by @code{pass_dse}.\\n\\n@item Tail recursion elimination\\n\\nThis pass transforms tail recursion into a loop.  It is located in\\n@file{tree-tailcall.cc} and is described by @code{pass_tail_recursion}.\\n\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/ChangeLog.tree-ssa\", \"chunk_index\": 164, \"score\": 0.2, \"text\": \"\\tcompute_may_aliases before calling rewrite_into_ssa.\\n\\tAfter the SSA pass, run dead code elimination and compute\\n\\tmust-aliases.\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/ChangeLog.tree-ssa\", \"chunk_index\": 236, \"score\": 0.1667, \"text\": \"\\t* tree-dfa.c (compute_may_aliases): Push/pop TV_TREE_MAY_ALIAS.\\n\\t* tree-ssa-ccp.c (tree_ssa_ccp): Push/pop TV_TREE_CCP.\\n\\t* tree-ssa-dce.c (tree_ssa_eliminate_dead_code): Push/pop\\n\\tTV_TREE_DCE.\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/ChangeLog.tree-ssa\", \"chunk_index\": 235, \"score\": 0.1429, \"text\": \"\\t* c-decl.c (c_expand_body): Call dump_current_function.\\n\\t* tree-ssa-dce.c (tree_ssa_eliminate_dead_code): Likewise.\\n\\t* tree-ssa-pre.c (tree_perform_ssapre): Likewise.\\n\\t* tree-ssa.c (build_tree_ssa): Likewise.\\n\\t* tree-ssa-ccp.c (tree_ssa_ccp): Likewise.\\n\\tDump variables and reaching definitions if TDF_DETAILS is set.\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/gimple-ssa-sccopy.cc\", \"chunk_index\": 10, \"score\": 0.125, \"text\": \"\\nclass pass_sccopy : public gimple_opt_pass\\n{\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/gimple-ssa-sccopy.cc\", \"chunk_index\": 11, \"score\": 0.1111, \"text\": \"\\ngimple_opt_pass *\\nmake_pass_sccopy (gcc::context *ctxt)\\n{\\n  return new pass_sccopy (ctxt);\\n}\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/gimple-ssa-sccopy.cc\", \"chunk_index\": 5, \"score\": 0.1, \"text\": \"  /* A PHI may generate a copy.  */\\n  if (gimple_code (stmt) == GIMPLE_PHI)\\n    {\\n\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/ChangeLog.tuples\", \"chunk_index\": 97, \"score\": 0.0909, \"text\": \"\\t(ipa-inline.o): Add dependency on TREE_FLOW_H.\\n\\t(out_object_file): Add dependency on TREE_GIMPLE_H.\\n\\t* gimple.c (gimple_set_code): Rename from set_gimple_code.\\n\\t(gimple_size): New.\\n\\t(gimple_alloc): New.\\n\\t(gimple_alloc_ops): New.\\n\\t(build_gimple_with_ops): Call them.\\n\\t(build_gimple_return): Only call gimple_return_set_retval if\\n\\tRETVAL is not NULL.\\n\\t(build_gimple_call): Validate argument FN.\\n\\t(extract_ops_from_tree): New.\\n\\t(build_gimple_assign_with_ops): New.\\n\\t(build_gimple_assign): Call them.\\n\\t(build_gimple_nop):  Call gimple_alloc.\\n\\t(build_gimple_bind): Likewise.\\n\\t(build_gimple_asm_1): Tidy.\\n\\t(build_gimple_asm_vec): Tidy.\\n\\t(build_gimple_asm): Tidy.\\n\\t(build_gimple_catch): Call gimple_alloc.\\n\\t(build_gimple_eh_filter): Likewise.\\n\\t(build_gimple_try): Likewise.\\n\\t(build_gimple_wce): Likewise.\\n\\t(build_gimple_phi): Remove.\\n\\t(build_gimple_resx): Call gimple_alloc.\\n... [chunk truncated]\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/ChangeLog.tuples\", \"chunk_index\": 21, \"score\": 0.0833, \"text\": \"\\t* tree-complex.c (init_dont_simulate_again): Call\\n\\tgimple_expr_code instead of gimple_subcode.\\n\\t(complex_visit_stmt): Likewise.\\n\\t(expand_complex_move): Call gimple_assign_rhs_code\\n\\tinstead of gimple_subcode.\\n\\t(expand_complex_operations_1): Likewise.\\n\\t* value-prof.c (gimple_divmod_fixed_value): Likewise.\\n\\t(gimple_mod_pow2): Likewise.\\n\\t(gimple_mod_subtract): Likewise.\\n\\t(gimple_divmod_values_to_profile): Likewise.\\n\\t* tree-ssa-alias-warnings.c (find_alias_site_helper):\\n\\tCall gimple_assign_cast_p.\\n\\t(already_warned_in_frontend_p): Likewise.\\n\\t* gimple.def: Add comments warning about code orderings.\\n\\t* omp-low.c (expand_omp_taskreg): Call gimple_omp_set_subcode.\\n\\t(expand_omp_atomic_fetch_op): Call gimple_assign_rhs_code.\\n\\t* tree-gimple.c (get_gimple_rhs_class): Move to gimple.c\\n\\t(get_gimple_rhs_num_ops): Likewise.\\n\\t(gimple_assign_rhs_code): Move to gimple.h.\\n\\t* tree-gimple.h (enum gimple_rhs_class): Move to gimple.h.\\n... [chunk truncated]\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/ChangeLog.tuples\", \"chunk_index\": 22, \"score\": 0.0769, \"text\": \"\\t(check_for_plus_in_loops): Likewise.\\n\\t* gimple.c (gimple_set_subcode): Move from gimple.h\\n\\t(gimple_check_failed): Access subcode field directly.\\n\\t(gimple_assign_single_p): Call gimple_assign_rhs_code\\n\\tinstead of gimple_subcode.\\n\\t(gimple_assign_unary_nop_p): Likewise.\\n\\t(gimple_get_lhs): Change argument type to const_gimple.\\n\\t(gimple_could_trap_p): Call gimple_assign_rhs_code\\n\\tinstead of gimple_subcode.\\n\\t(get_gimple_rhs_class): Move from tree-gimple.c.\\n\\t(get_gimple_rhs_num_ops): Likewise.\\n\\t* tree-ssa-structalias.c (update_alias_info): Call\\n\\tgimple_assign_rhs_code instead of gimple_subcode.\\n\\t(find_func_aliases): Likewise.\\n\\t* tree-ssa-threadedge.c (record_temporary_equivalences_from_phis):\\n\\tLikewise.\\n\"}]"
+    },
+    {
+      "role": "assistant",
+      "content": "Now let me find tree-pass.h (base class for opt_pass) and tree-ssa-dce.cc, and pass registration macros file.",
+      "tool_calls": [
+        {
+          "id": "toolu_01RcppPTkGfqNsWkg4rnVqDv",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"class opt_pass\", \"top_k\": 10}"
+          }
+        },
+        {
+          "id": "toolu_01UghqJC2Ntz1MUPSqCyT4XH",
+          "type": "function",
+          "function": {
+            "name": "list_files",
+            "arguments": "{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"limit\": 10}"
+          }
+        },
+        {
+          "id": "toolu_01WdJusFg8zmt6E12ZJi14kB",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"pass_data pass_dce|make_pass_dce|class pass_dce\", \"top_k\": 10}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01RcppPTkGfqNsWkg4rnVqDv",
+      "content": "[{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-pass.h\", \"chunk_index\": 1, \"score\": 1.0, \"text\": \"class opt_pass : public pass_data\\nclass gimple_opt_pass : public opt_pass\\nclass rtl_opt_pass : public opt_pass\\nclass simple_ipa_opt_pass : public opt_pass\\nclass ipa_opt_pass_d : public opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/web.cc\", \"chunk_index\": 5, \"score\": 0.5, \"text\": \"class pass_web : public rtl_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tsan.cc\", \"chunk_index\": 15, \"score\": 0.3333, \"text\": \"class pass_tsan : public gimple_opt_pass\\nclass pass_tsan_O0 : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/ubsan.cc\", \"chunk_index\": 40, \"score\": 0.25, \"text\": \"class pass_ubsan : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tracer.cc\", \"chunk_index\": 6, \"score\": 0.2, \"text\": \"class pass_tracer : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-eh.cc\", \"chunk_index\": 36, \"score\": 0.1667, \"text\": \"class pass_lower_eh : public gimple_opt_pass\\nclass pass_refactor_eh : public gimple_opt_pass\\nclass pass_lower_resx : public gimple_opt_pass\\nclass pass_lower_eh_dispatch : public gimple_opt_pass\\nclass pass_cleanup_eh : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-cfg.cc\", \"chunk_index\": 6, \"score\": 0.1429, \"text\": \"class pass_build_cfg : public gimple_opt_pass\\nclass pass_split_crit_edges : public gimple_opt_pass\\nclass pass_warn_function_return : public gimple_opt_pass\\nclass pass_warn_unused_result : public gimple_opt_pass\\nclass pass_fixup_cfg : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-sra.cc\", \"chunk_index\": 85, \"score\": 0.125, \"text\": \"class pass_sra_early : public gimple_opt_pass\\nclass pass_sra : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-vrp.cc\", \"chunk_index\": 21, \"score\": 0.1111, \"text\": \"class pass_vrp : public gimple_opt_pass\\nclass pass_assumptions : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-ssa.cc\", \"chunk_index\": 38, \"score\": 0.1, \"text\": \"class pass_update_address_taken : public gimple_opt_pass\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01UghqJC2Ntz1MUPSqCyT4XH",
+      "content": "[]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01WdJusFg8zmt6E12ZJi14kB",
+      "content": "[]"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_0178npHDMwSMQNLfuxqbwvga",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"pass_dce|pass_cd_dce\", \"top_k\": 20}"
+          }
+        },
+        {
+          "id": "toolu_01X2RYqKctK5MwCxXqEbAfRo",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"NEXT_PASS \\\\(pass_all_optimizations|make_pass_dce\", \"top_k\": 10}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_0178npHDMwSMQNLfuxqbwvga",
+      "content": "[{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-ssa-dce.cc\", \"chunk_index\": 33, \"score\": 1.0, \"text\": \"class pass_dce : public gimple_opt_pass\\nclass pass_cd_dce : public gimple_opt_pass\\n  pass_dce (gcc::context *ctxt)\\n  pass_cd_dce (gcc::context *ctxt)\\nmake_pass_dce (gcc::context *ctxt)\\n  return new pass_dce (ctxt);\\nmake_pass_cd_dce (gcc::context *ctxt)\\n  return new pass_cd_dce (ctxt);\\n  opt_pass * clone () final override { return new pass_dce (m_ctxt); }\\n}; // class pass_dce\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-pass.h\", \"chunk_index\": 6, \"score\": 0.5, \"text\": \"extern gimple_opt_pass *make_pass_dce (gcc::context *ctxt);\\nextern gimple_opt_pass *make_pass_cd_dce (gcc::context *ctxt);\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/passes.def\", \"chunk_index\": 1, \"score\": 0.3333, \"text\": \"\\t  NEXT_PASS (pass_cd_dce, false /* update_address_taken_p */);\\n\\t      NEXT_PASS (pass_dce);\\n      NEXT_PASS (pass_dce);\\n      NEXT_PASS (pass_dce);\\n      NEXT_PASS (pass_dce);\\n\\t  NEXT_PASS (pass_cd_dce, false /* update_address_taken_p */);\\n\\t      NEXT_PASS (pass_dce);\\n\\t      NEXT_PASS (pass_dce);\\n      NEXT_PASS (pass_dce, true /* update_address_taken_p */);\\n      NEXT_PASS (pass_cd_dce, false /* update_address_taken_p */);\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/ChangeLog.tuples\", \"chunk_index\": 43, \"score\": 0.25, \"text\": \"\\t* passes.c (init_optimization_passes): Enable pass_dce_loop.\\n\\t* passes.c (init_optimization_passes): Enabled pass_dce and\\n\\tpass_cd_dce.\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/ChangeLog.graphite\", \"chunk_index\": 107, \"score\": 0.2, \"text\": \"\\tgraphite transforms pass_copy_prop, pass_dce_loop and pass_lim.\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/ChangeLog.tree-ssa\", \"chunk_index\": 38, \"score\": 0.1667, \"text\": \"\\t* tree-pass.h: Declare extern pass_cd_dce.\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01X2RYqKctK5MwCxXqEbAfRo",
+      "content": "[{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/passes.def\", \"chunk_index\": 3, \"score\": 1.0, \"text\": \"  NEXT_PASS (pass_all_optimizations);\\n  NEXT_PASS (pass_all_optimizations_g);\"}]"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_01Mz4zUZceiinG3s9QgncqnB",
+          "type": "function",
+          "function": {
+            "name": "submit_files",
+            "arguments": "{\"files\": [{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/passes.def\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/passes.cc\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/pass_manager.h\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/tree-pass.h\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/tree-ssa-dce.cc\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/Makefile.in\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/doc/passes.texi\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/cgraphunit.cc\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/context.h\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/dumpfile.h\"}]}"
+          }
+        }
+      ]
+    }
+  ],
+  "ir_scores_unaligned": {
+    "task_id": "ccx-dep-trace-106",
+    "config_name": "claude_adapter",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.6,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 0.6667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.5,
+    "n_retrieved": 10,
+    "n_ground_truth": 5,
+    "n_overlap": 5
+  },
+  "retrieved_paths_aligned": [
+    "gcc/passes.def",
+    "gcc/passes.cc",
+    "gcc/pass_manager.h",
+    "gcc/tree-pass.h",
+    "gcc/tree-ssa-dce.cc",
+    "gcc/Makefile.in",
+    "gcc/doc/passes.texi",
+    "gcc/cgraphunit.cc",
+    "gcc/context.h",
+    "gcc/dumpfile.h"
+  ],
+  "scoring": "aligned_suffix_v1"
+}

@@ -1,0 +1,223 @@
+{
+  "task_id": "schema-evolution-tri-supabase-001",
+  "policy": "deepsearch",
+  "suite": "feature_delivery",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/supabase--v0.24.03",
+    "github.com/sg-evals/postgrest--v12.0.2",
+    "github.com/sg-evals/gotrue--v2.143.0"
+  ],
+  "retrieved_paths": [
+    "migrations/00_init_auth_schema.up.sql",
+    "migrations/20210710035447_alter_users.up.sql",
+    "migrations/20220114185340_add_banned_until.up.sql",
+    "migrations/20221215195500_modify_users_email_unique_index.up.sql",
+    "migrations/20230116124412_add_deleted_at.up.sql",
+    "migrations/20220811173540_add_sessions_table.up.sql",
+    "migrations/20221003041400_add_aal_and_factor_id_to_sessions.up.sql",
+    "migrations/20221114143122_add_session_not_after_column.up.sql",
+    "migrations/20231027141322_add_session_refresh_columns.up.sql",
+    "migrations/20231114161723_add_sessions_tag.up.sql",
+    "src/PostgREST/SchemaCache.hs",
+    "src/PostgREST/AppState.hs",
+    "src/PostgREST/Plan.hs",
+    "internal/models/user.go",
+    "internal/models/sessions.go",
+    "internal/models/refresh_token.go",
+    "internal/api/token_refresh.go",
+    "migrations/20221003041349_add_mfa_schema.up.sql",
+    "src/PostgREST/Query.hs"
+  ],
+  "retrieved_paths_union": [
+    "migrations/00_init_auth_schema.up.sql",
+    "migrations/20210710035447_alter_users.up.sql",
+    "migrations/20220114185340_add_banned_until.up.sql",
+    "migrations/20221215195500_modify_users_email_unique_index.up.sql",
+    "migrations/20230116124412_add_deleted_at.up.sql",
+    "migrations/20220811173540_add_sessions_table.up.sql",
+    "migrations/20221003041400_add_aal_and_factor_id_to_sessions.up.sql",
+    "migrations/20221114143122_add_session_not_after_column.up.sql",
+    "migrations/20231027141322_add_session_refresh_columns.up.sql",
+    "migrations/20231114161723_add_sessions_tag.up.sql",
+    "src/PostgREST/SchemaCache.hs",
+    "src/PostgREST/AppState.hs",
+    "src/PostgREST/Plan.hs",
+    "internal/models/user.go",
+    "internal/models/sessions.go",
+    "internal/models/refresh_token.go",
+    "internal/api/token_refresh.go",
+    "migrations/20221003041349_add_mfa_schema.up.sql",
+    "src/PostgREST/Query.hs"
+  ],
+  "required_files": [
+    "docker/volumes/db/init/00-initial-schema.sql",
+    "src/PostgREST/SchemaCache.hs",
+    "internal/models/user.go"
+  ],
+  "ir_scores": {
+    "task_id": "schema-evolution-tri-supabase-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0909,
+    "map_score": 0.0779,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1053,
+    "n_retrieved": 19,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "schema-evolution-tri-supabase-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0909,
+    "map_score": 0.0779,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1053,
+    "n_retrieved": 19,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 330.6,
+  "response_chars": 20923,
+  "raw_response": "---\ntitle: Trace Supabase schema migration impact on PostgREST and GoTrue\nshare_url: https://demo.sourcegraph.com/deepsearch/e1afeee6-b099-47fd-b706-edd03f444307\nurl: https://demo.sourcegraph.com/deepsearch/2244\ncreated: 2026-08-18T02:16:11Z\nupdated: 2026-08-18T02:21:41Z\n---\n\n# # Trace schema migration impact across Supabase core, PostgREST auto-API, and GoTrue auth\n\nYour team runs a Supabase-based platform. A schema migration adds a new RLS\n(Row Level Security) policy column to the auth.users table and modifies the\nauth.sessions table structure. After applying the migration, PostgREST's\nauto-generated API endpoints return unexpected 403 errors for authenticated\nusers, and GoTrue's token refresh flow fails intermittently.\n\nThe issue spans three repositories: the migration is defined in the Supabase\nmonorepo, PostgREST auto-generates API routes from the database schema, and\nGoTrue directly queries auth tables with hardcoded column expectations.\n\nYour task:\n\n1. Find where Supabase defines the auth schema migrations \u2014 locate the SQL\n   migration files for auth.users and auth.sessions tables in the Supabase\n   monorepo. Identify the migration that modifies RLS policies and session\n   structure.\n2. Find where PostgREST discovers database schema to generate API endpoints \u2014\n   locate the schema cache, table introspection, and RLS policy evaluation code.\n   Identify how PostgREST resolves permissions when RLS policies reference\n   columns it hasn't cached yet.\n3. Find where GoTrue queries auth tables \u2014 locate the session management,\n   token refresh, and user retrieval code. Identify all hardcoded column\n   references and table structure assumptions.\n4. Map the impact chain: which Supabase migration changes break which PostgREST\n   behaviors and which GoTrue queries.\n\nWrite your analysis to /workspace/SCHEMA_IMPACT.md with:\n\n- Supabase migration changes (with file paths)\n- Affected PostgREST schema cache and API generation logic\n- Affected GoTrue query and session management code\n- Impact chain showing migration -> PostgREST failure -> GoTrue failure\n\n\nSearch only these repositories: github.com/sg-evals/supabase--v0.24.03, github.com/sg-evals/postgrest--v12.0.2, github.com/sg-evals/gotrue--v2.143.0\n\nThe analysis is complete. Here is the full report (which has also been written to the artifact above):\n\n---\n\n# Schema Migration Impact Analysis\n\n## 1. Supabase Migration Changes\n\n**Important finding:** The `auth` schema is owned entirely by GoTrue, not the Supabase monorepo. The Supabase monorepo's example migrations only create FK references and RLS policies on *public* schema tables pointing to `auth.users`. GoTrue's migration files in [`migrations/`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/tree/migrations) are the authoritative source.\n\n### auth.users \u2014 Full Migration Chain\n\n| Migration File | Change |\n|---|---|\n| [`00_init_auth_schema.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/00_init_auth_schema.up.sql) | Creates table with 19 columns; defines `auth.uid()` and `auth.role()` functions used by all downstream RLS policies |\n| [`20210710035447_alter_users.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20210710035447_alter_users.up.sql) | Adds phone columns; **renames `confirmed_at` to `email_confirmed_at`** \u2014 any code referencing the old name breaks |\n| [`20220114185340_add_banned_until.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20220114185340_add_banned_until.up.sql) | Adds `banned_until` |\n| [`20221215195500_modify_users_email_unique_index.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20221215195500_modify_users_email_unique_index.up.sql) | Adds `is_sso_user boolean NOT NULL DEFAULT false`; **drops the global `users_email_key` UNIQUE constraint**; replaces it with a partial index `WHERE (is_sso_user = false)` \u2014 RLS policies relying on email uniqueness silently break |\n| [`20230116124412_add_deleted_at.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20230116124412_add_deleted_at.up.sql) | Adds `deleted_at` |\n\n### auth.sessions \u2014 Full Migration Chain\n\n| Migration File | Change |\n|---|---|\n| [`20220811173540_add_sessions_table.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20220811173540_add_sessions_table.up.sql) | Creates `auth.sessions(id, user_id, created_at, updated_at)`; adds `session_id uuid` FK to `auth.refresh_tokens` |\n| [`20221003041400_add_aal_and_factor_id_to_sessions.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20221003041400_add_aal_and_factor_id_to_sessions.up.sql) | Adds `factor_id uuid`, `aal aal_level` |\n| [`20221114143122_add_session_not_after_column.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20221114143122_add_session_not_after_column.up.sql) | Adds `not_after timestamptz` |\n| [`20231027141322_add_session_refresh_columns.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20231027141322_add_session_refresh_columns.up.sql) | Adds `refreshed_at timestamp`, `user_agent text`, `ip inet` |\n| [`20231114161723_add_sessions_tag.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20231114161723_add_sessions_tag.up.sql) | Adds `tag text` |\n\n**Every one of these columns is required by GoTrue's `Session` struct.** A partial migration leaves GoTrue unable to decode query results.\n\n---\n\n## 2. PostgREST Schema Cache and API Generation\n\n**Source:** [`src/PostgREST/SchemaCache.hs`](https://demo.sourcegraph.com/r/github.com/sg-evals/postgrest--v12.0.2/-/blob/src/PostgREST/SchemaCache.hs)\n\n### How the cache works\n\n[`loadSchemaCache`](https://demo.sourcegraph.com/r/github.com/sg-evals/postgrest--v12.0.2/-/blob/src/PostgREST/AppState.hs?L307-L331) loads the entire schema in one `READ COMMITTED` transaction and stores it in memory. It is refreshed only on `NOTIFY pgrst, 'reload schema'` or process restart. Any migration applied after the last load is **invisible to PostgREST**.\n\n[`querySchemaCache`](https://demo.sourcegraph.com/r/github.com/sg-evals/postgrest--v12.0.2/-/blob/src/PostgREST/SchemaCache.hs?L136-L165) runs five catalog queries:\n- **`allTables` / `tablesSqlQuery`** ([L589-L817](https://demo.sourcegraph.com/r/github.com/sg-evals/postgrest--v12.0.2/-/blob/src/PostgREST/SchemaCache.hs?L589-L817)) \u2014 reads `pg_attribute` to enumerate every column of every exposed table. New columns from migrations are absent until reload.\n- **`allM2OandO2ORels`** \u2014 FK-based relationship graph\n- **`allFunctions`** \u2014 RPC-callable routines\n- **`accessibleTables`** ([L462-L482](https://demo.sourcegraph.com/r/github.com/sg-evals/postgrest--v12.0.2/-/blob/src/PostgREST/SchemaCache.hs?L462-L482)) \u2014 checks `pg_has_role`, `has_table_privilege`, `has_any_column_privilege` at cache-load time\n\n### How PostgREST evaluates RLS\n\nPostgREST does **not** read `pg_policy`. RLS is enforced by PostgreSQL itself when PostgREST executes its generated SQL under the authenticated role. The key gap: PostgREST's plan ([`Plan.hs` L297](https://demo.sourcegraph.com/r/github.com/sg-evals/postgrest--v12.0.2/-/blob/src/PostgREST/Plan.hs?L297-L320)) builds a SELECT projection from the stale cache. If an RLS `USING` clause references a column not in the cache projection, PostgreSQL evaluates it as NULL \u2192 treated as FALSE \u2192 **every row is denied (403)**.\n\n---\n\n## 3. GoTrue Hardcoded Column References\n\n**Source:** [`internal/models/`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/tree/internal/models)\n\n### User struct ([`user.go` L20-71](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/internal/models/user.go?L20-L71))\n\nAll columns are hardcoded as `db:\"column_name\"` struct tags. Notable dependencies:\n- `is_sso_user` \u2014 added by `20221215195500`; affects email uniqueness logic\n- `email_confirmed_at` \u2014 renamed from `confirmed_at` in `20210710035447`; the old name `confirmed_at` is kept as a read-only field for backward compatibility but must exist in the DB\n\n### Session struct ([`sessions.go` L60-78](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/internal/models/sessions.go?L60-L78))\n\nAll 11 columns (`id`, `user_id`, `not_after`, `created_at`, `updated_at`, `factor_id`, `aal`, `refreshed_at`, `user_agent`, `ip`, `tag`) are required. `SELECT *` will fail ORM decoding if any is absent.\n\n### RefreshToken struct ([`refresh_token.go` L17-32](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/internal/models/refresh_token.go?L17-L32))\n\n`session_id` is critical \u2014 added by `20220811173540`. If missing: `FindTokenBySessionID` fails, `RevokeTokenFamily` silently skips session-based revocation (token reuse vulnerability).\n\n### Token Refresh Query Chain ([`token_refresh.go` L24-284](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/internal/api/token_refresh.go?L24-L284))\n\n`RefreshTokenGrant` runs two passes with a 5-second retry loop (`retryLoopDuration = 5.0`):\n\n1. **Non-locking pass (L54):** `FindUserWithRefreshToken` \u2192 chains `SELECT * FROM refresh_tokens`, `SELECT * FROM users`, `SELECT * FROM sessions`\n2. **Transactional locking pass (L93):** Same queries with `FOR UPDATE SKIP LOCKED`\n3. **Session update (L246):** `UpdateOnlyRefreshInfo` \u2192 `UPDATE sessions SET refreshed_at, user_agent, ip` \u2014 explicitly named columns, safe for forward additions\n4. **Token rotation (L211):** `GrantRefreshTokenSwap` \u2192 `RevokeTokenFamily` uses `session_id`\n\n**The intermittent failure mechanism:** `FOR UPDATE SKIP LOCKED` returns `sql.ErrNoRows` when a row is locked \u2014 GoTrue sets `retry=true` and waits. But schema errors return different error types, so `retry` stays `false` and the loop exits immediately. At a migration boundary, requests that started before the migration succeed; requests after fail. This looks intermittent but is deterministic.\n\n---\n\n## 4. Impact Chain\n\n```\nMIGRATION APPLIED\n        |\n        v\n+---------------------------------------------------------------+\n|  GoTrue Auth Schema Migrations                                |\n|  A: ALTER TABLE auth.users ADD COLUMN rls_policy_col         |\n|     + CREATE POLICY ... USING (rls_policy_col = ...)         |\n|  B: auth.sessions structural change (ADD/RENAME/DROP column) |\n+---------------------------------------------------------------+\n        |\n   +----+----+\n   |         |\n   v         v\n+----------+ +------------------------------------------+\n| PostgREST| | GoTrue                                   |\n| (stale   | | (hardcoded struct column expectations)   |\n|  cache)  | +------------------------------------------+\n+----------+\n   |               GOTRUE FAILURES (Scenario B):\n   v\nPOSTGREST FAILURES (Scenario A):\n\n1. rls_policy_col absent from SchemaCache.dbTables          1. SELECT * FROM sessions ORM scan fails\n   -> Plan.hs builds SELECT without the column                 -> Any missing column (refreshed_at,\n   -> PostgreSQL RLS USING (rls_policy_col = ...)                tag, user_agent, ip) -> decode error\n      evaluates to NULL -> FALSE                              \n   -> All rows denied -> HTTP 403 for all users           2. UpdateOnlyRefreshInfo fails\n                                                             -> UPDATE sessions SET refreshed_at,\n2. If new column has restrictive GRANT:                         user_agent, ip WHERE id=?\n   -> accessibleTables: has_any_column_privilege FALSE         -> Column not found -> 500\n   -> Entire table disappears from API -> 403\n                                                          3. Retry loop masks schema error\n3. Cache reload race condition:                              -> retry=false on schema errors\n   -> Old plan hits new DB schema                            -> Loop exits immediately\n   -> Column mismatch -> 500/403                             -> Requests at migration boundary\n                                                                see alternating success/failure\n                                                                (appears \"intermittent\")\n\n                                                          4. FindUserWithRefreshToken fails\n                                                             if session_id missing on\n                                                             refresh_tokens table\n                                                             -> RevokeTokenFamily skips\n                                                                session-based revocation\n                                                                (token reuse security risk)\n\nFIX FOR POSTGREST: NOTIFY pgrst, 'reload schema'; after migration\nFIX FOR GOTRUE:    Run all migrations before starting GoTrue binary\nFIX FOR RLS cols:  Add DEFAULT, GRANT SELECT, reload cache BEFORE enabling policy\n```\n\n---\n\n## File Reference Index\n\n**GoTrue migrations:**\n- [`migrations/00_init_auth_schema.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/00_init_auth_schema.up.sql) \u2014 baseline auth.users, refresh_tokens, auth.uid()\n- [`migrations/20220811173540_add_sessions_table.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20220811173540_add_sessions_table.up.sql) \u2014 auth.sessions + refresh_tokens.session_id\n- [`migrations/20221003041400_add_aal_and_factor_id_to_sessions.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20221003041400_add_aal_and_factor_id_to_sessions.up.sql)\n- [`migrations/20221114143122_add_session_not_after_column.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20221114143122_add_session_not_after_column.up.sql)\n- [`migrations/20221215195500_modify_users_email_unique_index.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20221215195500_modify_users_email_unique_index.up.sql)\n- [`migrations/20231027141322_add_session_refresh_columns.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20231027141322_add_session_refresh_columns.up.sql)\n- [`migrations/20231114161723_add_sessions_tag.up.sql`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/migrations/20231114161723_add_sessions_tag.up.sql)\n\n**GoTrue model code:**\n- [`internal/models/user.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/internal/models/user.go?L20-L71) \u2014 User struct\n- [`internal/models/sessions.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/internal/models/sessions.go?L60-L78) \u2014 Session struct + all session queries\n- [`internal/models/refresh_token.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/internal/models/refresh_token.go?L17-L32) \u2014 RefreshToken struct + RevokeTokenFamily\n- [`internal/api/token_refresh.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/gotrue--v2.143.0/-/blob/internal/api/token_refresh.go?L24-L284) \u2014 RefreshTokenGrant\n\n**PostgREST schema cache:**\n- [`src/PostgREST/SchemaCache.hs`](https://demo.sourcegraph.com/r/github.com/sg-evals/postgrest--v12.0.2/-/blob/src/PostgREST/SchemaCache.hs) \u2014 `querySchemaCache` (L136), `tablesSqlQuery` (L589), `accessibleTables` (L462)\n- [`src/PostgREST/AppState.hs`](https://demo.sourcegraph.com/r/github.com/sg-evals/postgrest--v12.0.2/-/blob/src/PostgREST/AppState.hs?L307-L331) \u2014 `loadSchemaCache`\n- [`src/PostgREST/Plan.hs`](https://demo.sourcegraph.com/r/github.com/sg-evals/postgrest--v12.0.2/-/blob/src/PostgREST/Plan.hs?L297-L320) \u2014 plan resolution from schema cache\n\n## Sources\n\n- [github.com/sg-evals/gotrue--v2.143.0/migrations/00_init_auth_schema.up.sql@3a8494d](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/migrations/00_init_auth_schema.up.sql)\n- [github.com/sg-evals/gotrue--v2.143.0/migrations/20220811173540_add_sessions_table.up.sql@3a8494d](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/migrations/20220811173540_add_sessions_table.up.sql)\n- [github.com/sg-evals/postgrest--v12.0.2/src/PostgREST/SchemaCache.hs@e93f351?L462-510](/github.com/sg-evals/postgrest--v12.0.2@e93f3513e4100ff75fc059a15a1b6b10c0172557/-/blob/src/PostgREST/SchemaCache.hs?L462-510)\n- [github.com/sg-evals/gotrue--v2.143.0/internal/models/sessions.go@3a8494d](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/internal/models/sessions.go)\n- [github.com/sg-evals/gotrue--v2.143.0/internal/models/refresh_token.go@3a8494d](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/internal/models/refresh_token.go)\n- [github.com/sg-evals/gotrue--v2.143.0/internal/models/user.go@3a8494d?L490-560](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/internal/models/user.go?L490-560)\n- [github.com/sg-evals/postgrest--v12.0.2/src/PostgREST/SchemaCache.hs@e93f351?L78-210](/github.com/sg-evals/postgrest--v12.0.2@e93f3513e4100ff75fc059a15a1b6b10c0172557/-/blob/src/PostgREST/SchemaCache.hs?L78-210)\n- [github.com/sg-evals/gotrue--v2.143.0](/github.com/sg-evals/gotrue--v2.143.0)\n- [github.com/sg-evals/gotrue--v2.143.0/migrations/20221003041400_add_aal_and_factor_id_to_sessions.up.sql@3a8494d](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/migrations/20221003041400_add_aal_and_factor_id_to_sessions.up.sql)\n- [github.com/sg-evals/gotrue--v2.143.0/migrations/20221114143122_add_session_not_after_column.up.sql@3a8494d](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/migrations/20221114143122_add_session_not_after_column.up.sql)\n- [github.com/sg-evals/gotrue--v2.143.0/migrations/20231027141322_add_session_refresh_columns.up.sql@3a8494d](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/migrations/20231027141322_add_session_refresh_columns.up.sql)\n- [github.com/sg-evals/gotrue--v2.143.0/migrations/20231114161723_add_sessions_tag.up.sql@3a8494d](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/migrations/20231114161723_add_sessions_tag.up.sql)\n- [github.com/sg-evals/gotrue--v2.143.0/migrations/20221003041349_add_mfa_schema.up.sql@3a8494d?L1-50](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/migrations/20221003041349_add_mfa_schema.up.sql?L1-50)\n- [github.com/sg-evals/postgrest--v12.0.2/src/PostgREST/SchemaCache.hs@e93f351?L589-760](/github.com/sg-evals/postgrest--v12.0.2@e93f3513e4100ff75fc059a15a1b6b10c0172557/-/blob/src/PostgREST/SchemaCache.hs?L589-760)\n- [github.com/sg-evals/postgrest--v12.0.2/src/PostgREST/SchemaCache.hs@e93f351?L760-850](/github.com/sg-evals/postgrest--v12.0.2@e93f3513e4100ff75fc059a15a1b6b10c0172557/-/blob/src/PostgREST/SchemaCache.hs?L760-850)\n- [github.com/sg-evals/gotrue--v2.143.0/internal/api/token_refresh.go@3a8494d](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/internal/api/token_refresh.go)\n- [github.com/sg-evals/gotrue--v2.143.0/internal/models/user.go@3a8494d?L1-80](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/internal/models/user.go?L1-80)\n- [github.com/sg-evals/gotrue--v2.143.0/migrations/20210710035447_alter_users.up.sql@3a8494d](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/migrations/20210710035447_alter_users.up.sql)\n- [github.com/sg-evals/postgrest--v12.0.2/src/PostgREST/Query.hs@e93f351?L160-200](/github.com/sg-evals/postgrest--v12.0.2@e93f3513e4100ff75fc059a15a1b6b10c0172557/-/blob/src/PostgREST/Query.hs?L160-200)\n- [github.com/sg-evals/postgrest--v12.0.2/src/PostgREST/AppState.hs@e93f351?L295-340](/github.com/sg-evals/postgrest--v12.0.2@e93f3513e4100ff75fc059a15a1b6b10c0172557/-/blob/src/PostgREST/AppState.hs?L295-340)\n- [github.com/sg-evals/gotrue--v2.143.0/migrations/20221215195500_modify_users_email_unique_index.up.sql@3a8494d](/github.com/sg-evals/gotrue--v2.143.0@3a8494d144cbff7b8e75d8b06650287e55b5ecc7/-/blob/migrations/20221215195500_modify_users_email_unique_index.up.sql)\n\n\nGenerated files:\n- files/SCHEMA_IMPACT_content.json: /.api/agent-files/v1/deep-search/e1afeee6-b099-47fd-b706-edd03f444307/files/SCHEMA_IMPACT_content.json\n- files/SCHEMA_IMPACT.csv: /.api/agent-files/v1/deep-search/e1afeee6-b099-47fd-b706-edd03f444307/files/SCHEMA_IMPACT.csv\n- files/SCHEMA_IMPACT_md.json: /.api/agent-files/v1/deep-search/e1afeee6-b099-47fd-b706-edd03f444307/files/SCHEMA_IMPACT_md.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "schema-evolution-tri-supabase-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0909,
+    "map_score": 0.0779,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1053,
+    "n_retrieved": 19,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "migrations/00_init_auth_schema.up.sql",
+    "migrations/20210710035447_alter_users.up.sql",
+    "migrations/20220114185340_add_banned_until.up.sql",
+    "migrations/20221215195500_modify_users_email_unique_index.up.sql",
+    "migrations/20230116124412_add_deleted_at.up.sql",
+    "migrations/20220811173540_add_sessions_table.up.sql",
+    "migrations/20221003041400_add_aal_and_factor_id_to_sessions.up.sql",
+    "migrations/20221114143122_add_session_not_after_column.up.sql",
+    "migrations/20231027141322_add_session_refresh_columns.up.sql",
+    "migrations/20231114161723_add_sessions_tag.up.sql",
+    "src/PostgREST/SchemaCache.hs",
+    "src/PostgREST/AppState.hs",
+    "src/PostgREST/Plan.hs",
+    "internal/models/user.go",
+    "internal/models/sessions.go",
+    "internal/models/refresh_token.go",
+    "internal/api/token_refresh.go",
+    "migrations/20221003041349_add_mfa_schema.up.sql",
+    "src/PostgREST/Query.hs"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "schema-evolution-tri-supabase-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0909,
+    "map_score": 0.0779,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1053,
+    "n_retrieved": 19,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

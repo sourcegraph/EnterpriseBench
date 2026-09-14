@@ -1,0 +1,208 @@
+{
+  "task_id": "incident-investigation-dual-cortex-001",
+  "policy": "deepsearch",
+  "suite": "incident_response",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/cortex--v1.18.0",
+    "github.com/sg-evals/alertmanager--v0.27.0"
+  ],
+  "retrieved_paths": [
+    "pkg/ruler/ruler.go",
+    "pkg/ruler/compat.go",
+    "vendor/github.com/prometheus/prometheus/notifier/notifier.go",
+    "pkg/ruler/manager.go",
+    "api/v2/api.go",
+    "types/types.go",
+    "matchers/compat/parse.go",
+    "vendor/github.com/prometheus/prometheus/rules/alerting.go",
+    "vendor/github.com/prometheus/prometheus/rules/manager.go",
+    "notifier/notifier.go",
+    "github.com/sg-evals/cortex--v1.18.0",
+    "vendor/.../notifier/notifier.go",
+    "github.com/sg-evals/alertmanager--v0.27.0",
+    "rules/alerting.go"
+  ],
+  "retrieved_paths_union": [
+    "pkg/ruler/ruler.go",
+    "pkg/ruler/compat.go",
+    "vendor/github.com/prometheus/prometheus/notifier/notifier.go",
+    "pkg/ruler/manager.go",
+    "api/v2/api.go",
+    "types/types.go",
+    "matchers/compat/parse.go",
+    "vendor/github.com/prometheus/prometheus/rules/alerting.go",
+    "vendor/github.com/prometheus/prometheus/rules/manager.go",
+    "notifier/notifier.go",
+    "github.com/sg-evals/cortex--v1.18.0",
+    "vendor/.../notifier/notifier.go",
+    "github.com/sg-evals/alertmanager--v0.27.0",
+    "rules/alerting.go"
+  ],
+  "required_files": [
+    "pkg/ruler/notifier.go",
+    "pkg/ruler/manager.go",
+    "notify/notify.go",
+    "types/types.go"
+  ],
+  "ir_scores": {
+    "task_id": "incident-investigation-dual-cortex-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2222,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.1681,
+      "10": 0.3072
+    },
+    "mrr": 0.25,
+    "map_score": 0.1458,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 14,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "incident-investigation-dual-cortex-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2222,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.1681,
+      "10": 0.3072
+    },
+    "mrr": 0.25,
+    "map_score": 0.1458,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 14,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 330.7,
+  "response_chars": 24416,
+  "raw_response": "---\ntitle: Investigating Cortex ruler alert drops for UTF-8 label tenants\nshare_url: https://demo.sourcegraph.com/deepsearch/3af945ab-285f-4d51-9217-13d5bf1738d5\nurl: https://demo.sourcegraph.com/deepsearch/2228\ncreated: 2026-08-18T02:03:22Z\nupdated: 2026-08-18T02:08:02Z\n---\n\n# # Incident: Cortex ruler silently loses alerts for tenants with UTF-8 label names\n\n## Alert\n\nA new multi-tenant Cortex 1.18 cluster is dropping alerts for one tenant\nwithout surfacing any error in the usual ruler-group failure metrics:\n\n```\nlevel=error msg=\"alert delivery failed\" tenant=team-utf8 alerts=4\nlevel=warn  msg=\"non-recoverable error sending alert\" status_code=400\nlevel=warn  msg=\"error sending alerts\" err=\"bad_data: invalid label name\"\n(no further entries \u2014 affected alerts never retry, never page)\n```\n\n`alertmanager_alerts_received_total` for the affected receiver stays flat\neven though the ruler's evaluation metrics show the alert firing.\n\n## Symptoms\n\n- Only tenants whose recording rules emit UTF-8 label names (e.g.\n  `http.status_code`, `k8s.namespace`) are affected. Classic ASCII tenants\n  are unaffected.\n- The cluster is running with the default (legacy) name-validation scheme\n  on the ruler side and Alertmanager v0.27.0 in classic label-validation\n  mode.\n- `cortex_prometheus_rule_group_iterations_failed_total` is flat for the\n  affected groups \u2014 the failure is invisible to the per-group error path.\n\n## Environment\n\n- `/workspace/cortex/` \u2014 `cortexproject/cortex` v1.18.0\n- `/workspace/alertmanager/` \u2014 `prometheus/alertmanager` v0.27.0\n\nBoth Go projects. The failure lives at the seam between the Cortex ruler's\noutbound alert-send path and Alertmanager's inbound label validation; you\nwill need to read both repos to locate it.\n\n## What I need\n\nInvestigate the two codebases and write an incident report grounded in the\nactual code \u2014 cite the specific files and functions you found, not general\ndescription of the symptoms above.\n\n1. **Root cause** \u2014 name the specific file and function on each side of the\n   boundary: the Cortex code path that constructs and sends alerts to\n   Alertmanager, and the Alertmanager code that validates alert label\n   names. Cite each by path.\n2. **Error chain** \u2014 trace from the rule evaluation that produces the\n   UTF-8 label to the alert being dropped with no surfaced error, at least\n   four hops, each tied to a code path you identified.\n3. **Affected components** \u2014 identify every component across both repos\n   that participates in the alert delivery path from rule evaluation to\n   Alertmanager.\n4. **Remediation** \u2014 propose a concrete, code-grounded fix and say where\n   it belongs (which repo and file).\n\n## Output\n\nWrite your incident report to `/workspace/cortex/INCIDENT_REPORT.md`.\n\n\nSearch only these repositories: github.com/sg-evals/cortex--v1.18.0, github.com/sg-evals/alertmanager--v0.27.0\n\nThe sandboxed evaluator cannot write directly to `/workspace/cortex/` on the filesystem. The complete incident report is below \u2014 you can copy it into `/workspace/cortex/INCIDENT_REPORT.md`.\n\n---\n\n# Incident Report: Cortex Ruler Silently Drops Alerts for UTF-8 Label Name Tenants\n\n**Date:** 2026-08-18\n**Severity:** P1 \u2014 Silent alert loss, no on-call page generated\n**Affected cluster:** Multi-tenant Cortex 1.18 with Alertmanager v0.27.0\n**Reporter:** Stephanie Jarmak\n\n---\n\n## Executive Summary\n\nTenants whose alerting rules produce labels with UTF-8 names (e.g. `http.status_code`, `k8s.namespace`) have all their alerts silently dropped at the Alertmanager API boundary. The Cortex ruler evaluates the rules correctly and fires the alerts, but Alertmanager rejects the POST with HTTP 400 because the label names fail classic-mode validation. The Cortex notifier layer logs the error at `warn` level and increments `prometheus_notifications_errors_total`, but this counter is not surfaced as a `cortex_prometheus_rule_group_iterations_failed_total` increment \u2014 so no existing alert fires and the failure is invisible to the SRE on call.\n\n---\n\n## 1. Root Cause\n\n### Cortex side \u2014 alert construction and dispatch\n\n**File:** [`pkg/ruler/ruler.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/pkg/ruler/ruler.go?L440-L462)\n**Function:** `SendAlerts`\n\n`SendAlerts` is wired as the `NotifyFunc` in `DefaultTenantManagerFactory` ([`pkg/ruler/compat.go` L325](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/pkg/ruler/compat.go?L325)). It copies label sets straight from the evaluated `rules.Alert` struct into a `notifier.Alert`, applying **no label-name sanitisation**:\n\n```go\na := &notifier.Alert{\n    StartsAt:     alert.FiredAt,\n    Labels:       alert.Labels,        // UTF-8 names pass through unchanged\n    Annotations:  alert.Annotations,\n    GeneratorURL: externalURL + ...,\n}\n```\n\nThe labels produced by the PromQL engine carry `labels.Labels` structs whose names are raw strings; nothing in the ruler or the embedded Prometheus notifier rewrites or strips non-ASCII label names before sending.\n\n**File:** [`vendor/github.com/prometheus/prometheus/notifier/notifier.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/vendor/github.com/prometheus/prometheus/notifier/notifier.go)\n**Functions:** `(Manager).sendAll` (L515), `(Manager).sendOne` (L660)\n\n`sendAll` serialises the `notifier.Alert` slice to JSON and POSTs it to Alertmanager's v2 API. `sendOne` treats any non-2xx response as a generic error:\n\n```go\nif resp.StatusCode/100 != 2 {\n    return fmt.Errorf(\"bad response status %s\", resp.Status)\n}\n```\n\nThe Cortex-overridden `Do` callback in [`pkg/ruler/manager.go` L302\u2013L334](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/pkg/ruler/manager.go?L302-L334) logs the error body at `level.Error` but does not convert it into a metric that the ruler's per-group accounting observes. The error propagates to `sendAll`, which increments `prometheus_notifications_errors_total` (a per-Alertmanager URL counter, L613) and, if all endpoints fail, increments `prometheus_notifications_dropped_total` (L372) \u2014 but **neither is `cortex_prometheus_rule_group_iterations_failed_total`**, which is only incremented when `rules.Group.Eval` itself returns an error, not when notification delivery fails.\n\n### Alertmanager side \u2014 label name validation\n\n**File:** [`api/v2/api.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.27.0/-/blob/api/v2/api.go?L310-L368)\n**Function:** `(API).postAlertsHandler`\n\n`postAlertsHandler` iterates every inbound alert and calls `a.Validate()`. If validation fails, the alert is added to `validationErrs` and skipped; valid alerts in the same batch are still committed. After the full batch, if `validationErrs` is non-empty the handler returns HTTP 400:\n\n```go\nif validationErrs.Len() > 0 {\n    level.Error(logger).Log(\"msg\", \"Failed to validate alerts\", \"err\", validationErrs.Error())\n    return alert_ops.NewPostAlertsBadRequest().WithPayload(validationErrs.Error())\n}\n```\n\nBecause `alertmanager_alerts_received_total` (`api.m.Firing().Inc()` at L338) is only incremented for alerts that pass the timestamp checks \u2014 before validation \u2014 rejected alerts are never reflected there.\n\n**File:** [`types/types.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.27.0/-/blob/types/types.go?L307-L337)\n**Functions:** `validateLs` (L307), `(Alert).Validate` (L321)\n\n`validateLs` calls `compat.IsValidLabelName` for every label name:\n\n```go\nif !compat.IsValidLabelName(ln) {\n    return fmt.Errorf(\"invalid name %q\", ln)\n}\n```\n\n**File:** [`matchers/compat/parse.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.27.0/-/blob/matchers/compat/parse.go?L31-L73)\n**Functions:** package-level `isValidLabelName` (L32), `InitFromFlags` (L59), `isValidClassicLabelName` (L191)\n\nThe package-level `isValidLabelName` is initialised to `isValidClassicLabelName` **before** `InitFromFlags` is called (L32). When Alertmanager is started with `--feature-flags=classic-mode`, `InitFromFlags` explicitly sets:\n\n```go\nisValidLabelName = isValidClassicLabelName(l)   // delegates to model.LabelName.IsValid()\n```\n\n`isValidClassicLabelName` calls `name.IsValid()` which uses the regex `[a-zA-Z_][a-zA-Z0-9_]*`. Label names containing `.` (e.g. `http.status_code`) or any non-ASCII code point fail this check and return `false`. UTF-8 validation is only activated by `--feature-flags=utf8-strict-mode` or the default no-flag path, neither of which is active in this cluster.\n\n---\n\n## 2. Error Chain (hop-by-hop)\n\n### Hop 1 \u2014 Rule evaluation emits UTF-8 label names\n\n[`vendor/github.com/prometheus/prometheus/rules/alerting.go`, `(AlertingRule).sendAlerts` L560](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/vendor/github.com/prometheus/prometheus/rules/alerting.go?L560-L577):\n\nThe alerting rule evaluates its PromQL expression; the result `promql.Vector` carries `labels.Labels` with raw string names. No validation of character set occurs. `sendAlerts` calls the registered `NotifyFunc` directly with these labels.\n\n### Hop 2 \u2014 `SendAlerts` forwards labels unmodified into the notifier queue\n\n[`pkg/ruler/ruler.go`, `SendAlerts` L440](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/pkg/ruler/ruler.go?L440-L462):\n\nLabels are copied verbatim into `notifier.Alert.Labels`. No sanitisation is applied. `n.Send(res...)` appends the alerts to the in-memory notification queue ([`notifier/notifier.go`, `(Manager).Send` L411](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/vendor/github.com/prometheus/prometheus/notifier/notifier.go?L411-L441)).\n\n### Hop 3 \u2014 Notifier serialises and POSTs; Alertmanager returns HTTP 400\n\n[`notifier/notifier.go`, `sendAll` L515 and `sendOne` L660](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/vendor/github.com/prometheus/prometheus/notifier/notifier.go?L515-L683):\n\n`sendAll` marshals the batch to JSON (label names are preserved verbatim). `sendOne` executes the POST. Alertmanager's `postAlertsHandler` calls `validateLs` \u2192 `isValidClassicLabelName` \u2192 `name.IsValid()` \u2192 returns false for `http.status_code`. Alertmanager returns HTTP 400 with body `\"bad_data: invalid label set: invalid name \\\"http.status_code\\\"\"`. `sendOne` sees `resp.StatusCode/100 != 2` and returns a non-nil error.\n\n### Hop 4 \u2014 Cortex `Do` callback logs the error but does not propagate a ruler-level failure\n\n[`pkg/ruler/manager.go`, anonymous `Do` func L302\u2013L334](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/pkg/ruler/manager.go?L302-L334):\n\nThe `Do` closure reads the response body (capped at 150 bytes) and logs `level.Error \u2026 \"error occurred sending notification\"`. It returns `resp, err` where `err` is nil from `ctxhttp.Do` (the TCP/HTTP round-trip itself succeeded). `sendOne` then detects the status code independently, wraps it as `\"bad response status 400 Bad Request\"`, and returns that error to `sendAll`.\n\n### Hop 5 \u2014 `sendAll` increments `dropped_total`; ruler group accounting is never touched\n\n[`notifier/notifier.go`, `sendAll` L610-L613 and `sendOneBatch` L371-L373](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/vendor/github.com/prometheus/prometheus/notifier/notifier.go?L368-L373):\n\n`sendAll` logs `level.Error \u2026 \"Error sending alert\"` and increments `prometheus_notifications_errors_total{alertmanager=<url>}`. If no Alertmanager succeeds, it returns `false`. `sendOneBatch` then increments `prometheus_notifications_dropped_total`. The return value of `sendAll` is **not** plumbed back to the rule-group evaluation loop. `cortex_prometheus_rule_group_iterations_failed_total` is only incremented when `rules.Group.Eval` returns an error \u2014 the notification path is entirely separate. The failure is invisible.\n\n---\n\n## 3. Affected Components\n\n### `github.com/sg-evals/cortex--v1.18.0`\n\n| Component | File | Role |\n|-----------|------|------|\n| Rule group evaluator | [`pkg/ruler/manager.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/pkg/ruler/manager.go?L243-L257) | Orchestrates per-tenant rule group evaluation |\n| Alert notify wiring | [`pkg/ruler/compat.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/pkg/ruler/compat.go?L319-L337) | Wires `SendAlerts` as `NotifyFunc` in `rules.ManagerOptions` |\n| Label copy / alert construction | [`pkg/ruler/ruler.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/pkg/ruler/ruler.go?L440-L462) | Converts `rules.Alert` \u2192 `notifier.Alert`; no label-name sanitisation |\n| Per-tenant notifier factory | [`pkg/ruler/manager.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/pkg/ruler/manager.go?L286-L346) | Creates one `notifier.Manager` per tenant; installs HTTP `Do` callback |\n| HTTP Do callback | [`pkg/ruler/manager.go` L302-L334](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/pkg/ruler/manager.go?L302-L334) | Injects OrgID header, executes HTTP POST, logs non-2xx errors |\n| Prometheus notifier Manager | [`vendor/.../notifier/notifier.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/vendor/github.com/prometheus/prometheus/notifier/notifier.go) | Queues alerts (`Send`), batches and dispatches (`sendAll`, `sendOne`) |\n| Alert serialisation | [`notifier/notifier.go` L632-L658](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/vendor/github.com/prometheus/prometheus/notifier/notifier.go?L632-L658) | `alertsToOpenAPIAlerts` \u2014 label names are raw strings, no re-encoding |\n\n### `github.com/sg-evals/alertmanager--v0.27.0`\n\n| Component | File | Role |\n|-----------|------|------|\n| POST /api/v2/alerts handler | [`api/v2/api.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.27.0/-/blob/api/v2/api.go?L310-L369) | Receives alerts, calls `Validate()`, returns 400 on invalid labels |\n| Alert validation | [`types/types.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.27.0/-/blob/types/types.go?L307-L337) | `validateLs` + `Alert.Validate` \u2014 calls `compat.IsValidLabelName` |\n| Label name validation dispatch | [`matchers/compat/parse.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.27.0/-/blob/matchers/compat/parse.go?L31-L73) | `InitFromFlags` sets the active validator; defaults to classic before init |\n| Classic validator | [`matchers/compat/parse.go` L191-L195](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.27.0/-/blob/matchers/compat/parse.go?L191-L195) | `isValidClassicLabelName` \u2014 `model.LabelName.IsValid()`, ASCII-only regex |\n\n---\n\n## 4. Remediation\n\n### Immediate \u2014 fix Alertmanager configuration (no code change)\n\nThe cluster is misconfigured with `--feature-flags=classic-mode`. Remove that flag. Without it, `InitFromFlags` in [`matchers/compat/parse.go` L68-L72](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.27.0/-/blob/matchers/compat/parse.go?L68-L72) sets `isValidLabelName = isValidUTF8LabelName`, which accepts any valid UTF-8 string. This unblocks all affected tenants immediately.\n\n### Short-term \u2014 surface delivery failures in the Cortex ruler\n\n**Repo:** `github.com/sg-evals/cortex--v1.18.0`\n**File:** [`pkg/ruler/manager.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/pkg/ruler/manager.go?L302-L334)\n\nThe `Do` callback currently returns `(resp, nil)` after logging a non-2xx, causing `sendOne` to detect the status itself without the error being fed back to the ruler's group accounting. Amend the callback to return a real error on non-2xx responses, and add a per-tenant counter:\n\n```go\nif resp.StatusCode/100 != 2 {\n    bodyBytes, _ := io.ReadAll(resp.Body)\n    resp.Body.Close()\n    resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))\n    msg := string(bodyBytes)\n    if len(msg) > 150 { msg = msg[:150] }\n    level.Error(logger).Log(\"msg\", \"error occurred sending notification\",\n        \"error\", msg, \"response_code\", resp.StatusCode)\n    return resp, fmt.Errorf(\"alertmanager returned %d: %s\", resp.StatusCode, msg)\n}\n```\n\nThis ensures `sendAll` reliably increments `prometheus_notifications_errors_total` and makes the failure visible in alerting rules watching that counter.\n\n### Medium-term \u2014 validate label names at the `SendAlerts` boundary\n\n**Repo:** `github.com/sg-evals/cortex--v1.18.0`\n**File:** [`pkg/ruler/ruler.go`, `SendAlerts` L440](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/-/blob/pkg/ruler/ruler.go?L440)\n\nAdd a label-name validation step before handing labels to the notifier, gated on the ruler's own validation mode configuration. When classic mode is configured, reject or sanitise UTF-8 label names and emit a per-tenant warning metric. This prevents the failure even when the downstream Alertmanager is in classic mode and allows mixed-mode clusters to coexist safely.\n\n### Long-term \u2014 observability gap\n\nAdd `cortex_ruler_notification_failures_total{user=...}` incremented whenever `sendAll` returns false for a given tenant's notifier. This requires either threading the `sendAll` result back through the rule group evaluation callback or wrapping `notifier.Manager` in a Cortex-specific shim.\n\n---\n\n## Timeline\n\n| Step | Location | What happens |\n|------|----------|--------------|\n| 1 | `rules/alerting.go` `sendAlerts` | Rule fires; labels contain `http.status_code` |\n| 2 | `pkg/ruler/ruler.go` `SendAlerts` | Labels copied verbatim to `notifier.Alert`; no sanitisation |\n| 3 | `notifier/notifier.go` `Send` | Alert appended to in-memory queue |\n| 4 | `notifier/notifier.go` `sendAll` | JSON serialised; UTF-8 name preserved; POST dispatched |\n| 5 | `api/v2/api.go` `postAlertsHandler` | `validateLs` \u2192 `isValidClassicLabelName` \u2192 `false` for `.`; HTTP 400 returned |\n| 6 | `pkg/ruler/manager.go` `Do` | Error body logged; `(resp, nil)` returned |\n| 7 | `notifier/notifier.go` `sendOne` | Detects `400`; returns `\"bad response status\"` error |\n| 8 | `notifier/notifier.go` `sendOneBatch` | `dropped_total` incremented; ruler group eval loop unaffected |\n| 9 | \u2014 | `cortex_prometheus_rule_group_iterations_failed_total` stays flat; no page fires |\n\n---\n\n*Report grounded in source code inspection of [`github.com/sg-evals/cortex--v1.18.0`](https://demo.sourcegraph.com/r/github.com/sg-evals/cortex--v1.18.0/) and [`github.com/sg-evals/alertmanager--v0.27.0`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.27.0/).*\n\n## Sources\n\n- [github.com/sg-evals/cortex--v1.18.0/pkg/ruler/compat.go@075a82f?L280-360](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/pkg/ruler/compat.go?L280-360)\n- [github.com/sg-evals/alertmanager--v0.27.0/api/v2/api.go@9b9d5cd?L305-400](/github.com/sg-evals/alertmanager--v0.27.0@9b9d5cddd54a9eb60cb3c8f8cb92cdeaffb4facb/-/blob/api/v2/api.go?L305-400)\n- [github.com/sg-evals/alertmanager--v0.27.0/types/types.go@9b9d5cd?L300-350](/github.com/sg-evals/alertmanager--v0.27.0@9b9d5cddd54a9eb60cb3c8f8cb92cdeaffb4facb/-/blob/types/types.go?L300-350)\n- [github.com/sg-evals/alertmanager--v0.27.0/matchers/compat/parse.go@9b9d5cd](/github.com/sg-evals/alertmanager--v0.27.0@9b9d5cddd54a9eb60cb3c8f8cb92cdeaffb4facb/-/blob/matchers/compat/parse.go)\n- [github.com/sg-evals/cortex--v1.18.0/vendor/github.com/prometheus/prometheus/notifier/notifier.go@075a82f?L560-700](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/vendor/github.com/prometheus/prometheus/notifier/notifier.go?L560-700)\n- [github.com/sg-evals/cortex--v1.18.0/vendor/github.com/prometheus/prometheus/notifier/notifier.go@075a82f?L480-560](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/vendor/github.com/prometheus/prometheus/notifier/notifier.go?L480-560)\n- [github.com/sg-evals/cortex--v1.18.0/pkg/ruler/compat.go@075a82f?L200-280](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/pkg/ruler/compat.go?L200-280)\n- [github.com/sg-evals/cortex--v1.18.0/pkg/ruler/manager.go@075a82f?L240-330](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/pkg/ruler/manager.go?L240-330)\n- [github.com/sg-evals/cortex--v1.18.0/pkg/ruler/manager.go@075a82f?L330-380](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/pkg/ruler/manager.go?L330-380)\n- [github.com/sg-evals/cortex--v1.18.0/pkg/ruler/compat.go@075a82f?L130-200](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/pkg/ruler/compat.go?L130-200)\n- [repo:^github.com/sg-evals/cortex--v1.18.0$ SendAlerts notifier Send](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fcortex--v1.18.0$%20SendAlerts%20notifier%20Send)\n- [github.com/sg-evals/cortex--v1.18.0/pkg/ruler/ruler.go@075a82f?L432-480](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/pkg/ruler/ruler.go?L432-480)\n- [github.com/sg-evals/cortex--v1.18.0/vendor/github.com/prometheus/prometheus/rules/alerting.go@075a82f?L555-610](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/vendor/github.com/prometheus/prometheus/rules/alerting.go?L555-610)\n- [github.com/sg-evals/cortex--v1.18.0/vendor/github.com/prometheus/prometheus/notifier/notifier.go@075a82f?L370-480](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/vendor/github.com/prometheus/prometheus/notifier/notifier.go?L370-480)\n- [github.com/sg-evals/cortex--v1.18.0/vendor/github.com/prometheus/prometheus/notifier/notifier.go@075a82f?L320-375](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/vendor/github.com/prometheus/prometheus/notifier/notifier.go?L320-375)\n- [repo:^github.com/sg-evals/alertmanager--v0.27.0$ IsValidLabelName isValidClassicLabelName IsValid](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Falertmanager--v0.27.0$%20IsValidLabelName%20isValidClassicLabelName%20IsValid)\n- [repo:^github.com/sg-evals/alertmanager--v0.27.0$ model.LabelName IsValid](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Falertmanager--v0.27.0$%20model.LabelName%20IsValid)\n- [repo:^github.com/sg-evals/cortex--v1.18.0$ notifier dropped metrics file:vendor/github.com/prometheus/prometheus/notifier](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fcortex--v1.18.0$%20notifier%20dropped%20metrics%20file:vendor%2Fgithub.com%2Fprometheus%2Fprometheus%2Fnotifier)\n- [github.com/sg-evals/cortex--v1.18.0](/github.com/sg-evals/cortex--v1.18.0)\n- [github.com/sg-evals/cortex--v1.18.0/vendor/github.com/prometheus/prometheus/rules/manager.go@075a82f?L1-50](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/vendor/github.com/prometheus/prometheus/rules/manager.go?L1-50)\n- [repo:^github.com/sg-evals/cortex--v1.18.0$ notifier metrics errors alertmanager_notifications](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fcortex--v1.18.0$%20notifier%20metrics%20errors%20alertmanager_notifications)\n- [github.com/sg-evals/cortex--v1.18.0/vendor/github.com/prometheus/prometheus/notifier/notifier.go@075a82f?L200-320](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/vendor/github.com/prometheus/prometheus/notifier/notifier.go?L200-320)\n- [github.com/sg-evals/cortex--v1.18.0/vendor/github.com/prometheus/prometheus/notifier/notifier.go@075a82f?L140-200](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/vendor/github.com/prometheus/prometheus/notifier/notifier.go?L140-200)\n- [github.com/sg-evals/cortex--v1.18.0/vendor/github.com/prometheus/prometheus/notifier/notifier.go@075a82f?L100-145](/github.com/sg-evals/cortex--v1.18.0@075a82fdb5852caaff58b3a0ae1ed38a180f5179/-/blob/vendor/github.com/prometheus/prometheus/notifier/notifier.go?L100-145)\n\n\nGenerated files:\n- files/INCIDENT_REPORT_content.json: /.api/agent-files/v1/deep-search/3af945ab-285f-4d51-9217-13d5bf1738d5/files/INCIDENT_REPORT_content.json\n- files/INCIDENT_REPORT.csv: /.api/agent-files/v1/deep-search/3af945ab-285f-4d51-9217-13d5bf1738d5/files/INCIDENT_REPORT.csv\n- files/INCIDENT_REPORT.md.svg: /.api/agent-files/v1/deep-search/3af945ab-285f-4d51-9217-13d5bf1738d5/files/INCIDENT_REPORT.md.svg\n",
+  "ir_scores_unaligned": {
+    "task_id": "incident-investigation-dual-cortex-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2222,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.1681,
+      "10": 0.3072
+    },
+    "mrr": 0.25,
+    "map_score": 0.1458,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 14,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "pkg/ruler/ruler.go",
+    "pkg/ruler/compat.go",
+    "vendor/github.com/prometheus/prometheus/notifier/notifier.go",
+    "pkg/ruler/manager.go",
+    "api/v2/api.go",
+    "types/types.go",
+    "matchers/compat/parse.go",
+    "vendor/github.com/prometheus/prometheus/rules/alerting.go",
+    "vendor/github.com/prometheus/prometheus/rules/manager.go",
+    "notifier/notifier.go",
+    "github.com/sg-evals/cortex--v1.18.0",
+    "vendor/.../notifier/notifier.go",
+    "github.com/sg-evals/alertmanager--v0.27.0",
+    "rules/alerting.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "incident-investigation-dual-cortex-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.25,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2222,
+      "10": 0.2857
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.1681,
+      "10": 0.3072
+    },
+    "mrr": 0.25,
+    "map_score": 0.1458,
+    "file_recall": 0.5,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 14,
+    "n_ground_truth": 4,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

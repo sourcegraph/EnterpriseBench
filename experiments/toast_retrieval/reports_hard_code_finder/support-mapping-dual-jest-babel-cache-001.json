@@ -1,0 +1,193 @@
+{
+  "task_id": "support-mapping-dual-jest-babel-cache-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/jest--v29.7.0",
+    "github.com/sg-evals/babel--v7.24.0"
+  ],
+  "retrieved_paths": [
+    "packages/jest-runtime/src/index.ts",
+    "packages/jest-transform/src/ScriptTransformer.ts",
+    "packages/babel-jest/src/index.ts",
+    "packages/babel-core/src/config/index.ts",
+    "packages/babel-core/src/config/partial.ts",
+    "packages/babel-core/src/config/full.ts",
+    "packages/babel-core/src/config/files/index.ts",
+    "packages/babel-plugin-transform-runtime/src/index.ts",
+    "packages/babel--v7.24.0/-/blob/packages/babel-plugin-transform-runtime/src/index.ts"
+  ],
+  "retrieved_paths_union": [
+    "packages/jest-runtime/src/index.ts",
+    "packages/jest-transform/src/ScriptTransformer.ts",
+    "packages/babel-jest/src/index.ts",
+    "packages/babel-core/src/config/index.ts",
+    "packages/babel-core/src/config/partial.ts",
+    "packages/babel-core/src/config/full.ts",
+    "packages/babel-core/src/config/files/index.ts",
+    "packages/babel-plugin-transform-runtime/src/index.ts",
+    "packages/babel--v7.24.0/-/blob/packages/babel-plugin-transform-runtime/src/index.ts"
+  ],
+  "required_files": [
+    "jest/packages/jest-runtime/src/index.ts",
+    "jest/packages/jest-transform/src/ScriptTransformer.ts",
+    "babel/packages/babel-core/src/config/full.ts",
+    "babel/packages/babel-core/src/config/partial.ts"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-jest-babel-cache-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.75,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.6667,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7877,
+      "10": 0.9268
+    },
+    "mrr": 1.0,
+    "map_score": 0.8167,
+    "file_recall": 1.0,
+    "context_efficiency": 0.4444,
+    "n_retrieved": 9,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-jest-babel-cache-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.5,
+      "5": 0.75,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.5714,
+      "5": 0.6667,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7654,
+      "5": 0.7877,
+      "10": 0.9268
+    },
+    "mrr": 1.0,
+    "map_score": 0.8167,
+    "file_recall": 1.0,
+    "context_efficiency": 0.4444,
+    "n_retrieved": 9,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "elapsed_seconds": 21.2,
+  "response_chars": 5482,
+  "raw_response": "The transform path and cache boundary are in Jest\u2019s `ScriptTransformer` and `babel-jest`; Babel resolves the effective plugin/config objects, but `babel-jest` hashes their serialized options\u2014not installed package contents or lockfile resolution.\n\nRelevant files:\n\n- [sg-evals/jest--v29.7.0:packages/jest-runtime/src/index.ts?L1605-L1629](/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/jest-runtime/src/index.ts?L1605-L1629) - `Runtime.transformFile()` reads source and invokes `ScriptTransformer.transform()`.\n- [sg-evals/jest--v29.7.0:packages/jest-transform/src/ScriptTransformer.ts?L142-L174](/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/jest-transform/src/ScriptTransformer.ts?L142-L174) - `_getCacheKey()` constructs transform options and calls the transformer\u2019s `getCacheKey`; the final Jest key includes file data, filename, Jest config, instrumentation, and transformer key.\n- [sg-evals/jest--v29.7.0:packages/jest-transform/src/ScriptTransformer.ts?L482-L535](/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/jest-transform/src/ScriptTransformer.ts?L482-L535) - `transformSource()` computes the cache path, reads cached output when `config.cache` is enabled, and only invokes `transformer.process()` on a miss.\n- [sg-evals/jest--v29.7.0:packages/jest-transform/src/ScriptTransformer.ts?L538-L600](/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/jest-transform/src/ScriptTransformer.ts?L538-L600) - Async equivalent, including `getCacheKeyAsync` and cached-output short circuit.\n- [sg-evals/jest--v29.7.0:packages/babel-jest/src/index.ts?L71-L103](/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/babel-jest/src/index.ts?L71-L103) - `getCacheKeyFromConfig()` hashes babel-jest source, `JSON.stringify(babelOptions.options)`, source text, relative path, Jest `configString`, config paths, instrumentation, `NODE_ENV`, `BABEL_ENV`, and Node version.\n- [sg-evals/jest--v29.7.0:packages/babel-jest/src/index.ts?L105-L148](/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/babel-jest/src/index.ts?L105-L148) - `loadBabelConfig()` calls Babel `loadPartialConfig`; `loadBabelOptions()` consumes the resolved options and adds Istanbul instrumentation.\n- [sg-evals/jest--v29.7.0:packages/babel-jest/src/index.ts?L151-L216](/r/github.com/sg-evals/jest--v29.7.0/-/blob/packages/babel-jest/src/index.ts?L151-L216) - `createTransformer().getCacheKey()` merges Jest/Babel options, loads the partial config, then delegates to `getCacheKeyFromConfig()`.\n- [sg-evals/babel--v7.24.0:packages/babel-core/src/config/index.ts?L26-L30](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-core/src/config/index.ts?L26-L30) - Babel exports `loadPartialConfig` implementation from `partial.ts`.\n- [sg-evals/babel--v7.24.0:packages/babel-core/src/config/index.ts?L41-L70](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-core/src/config/index.ts?L41-L70) - public `loadPartialConfig()` wrapper invokes the synchronous gensync runner.\n- [sg-evals/babel--v7.24.0:packages/babel-core/src/config/partial.ts?L67-L109](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-core/src/config/partial.ts?L67-L109) - `loadPrivatePartialConfig()` validates options, establishes filename/cwd/root/env context, and builds the root config chain.\n- [sg-evals/babel--v7.24.0:packages/babel-core/src/config/partial.ts?L112-L154](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-core/src/config/partial.ts?L112-L154) - creates normalized options, including resolved plugin and preset config items.\n- [sg-evals/babel--v7.24.0:packages/babel-core/src/config/full.ts?L59-L75](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-core/src/config/full.ts?L59-L75) - `loadFullConfig()` obtains the partial config and begins resolving plugin/preset passes.\n- [sg-evals/babel--v7.24.0:packages/babel-core/src/config/full.ts?L85-L101](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-core/src/config/full.ts?L85-L101) - converts plugin/preset entries into descriptors and prepares plugin passes.\n- [sg-evals/babel--v7.24.0:packages/babel-core/src/config/files/index.ts?L24-L29](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-core/src/config/files/index.ts?L24-L29) - exports `loadPlugin`, `resolvePlugin`, and related resolution functions.\n- [sg-evals/babel--v7.24.0:packages/babel-plugin-transform-runtime/src/index.ts?L20-L32](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel-plugin-transform-runtime/src/index.ts?L20-L32) - transform-runtime plugin initialization and its runtime/helper options, which affect generated async/regenerator imports.\n- [sg-evals/babel--v7.24.0:packages/babel-plugin-transform-runtime/src/index.ts?L94-L100](/r/github.com/sg-evals/babel--v7.24.0/-/blob/packages/babel--v7.24.0/-/blob/packages/babel-plugin-transform-runtime/src/index.ts?L94-L100) - documents the regenerator-runtime behavior boundary in the plugin.\n\nA lockfile-only resolution change can leave `JSON.stringify(babelOptions.options)` and all other hashed inputs unchanged even though the loaded plugin implementation differs. Jest therefore reuses the old transformed artifact. The first run after the dependency change may pass because it creates or encounters output generated with the old/new implementation; the subsequent run hits the persisted cache and skips Babel processing, exposing the incompatible stale output (`regeneratorRuntime` reference). Clearing the cache forces a fresh transform and repeats the cycle.",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-jest-babel-cache-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 9,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "jest/packages/jest-runtime/src/index.ts",
+    "jest/packages/jest-transform/src/ScriptTransformer.ts",
+    "packages/babel-jest/src/index.ts",
+    "packages/babel-core/src/config/index.ts",
+    "babel/packages/babel-core/src/config/partial.ts",
+    "babel/packages/babel-core/src/config/full.ts",
+    "packages/babel-core/src/config/files/index.ts",
+    "packages/babel-plugin-transform-runtime/src/index.ts",
+    "packages/babel--v7.24.0/-/blob/packages/babel-plugin-transform-runtime/src/index.ts"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-jest-babel-cache-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 9,
+    "n_ground_truth": 4,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

@@ -1,0 +1,191 @@
+{
+  "task_id": "api-contract-dual-hyper-reqwest-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/hyper--v1.0.0",
+    "github.com/sg-evals/reqwest--v0.11.22"
+  ],
+  "retrieved_paths": [
+    "Cargo.toml",
+    "src/body/mod.rs",
+    "src/body/incoming.rs",
+    "src/async_impl/body.rs",
+    "src/async_impl/client.rs",
+    "src/async_impl/response.rs",
+    "src/async_impl/decoder.rs",
+    "src/async_impl/h3_client/mod.rs",
+    "src/async_impl/h3_client/pool.rs"
+  ],
+  "retrieved_paths_union": [
+    "Cargo.toml",
+    "src/body/mod.rs",
+    "src/body/incoming.rs",
+    "src/async_impl/body.rs",
+    "src/async_impl/client.rs",
+    "src/async_impl/response.rs",
+    "src/async_impl/decoder.rs",
+    "src/async_impl/h3_client/mod.rs",
+    "src/async_impl/h3_client/pool.rs"
+  ],
+  "required_files": [
+    "hyper/src/body/mod.rs",
+    "reqwest/src/async_impl/client.rs"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6241,
+      "10": 0.6241
+    },
+    "mrr": 0.5,
+    "map_score": 0.45,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6241,
+      "10": 0.6241
+    },
+    "mrr": 0.5,
+    "map_score": 0.45,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 31.4,
+  "response_chars": 5353,
+  "raw_response": "I\u2019m unable to write `/workspace/analysis/IMPACT_REPORT.md` because the available tools only support repository search/read, not filesystem writes. Findings:\n\n- [hyper--v1.0.0:Cargo.toml?L22-L34](/r/github.com/sg-evals/hyper--v1.0.0/-/blob/Cargo.toml?L22-L34) - Hyper 1.0 uses `http = \"1\"` and `http-body = \"1\"`.\n- [hyper--v1.0.0:src/body/mod.rs?L1-L34](/r/github.com/sg-evals/hyper--v1.0.0/-/blob/src/body/mod.rs?L1-L34) - Defines/re-exports `hyper::body::Body`, `Frame`, `SizeHint`, and `Incoming`; received bodies are `Incoming`, while `Full`/`Empty` come from `http-body-util`.\n- [hyper--v1.0.0:src/body/incoming.rs?L21-L37](/r/github.com/sg-evals/hyper--v1.0.0/-/blob/src/body/incoming.rs?L21-L37) - `Incoming` is the concrete network receive body for requests/responses.\n- [hyper--v1.0.0:src/body/incoming.rs?L170-L203](/r/github.com/sg-evals/hyper--v1.0.0/-/blob/src/body/incoming.rs?L170-L203) - Implements `http_body::Body` 1.x with `Data = Bytes`, `Error = hyper::Error`, and `poll_frame(...) -> Poll<Option<Result<Frame<Bytes>, Error>>>`.\n\n- [reqwest--v0.11.22:Cargo.toml?L100-L104](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/Cargo.toml?L100-L104) - Reqwest expects Hyper 0.14.21 and `http-body = \"0.4.0\"`.\n- [reqwest--v0.11.22:src/async_impl/body.rs?L8-L35](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L8-L35) - Reqwest\u2019s internal bodies use the old `http_body::Body` contract and `hyper::Body`.\n- [reqwest--v0.11.22:src/async_impl/body.rs?L111-L118](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L111-L118) - `Body::response` accepts `hyper::Body`.\n- [reqwest--v0.11.22:src/async_impl/body.rs?L156-L178](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L156-L178) - `into_stream` produces the request body and `From<hyper::Body>` wraps Hyper\u2019s old body.\n- [reqwest--v0.11.22:src/async_impl/body.rs?L231-L290](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L231-L290) - `ImplStream` implements old `HttpBody` using `poll_data`, `poll_trailers`, `is_end_stream`, and `size_hint`.\n- [reqwest--v0.11.22:src/async_impl/body.rs?L330-L358](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/body.rs?L330-L358) - `WrapHyper` directly calls old `hyper::Body::poll_data`.\n- [reqwest--v0.11.22:src/async_impl/client.rs?L1648-L1649](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/client.rs?L1648-L1649) - Client is typed as `hyper::Client<Connector, ImplStream>`.\n- [reqwest--v0.11.22:src/async_impl/client.rs?L2187-L2195](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/client.rs?L2187-L2195) - Builds requests with `body.into_stream()` and sends them through Hyper.\n- [reqwest--v0.11.22:src/async_impl/response.rs?L25-L47](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/response.rs?L25-L47) - Response construction requires `hyper::Response<hyper::Body>`.\n- [reqwest--v0.11.22:src/async_impl/response.rs?L80-L84](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/response.rs?L80-L84) - Uses `hyper::body::HttpBody::size_hint`.\n- [reqwest--v0.11.22:src/async_impl/response.rs?L258-L260](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/response.rs?L258-L260) - Uses removed `hyper::body::to_bytes`.\n- [reqwest--v0.11.22:src/async_impl/decoder.rs?L18-L20](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/decoder.rs?L18-L20) and [L260-L286](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/decoder.rs?L260-L286) - Decoder implements the old `HttpBody` API.\n- [reqwest--v0.11.22:src/async_impl/h3_client/mod.rs?L48-L60](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/h3_client/mod.rs?L48-L60) and [L78-L84](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/h3_client/mod.rs?L78-L84) - HTTP/3 path uses `hyper::Body` for response types.\n- [reqwest--v0.11.22:src/async_impl/h3_client/pool.rs?L125-L150](/r/github.com/sg-evals/reqwest--v0.11.22/-/blob/src/async_impl/h3_client/pool.rs?L125-L150) - HTTP/3 buffers response data and constructs `HyperBody::from(resp_body)`.\n\nContract mismatch and migration:\n\n1. Hyper 1 replaces `hyper::Body` as the receive-body concrete type with `hyper::body::Incoming`; request bodies remain generic `B: http_body::Body`.\n2. `http-body` 0.4\u2019s `poll_data`/`poll_trailers` API became 1.x\u2019s single `poll_frame` API, with data and trailers represented by `Frame`.\n3. `hyper::body::HttpBody` is no longer the applicable trait; use `http_body::Body`.\n4. `hyper::body::to_bytes` is removed from Hyper 1; use `http_body_util::BodyExt::collect().await?.to_bytes()`.\n5. Reqwest must migrate `WrapHyper`, `ImplStream`, and `Decoder` to `poll_frame`; adapt `Frame::data` and `Frame::trailers`.\n6. Replace response signatures and wrappers from `hyper::Body` to `hyper::body::Incoming`, including `Response::new`, `Body::response`, `WrapHyper`, HTTP/3 response futures, and HTTP/3 buffered response construction.\n7. Replace the Hyper client type with the Hyper 1 client builder/API and ensure request bodies implement `http_body::Body<Data = Bytes>`, likely using `http_body_util` adapters where needed.\n8. Replace `Full`/`Empty` body construction with `http-body-util::{Full, Empty}` rather than expecting constructors on `hyper::Body`.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6241,
+      "10": 0.6241
+    },
+    "mrr": 0.5,
+    "map_score": 0.45,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "Cargo.toml",
+    "hyper/src/body/mod.rs",
+    "src/body/incoming.rs",
+    "src/async_impl/body.rs",
+    "reqwest/src/async_impl/client.rs",
+    "src/async_impl/response.rs",
+    "src/async_impl/decoder.rs",
+    "src/async_impl/h3_client/mod.rs",
+    "src/async_impl/h3_client/pool.rs"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-hyper-reqwest-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6241,
+      "10": 0.6241
+    },
+    "mrr": 0.5,
+    "map_score": 0.45,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

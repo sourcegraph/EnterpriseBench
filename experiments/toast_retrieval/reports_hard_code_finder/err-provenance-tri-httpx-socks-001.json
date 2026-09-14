@@ -1,0 +1,189 @@
+{
+  "task_id": "err-provenance-tri-httpx-socks-001",
+  "policy": "code_finder",
+  "suite": "customer_escalation",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/httpx--0.27.0",
+    "github.com/sg-evals/httpcore--1.0.5",
+    "github.com/sg-evals/h11--v0.14.0"
+  ],
+  "retrieved_paths": [
+    "h11/_readers.py",
+    "h11/_util.py",
+    "h11/_connection.py",
+    "h11/_abnf.py",
+    "httpx/_transports/default.py",
+    "httpcore/_async/socks_proxy.py",
+    "httpcore/_async/http11.py"
+  ],
+  "retrieved_paths_union": [
+    "h11/_readers.py",
+    "h11/_util.py",
+    "h11/_connection.py",
+    "h11/_abnf.py",
+    "httpx/_transports/default.py",
+    "httpcore/_async/socks_proxy.py",
+    "httpcore/_async/http11.py"
+  ],
+  "required_files": [
+    "httpx/httpx/_transports/default.py",
+    "httpcore/httpcore/_async/socks_proxy.py",
+    "httpcore/httpcore/_async/http11.py",
+    "h11/h11/_readers.py",
+    "h11/h11/_connection.py"
+  ],
+  "ir_scores": {
+    "task_id": "err-provenance-tri-httpx-socks-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.4,
+      "5": 0.6,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.5,
+      "5": 0.6,
+      "10": 0.6667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.6399,
+      "10": 0.8738
+    },
+    "mrr": 1.0,
+    "map_score": 0.7295,
+    "file_recall": 1.0,
+    "context_efficiency": 0.7143,
+    "n_retrieved": 7,
+    "n_ground_truth": 5,
+    "n_overlap": 5
+  },
+  "ir_scores_union": {
+    "task_id": "err-provenance-tri-httpx-socks-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.6,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.4,
+      "5": 0.6,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.5,
+      "5": 0.6,
+      "10": 0.6667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.6399,
+      "10": 0.8738
+    },
+    "mrr": 1.0,
+    "map_score": 0.7295,
+    "file_recall": 1.0,
+    "context_efficiency": 0.7143,
+    "n_retrieved": 7,
+    "n_ground_truth": 5,
+    "n_overlap": 5
+  },
+  "elapsed_seconds": 18.7,
+  "response_chars": 5194,
+  "raw_response": "The failure originates in **h11**, after SOCKS5 setup has completed. The appliance sends an invalid HTTP/1.1 header; curl is more permissive.\n\n```json\n{\n  \"origin\": {\n    \"repo\": \"h11\",\n    \"file\": \"h11/_readers.py\",\n    \"function\": \"_decode_header_lines\",\n    \"message\": \"illegal header line: {!r}\",\n    \"validation_helper\": \"h11._util.validate\",\n    \"regex_definition\": \"h11/_readers.py:39: header_field_re = re.compile(header_field.encode(\\\"ascii\\\"))\",\n    \"grammar\": \"header-field = field-name \\\":\\\" OWS field-value OWS\"\n  },\n  \"exception_conversion\": {\n    \"mechanism\": \"_reraise_as_remote_protocol_error\",\n    \"defined_in\": \"h11/_util.py\",\n    \"invoked_in\": \"h11/_connection.py\",\n    \"except_block\": \"except BaseException as exc: ... if isinstance(exc, LocalProtocolError): exc._reraise_as_remote_protocol_error()\"\n  },\n  \"transport_chain\": [\n    \"httpx.AsyncHTTPTransport selects the proxy.url.scheme == \\\"socks5\\\" branch\",\n    \"That branch constructs httpcore.AsyncSOCKSProxy\",\n    \"AsyncSOCKSProxy.create_connection constructs AsyncSocks5Connection\",\n    \"AsyncSocks5Connection connects to the SOCKS server and calls _init_socks5_connection\",\n    \"After SOCKS5 establishment, the stream is passed to AsyncHTTP11Connection\",\n    \"AsyncHTTP11Connection owns h11.Connection and parses response headers\"\n  ],\n  \"trigger\": {\n    \"bytes\": \"X-Gw-Status : OK\",\n    \"violation\": \"There is whitespace before the colon. The grammar requires field-name immediately followed by ':'; optional OWS is permitted only after the colon and around the field value.\",\n    \"why_curl_accepts\": \"curl/libcurl's HTTP parser tolerates this obsolete/non-conforming whitespace, whereas h11 performs strict full-match validation.\"\n  },\n  \"verdict\": \"This is not an httpx SOCKS corruption bug. The SOCKS layer forwards the byte stream and hands it off before HTTP parsing. The origin appliance emits malformed HTTP. Options are to fix/configure LegacyGW, place a tolerant HTTP intermediary/normalizing reverse proxy between the client and appliance, or use a client/parser that accepts the malformed header (such as curl).\"\n}\n```\n\nCitations:\n\n- [h11:h11/_readers.py?L39-L69](/r/github.com/sg-evals/h11--v0.14.0/-/blob/h11/_readers.py?L39-L69) \u2014 compiled regex and exact error construction:\n  `header_field_re = re.compile(header_field.encode(\"ascii\"))`  \n  `matches = validate(header_field_re, line, \"illegal header line: {!r}\", line)`\n\n- [h11:h11/_util.py?L48-L67](/r/github.com/sg-evals/h11--v0.14.0/-/blob/h11/_util.py?L48-L67) \u2014 conversion design and method:\n  `Therefore we always raise LocalProtocolError internally, and then receive_data will translate this into a RemoteProtocolError.`\n\n- [h11:h11/_util.py?L67-L80](/r/github.com/sg-evals/h11--v0.14.0/-/blob/h11/_util.py?L67-L80) \u2014 in-place class conversion:\n  `self.__class__ = RemoteProtocolError`\n\n- [h11:h11/_connection.py?L468-L489](/r/github.com/sg-evals/h11--v0.14.0/-/blob/h11/_connection.py?L468-L489) \u2014 invoking except-block:\n  `except BaseException as exc:`  \n  `if isinstance(exc, LocalProtocolError):`  \n  `exc._reraise_as_remote_protocol_error()`\n\n- [h11:h11/_abnf.py?L55-L70](/r/github.com/sg-evals/h11--v0.14.0/-/blob/h11/_abnf.py?L55-L70) \u2014 header grammar:\n  `#  header-field   = field-name \":\" OWS field-value OWS`\n\n- [httpx:httpx/_transports/default.py?L311-L328](/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_transports/default.py?L311-L328) \u2014 SOCKS branch:\n  `elif proxy.url.scheme == \"socks5\":`  \n  `self._pool = httpcore.AsyncSOCKSProxy(`\n\n- [httpcore:httpcore/_async/socks_proxy.py?L177-L180](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/socks_proxy.py?L177-L180) \u2014 pool creates per-origin SOCKS connection:\n  `return AsyncSocks5Connection(`\n\n- [httpcore:httpcore/_async/socks_proxy.py?L190-L217](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/socks_proxy.py?L190-L217) \u2014 per-connection class:\n  `class AsyncSocks5Connection(AsyncConnectionInterface):`\n\n- [httpcore:httpcore/_async/socks_proxy.py?L225-L246](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/socks_proxy.py?L225-L246) \u2014 TCP connection and SOCKS5 handshake:\n  `# Connect to the remote host using socks5`  \n  `await _init_socks5_connection(**kwargs)`\n\n- [httpcore:httpcore/_async/socks_proxy.py?L41-L63](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/socks_proxy.py?L41-L63) \u2014 handshake helper:\n  `conn = socks5.SOCKS5Connection()`  \n  `await stream.write(outgoing_bytes)`\n\n- [httpcore:httpcore/_async/http11.py?L50-L70](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http11.py?L50-L70) \u2014 HTTP/1.1 parser state:\n  `self._h11_state = h11.Connection(`\n\n- [httpcore:httpcore/_async/http11.py?L104-L113](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http11.py?L104-L113) \u2014 response-header parsing begins after transport setup:\n  `) = await self._receive_response_headers(**kwargs)`\n\n- [httpcore:httpcore/_async/http11.py?L216-L225](/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http11.py?L216-L225) \u2014 h11 event parser and conversion to httpcore:\n  `with map_exceptions({h11.RemoteProtocolError: RemoteProtocolError}):`  \n  `event = self._h11_state.next_event()`",
+  "ir_scores_unaligned": {
+    "task_id": "err-provenance-tri-httpx-socks-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.4,
+      "5": 0.4,
+      "10": 0.4
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.5,
+      "5": 0.4,
+      "10": 0.2667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.5087,
+      "10": 0.5087
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.4,
+    "context_efficiency": 0.2857,
+    "n_retrieved": 7,
+    "n_ground_truth": 5,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "h11/h11/_readers.py",
+    "h11/_util.py",
+    "h11/h11/_connection.py",
+    "h11/_abnf.py",
+    "httpx/httpx/_transports/default.py",
+    "httpcore/httpcore/_async/socks_proxy.py",
+    "httpcore/httpcore/_async/http11.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "err-provenance-tri-httpx-socks-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.6667,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.4,
+      "5": 0.4,
+      "10": 0.4
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.5,
+      "5": 0.4,
+      "10": 0.2667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.7039,
+      "5": 0.5087,
+      "10": 0.5087
+    },
+    "mrr": 1.0,
+    "map_score": 0.3333,
+    "file_recall": 0.4,
+    "context_efficiency": 0.2857,
+    "n_retrieved": 7,
+    "n_ground_truth": 5,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

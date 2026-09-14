@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-log4j-slf4j-async-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: slf4j/slf4j-api/src/main/java/org/slf4j/LoggerFactory.java, slf4j/slf4j-api/src/main/java/org/slf4j/Logger.java, log4j2/log4j-core/src/main/java/org/apache/logging/log4j/core/appender/AsyncAppender.java, log4j2/log4j-core/src/main/java/org/apache/logging/log4j/core/async/AsyncLoggerConfigDisruptor.java. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify slf4j/slf4j-api/src/main/java/org/slf4j/LoggerFactory.java as part of the error source",
+        "Must identify slf4j/slf4j-api/src/main/java/org/slf4j/Logger.java as part of the error source",
+        "Must identify log4j2/log4j-core/src/main/java/org/apache/logging/log4j/core/appender/AsyncAppender.java as part of the error source",
+        "Must identify log4j2/log4j-core/src/main/java/org/apache/logging/log4j/core/async/AsyncLoggerConfigDisruptor.java as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) slf4j's LoggerFactory binds at runtime to log4j-slf4j-impl which exposes a Log4jLogger that forwards each call to log4j2's AbstractLogger.logMessage -> (2) When the appender chain includes AsyncAppender, log events enter a blocking queue or LMAX Disruptor ring depending on configuration -> (3) log4j2's AsyncAppender uses AsyncQueueFullPolicy to decide what to do when the queue is full; the default Discard policy drops events below ERROR level -> (4) Under burst load the ring buffer fills, AsyncQueueFullPolicy.Discard drops INFO/DEBUG events silently, and slf4j callers see Logger.info() return without a thrown exception.",
+      "evaluation_criteria": [
+        "Must describe the step: slf4j's LoggerFactory binds at runtime to log4j-slf4j-impl which exposes a Log4j...",
+        "Must describe the step: When the appender chain includes AsyncAppender, log events enter a blocking queu...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) Customer's log4j2 config uses AsyncAppender or AsyncLoggerConfig with the default discard policy; (2) Sustained burst load fills the Disruptor ring beyond ringBufferSize; (3) The discard policy drops sub-ERROR events without error reporting back to slf4j's Logger.info caller.",
+      "evaluation_criteria": [
+        "Must identify the condition: Customer's log4j2 config uses AsyncAppender or AsyncLoggerConfig with the defaul...",
+        "Must identify the condition: Sustained burst load fills the Disruptor ring beyond ringBufferSize...",
+        "Must identify the condition: The discard policy drops sub-ERROR events without error reporting back to slf4j'...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

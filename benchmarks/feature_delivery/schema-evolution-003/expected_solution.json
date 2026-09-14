@@ -1,0 +1,41 @@
+{
+  "task_id": "schema-evolution-003",
+  "checkpoints": {
+    "identify_schema_change": {
+      "expected_solution": "Zulip PR #30301 replaces the integer policy field `Realm.create_public_stream_policy` with a foreign key `Realm.can_create_public_channel_group` pointing to `NamedUserGroup`. The change ships as a 4-migration sequence added under zerver/migrations/: (1) `0532_realm_can_create_public_channel_group` adds the FK column nullable; (2) `0533_set_can_create_public_channel_group` backfills the FK from old policy values (mapping integer enum buckets to NamedUserGroup rows: members/moderators/admins/owners); (3) `0534_alter_realm_can_create_public_channel_group` tightens the column to NOT NULL after backfill; (4) `0535_remove_realm_create_public_stream_policy` drops the old integer column. The model declaration changes in `zerver/models/realms.py`.",
+      "evaluation_criteria": [
+        "Must identify all 4 migrations (0532 through 0535) added under zerver/migrations/ for can_create_public_channel_group",
+        "Must reference zerver/models/realms.py as the model declaration site",
+        "Must explain the 4-step pattern: add nullable FK → backfill → make NOT NULL → drop old column",
+        "Should reference the old field name create_public_stream_policy and the new field name can_create_public_channel_group"
+      ]
+    },
+    "find_direct_refs": {
+      "expected_solution": "Backend direct references: (1) `zerver/models/realms.py` — replaces `create_public_stream_policy` with `can_create_public_channel_group` FK; (2) `zerver/actions/realm_settings.py` — admin settings updates; permission check now resolves a NamedUserGroup membership instead of an enum compare; (3) `zerver/actions/create_realm.py` — new realms must initialize the FK to a sensible default group (e.g., members); (4) `zerver/lib/events.py` — emits the new field in `realm/update` events and removes the old one; (5) `zerver/lib/event_schema.py` — schema validators for outgoing events; (6) `zerver/views/realm.py` — REST endpoint accepts the new group-FK parameter (replacing the integer policy parameter).",
+      "evaluation_criteria": [
+        "Must cite zerver/actions/realm_settings.py and zerver/lib/events.py",
+        "Must cite zerver/lib/event_schema.py for event schema validation",
+        "Must cite zerver/models/realms.py and zerver/views/realm.py",
+        "Should mention zerver/actions/create_realm.py for the new-realm initialization path"
+      ]
+    },
+    "find_indirect_refs": {
+      "expected_solution": "Frontend (JS/TS) references: (1) `web/src/settings_org.js` — organization-permissions settings UI; replaces a dropdown of integer policies with a group picker; (2) `web/src/settings_data.ts` — derived state used by the settings page; recomputes can-create permission from group membership instead of policy enum; (3) `web/src/settings_components.ts` — shared widget definitions for group-selectable settings; (4) `web/src/state_data.ts` — server-state typings for the realm payload; (5) `web/src/server_events_dispatch.js` — handles incoming `realm/update` events for the renamed field; (6) `web/src/stream_settings_ui.js` — channel-creation UI hides 'create public channel' button when current user is not in the configured group; (7) `web/src/ui_init.js` — initial bootstrap reads the new realm field; (8) `web/templates/settings/organization_permissions_admin.hbs` — Handlebars template for the settings page; (9) `zerver/openapi/zulip.yaml` — OpenAPI schema documenting the public API change.",
+      "evaluation_criteria": [
+        "Must cite web/src/settings_org.js and web/src/settings_data.ts",
+        "Must cite web/src/server_events_dispatch.js for incoming event handling",
+        "Must cite web/templates/settings/organization_permissions_admin.hbs",
+        "Should cite zerver/openapi/zulip.yaml and at least one of web/src/state_data.ts, web/src/settings_components.ts, web/src/stream_settings_ui.js, or web/src/ui_init.js"
+      ]
+    },
+    "identify_test_impact": {
+      "expected_solution": "Backend tests: (1) `zerver/tests/test_events.py` — verifies the new field in realm/update events; (2) `zerver/tests/test_realm.py` — covers REST settings endpoints including the FK parameter; (3) `zerver/tests/test_subs.py` — exercises stream/channel creation, where the permission gate now consults the group. Frontend tests: (4) `web/tests/dispatch.test.js` — dispatcher coverage for realm/update with the new field; (5) `web/tests/settings_data.test.js` — derived-state computation; (6) `web/tests/settings_org.test.js` — settings UI rendering; (7) `web/e2e-tests/admin.test.ts` — end-to-end coverage of the settings page in a real browser. PR file count = 33.",
+      "evaluation_criteria": [
+        "Must cite zerver/tests/test_events.py, zerver/tests/test_realm.py, and zerver/tests/test_subs.py for backend coverage",
+        "Must cite at least two of web/tests/dispatch.test.js, web/tests/settings_data.test.js, web/tests/settings_org.test.js for frontend coverage",
+        "Must cite web/e2e-tests/admin.test.ts as the end-to-end test",
+        "Should explain how each test exercises the renamed field/group-based permission"
+      ]
+    }
+  }
+}

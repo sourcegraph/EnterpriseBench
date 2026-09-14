@@ -87,7 +87,14 @@ def get_checkpoints(task_toml):
 
 
 def check_gt_leakage(instruction, gt_paths, pr_refs, gt_json):
-    """Check if instruction leaks ground truth information."""
+    """Check if instruction leaks ground truth information.
+
+    Path matching here is exact-full-path only. Basename/stem-tier disclosure
+    ("realms.py", "the avatar helper") is invisible to this check by design --
+    naming files can be legitimate scenario setup for execution tasks. Tasks
+    scored on retrieval are held to the stricter tiered gate in
+    scripts/audit_disclosure.py (CI-enforced via configs/retrieval_slice.json).
+    """
     issues = []
 
     # Check for PR numbers/URLs

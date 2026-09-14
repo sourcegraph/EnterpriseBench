@@ -1,0 +1,242 @@
+{
+  "task_id": "ccx-dep-trace-106",
+  "policy": "claude_adapter",
+  "model": "anthropic/claude-sonnet-5",
+  "suite": "dependency_management",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/gcc--releases_gcc-14.2.0"
+  ],
+  "retrieved_paths": [
+    "gcc/passes.def",
+    "gcc/passes.cc",
+    "gcc/pass_manager.h",
+    "gcc/tree-pass.h",
+    "gcc/tree-ssa-dce.cc",
+    "gcc/Makefile.in"
+  ],
+  "required_files": [
+    "gcc/passes.def",
+    "gcc/passes.cc",
+    "gcc/pass_manager.h",
+    "gcc/tree-ssa-dce.cc",
+    "gcc/tree-pass.h"
+  ],
+  "ir_scores": {
+    "task_id": "ccx-dep-trace-106",
+    "config_name": "claude_adapter",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.6,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 0.6667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.8333,
+    "n_retrieved": 6,
+    "n_ground_truth": 5,
+    "n_overlap": 5
+  },
+  "rounds_executed": 4,
+  "input_tokens": 31101,
+  "output_tokens": 1107,
+  "token_counting": "provider_reported",
+  "elapsed_seconds": 19.3,
+  "transcript": [
+    {
+      "role": "system",
+      "content": "You are a code retrieval policy. Given a task, find the source files required to carry it out. Search only these repositories: github.com/sg-evals/gcc--releases_gcc-14.2.0. When you are confident, call submit_files with every required file, most important first, using repo-relative paths exactly as the tools returned them."
+    },
+    {
+      "role": "user",
+      "content": "# GCC Optimization Pass Registration and Execution Chain\n\n## Your Task\n\nA team member is onboarding to the GCC compiler internals and needs to understand how optimization passes are structured and executed. Trace the optimization pass pipeline in `gcc-mirror/gcc`:\n\n1. Where is the master list that defines the ordering and registration of all optimization passes?\n2. Which source file implements the pass manager that orchestrates pass execution?\n3. Where is the base class for optimization passes and the pass manager interface defined?\n4. Find an example of a concrete GIMPLE optimization pass \u2014 specifically one that performs dead code elimination on the tree-SSA representation.\n5. Where are the pass registration macros and tree-SSA pass declarations defined?\n\nReport the repo, file path, and key struct/function name for each file you identify.\n\n## Context\n\nYou are working on a codebase task involving repos from the crossrepo domain. The GCC source tree is large; focus your investigation on the `gcc/` subdirectory where the compiler core lives.\n\n## Available Resources\n\n## Output Format\n\nUse the published task contract:\n\n- `TASK_WORKDIR=/workspace`\n- `TASK_REPO_ROOT=/workspace`\n- `TASK_OUTPUT=/workspace/agent_output/answer.json`\n\nCreate a file at `TASK_OUTPUT` (`/workspace/agent_output/answer.json`) with your findings in the following structure:\n\n```json\n{\n  \"files\": [{ \"repo\": \"repo-name\", \"path\": \"relative/path/to/file.go\" }],\n  \"symbols\": [\n    {\n      \"repo\": \"repo-name\",\n      \"path\": \"relative/path/to/file.go\",\n      \"symbol\": \"SymbolName\"\n    }\n  ],\n  \"chain\": [\n    {\n      \"repo\": \"repo-name\",\n      \"path\": \"relative/path/to/file.go\",\n      \"symbol\": \"FunctionName\"\n    }\n  ],\n  \"text\": \"Narrative explanation of your findings, citing repos and file paths.\"\n}\n```\n\nInclude only the fields relevant to this task. Your answer is evaluated against a closed-world oracle \u2014 completeness matters.\n\n## Evaluation\n\nYour answer will be scored on:\n\n- **File recall and precision**: Did you find all relevant files?\n"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_015Ma47deBm5D7i1fUfYj1As",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"pass_manager\", \"top_k\": 20}"
+          }
+        },
+        {
+          "id": "toolu_013tTARmQ6z6vuNNWdDLshaA",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"INSERT_PASSES_AFTER|NEXT_PASS|PUSH_INSERT_PASSES_WITHIN\", \"top_k\": 20}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_015Ma47deBm5D7i1fUfYj1As",
+      "content": "[{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/pass_manager.h\", \"chunk_index\": 0, \"score\": 1.0, \"text\": \"class pass_manager\\n#ifndef GCC_PASS_MANAGER_H\\n#define GCC_PASS_MANAGER_H\\n/* pass_manager.h - The pipeline of optimization passes\\n  pass_manager (context *ctxt);\\n  ~pass_manager ();\\n}; // class pass_manager\\n#endif /* ! GCC_PASS_MANAGER_H */\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/passes.cc\", \"chunk_index\": 26, \"score\": 0.5, \"text\": \"pass_manager::pass_manager (context *ctxt)\\npass_manager::~pass_manager ()\\n#include \\\"pass_manager.h\\\"\\npass_manager::execute_early_local_passes ()\\npass_manager::execute_pass_mode_switching ()\\npass_manager::\\npass_manager::\\npass_manager::get_pass_for_id (int id) const\\npass_manager::register_one_dump_file (opt_pass *pass)\\n/* Register the dump files for the pass_manager starting at PASS. */\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_013tTARmQ6z6vuNNWdDLshaA",
+      "content": "[{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/passes.cc\", \"chunk_index\": 26, \"score\": 1.0, \"text\": \"#define INSERT_PASSES_AFTER(PASS)\\n#define PUSH_INSERT_PASSES_WITHIN(PASS)\\n#define NEXT_PASS(PASS, NUM) PASS ## _ ## NUM = NULL\\n#define NEXT_PASS_WITH_ARG(PASS, NUM, ARG) NEXT_PASS (PASS, NUM)\\n#define INSERT_PASSES_AFTER(PASS)\\t\\t\\\\\\n#define PUSH_INSERT_PASSES_WITHIN(PASS) \\\\\\n#define NEXT_PASS(PASS, NUM) \\\\\\nnext_pass_1 (opt_pass **list, opt_pass *pass, opt_pass *initial_pass)\\n#define NEXT_PASS_WITH_ARG(PASS, NUM, ARG)\\t\\t\\\\\\n      NEXT_PASS (PASS, NUM);\\t\\t\\t\\t\\\\\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/pass_manager.h\", \"chunk_index\": 2, \"score\": 0.5, \"text\": \"#define INSERT_PASSES_AFTER(PASS)\\n#define PUSH_INSERT_PASSES_WITHIN(PASS)\\n#define NEXT_PASS(PASS, NUM) opt_pass *PASS ## _ ## NUM\\n#define NEXT_PASS_WITH_ARG(PASS, NUM, ARG) NEXT_PASS (PASS, NUM)\\n         NEXT_PASS (pass_build_cfg, 1);\"}]"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_01SbSutZGoxw2aVZp8xuAK1a",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"pass-instances.def|passes.def\", \"top_k\": 20}"
+          }
+        },
+        {
+          "id": "toolu_01WrTPnAbS5PYK4ztTdhpus2",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"class opt_pass|class gimple_opt_pass|virtual bool gate|virtual unsigned int execute\", \"top_k\": 20}"
+          }
+        },
+        {
+          "id": "toolu_01U3UPMLhM31nRqeQyaCEn6d",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"pass_cd_dce|make_pass_cd_dce|class pass_cd_dce\", \"top_k\": 20}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01SbSutZGoxw2aVZp8xuAK1a",
+      "content": "[{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/bpf/bpf-passes.def\", \"chunk_index\": 0, \"score\": 1.0, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/arm/arm-passes.def\", \"chunk_index\": 0, \"score\": 0.5, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/arc/arc-passes.def\", \"chunk_index\": 0, \"score\": 0.3333, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/avr/avr-passes.def\", \"chunk_index\": 0, \"score\": 0.25, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/cris/cris-passes.def\", \"chunk_index\": 0, \"score\": 0.2, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/i386/i386-passes.def\", \"chunk_index\": 0, \"score\": 0.1667, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/alpha/alpha-passes.def\", \"chunk_index\": 0, \"score\": 0.1429, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/aarch64/aarch64-passes.def\", \"chunk_index\": 0, \"score\": 0.125, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/ChangeLog\", \"chunk_index\": 86, \"score\": 0.1111, \"text\": \"\\t* config/avr/avr-passes.def (avr_pass_fuse_add): Insert new pass.\\n\\t* config/aarch64/aarch64-passes.def (pass_late_track_speculation):\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/Makefile.in\", \"chunk_index\": 41, \"score\": 0.1, \"text\": \"pass-instances.def: $(srcdir)/passes.def $(PASSES_EXTRA) \\\\\\n\\t  $(srcdir)/passes.def $(PASSES_EXTRA) > pass-instances.def\\n       common/common-target-hooks-def.h pass-instances.def \\\\\\n  pass-instances.def params.list $(srcdir)/../include/gomp-constants.h \\\\\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/bpf/t-bpf\", \"chunk_index\": 0, \"score\": 0.0909, \"text\": \"PASSES_EXTRA += $(srcdir)/config/bpf/bpf-passes.def\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/arc/t-arc\", \"chunk_index\": 0, \"score\": 0.0833, \"text\": \"PASSES_EXTRA += $(srcdir)/config/arc/arc-passes.def\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/avr/t-avr\", \"chunk_index\": 0, \"score\": 0.0769, \"text\": \"PASSES_EXTRA += $(srcdir)/config/avr/avr-passes.def\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/arm/t-arm\", \"chunk_index\": 3, \"score\": 0.0714, \"text\": \"PASSES_EXTRA += $(srcdir)/config/arm/arm-passes.def\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/cris/t-cris\", \"chunk_index\": 0, \"score\": 0.0667, \"text\": \"PASSES_EXTRA += $(srcdir)/config/cris/cris-passes.def\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/i386/t-i386\", \"chunk_index\": 0, \"score\": 0.0625, \"text\": \"PASSES_EXTRA += $(srcdir)/config/i386/i386-passes.def\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/alpha/t-alpha\", \"chunk_index\": 0, \"score\": 0.0588, \"text\": \"PASSES_EXTRA += $(srcdir)/config/alpha/alpha-passes.def\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/aarch64/t-aarch64\", \"chunk_index\": 2, \"score\": 0.0556, \"text\": \"PASSES_EXTRA += $(srcdir)/config/aarch64/aarch64-passes.def\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/passes.def\", \"chunk_index\": 0, \"score\": 0.0526, \"text\": \"\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/config/s390/s390-passes.def\", \"chunk_index\": 0, \"score\": 0.05, \"text\": \"\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01WrTPnAbS5PYK4ztTdhpus2",
+      "content": "[]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01U3UPMLhM31nRqeQyaCEn6d",
+      "content": "[{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-ssa-dce.cc\", \"chunk_index\": 34, \"score\": 1.0, \"text\": \"class pass_cd_dce : public gimple_opt_pass\\n}; // class pass_cd_dce\"}]"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_01NwkNSYhUbq7tqsL6S8hJGY",
+          "type": "function",
+          "function": {
+            "name": "grep",
+            "arguments": "{\"pattern\": \"class opt_pass|DEFINE_.*PASS|GCC_TREE_PASS_H\", \"top_k\": 20}"
+          }
+        },
+        {
+          "id": "toolu_01GVT17As1xPaFhqLUbJRnyJ",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/passes.def\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01NwkNSYhUbq7tqsL6S8hJGY",
+      "content": "[{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-pass.h\", \"chunk_index\": 1, \"score\": 1.0, \"text\": \"class opt_pass : public pass_data\\nclass gimple_opt_pass : public opt_pass\\nclass rtl_opt_pass : public opt_pass\\nclass simple_ipa_opt_pass : public opt_pass\\nclass ipa_opt_pass_d : public opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/web.cc\", \"chunk_index\": 5, \"score\": 0.5, \"text\": \"class pass_web : public rtl_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tsan.cc\", \"chunk_index\": 15, \"score\": 0.3333, \"text\": \"class pass_tsan : public gimple_opt_pass\\nclass pass_tsan_O0 : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/ubsan.cc\", \"chunk_index\": 40, \"score\": 0.25, \"text\": \"class pass_ubsan : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tracer.cc\", \"chunk_index\": 6, \"score\": 0.2, \"text\": \"class pass_tracer : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-eh.cc\", \"chunk_index\": 36, \"score\": 0.1667, \"text\": \"class pass_lower_eh : public gimple_opt_pass\\nclass pass_refactor_eh : public gimple_opt_pass\\nclass pass_lower_resx : public gimple_opt_pass\\nclass pass_lower_eh_dispatch : public gimple_opt_pass\\nclass pass_cleanup_eh : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-cfg.cc\", \"chunk_index\": 6, \"score\": 0.1429, \"text\": \"class pass_build_cfg : public gimple_opt_pass\\nclass pass_split_crit_edges : public gimple_opt_pass\\nclass pass_warn_function_return : public gimple_opt_pass\\nclass pass_warn_unused_result : public gimple_opt_pass\\nclass pass_fixup_cfg : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-sra.cc\", \"chunk_index\": 85, \"score\": 0.125, \"text\": \"class pass_sra_early : public gimple_opt_pass\\nclass pass_sra : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-vrp.cc\", \"chunk_index\": 21, \"score\": 0.1111, \"text\": \"class pass_vrp : public gimple_opt_pass\\nclass pass_assumptions : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-ssa.cc\", \"chunk_index\": 38, \"score\": 0.1, \"text\": \"class pass_update_address_taken : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/tree-nrv.cc\", \"chunk_index\": 1, \"score\": 0.0909, \"text\": \"class pass_nrv : public gimple_opt_pass\\nclass pass_return_slot : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/asan.cc\", \"chunk_index\": 71, \"score\": 0.0833, \"text\": \"class pass_asan : public gimple_opt_pass\\nclass pass_asan_O0 : public gimple_opt_pass\"}, {\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/trans-mem.cc\", \"chunk_index\": 14, \"score\": 0.0769, \"text\": \"class pass_diagnose_tm_blocks : public gimple_opt_pass\"}]"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_01GVT17As1xPaFhqLUbJRnyJ",
+      "content": "{\"repo\": \"github.com/sg-evals/gcc--releases_gcc-14.2.0\", \"path\": \"gcc/passes.def\", \"content\": \"/* Description of pass structure\\n   Copyright (C) 1987-2024 Free Software Foundation, Inc.\\n\\nThis file is part of GCC.\\n\\nGCC is free software; you can redistribute it and/or modify it under\\nthe terms of the GNU General Public License as published by the Free\\nSoftware Foundation; either version 3, or (at your option) any later\\nversion.\\n\\nGCC is distributed in the hope that it will be useful, but WITHOUT ANY\\nWARRANTY; without even the implied warranty of MERCHANTABILITY or\\nFITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License\\nfor more details.\\n\\nYou should have received a copy of the GNU General Public License\\nalong with GCC; see the file COPYING3.  If not see\\n<http://www.gnu.org/licenses/>.  */\\n\\n/*\\n Macros that should be defined when using this file:\\n   INSERT_PASSES_AFTER (PASS)\\n   PUSH_INSERT_PASSES_WITHIN (PASS)\\n   POP_INSERT_PASSES ()\\n   NEXT_PASS (PASS)\\n   TERMINATE_PASS_LIST (PASS)\\n */\\n\\n /* All passes needed to lower the function into shape optimizers can\\n    operate on.  These passes are always run first on the function, but\\n    backend might produce already lowered functions that are not processed\\n    by these passes.  */\\n  INSERT_PASSES_AFTER (all_lowering_passes)\\n  NEXT_PASS (pass_warn_unused_result);\\n  NEXT_PASS (pass_diagnose_omp_blocks);\\n  NEXT_PASS (pass_diagnose_tm_blocks);\\n  NEXT_PASS (pass_omp_oacc_kernels_decompose);\\n  NEXT_PASS (pass_lower_omp);\\n  NEXT_PASS (pass_lower_cf);\\n  NEXT_PASS (pass_lower_tm);\\n  NEXT_PASS (pass_refactor_eh);\\n  NEXT_PASS (pass_lower_eh);\\n  NEXT_PASS (pass_coroutine_lower_builtins);\\n  NEXT_PASS (pass_build_cfg);\\n  NEXT_PASS (pass_warn_function_return);\\n  NEXT_PASS (pass_coroutine_early_expand_ifns);\\n  NEXT_PASS (pass_expand_omp);\\n  NEXT_PASS (pass_build_cgraph_edges);\\n  TERMINATE_PASS_LIST (all_lowering_passes)\\n\\n  /* Interprocedural optimization passes.  */\\n  INSERT_PASSES_AFTER (all_small_ipa_passes)\\n  NEXT_PASS (pass_ipa_free_lang_data);\\n  NEXT_PASS (pass_ipa_function_and_variable_visibility);\\n  NEXT_PASS (pass_ipa_strub_mode);\\n  NEXT_PASS (pass_build_ssa_passes);\\n  PUSH_INSERT_PASSES_WITHIN (pass_build_ssa_passes)\\n      NEXT_PASS (pass_fixup_cfg);\\n      NEXT_PASS (pass_build_ssa);\\n      NEXT_PASS (pass_walloca, /*strict_mode_p=*/true);\\n      NEXT_PASS (pass_warn_printf);\\n      NEXT_PASS (pass_warn_nonnull_compare);\\n      NEXT_PASS (pass_early_warn_uninitialized);\\n      NEXT_PASS (pass_warn_access, /*early=*/true);\\n      NEXT_PASS (pass_ubsan);\\n      NEXT_PASS (pass_nothrow);\\n      NEXT_PASS (pass_rebuild_cgraph_edges);\\n  POP_INSERT_PASSES ()\\n\\n  NEXT_PASS (pass_local_optimization_passes);\\n  PUSH_INSERT_PASSES_WITHIN (pass_local_optimization_passes)\\n      NEXT_PASS (pass_fixup_cfg);\\n      NEXT_PASS (pass_rebuild_cgraph_edges);\\n      NEXT_PASS (pass_local_fn_summary);\\n      NEXT_PASS (pass_early_inline);\\n      NEXT_PASS (pass_warn_recursion);\\n      NEXT_PASS (pass_all_early_optimizations);\\n      PUSH_INSERT_PASSES_WITHIN (pass_all_early_optimizations)\\n\\t  NEXT_PASS (pass_remove_cgraph_callee_edges);\\n\\t  NEXT_PASS (pass_early_object_sizes);\\n\\t  /* Don't record nonzero bits before IPA to avoid\\n\\t     using too much memory.  */\\n\\t  NEXT_PASS (pass_ccp, false /* nonzero_p */);\\n\\t  /* After CCP we rewrite no longer addressed locals into SSA\\n\\t     form if possible.  */\\n\\t  NEXT_PASS (pass_forwprop);\\n          NEXT_PASS (pass_early_thread_jumps, /*first=*/true);\\n\\t  NEXT_PASS (pass_sra_early);\\n\\t  /* pass_build_ealias is a dummy pass that ensures that we\\n\\t     execute TODO_rebuild_alias at this point.  */\\n\\t  NEXT_PASS (pass_build_ealias);\\n\\t  /* Do phiprop before FRE so we optimize std::min and std::max well.  */\\n\\t  NEXT_PASS (pass_phiprop);\\n\\t  NEXT_PASS (pass_fre, true /* may_iterate */);\\n\\t  NEXT_PASS (pass_early_vrp);\\n\\t  NEXT_PASS (pass_merge_phi);\\n          NEXT_PASS (pass_dse);\\n\\t  NEXT_PASS (pass_cd_dce, false /* update_address_taken_p */);\\n\\t  NEXT_PASS (pass_phiopt, true /* early_p */);\\n\\t  NEXT_PASS (pass_tail_recursion);\\n\\t  NEXT_PASS (pass_if_to_switch);\\n\\t  NEXT_PASS (pass_convert_switch);\\n\\t  NEXT_PASS (pass_cleanup_eh);\\n\\t  NEXT_PASS (pass_sccopy);\\n\\t  NEXT_PASS (pass_profile);\\n\\t  NEXT_PASS (pass_local_pure_const);\\n\\t  NEXT_PASS (pass_modref);\\n\\t  /* Split functions creates parts that are not run through\\n\\t     early optimizations again.  It is thus good idea to do this\\n\\t      late.  */\\n\\t  NEXT_PASS (pass_split_functions);\\n\\t  NEXT_PASS (pass_strip_predict_hints, true /* early_p */);\\n      POP_INSERT_PASSES ()\\n      NEXT_PASS (pass_release_ssa_names);\\n      NEXT_PASS (pass_rebuild_cgraph_edges);\\n      NEXT_PASS (pass_local_fn_summary);\\n  POP_INSERT_PASSES ()\\n\\n  NEXT_PASS (pass_ipa_remove_symbols);\\n  NEXT_PASS (pass_ipa_strub);\\n  NEXT_PASS (pass_ipa_oacc);\\n  PUSH_INSERT_PASSES_WITHIN (pass_ipa_oacc)\\n      NEXT_PASS (pass_ipa_pta);\\n      /* Pass group that runs when the function is an offloaded function\\n\\t containing oacc kernels loops.\\t */\\n      NEXT_PASS (pass_ipa_oacc_kernels);\\n      PUSH_INSERT_PASSES_WITHIN (pass_ipa_oacc_kernels)\\n\\t  NEXT_PASS (pass_oacc_kernels);\\n\\t  PUSH_INSERT_PASSES_WITHIN (pass_oacc_kernels)\\n\\t      NEXT_PASS (pass_ch);\\n\\t      NEXT_PASS (pass_fre, true /* may_iterate */);\\n\\t      /* We use pass_lim to rewrite in-memory iteration and reduction\\n\\t\\t variable accesses in loops into local variables accesses.  */\\n\\t      NEXT_PASS (pass_lim);\\n\\t      NEXT_PASS (pass_dominator, false /* may_peel_loop_headers_p */);\\n\\t      NEXT_PASS (pass_dce);\\n\\t      NEXT_PASS (pass_parallelize_loops, true /* oacc_kernels_p */);\\n\\t      NEXT_PASS (pass_expand_omp_ssa);\\n\\t      NEXT_PASS (pass_rebuild_cgraph_edges);\\n\\t  POP_INSERT_PASSES ()\\n      POP_INSERT_PASSES ()\\n  POP_INSERT_PASSES ()\\n\\n  NEXT_PASS (pass_target_clone);\\n  NEXT_PASS (pass_ipa_auto_profile);\\n  NEXT_PASS (pass_ipa_tree_profile);\\n  PUSH_INSERT_PASSES_WITHIN (pass_ipa_tree_profile)\\n      NEXT_PASS (pass_feedback_split_functions);\\n  POP_INSERT_PASSES ()\\n  NEXT_PASS (pass_ipa_free_fn_summary, true /* small_p */);\\n  NEXT_PASS (pass_ipa_increase_alignment);\\n  NEXT_PASS (pass_ipa_tm);\\n  NEXT_PASS (pass_ipa_lower_emutls);\\n  TERMINATE_PASS_LIST (all_small_ipa_passes)\\n\\n  INSERT_PASSES_AFTER (all_regular_ipa_passes)\\n  NEXT_PASS (pass_analyzer);\\n  NEXT_PASS (pass_ipa_odr);\\n  NEXT_PASS (pass_ipa_whole_program_visibility);\\n  NEXT_PASS (pass_ipa_profile);\\n  NEXT_PASS (pass_ipa_icf);\\n  NEXT_PASS (pass_ipa_devirt);\\n  NEXT_PASS (pass_ipa_cp);\\n  NEXT_PASS (pass_ipa_sra);\\n  NEXT_PASS (pass_ipa_cdtor_merge);\\n  NEXT_PASS (pass_ipa_fn_summary);\\n  NEXT_PASS (pass_ipa_inline);\\n  NEXT_PASS (pass_ipa_pure_const);\\n  NEXT_PASS (pass_ipa_modref);\\n  NEXT_PASS (pass_ipa_free_fn_summary, false /* small_p */);\\n  NEXT_PASS (pass_ipa_reference);\\n  /* This pass needs to be scheduled after any IP code duplication.   */\\n  NEXT_PASS (pass_ipa_single_use);\\n  /* Comdat privatization come last, as direct references to comdat local\\n     symbols are not allowed outside of the comdat group.  Privatizing early\\n     would result in missed optimizations due to this restriction.  */\\n  NEXT_PASS (pass_ipa_comdats);\\n  TERMINATE_PASS_LIST (all_regular_ipa_passes)\\n\\n  /* Simple IPA passes executed after the regular passes.  In WHOPR mode the\\n     passes are executed after partitioning and thus see just parts of the\\n     compiled unit.  */\\n  INSERT_PASSES_AFTER (all_late_ipa_passes)\\n  NEXT_PASS (pass_ipa_pta);\\n  NEXT_PASS (pass_omp_simd_clone);\\n  TERMINATE_PASS_LIST (all_late_ipa_passes)\\n\\n  /* These passes are run after IPA passes on every function that is being\\n     output to the assembler file.  */\\n  INSERT_PASSES_AFTER (all_passes)\\n  NEXT_PASS (pass_fixup_cfg);\\n  NEXT_PASS (pass_lower_eh_dispatch);\\n  NEXT_PASS (pass_oacc_loop_designation);\\n  NEXT_PASS (pass_omp_oacc_neuter_broadcast);\\n  NEXT_PASS (pass_oacc_device_lower);\\n  NEXT_PASS (pass_omp_device_lower);\\n  NEXT_PASS (pass_omp_target_link);\\n  NEXT_PASS (pass_adjust_alignment);\\n  NEXT_PASS (pass_harden_control_flow_redundancy);\\n  NEXT_PASS (pass_all_optimizations);\\n  PUSH_INSERT_PASSES_WITHIN (pass_all_optimizations)\\n      NEXT_PASS (pass_remove_cgraph_callee_edges);\\n      /* Initial scalar cleanups before alias computation.\\n\\t They ensure memory accesses are not indirect wherever possible.  */\\n      NEXT_PASS (pass_strip_predict_hints, false /* early_p */);\\n      NEXT_PASS (pass_ccp, true /* nonzero_p */);\\n      /* After CCP we rewrite no longer addressed locals into SSA\\n\\t form if possible.  */\\n      NEXT_PASS (pass_object_sizes);\\n      NEXT_PASS (pass_post_ipa_warn);\\n      /* Must run before loop unrolling.  */\\n      NEXT_PASS (pass_warn_access, /*early=*/true);\\n      /* Profile count may overflow as a result of inlinining very large\\n         loop nests.  This pass should run before any late pass that makes\\n\\t use of profile.  */\\n      NEXT_PASS (pass_rebuild_frequencies);\\n      NEXT_PASS (pass_complete_unrolli);\\n      NEXT_PASS (pass_backprop);\\n      NEXT_PASS (pass_phiprop);\\n      NEXT_PASS (pass_forwprop);\\n      /* pass_build_alias is a dummy pass that ensures that we\\n\\t execute TODO_rebuild_alias at this point.  */\\n      NEXT_PASS (pass_build_alias);\\n      NEXT_PASS (pass_return_slot);\\n      NEXT_PASS (pass_fre, true /* may_iterate */);\\n      NEXT_PASS (pass_merge_phi);\\n      NEXT_PASS (pass_thread_jumps_full, /*first=*/true);\\n      NEXT_PASS (pass_vrp, false /* final_p*/);\\n      NEXT_PASS (pass_dse);\\n      NEXT_PASS (pass_dce);\\n      /* pass_stdarg is always run and at this point we execute\\n         TODO_remove_unused_locals to prune CLOBBERs of dead\\n\\t variables which are otherwise a churn on alias walkings.  */\\n      NEXT_PASS (pass_stdarg);\\n      NEXT_PASS (pass_call_cdce);\\n      NEXT_PASS (pass_cselim);\\n      NEXT_PASS (pass_copy_prop);\\n      NEXT_PASS (pass_tree_ifcombine);\\n      NEXT_PASS (pass_merge_phi);\\n      NEXT_PASS (pass_phiopt, false /* early_p */);\\n      NEXT_PASS (pass_tail_recursion);\\n      NEXT_PASS (pass_ch);\\n      NEXT_PASS (pass_lower_complex);\\n      NEXT_PASS (pass_lower_bitint);\\n      NEXT_PASS (pass_sra);\\n      /* The dom pass will also resolve all __builtin_constant_p calls\\n         that are still there to 0.  This has to be done after some\\n\\t propagations have already run, but before some more dead code\\n\\t is removed, and this place fits nicely.  Remember this when\\n\\t trying to move or duplicate pass_dominator somewhere earlier.  */\\n      NEXT_PASS (pass_thread_jumps, /*first=*/true);\\n      NEXT_PASS (pass_dominator, true /* may_peel_loop_headers_p */);\\n      /* Threading can leave many const/copy propagations in the IL.\\n\\t Clean them up.  Failure to do so well can lead to false\\n\\t positives from warnings for erroneous code.  */\\n      NEXT_PASS (pass_copy_prop);\\n      /* Identify paths that should never be executed in a conforming\\n\\t program and isolate those paths.  */\\n      NEXT_PASS (pass_isolate_erroneous_paths);\\n      NEXT_PASS (pass_reassoc, true /* early_p */);\\n      NEXT_PASS (pass_dce);\\n      NEXT_PASS (pass_forwprop);\\n      NEXT_PASS (pass_phiopt, false /* early_p */);\\n      NEXT_PASS (pass_ccp, true /* nonzero_p */);\\n      /* After CCP we rewrite no longer addressed locals into SSA\\n\\t form if possible.  */\\n      NEXT_PASS (pass_expand_powcabs);\\n      NEXT_PASS (pass_optimize_bswap);\\n      NEXT_PASS (pass_laddress);\\n      NEXT_PASS (pass_lim);\\n      NEXT_PASS (pass_walloca, false);\\n      NEXT_PASS (pass_pre);\\n      NEXT_PASS (pass_sink_code, false /* unsplit edges */);\\n      NEXT_PASS (pass_sancov);\\n      NEXT_PASS (pass_asan);\\n      NEXT_PASS (pass_tsan);\\n      NEXT_PASS (pass_dse, true /* use DR analysis */);\\n      NEXT_PASS (pass_dce);\\n      /* Pass group that runs when 1) enabled, 2) there are loops\\n\\t in the function.  Make sure to run pass_fix_loops before\\n\\t to discover/remove loops before running the gate function\\n\\t of pass_tree_loop.  */\\n      NEXT_PASS (pass_fix_loops);\\n      NEXT_PASS (pass_tree_loop);\\n      PUSH_INSERT_PASSES_WITHIN (pass_tree_loop)\\n          /* Before loop_init we rewrite no longer addressed locals into SSA\\n\\t     form if possible.  */\\n\\t  NEXT_PASS (pass_tree_loop_init);\\n\\t  NEXT_PASS (pass_tree_unswitch);\\n\\t  NEXT_PASS (pass_loop_split);\\n\\t  NEXT_PASS (pass_scev_cprop);\\n\\t  NEXT_PASS (pass_loop_versioning);\\n\\t  NEXT_PASS (pass_loop_jam);\\n\\t  /* All unswitching, final value replacement and splitting can expose\\n\\t     empty loops.  Remove them now.  */\\n\\t  NEXT_PASS (pass_cd_dce, false /* update_address_taken_p */);\\n\\t  NEXT_PASS (pass_iv_canon);\\n\\t  NEXT_PASS (pass_loop_distribution);\\n\\t  NEXT_PASS (pass_linterchange);\\n\\t  NEXT_PASS (pass_copy_prop);\\n\\t  NEXT_PASS (pass_graphite);\\n\\t  PUSH_INSERT_PASSES_WITHIN (pass_graphite)\\n\\t      NEXT_PASS (pass_graphite_transforms);\\n\\t      NEXT_PASS (pass_lim);\\n\\t      NEXT_PASS (pass_copy_prop);\\n\\t      NEXT_PASS (pass_dce);\\n\\t  POP_INSERT_PASSES ()\\n\\t  NEXT_PASS (pass_parallelize_loops, false /* oacc_kernels_p */);\\n\\t  NEXT_PASS (pass_expand_omp_ssa);\\n\\t  NEXT_PASS (pass_ch_vect);\\n\\t  NEXT_PASS (pass_if_conversion);\\n\\t  /* pass_vectorize must immediately follow pass_if_conversion.\\n\\t     Please do not add any other passes in between.  */\\n\\t  NEXT_PASS (pass_vectorize);\\n\\t  PUSH_INSERT_PASSES_WITHIN (pass_vectorize)\\n\\t      NEXT_PASS (pass_dce);\\n\\t  POP_INSERT_PASSES ()\\n\\t  NEXT_PASS (pass_predcom);\\n\\t  NEXT_PASS (pass_complete_unroll);\\n\\t  NEXT_PASS (pass_pre_slp_scalar_cleanup);\\n\\t  PUSH_INSERT_PASSES_WITHIN (pass_pre_slp_scalar_cleanup)\\n\\t      NEXT_PASS (pass_fre, false /* may_iterate */);\\n\\t      NEXT_PASS (pass_dse);\\n\\t  POP_INSERT_PASSES ()\\n\\t  NEXT_PASS (pass_slp_vectorize);\\n\\t  NEXT_PASS (pass_loop_prefetch);\\n\\t  /* Run IVOPTs after the last pass that uses data-reference analysis\\n\\t     as that doesn't handle TARGET_MEM_REFs.  */\\n\\t  NEXT_PASS (pass_iv_optimize);\\n\\t  NEXT_PASS (pass_lim);\\n\\t  NEXT_PASS (pass_tree_loop_done);\\n      POP_INSERT_PASSES ()\\n      /* Pass group that runs when pass_tree_loop is disabled or there\\n         are no loops in the function.  */\\n      NEXT_PASS (pass_tree_no_loop);\\n      PUSH_INSERT_PASSES_WITHIN (pass_tree_no_loop)\\n\\t  NEXT_PASS (pass_slp_vectorize);\\n      POP_INSERT_PASSES ()\\n      NEXT_PASS (pass_simduid_cleanup);\\n      NEXT_PASS (pass_lower_vector_ssa);\\n      NEXT_PASS (pass_lower_switch);\\n      NEXT_PASS (pass_cse_sincos);\\n      NEXT_PASS (pass_cse_reciprocals);\\n      NEXT_PASS (pass_reassoc, false /* early_p */);\\n      NEXT_PASS (pass_strength_reduction);\\n      NEXT_PASS (pass_split_paths);\\n      NEXT_PASS (pass_tracer);\\n      NEXT_PASS (pass_fre, false /* may_iterate */);\\n      /* After late FRE we rewrite no longer addressed locals into SSA\\n         form if possible.  */\\n      NEXT_PASS (pass_thread_jumps, /*first=*/false);\\n      NEXT_PASS (pass_dominator, false /* may_peel_loop_headers_p */);\\n      NEXT_PASS (pass_strlen);\\n      NEXT_PASS (pass_thread_jumps_full, /*first=*/false);\\n      NEXT_PASS (pass_vrp, true /* final_p */);\\n      /* Run CCP to compute alignment and nonzero bits.  */\\n      NEXT_PASS (pass_ccp, true /* nonzero_p */);\\n      NEXT_PASS (pass_warn_restrict);\\n      NEXT_PASS (pass_dse);\\n      NEXT_PASS (pass_dce, true /* update_address_taken_p */);\\n      /* After late DCE we rewrite no longer addressed locals into SSA\\n\\t form if possible.  */\\n      NEXT_PASS (pass_forwprop);\\n      NEXT_PASS (pass_sink_code, true /* unsplit edges */);\\n      NEXT_PASS (pass_phiopt, false /* early_p */);\\n      NEXT_PASS (pass_fold_builtins);\\n      NEXT_PASS (pass_optimize_widening_mul);\\n      NEXT_PASS (pass_store_merging);\\n      /* If DCE is not run before checking for uninitialized uses,\\n\\t we may get false warnings (e.g., testsuite/gcc.dg/uninit-5.c).\\n\\t However, this also causes us to misdiagnose cases that should be\\n\\t real warnings (e.g., testsuite/gcc.dg/pr18501.c).  */\\n      NEXT_PASS (pass_cd_dce, false /* update_address_taken_p */);\\n      NEXT_PASS (pass_sccopy);\\n      NEXT_PASS (pass_tail_calls);\\n      /* Split critical edges before late uninit warning to reduce the\\n         number of false positives from it.  */\\n      NEXT_PASS (pass_split_crit_edges);\\n      NEXT_PASS (pass_late_warn_uninitialized);\\n      NEXT_PASS (pass_local_pure_const);\\n      NEXT_PASS (pass_modref);\\n      /* uncprop replaces constants by SSA names.  This makes analysis harder\\n\\t and thus it should be run last.  */\\n      NEXT_PASS (pass_uncprop);\\n  POP_INSERT_PASSES ()\\n  NEXT_PASS (pass_all_optimizations_g);\\n  PUSH_INSERT_PASSES_WITHIN (pass_all_optimizations_g)\\n      /* The idea is that with -Og we do not perform any IPA optimization\\n\\t so post-IPA work should be restricted to semantically required\\n\\t passes and all optimization work is done early.  */\\n      NEXT_PASS (pass_remove_cgraph_callee_edges);\\n      NEXT_PASS (pass_strip_predict_hints, false /* early_p */);\\n      /* Lower remaining pieces of GIMPLE.  */\\n      NEXT_PASS (pass_lower_complex);\\n      NEXT_PASS (pass_lower_bitint);\\n      NEXT_PASS (pass_lower_vector_ssa);\\n      NEXT_PASS (pass_lower_switch);\\n      /* Perform simple scalar cleanup which is constant/copy propagation.  */\\n      NEXT_PASS (pass_ccp, true /* nonzero_p */);\\n      NEXT_PASS (pass_post_ipa_warn);\\n      NEXT_PASS (pass_object_sizes);\\n      /* Fold remaining builtins.  */\\n      NEXT_PASS (pass_fold_builtins);\\n      NEXT_PASS (pass_strlen);\\n      /* Copy propagation also copy-propagates constants, this is necessary\\n         to forward object-size and builtin folding results properly.  */\\n      NEXT_PASS (pass_copy_prop);\\n      NEXT_PASS (pass_dce);\\n      /* Profile count may overflow as a result of inlinining very large\\n         loop nests.  This pass should run before any late pass that makes\\n\\t use of profile.  */\\n      NEXT_PASS (pass_rebuild_frequencies);\\n      NEXT_PASS (pass_sancov);\\n      NEXT_PASS (pass_asan);\\n      NEXT_PASS (pass_tsan);\\n      /* ???  We do want some kind of loop invariant motion, but we possibly\\n         need to adjust LIM to be more friendly towards preserving accurate\\n\\t debug information here.  */\\n      /* Split critical edges before late uninit warning to reduce the\\n         number of false positives from it.  */\\n      NEXT_PASS (pass_split_crit_edges);\\n      NEXT_PASS (pass_late_warn_uninitialized);\\n      /* uncprop replaces constants by SSA names.  This makes analysis harder\\n\\t and thus it should be run last.  */\\n      NEXT_PASS (pass_uncprop);\\n  POP_INSERT_PASSES ()\\n  NEXT_PASS (pass_assumptions);\\n  NEXT_PASS (pass_tm_init);\\n  PUSH_INSERT_PASSES_WITHIN (pass_tm_init)\\n      NEXT_PASS (pass_tm_mark);\\n      NEXT_PASS (pass_tm_memopt);\\n      NEXT_PASS (pass_tm_edges);\\n  POP_INSERT_PASSES ()\\n  NEXT_PASS (pass_simduid_cleanup);\\n  NEXT_PASS (pass_vtable_verify);\\n  NEXT_PASS (pass_lower_vaarg);\\n  NEXT_PASS (pass_lower_vector);\\n  NEXT_PASS (pass_lower_complex_O0);\\n  NEXT_PASS (pass_lower_bitint_O0);\\n  NEXT_PASS (pass_sancov_O0);\\n  NEXT_PASS (pass_lower_switch_O0);\\n  NEXT_PASS (pass_asan_O0);\\n  NEXT_PASS (pass_tsan_O0);\\n  NEXT_PASS (pass_sanopt);\\n  NEXT_PASS (pass_cleanup_eh);\\n  NEXT_PASS (pass_lower_resx);\\n  NEXT_PASS (pass_nrv);\\n  NEXT_PASS (pass_gimple_isel);\\n  NEXT_PASS (pass_harden_conditional_branches);\\n  NEXT_PASS (pass_harden_compares);\\n  NEXT_PASS (pass_warn_access, /*early=*/false);\\n  NEXT_PASS (pass_cleanup_cfg_post_optimizing);\\n  NEXT_PASS (pass_warn_function_noreturn);\\n\\n  NEXT_PASS (pass_expand);\\n\\n  NEXT_PASS (pass_rest_of_compilation);\\n  PUSH_INSERT_PASSES_WITHIN (pass_rest_of_compilation)\\n      NEXT_PASS (pass_instantiate_virtual_regs);\\n      NEXT_PASS (pass_into_cfg_layout_mode);\\n      NEXT_PASS (pass_jump);\\n      NEXT_PASS (pass_lower_subreg);\\n      NEXT_PASS (pass_df_initialize_opt);\\n      NEXT_PASS (pass_cse);\\n      NEXT_PASS (pass_rtl_fwprop);\\n      NEXT_PASS (pass_rtl_cprop);\\n      NEXT_PASS (pass_rtl_pre);\\n      NEXT_PASS (pass_rtl_hoist);\\n      NEXT_PASS (pass_rtl_cprop);\\n      NEXT_PASS (pass_rtl_store_motion);\\n      NEXT_PASS (pass_cse_after_global_opts);\\n      NEXT_PASS (pass_rtl_ifcvt);\\n      NEXT_PASS (pass_reginfo_init);\\n      /* Perform loop optimizations.  It might be better to do them a bit\\n\\t sooner, but we want the profile feedback to work more\\n\\t efficiently.  */\\n      NEXT_PASS (pass_loop2);\\n      PUSH_INSERT_PASSES_WITHIN (pass_loop2)\\n\\t  NEXT_PASS (pass_rtl_loop_init);\\n\\t  NEXT_PASS (pass_rtl_move_loop_invariants);\\n\\t  NEXT_PASS (pass_rtl_unroll_loops);\\n\\t  NEXT_PASS (pass_rtl_doloop);\\n\\t  NEXT_PASS (pass_rtl_loop_done);\\n      POP_INSERT_PASSES ()\\n      NEXT_PASS (pass_lower_subreg2);\\n      NEXT_PASS (pass_web);\\n      NEXT_PASS (pass_rtl_cprop);\\n      NEXT_PASS (pass_cse2);\\n      NEXT_PASS (pass_rtl_dse1);\\n      NEXT_PASS (pass_rtl_fwprop_addr);\\n      NEXT_PASS (pass_inc_dec);\\n      NEXT_PASS (pass_initialize_regs);\\n      NEXT_PASS (pass_ud_rtl_dce);\\n      NEXT_PASS (pass_combine);\\n      NEXT_PASS (pass_if_after_combine);\\n      NEXT_PASS (pass_jump_after_combine);\\n      NEXT_PASS (pass_partition_blocks);\\n      NEXT_PASS (pass_outof_cfg_layout_mode);\\n      NEXT_PASS (pass_split_all_insns);\\n      NEXT_PASS (pass_lower_subreg3);\\n      NEXT_PASS (pass_df_initialize_no_opt);\\n      NEXT_PASS (pass_stack_ptr_mod);\\n      NEXT_PASS (pass_mode_switching);\\n      NEXT_PASS (pass_match_asm_constraints);\\n      NEXT_PASS (pass_sms);\\n      NEXT_PASS (pass_live_range_shrinkage);\\n      NEXT_PASS (pass_sched);\\n      NEXT_PASS (pass_early_remat);\\n      NEXT_PASS (pass_ira);\\n      NEXT_PASS (pass_reload);\\n      NEXT_PASS (pass_postreload);\\n      PUSH_INSERT_PASSES_WITHIN (pass_postreload)\\n\\t  NEXT_PASS (pass_postreload_cse);\\n\\t  NEXT_PASS (pass_gcse2);\\n\\t  NEXT_PASS (pass_split_after_reload);\\n\\t  NEXT_PASS (pass_ree);\\n\\t  NEXT_PASS (pass_compare_elim_after_reload);\\n\\t  NEXT_PASS (pass_thread_prologue_and_epilogue);\\n\\t  NEXT_PASS (pass_rtl_dse2);\\n\\t  NEXT_PASS (pass_stack_adjustments);\\n\\t  NEXT_PASS (pass_jump2);\\n\\t  NEXT_PASS (pass_duplicate_computed_gotos);\\n\\t  NEXT_PASS (pass_sched_fusion);\\n\\t  NEXT_PASS (pass_peephole2);\\n\\t  NEXT_PASS (pass_if_after_reload);\\n\\t  NEXT_PASS (pass_regrename);\\n\\t  NEXT_PASS (pass_fold_mem_offsets);\\n\\t  NEXT_PASS (pass_cprop_hardreg);\\n\\t  NEXT_PASS (pass_fast_rtl_dce);\\n\\t  NEXT_PASS (pass_reorder_blocks);\\n\\t  NEXT_PASS (pass_leaf_regs);\\n\\t  NEXT_PASS (pass_split_before_sched2);\\n\\t  NEXT_PASS (pass_sched2);\\n\\t  NEXT_PASS (pass_stack_regs);\\n\\t  PUSH_INSERT_PASSES_WITHIN (pass_stack_regs)\\n\\t      NEXT_PASS (pass_split_before_regstack);\\n\\t      NEXT_PASS (pass_stack_regs_run);\\n\\t  POP_INSERT_PASSES ()\\n      POP_INSERT_PASSES ()\\n      NEXT_PASS (pass_late_thread_prologue_and_epilogue);\\n      /* No target-independent code motion is allowed beyond this point,\\n         excepting the legacy delayed-branch pass.  */\\n      NEXT_PASS (pass_late_compilation);\\n      PUSH_INSERT_PASSES_WITHIN (pass_late_compilation)\\n\\t  NEXT_PASS (pass_zero_call_used_regs);\\n\\t  NEXT_PASS (pass_compute_alignments);\\n\\t  NEXT_PASS (pass_variable_tracking);\\n\\t  NEXT_PASS (pass_free_cfg);\\n\\t  NEXT_PASS (pass_machine_reorg);\\n\\t  NEXT_PASS (pass_cleanup_barriers);\\n\\t  NEXT_PASS (pass_delay_slots);\\n\\t  NEXT_PASS (pass_split_for_shorten_branches);\\n\\t  NEXT_PASS (pass_convert_to_eh_region_ranges);\\n\\t  NEXT_PASS (pass_shorten_branches);\\n\\t  NEXT_PASS (pass_set_nothrow_function_flags);\\n\\t  NEXT_PASS (pass_dwarf2_frame);\\n\\t  NEXT_PASS (pass_final);\\n      POP_INSERT_PASSES ()\\n      NEXT_PASS (pass_df_finish);\\n  POP_INSERT_PASSES ()\\n  NEXT_PASS (pass_clean_state);\\n  TERMINATE_PASS_LIST (all_passes)\"}"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "toolu_011HVKhTm9jgcu9bft2NshxR",
+          "type": "function",
+          "function": {
+            "name": "submit_files",
+            "arguments": "{\"files\": [{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/passes.def\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/passes.cc\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/pass_manager.h\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/tree-pass.h\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/tree-ssa-dce.cc\"},{\"repo\":\"github.com/sg-evals/gcc--releases_gcc-14.2.0\",\"path\":\"gcc/Makefile.in\"}]}"
+          }
+        }
+      ]
+    }
+  ],
+  "ir_scores_unaligned": {
+    "task_id": "ccx-dep-trace-106",
+    "config_name": "claude_adapter",
+    "precision": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 0.5
+    },
+    "recall": {
+      "1": 0.2,
+      "3": 0.6,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.3333,
+      "3": 0.75,
+      "5": 1.0,
+      "10": 0.6667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 1.0,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "mrr": 1.0,
+    "map_score": 1.0,
+    "file_recall": 1.0,
+    "context_efficiency": 0.8333,
+    "n_retrieved": 6,
+    "n_ground_truth": 5,
+    "n_overlap": 5
+  },
+  "retrieved_paths_aligned": [
+    "gcc/passes.def",
+    "gcc/passes.cc",
+    "gcc/pass_manager.h",
+    "gcc/tree-pass.h",
+    "gcc/tree-ssa-dce.cc",
+    "gcc/Makefile.in"
+  ],
+  "scoring": "aligned_suffix_v1"
+}

@@ -1,0 +1,208 @@
+{
+  "task_id": "dep-graph-tri-tokio-hyper-tonic-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/tokio--tokio-1.0.0",
+    "github.com/sg-evals/hyper--v0.14.0",
+    "github.com/sg-evals/tonic--v0.6.0"
+  ],
+  "retrieved_paths": [
+    "tokio/Cargo.toml",
+    "tokio/CHANGELOG.md",
+    "Cargo.toml",
+    "src/common/exec.rs",
+    "src/client/connect/http.rs",
+    "src/client/pool.rs",
+    "src/common/drain.rs",
+    "src/server/mod.rs",
+    "src/client/conn.rs",
+    "tonic/Cargo.toml",
+    "tonic/src/transport/channel/mod.rs",
+    "tonic/src/transport/server/mod.rs",
+    "tonic/src/lib.rs",
+    "CHANGELOG.md"
+  ],
+  "retrieved_paths_union": [
+    "tokio/Cargo.toml",
+    "tokio/CHANGELOG.md",
+    "Cargo.toml",
+    "src/common/exec.rs",
+    "src/client/connect/http.rs",
+    "src/client/pool.rs",
+    "src/common/drain.rs",
+    "src/server/mod.rs",
+    "src/client/conn.rs",
+    "tonic/Cargo.toml",
+    "tonic/src/transport/channel/mod.rs",
+    "tonic/src/transport/server/mod.rs",
+    "tonic/src/lib.rs",
+    "CHANGELOG.md"
+  ],
+  "required_files": [
+    "tonic/tonic/Cargo.toml",
+    "hyper/Cargo.toml",
+    "tokio/tokio/Cargo.toml"
+  ],
+  "ir_scores": {
+    "task_id": "dep-graph-tri-tokio-hyper-tonic-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.6049
+    },
+    "mrr": 1.0,
+    "map_score": 0.4,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "dep-graph-tri-tokio-hyper-tonic-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.6049
+    },
+    "mrr": 1.0,
+    "map_score": 0.4,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 20.5,
+  "response_chars": 6150,
+  "raw_response": "I\u2019m unable to write `/workspace/analysis/IMPACT_REPORT.md` because this interface provides repository search/read tools but no filesystem-write tool. Relevant findings:\n\n- [sg-evals/tokio--tokio-1.0.0:tokio/Cargo.toml?L26-L107](/r/github.com/sg-evals/tokio--tokio-1.0.0/-/blob/tokio/Cargo.toml?L26-L107) - Tokio 1.0.0 feature definitions and optional runtime, networking, synchronization, and timer dependencies.\n- [sg-evals/tokio--tokio-1.0.0:tokio/CHANGELOG.md?L125-L162](/r/github.com/sg-evals/tokio--tokio-1.0.0/-/blob/tokio/CHANGELOG.md?L125-L162) - Tokio 1.0 migration changes: `rt-threaded` \u2192 `rt-multi-thread`, network feature consolidation into `net`, `delay_for`/`delay_until` \u2192 `sleep`/`sleep_until`, `Runtime::block_on` signature change, and `AsyncRead`/`ReadBuf`.\n- [sg-evals/hyper--v0.14.0:Cargo.toml?L22-L37](/r/github.com/sg-evals/hyper--v0.14.0/-/blob/Cargo.toml?L22-L37) - Hyper 0.14.0 depends on `tokio = \"1\"` with `sync`; `h2 = \"0.3\"` is optional.\n- [sg-evals/hyper--v0.14.0:Cargo.toml?L71-L107](/r/github.com/sg-evals/hyper--v0.14.0/-/blob/Cargo.toml?L71-L107) - Hyper feature chain: `full` \u2192 `runtime`; `runtime` \u2192 `tcp`, `tokio/rt`; `tcp` \u2192 `tokio/net`, `tokio/rt`, `tokio/time`.\n- [sg-evals/hyper--v0.14.0:src/common/exec.rs?L27-L59](/r/github.com/sg-evals/hyper--v0.14.0/-/blob/src/common/exec.rs?L27-L59) - Default executor uses `tokio::task::spawn`; custom execution uses `hyper::rt::Executor`.\n- [sg-evals/hyper--v0.14.0:src/client/connect/http.rs?L12-L18](/r/github.com/sg-evals/hyper--v0.14.0/-/blob/src/client/connect/http.rs?L12-L18) - Uses `tokio::net::{TcpSocket, TcpStream}` and `tokio::time::Sleep`.\n- [sg-evals/hyper--v0.14.0:src/client/connect/http.rs?L470-L481](/r/github.com/sg-evals/hyper--v0.14.0/-/blob/src/client/connect/http.rs?L470-L481) - Uses `tokio::time::sleep`.\n- [sg-evals/hyper--v0.14.0:src/client/connect/http.rs?L640-L652](/r/github.com/sg-evals/hyper--v0.14.0/-/blob/src/client/connect/http.rs?L640-L652) - Uses `tokio::time::timeout` around connection futures.\n- [sg-evals/hyper--v0.14.0:src/client/pool.rs?L10-L12](/r/github.com/sg-evals/hyper--v0.14.0/-/blob/src/client/pool.rs?L10-L12) - Uses Tokio `time::{Duration, Instant, Interval}`.\n- [sg-evals/hyper--v0.14.0:src/client/pool.rs?L417-L420](/r/github.com/sg-evals/hyper--v0.14.0/-/blob/src/client/pool.rs?L417-L420) - Uses `tokio::time::interval`.\n- [sg-evals/hyper--v0.14.0:src/common/drain.rs?L1-L6](/r/github.com/sg-evals/hyper--v0.14.0/-/blob/src/common/drain.rs?L1-L6) - Uses `tokio::sync::watch`.\n- [sg-evals/hyper--v0.14.0:src/server/mod.rs?L408-L415](/r/github.com/sg-evals/hyper--v0.14.0/-/blob/src/server/mod.rs?L408-L415) - Server executor configuration; default is Tokio spawning.\n- [sg-evals/hyper--v0.14.0:src/client/conn.rs?L505-L512](/r/github.com/sg-evals/hyper--v0.14.0/-/blob/src/client/conn.rs?L505-L512) - HTTP/2 background-task executor API.\n- [sg-evals/tonic--v0.6.0:tonic/Cargo.toml?L25-L43](/r/github.com/sg-evals/tonic--v0.6.0/-/blob/tonic/Cargo.toml?L25-L43) - `transport` feature enables `h2`, `hyper`, `tokio`, `tower`, Tokio macros/time, and `hyper-timeout`.\n- [sg-evals/tonic--v0.6.0:tonic/Cargo.toml?L72-L79](/r/github.com/sg-evals/tonic--v0.6.0/-/blob/tonic/Cargo.toml?L72-L79) - Exact Tonic constraints: `hyper = \"0.14.4\"` with `full`; `tokio = \"1.0.1\"` with `net`; `h2 = \"0.3\"`.\n- [sg-evals/tonic--v0.6.0:tonic/src/transport/channel/mod.rs?L19-L40](/r/github.com/sg-evals/tonic--v0.6.0/-/blob/tonic/src/transport/channel/mod.rs?L19-L40) - Tonic channel imports Hyper connection traits and Tokio async I/O plus `sync::mpsc`.\n- [sg-evals/tonic--v0.6.0:tonic/src/transport/channel/mod.rs?L44-L69](/r/github.com/sg-evals/tonic--v0.6.0/-/blob/tonic/src/transport/channel/mod.rs?L44-L69) - Channel is backed by Hyper and Tower, with a background task through Tower buffer.\n- [sg-evals/tonic--v0.6.0:tonic/src/transport/channel/mod.rs?L133-L162](/r/github.com/sg-evals/tonic--v0.6.0/-/blob/tonic/src/transport/channel/mod.rs?L133-L162) - Connection bounds require Tokio `AsyncRead`/`AsyncWrite` and Hyper connection compatibility.\n- [sg-evals/tonic--v0.6.0:tonic/src/transport/server/mod.rs?L39-L58](/r/github.com/sg-evals/tonic--v0.6.0/-/blob/tonic/src/transport/server/mod.rs?L39-L58) - Tonic server wraps Hyper and uses Tokio async I/O.\n- [sg-evals/tonic--v0.6.0:tonic/src/transport/server/mod.rs?L63-L88](/r/github.com/sg-evals/tonic--v0.6.0/-/blob/tonic/src/transport/server/mod.rs?L63-L88) - Tonic server configuration includes HTTP/2 keepalive and connection settings.\n- [sg-evals/tonic--v0.6.0:tonic/src/lib.rs?L18-L25](/r/github.com/sg-evals/tonic--v0.6.0/-/blob/tonic/src/lib.rs?L18-L25) - Documents transport as based on Hyper, Tokio, and Tower.\n- [sg-evals/hyper--v0.14.0:CHANGELOG.md?L267-L274](/r/github.com/sg-evals/hyper--v0.14.0/-/blob/CHANGELOG.md?L267-L274) - Hyper migration note: executor types must implement `hyper::rt::Executor`; replace old `hyper::rt::spawn`/`run` with `tokio::task::spawn`, `#[tokio::main]`, or explicit runtime management.\n\n**Dependency/conflict summary:** Tokio\u2019s repository is version `1.0.0`, while Hyper permits any Tokio 1.x (`\"1\"`), and Tonic requires Tokio `1.0.1` or newer within 1.x. Thus Tonic cannot resolve against exactly Tokio 1.0.0, but can resolve against a compatible later Tokio 1.x release. Hyper\u2019s `\"1\"` constraint is compatible with Tonic\u2019s `1.0.1`; Hyper\u2019s `hyper` version is `0.14.0`, while Tonic requires `>=0.14.4`, so the standalone Hyper snapshot is older than Tonic\u2019s minimum and should be upgraded before coordination.\n\n**Recommended coordination:** upgrade/publish Tokio to at least `1.0.1`; validate Hyper against that Tokio version and update Hyper\u2019s minimum if needed; then update Tonic\u2019s Hyper constraint or lockfile to the validated Hyper release. Run feature-matrix tests for `runtime`, `tcp`, `net`, `time`, `sync`, `macros`, HTTP/2, client connection, server connection, DNS, keepalive, and custom executor paths. Expect primarily dependency-resolution and behavioral compatibility work; Tokio 1.0 API changes are already reflected in these snapshots, but custom executor and runtime integrations require compile-time review.",
+  "ir_scores_unaligned": {
+    "task_id": "dep-graph-tri-tokio-hyper-tonic-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.6049
+    },
+    "mrr": 1.0,
+    "map_score": 0.4,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "tokio/tokio/Cargo.toml",
+    "tokio/CHANGELOG.md",
+    "Cargo.toml",
+    "src/common/exec.rs",
+    "src/client/connect/http.rs",
+    "src/client/pool.rs",
+    "src/common/drain.rs",
+    "src/server/mod.rs",
+    "src/client/conn.rs",
+    "tonic/tonic/Cargo.toml",
+    "tonic/src/transport/channel/mod.rs",
+    "tonic/src/transport/server/mod.rs",
+    "tonic/src/lib.rs",
+    "CHANGELOG.md"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "dep-graph-tri-tokio-hyper-tonic-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.6049
+    },
+    "mrr": 1.0,
+    "map_score": 0.4,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.1429,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

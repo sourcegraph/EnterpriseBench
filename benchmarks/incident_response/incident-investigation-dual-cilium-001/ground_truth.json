@@ -1,0 +1,40 @@
+{
+  "task_id": "incident-investigation-dual-cilium-001",
+  "task_type": "incident_investigation",
+  "repos": [
+    {"url": "https://github.com/cilium/cilium", "rev": "v1.16.4", "path": "cilium"},
+    {"url": "https://github.com/cilium/ebpf", "rev": "v0.16.0", "path": "ebpf"}
+  ],
+  "required_files": [
+    {"path": "pkg/datapath/loader/netlink.go", "repo": "cilium", "confidence": 0.90, "source": "deterministic"},
+    {"path": "pkg/bpf/collection.go", "repo": "cilium", "confidence": 0.95, "source": "deterministic"},
+    {"path": "map.go", "repo": "ebpf", "confidence": 0.90, "source": "deterministic"},
+    {"path": "collection.go", "repo": "ebpf", "confidence": 0.85, "source": "deterministic"}
+  ],
+  "sufficient_files": [
+    {"path": "pkg/endpoint/bpf.go", "repo": "cilium", "confidence": 0.80},
+    {"path": "elf_reader.go", "repo": "ebpf", "confidence": 0.70}
+  ],
+  "expected_answer": {
+    "root_cause": "Concurrent endpoint regenerations in Cilium call into pkg/bpf/collection.go::LoadCollectionSpec, which feeds a shared/templated BPF ELF reader into cilium/ebpf. The library's map creation path (map.go::createMap, fed by collection.go) reads from the supplied io.Reader / MapSpec without copying internal state. When two goroutines drive the same template through this path, the underlying cursor and MapSpec fields are mutated concurrently, producing torn struct values that are then passed to the bpf() syscall. The kernel verifier reads the corrupted definition and rejects the program.",
+    "error_chain": [
+      "Multiple pod starts trigger pkg/endpoint/bpf.go::regenerateBPF concurrently",
+      "Each calls into pkg/datapath/loader/netlink.go::loadDatapath",
+      "loadDatapath builds a *bytes.Reader for the templated BPF ELF",
+      "pkg/bpf/collection.go::LoadCollectionSpec wraps and forwards to cilium/ebpf",
+      "cilium/ebpf collection.go invokes elf_reader.go to parse the ELF — internal state mutation",
+      "cilium/ebpf map.go::createMap consumes MapSpec and issues bpf() syscall",
+      "Concurrent calls produce torn MapSpec field values",
+      "Kernel verifier returns 'invalid argument' / 'program too large' for the corrupt definition",
+      "Error surfaces in agent logs as 'failed to attach' or 'map create: invalid argument'"
+    ],
+    "affected_components": [
+      "Cilium endpoint manager (pkg/endpoint/bpf.go)",
+      "Cilium datapath loader (pkg/datapath/loader/netlink.go)",
+      "Cilium BPF collection wrapper (pkg/bpf/collection.go)",
+      "cilium/ebpf library (collection.go, map.go, elf_reader.go)",
+      "All BPF map creations performed during concurrent endpoint regeneration"
+    ],
+    "remediation": "Three layered options: (1) Serialize endpoint regenerations through a per-template mutex so concurrent loaders don't share a reader. (2) Deep-copy the MapSpec / construct a fresh bytes.Reader per call before handing to cilium/ebpf. (3) Fix the cilium/ebpf side to take a value rather than a reader, or document that callers must not share readers and add a defensive copy."
+  }
+}

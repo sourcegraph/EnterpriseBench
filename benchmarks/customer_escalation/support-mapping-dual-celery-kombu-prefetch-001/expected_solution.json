@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-celery-kombu-prefetch-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: celery/celery/worker/consumer/consumer.py, celery/celery/worker/consumer/tasks.py, kombu/kombu/connection.py, kombu/kombu/messaging.py. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify celery/celery/worker/consumer/consumer.py as part of the error source",
+        "Must identify celery/celery/worker/consumer/tasks.py as part of the error source",
+        "Must identify kombu/kombu/connection.py as part of the error source",
+        "Must identify kombu/kombu/messaging.py as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) Celery's consumer.py opens a Kombu Connection and invokes tasks.Tasks.start which calls channel.basic_qos with the configured prefetch_count once at startup -> (2) Kombu's connection.py ensure() wrapper detects the broker drop and transparently re-creates the underlying transport, exposing a fresh channel object -> (3) kombu/messaging.py rebinds the consumer to the new channel but does not re-issue basic_qos, leaving the new channel at the AMQP default prefetch_count of 0 (unlimited) -> (4) RabbitMQ delivers a burst of unacked messages, but Celery's worker thread pool is already bounded; without prefetch backpressure the consumer state machine deadlocks on its own queue size accounting.",
+      "evaluation_criteria": [
+        "Must describe the step: Celery's consumer.py opens a Kombu Connection and invokes tasks.Tasks.start whic...",
+        "Must describe the step: Kombu's connection.py ensure() wrapper detects the broker drop and transparently...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) The broker connection drops and Kombu's ensure() recreates the channel without re-applying basic_qos; (2) Celery's consumer does not re-issue prefetch on reconnect because it treats the Kombu channel as a stable abstraction; (3) RabbitMQ's default prefetch_count of 0 means unlimited, so the fresh channel ignores Celery's worker_prefetch_multiplier setting.",
+      "evaluation_criteria": [
+        "Must identify the condition: The broker connection drops and Kombu's ensure() recreates the channel without r...",
+        "Must identify the condition: Celery's consumer does not re-issue prefetch on reconnect because it treats the ...",
+        "Must identify the condition: RabbitMQ's default prefetch_count of 0 means unlimited, so the fresh channel ign...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

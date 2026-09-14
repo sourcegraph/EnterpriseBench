@@ -1,0 +1,70 @@
+{
+  "task_id": "support-mapping-dual-axum-tower-middleware-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/tokio-rs/axum",
+      "rev": "axum-v0.7.5",
+      "path": "axum"
+    },
+    {
+      "url": "https://github.com/tower-rs/tower",
+      "rev": "tower-0.4.13",
+      "path": "tower"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "axum/axum/src/routing/mod.rs",
+      "repo": "axum",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "axum/axum/src/routing/path_router.rs",
+      "repo": "axum",
+      "confidence": 0.85,
+      "source": "deterministic"
+    },
+    {
+      "path": "tower/tower/src/builder/mod.rs",
+      "repo": "tower",
+      "confidence": 0.9,
+      "source": "deterministic"
+    },
+    {
+      "path": "tower/tower/src/layer/layer_fn.rs",
+      "repo": "tower",
+      "confidence": 0.75,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "axum/axum/src/middleware/from_fn.rs",
+      "repo": "axum",
+      "confidence": 0.75
+    },
+    {
+      "path": "tower/tower-layer/src/lib.rs",
+      "repo": "tower",
+      "confidence": 0.7
+    }
+  ],
+  "error_chain": [
+    "axum's Router stores routes in a path_router and applies layer() globally to the underlying service stack",
+    "route_layer() in axum's Router differs: it wraps only routes currently registered, not routes added later via merge",
+    "tower's ServiceBuilder composes layers in declaration order; the wrapped Service is built from the inner-most layer outward",
+    "When the customer calls Router::merge(sub_router) after Router::route_layer(auth), axum's path_router merges sub_router's routes into the parent without re-applying route_layer, leaving those endpoints unwrapped by the auth layer"
+  ],
+  "trigger_conditions": [
+    "Customer's code uses Router::route_layer(auth_layer) followed by Router::merge(sub_router) to attach modular routes",
+    "axum's route_layer applies only to routes registered before the merge call; merged routes bypass it",
+    "tower's ServiceBuilder is unaware of axum's per-route routing decisions, so the Layer is effectively absent for the merged subset"
+  ],
+  "expected_answer": {
+    "error_origin": "axum's Router::route_layer does not wrap routes added later via Router::merge; tower's ServiceBuilder layer is never composed for those routes",
+    "bypass_reason": "route_layer() only applies to routes already in the Router; merge() adds new routes outside that wrap",
+    "correct_config": "Use Router::layer (global) instead of route_layer for auth, or apply route_layer AFTER all merges, or use middleware::from_fn on the merged sub-router so the layer travels with its routes"
+  }
+}

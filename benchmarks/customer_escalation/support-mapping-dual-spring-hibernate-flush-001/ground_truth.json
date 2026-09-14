@@ -1,0 +1,70 @@
+{
+  "task_id": "support-mapping-dual-spring-hibernate-flush-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/spring-projects/spring-framework",
+      "rev": "v6.1.4",
+      "path": "spring-framework"
+    },
+    {
+      "url": "https://github.com/hibernate/hibernate-orm",
+      "rev": "6.4.4",
+      "path": "hibernate-orm"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "spring-framework/spring-orm/src/main/java/org/springframework/orm/jpa/JpaTransactionManager.java",
+      "repo": "spring-framework",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "spring-framework/spring-tx/src/main/java/org/springframework/transaction/support/TransactionTemplate.java",
+      "repo": "spring-framework",
+      "confidence": 0.85,
+      "source": "deterministic"
+    },
+    {
+      "path": "hibernate-orm/hibernate-core/src/main/java/org/hibernate/internal/SessionImpl.java",
+      "repo": "hibernate-orm",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "hibernate-orm/hibernate-core/src/main/java/org/hibernate/event/internal/DefaultAutoFlushEventListener.java",
+      "repo": "hibernate-orm",
+      "confidence": 0.85,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "spring-framework/spring-orm/src/main/java/org/springframework/orm/jpa/EntityManagerFactoryUtils.java",
+      "repo": "spring-framework",
+      "confidence": 0.7
+    },
+    {
+      "path": "hibernate-orm/hibernate-core/src/main/java/org/hibernate/engine/spi/ActionQueue.java",
+      "repo": "hibernate-orm",
+      "confidence": 0.75
+    }
+  ],
+  "error_chain": [
+    "Spring's TransactionTemplate wraps the operation in a JTA-style transaction via JpaTransactionManager which delegates flush decisions to the EntityManager",
+    "Hibernate's SessionImpl owns the dirty-entity action queue; an HQL query triggers DefaultAutoFlushEventListener which flushes pending actions before the query runs",
+    "A native SQL query path bypasses DefaultAutoFlushEventListener because Hibernate cannot determine which entities the SQL touches; FlushMode.AUTO does not apply to native queries",
+    "The native query reads the database directly, sees the pre-save value, and Hibernate's first-level cache still holds the new value; the transaction commits with the discrepancy invisible until downstream code re-reads"
+  ],
+  "trigger_conditions": [
+    "Customer's @Transactional method calls save() then immediately executes a native query (entityManager.createNativeQuery)",
+    "Hibernate's auto-flush listener does not fire for native queries, so dirty entities are not written before the SQL executes",
+    "Spring's JpaTransactionManager defers the flush to commit, leaving the in-method native read against stale persistent state"
+  ],
+  "expected_answer": {
+    "error_origin": "Hibernate's DefaultAutoFlushEventListener not firing for native SQL paths in SessionImpl",
+    "bypass_reason": "Spring's JpaTransactionManager only flushes at commit; it does not insert a flush before a native query because Hibernate's auto-flush is the contract",
+    "correct_config": "Either explicitly call entityManager.flush() before the native query, or set FlushMode.ALWAYS on the query, or restructure to use HQL/Criteria so Hibernate's auto-flush fires"
+  }
+}

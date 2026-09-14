@@ -1,0 +1,30 @@
+{
+  "task_id": "cal-sup-requests-cabundle-007",
+  "checkpoints": {
+    "code_paths": {
+      "expected_solution": "Core code paths: (1) src/requests/utils.py \u2014 Contains DEFAULT_CA_BUNDLE_PATH and environment variable reading logic. (2) src/requests/sessions.py \u2014 Session.request and merge_environment_settings where verify is resolved.",
+      "evaluation_criteria": [
+        "Must identify src/requests/utils.py as part of the core code path",
+        "Must identify src/requests/sessions.py as part of the core code path",
+        "Must reference specific functions, types, or methods from the cited files",
+        "Must explain how src/requests/utils.py interacts with src/requests/sessions.py"
+      ]
+    },
+    "ownership": {
+      "expected_solution": "Ownership: the code lives under src/requests/sessions.py, src/requests/utils.py. Subsystem keywords: session, verify, ca-bundle, environment, tls, ssl.",
+      "evaluation_criteria": [
+        "Must identify the owning subsystem (e.g. directory 'src/requests/utils.py')",
+        "Must reference the secondary subsystem 'src/requests/sessions.py'",
+        "Must reference at least one of the ownership keywords: session, verify, ca-bundle"
+      ]
+    },
+    "severity": {
+      "expected_solution": "Severity: MEDIUM. The reported symptom affects a real user workflow but has a workaround or limited blast radius. In this case: Map customer report of REQUESTS_CA_BUNDLE overriding session.verify=False.",
+      "evaluation_criteria": [
+        "Must assess severity as MEDIUM",
+        "Must justify the severity rating with reference to user impact or blast radius",
+        "Must align severity with the type of failure (e.g. crash vs incorrect-result vs degraded behavior)"
+      ]
+    }
+  }
+}

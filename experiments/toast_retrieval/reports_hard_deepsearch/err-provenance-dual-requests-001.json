@@ -1,0 +1,203 @@
+{
+  "task_id": "err-provenance-dual-requests-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/requests--v2.31.0",
+    "github.com/sg-evals/urllib3--2.1.0"
+  ],
+  "retrieved_paths": [
+    "requests/api.py",
+    "requests/sessions.py",
+    "requests/adapters.py",
+    "requests/utils.py",
+    "requests/certs.py",
+    "src/urllib3/connectionpool.py",
+    "src/urllib3/connection.py",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/exceptions.py",
+    "src/urllib3/util/retry.py",
+    "requests/exceptions.py",
+    "src/urllib3/poolmanager.py",
+    "Modules/_ssl.c"
+  ],
+  "retrieved_paths_union": [
+    "requests/api.py",
+    "requests/sessions.py",
+    "requests/adapters.py",
+    "requests/utils.py",
+    "requests/certs.py",
+    "src/urllib3/connectionpool.py",
+    "src/urllib3/connection.py",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/exceptions.py",
+    "src/urllib3/util/retry.py",
+    "requests/exceptions.py",
+    "src/urllib3/poolmanager.py",
+    "Modules/_ssl.c"
+  ],
+  "required_files": [
+    "src/requests/adapters.py",
+    "src/urllib3/connectionpool.py"
+  ],
+  "ir_scores": {
+    "task_id": "err-provenance-dual-requests-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.525
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1538,
+    "n_retrieved": 13,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "err-provenance-dual-requests-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.525
+    },
+    "mrr": 0.3333,
+    "map_score": 0.3333,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1538,
+    "n_retrieved": 13,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 330.6,
+  "response_chars": 20672,
+  "raw_response": "---\ntitle: Tracing requests\u2013urllib3 SSL certificate verification and CA bundle resolution\nshare_url: https://demo.sourcegraph.com/deepsearch/84981f24-49b4-4697-a8f4-a8251b0e1c77\nurl: https://demo.sourcegraph.com/deepsearch/2204\ncreated: 2026-08-18T01:48:26Z\nupdated: 2026-08-18T01:53:17Z\n---\n\n# # Trace requests SSLError through to urllib3 certificate verification and ssl module interaction\n\nA customer reports this error when calling an internal API endpoint signed by\ntheir corporate CA:\n\n    requests.exceptions.SSLError: HTTPSConnectionPool(host='api.internal.corp',\n    port=443): Max retries exceeded with url: /v1/data (Caused by\n    SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED]\n    certificate verify failed: unable to get local issuer certificate\n    (_ssl.c:1006)')))\n\nThe customer has set `REQUESTS_CA_BUNDLE=/etc/ssl/certs/corp-ca.pem` but the\nerror persists. They have verified the certificate file exists and is valid\nusing `openssl verify`.\n\nYour task:\n\n1. Find where the requests library initiates HTTPS connections and how it\n   resolves CA bundle configuration \u2014 trace from requests.get() through the\n   Session, HTTPAdapter, and into urllib3 pool manager creation.\n2. Find where urllib3 performs SSL certificate verification \u2014 trace through\n   HTTPSConnectionPool, the ssl_wrap_socket utility, and how it interacts\n   with Python's ssl module.\n3. Trace the full error propagation chain: Python ssl module raises\n   SSLCertVerificationError -> urllib3 catches and wraps in MaxRetryError ->\n   requests catches and wraps in SSLError -> user sees nested exception.\n   Document each file and function in the chain.\n4. Identify why REQUESTS_CA_BUNDLE might not take effect \u2014 examine the\n   precedence of verify parameter, environment variables, certifi fallback,\n   and how the merge_environment_settings method resolves the final CA bundle\n   path. Determine conditions where the env var is silently overridden.\n\nWrite your analysis to /workspace/ERROR_PROVENANCE.md with:\n\n- Full error chain (file:function at each step)\n- Error origin in urllib3/Python ssl module\n- CA bundle resolution logic in requests\n- Conditions where REQUESTS_CA_BUNDLE is silently ignored\n\n\nSearch only these repositories: github.com/sg-evals/requests--v2.31.0, github.com/sg-evals/urllib3--2.1.0\n\nThe file module only produces JSON/CSV. The full analysis is below as the markdown document content. Here is the complete `ERROR_PROVENANCE.md`:\n\n---\n\n# SSL Error Provenance Analysis\n\n## 1. Full Error Chain (file:function at each step)\n\n### Step 1 \u2014 `requests.get()` / `requests.api.request()`\n\n[`requests/api.py:get()`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/api.py?L62) \u2192 [`requests/api.py:request()`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/api.py?L14)\n\n`requests.get()` calls `request(\"get\", ...)`, which creates a temporary `Session` via `with sessions.Session() as session:`, then calls `session.request()`.\n\n---\n\n### Step 2 \u2014 `Session.request()` calls `merge_environment_settings()`\n\n[`requests/sessions.py:Session.request()`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/sessions.py?L502-L591)\n\n```python\nsettings = self.merge_environment_settings(prep.url, proxies, stream, verify, cert)\nresp = self.send(prep, **send_kwargs)\n```\n\nThis is where the final CA bundle path is resolved (see \u00a74).\n\n---\n\n### Step 3 \u2014 `Session.send()` selects the adapter\n\n[`requests/sessions.py:Session.send()`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/sessions.py?L673-L749)\n\n```python\nadapter = self.get_adapter(url=request.url)  # selects HTTPAdapter for https://\nr = adapter.send(request, **kwargs)\n```\n\n---\n\n### Step 4 \u2014 `HTTPAdapter.send()` calls `cert_verify()`, then `conn.urlopen()`\n\n[`requests/adapters.py:HTTPAdapter.send()`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L434-L538)\n\n```python\nconn = self.get_connection(request.url, proxies)   # \u2192 HTTPSConnectionPool\nself.cert_verify(conn, request.url, verify, cert)  # sets conn.ca_certs etc.\nresp = conn.urlopen(...)\n```\n\n[`requests/adapters.py:HTTPAdapter.cert_verify()`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L237-L292):\n\n```python\nif verify is not True:\n    cert_loc = verify                              # use path string directly\nif not cert_loc:\n    cert_loc = extract_zipped_paths(DEFAULT_CA_BUNDLE_PATH)  # certifi fallback\nconn.cert_reqs = \"CERT_REQUIRED\"\nconn.ca_certs = cert_loc   # or conn.ca_cert_dir if directory\n```\n\n`DEFAULT_CA_BUNDLE_PATH = certs.where()` is set at import time in [`requests/utils.py` line 63](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/utils.py?L63), where [`requests/certs.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/certs.py) simply re-exports `certifi.where()`.\n\n---\n\n### Step 5 \u2014 `HTTPSConnectionPool._new_conn()` creates `HTTPSConnection`\n\n[`src/urllib3/connectionpool.py:HTTPSConnectionPool._new_conn()`](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/connectionpool.py?L1047-L1086)\n\nPasses `ca_certs`, `ca_cert_dir`, `cert_reqs`, etc. from the pool's own attributes into a new `HTTPSConnection` object.\n\n---\n\n### Step 6 \u2014 `_validate_conn()` triggers `conn.connect()`\n\n[`src/urllib3/connectionpool.py:HTTPSConnectionPool._validate_conn()`](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/connectionpool.py?L1088-L1107)\n\n```python\nif conn.is_closed:\n    conn.connect()   # triggers TLS handshake\n```\n\n---\n\n### Step 7 \u2014 `HTTPSConnection.connect()` calls `_ssl_wrap_socket_and_match_hostname()`\n\n[`src/urllib3/connection.py:HTTPSConnection.connect()`](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/connection.py?L609-L666)\n\n```python\nself.sock = sock = self._new_conn()\nsock_and_verified = _ssl_wrap_socket_and_match_hostname(\n    sock=sock, cert_reqs=self.cert_reqs,\n    ca_certs=self.ca_certs, ca_cert_dir=self.ca_cert_dir,\n    server_hostname=server_hostname, ssl_context=self.ssl_context, ...\n)\n```\n\n---\n\n### Step 8 \u2014 `_ssl_wrap_socket_and_match_hostname()` builds the `SSLContext`\n\n[`src/urllib3/connection.py:_ssl_wrap_socket_and_match_hostname()`](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/connection.py?L708-L830)\n\nCalls [`src/urllib3/util/ssl_.py:create_urllib3_context()`](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/util/ssl_.py?L216-L356), which creates an `ssl.SSLContext(PROTOCOL_TLS_CLIENT)` with `verify_mode=CERT_REQUIRED` and `check_hostname=True`. Then calls `ssl_wrap_socket(...)`.\n\n---\n\n### Step 9 \u2014 `ssl_wrap_socket()` loads the CA bundle via `load_verify_locations()`\n\n[`src/urllib3/util/ssl_.py:ssl_wrap_socket()`](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/util/ssl_.py?L397-L471)\n\n```python\nif ca_certs or ca_cert_dir or ca_cert_data:\n    context.load_verify_locations(ca_certs, ca_cert_dir, ca_cert_data)\n```\n\nThen wraps the socket \u2014 [`_ssl_wrap_socket_impl()`](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/util/ssl_.py?L498-L514):\n\n```python\nreturn ssl_context.wrap_socket(sock, server_hostname=server_hostname)\n```\n\n---\n\n### Step 10 \u2014 Python `ssl` module raises `ssl.SSLCertVerificationError` \u2190 **ROOT ORIGIN**\n\n**File:** CPython `Modules/_ssl.c` (Python stdlib, line ~1006)\n\n`ssl.SSLContext.wrap_socket()` calls `SSL_connect()`. OpenSSL returns `X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY` when the chain cannot be verified. CPython translates this to:\n\n```\nssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED]\ncertificate verify failed: unable to get local issuer certificate (_ssl.c:1006)\n```\n\nIn urllib3, `ssl.SSLError` is aliased as `BaseSSLError` at [`src/urllib3/connection.py` line 32](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/connection.py?L32).\n\n---\n\n### Step 11 \u2014 urllib3 wraps `BaseSSLError` \u2192 `urllib3.exceptions.SSLError`\n\n[`src/urllib3/connectionpool.py:HTTPConnectionPool.urlopen()`](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/connectionpool.py?L814-L850) and [`_make_request()`](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/connectionpool.py?L464-L491):\n\n```python\nif isinstance(e, (BaseSSLError, CertificateError)):\n    new_e = SSLError(e)    # urllib3.exceptions.SSLError wrapping ssl.SSLError\nretries = retries.increment(method, url, error=new_e, ...)\n```\n\n[`urllib3.exceptions.SSLError`](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/exceptions.py?L55-L57) is defined as a direct subclass of `urllib3.exceptions.HTTPError`.\n\n---\n\n### Step 12 \u2014 Retry exhaustion raises `urllib3.exceptions.MaxRetryError`\n\n[`src/urllib3/util/retry.py:Retry.increment()`](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/util/retry.py?L513-L515)\n\n```python\nif new_retry.is_exhausted():\n    reason = error or ResponseError(cause)\n    raise MaxRetryError(_pool, url, reason) from reason\n```\n\n[`MaxRetryError.__init__`](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/exceptions.py?L96-L103) formats the message:\n\n```python\nmessage = f\"Max retries exceeded with url: {url} (Caused by {reason!r})\"\n```\n\nThe requests `HTTPAdapter` default is `Retry(0, read=False)` ([`requests/adapters.py` line 143](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L143)), so retries are exhausted immediately on any SSL error.\n\n---\n\n### Step 13 \u2014 requests catches `MaxRetryError`, raises `requests.exceptions.SSLError`\n\n[`requests/adapters.py:HTTPAdapter.send()`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L503-L517)\n\n```python\nexcept MaxRetryError as e:\n    if isinstance(e.reason, _SSLError):    # _SSLError = urllib3.exceptions.SSLError\n        raise SSLError(e, request=request)\n```\n\n[`requests.exceptions.SSLError`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/exceptions.py?L57) inherits `ConnectionError \u2192 RequestException \u2192 IOError`.\n\n---\n\n## 2. Error Origin Summary\n\n| Layer | Exception class | Site |\n|-------|----------------|------|\n| Root cause | `ssl.SSLCertVerificationError` | CPython `_ssl.c:~1006` via `SSL_connect()` |\n| urllib3 first wrap | `urllib3.exceptions.SSLError` | [`connectionpool.py:urlopen()` lines 828\u2013829](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/connectionpool.py?L828-L829) |\n| urllib3 retry wrap | `urllib3.exceptions.MaxRetryError` | [`retry.py:Retry.increment()` line 515](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/util/retry.py?L515) |\n| requests final wrap | `requests.exceptions.SSLError` | [`adapters.py:HTTPAdapter.send()` line 517](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L517) |\n\nThe precise handshake failure site is [`ssl_.py:_ssl_wrap_socket_impl()` line 514](https://demo.sourcegraph.com/r/github.com/sg-evals/urllib3--2.1.0/-/blob/src/urllib3/util/ssl_.py?L514):\n```python\nreturn ssl_context.wrap_socket(sock, server_hostname=server_hostname)\n```\n\n---\n\n## 3. CA Bundle Resolution Logic\n\n### `merge_environment_settings` \u2014 env var lookup\n\n[`requests/sessions.py:Session.merge_environment_settings()` lines 751\u2013780](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/sessions.py?L751-L780)\n\n```python\nif self.trust_env:\n    if verify is True or verify is None:          # GUARD: env var only read here\n        verify = (\n            os.environ.get(\"REQUESTS_CA_BUNDLE\")  # consulted first\n            or os.environ.get(\"CURL_CA_BUNDLE\")   # fallback\n            or verify                             # unchanged (True) if both unset/empty\n        )\n\nverify = merge_setting(verify, self.verify)       # request-level beats session-level\n```\n\n[`merge_setting()`](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/sessions.py?L61-L88) for non-Mapping types always returns the first argument (`request_setting`), so after the env var block, `verify` holds the env var path (or `True`), and `self.verify` only applies when `verify` is still `None`.\n\n### `cert_verify` \u2014 translates `verify` to `ca_certs` on the connection object\n\n[`requests/adapters.py:HTTPAdapter.cert_verify()` lines 237\u2013292](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L237-L292)\n\n```python\ncert_loc = None\nif verify is not True:\n    cert_loc = verify                                      # env var path or explicit path\nif not cert_loc:\n    cert_loc = extract_zipped_paths(DEFAULT_CA_BUNDLE_PATH)  # certifi\nconn.ca_certs = cert_loc\n```\n\n### Precedence order (highest to lowest)\n\n| Priority | Source | Condition |\n|----------|--------|-----------|\n| 1 (highest) | `verify=` kwarg to `requests.get()` / `session.request()` | Any non-`None` value |\n| 2 | `session.verify` attribute | When request-level `verify` is `None` AND `trust_env=False` |\n| 3 | `REQUESTS_CA_BUNDLE` env var | Only if `verify` is `True` or `None` AND `trust_env=True` |\n| 4 | `CURL_CA_BUNDLE` env var | Same conditions, used only if `REQUESTS_CA_BUNDLE` unset/empty |\n| 5 (lowest) | certifi bundle (`DEFAULT_CA_BUNDLE_PATH`) | Applied in `cert_verify()` when `verify` is still `True` |\n\n---\n\n## 4. Conditions Where `REQUESTS_CA_BUNDLE` Is Silently Ignored\n\n### Condition A: `verify` is not `True` or `None` at call time\n\nThe guard in [`merge_environment_settings` line 767](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/sessions.py?L767):\n```python\nif verify is True or verify is None:\n    verify = os.environ.get(\"REQUESTS_CA_BUNDLE\") or ...\n```\nIf `verify=\"/another/path.pem\"` is passed to `requests.get()`, or set on the session, the `if` is **false** and the env var is never read. The hardcoded path wins silently.\n\n### Condition B: `session.trust_env = False`\n\nThe entire lookup is inside `if self.trust_env:` ([line 758](https://demo.sourcegraph.com/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/sessions.py?L758)). Setting `session.trust_env = False` disables all env var lookups with no warning.\n\n### Condition C: `REQUESTS_CA_BUNDLE=\"\"` (empty string)\n\n```python\nos.environ.get(\"REQUESTS_CA_BUNDLE\") or os.environ.get(\"CURL_CA_BUNDLE\") or verify\n```\nAn empty string is falsy. Python's `or` falls through to `CURL_CA_BUNDLE`, then to `verify` (`True`), causing certifi to be used silently.\n\n### Condition D: `verify=False` anywhere in the call chain\n\n`cert_verify()` sets `conn.cert_reqs = \"CERT_NONE\"` and `conn.ca_certs = None`. All certificate verification is disabled; the env var is irrelevant and no `SSLCertVerificationError` is raised \u2014 but the connection is completely unprotected.\n\n### Condition E: Connection reuse \u2014 TLS already negotiated\n\nIf a connection is re-used from the pool (`conn.is_closed` is `False`), `_validate_conn()` does **not** call `conn.connect()` again. The TLS handshake already happened with whatever CA bundle was in effect for the *first* request on that socket. A subsequent call with a corrected env var has no effect on the live socket.\n\n### Condition F: Missing intermediate CA in the bundle file\n\n`context.load_verify_locations(ca_certs)` only loads what is in the file. If `/etc/ssl/certs/corp-ca.pem` contains only the root CA but not the intermediate CA, and the server does not include the intermediate in its TLS `Certificate` message, OpenSSL fails with `unable to get local issuer certificate`. `openssl verify` on the command line may not reproduce this because it resolves intermediates differently (e.g., from the system store).\n\n### Root Cause Summary for This Customer\n\n| Most likely cause | How to verify |\n|---|---|\n| Something overrides `verify=` explicitly (path or `True` set on session/call) | Audit all `session.verify =` and `verify=` call sites |\n| `trust_env=False` on the session | `grep -r \"trust_env\"` in application code |\n| Missing intermediate CA in the PEM file | `openssl s_client -connect api.internal.corp:443 -CAfile /etc/ssl/certs/corp-ca.pem` |\n| Env var not visible in the process | `python -c \"import os; print(os.environ.get('REQUESTS_CA_BUNDLE'))\"` in-process |\n\n## Sources\n\n- [github.com/sg-evals/requests--v2.31.0](/github.com/sg-evals/requests--v2.31.0)\n- [github.com/sg-evals/urllib3--2.1.0](/github.com/sg-evals/urllib3--2.1.0)\n- [github.com/sg-evals/requests--v2.31.0](/github.com/sg-evals/requests--v2.31.0)\n- [github.com/sg-evals/urllib3--2.1.0](/github.com/sg-evals/urllib3--2.1.0)\n- [github.com/sg-evals/urllib3--2.1.0](/github.com/sg-evals/urllib3--2.1.0)\n- [github.com/sg-evals/urllib3--2.1.0](/github.com/sg-evals/urllib3--2.1.0)\n- [github.com/sg-evals/requests--v2.31.0/requests/api.py@888b11e](/github.com/sg-evals/requests--v2.31.0@888b11ea9c865915151fc53f9feb080c32399f32/-/blob/requests/api.py)\n- [github.com/sg-evals/requests--v2.31.0/requests/sessions.py@888b11e](/github.com/sg-evals/requests--v2.31.0@888b11ea9c865915151fc53f9feb080c32399f32/-/blob/requests/sessions.py)\n- [github.com/sg-evals/requests--v2.31.0/requests/adapters.py@888b11e](/github.com/sg-evals/requests--v2.31.0@888b11ea9c865915151fc53f9feb080c32399f32/-/blob/requests/adapters.py)\n- [github.com/sg-evals/requests--v2.31.0/requests/exceptions.py@888b11e](/github.com/sg-evals/requests--v2.31.0@888b11ea9c865915151fc53f9feb080c32399f32/-/blob/requests/exceptions.py)\n- [github.com/sg-evals/requests--v2.31.0/requests/certs.py@888b11e](/github.com/sg-evals/requests--v2.31.0@888b11ea9c865915151fc53f9feb080c32399f32/-/blob/requests/certs.py)\n- [github.com/sg-evals/urllib3--2.1.0/src/urllib3/connectionpool.py@6164954](/github.com/sg-evals/urllib3--2.1.0@61649544cd0e6e5c45327c0dd8fcaae0d4fa0361/-/blob/src/urllib3/connectionpool.py)\n- [github.com/sg-evals/urllib3--2.1.0/src/urllib3/connection.py@6164954](/github.com/sg-evals/urllib3--2.1.0@61649544cd0e6e5c45327c0dd8fcaae0d4fa0361/-/blob/src/urllib3/connection.py)\n- [github.com/sg-evals/urllib3--2.1.0/src/urllib3/util/ssl_.py@6164954](/github.com/sg-evals/urllib3--2.1.0@61649544cd0e6e5c45327c0dd8fcaae0d4fa0361/-/blob/src/urllib3/util/ssl_.py)\n- [github.com/sg-evals/urllib3--2.1.0/src/urllib3/exceptions.py@6164954](/github.com/sg-evals/urllib3--2.1.0@61649544cd0e6e5c45327c0dd8fcaae0d4fa0361/-/blob/src/urllib3/exceptions.py)\n- [github.com/sg-evals/urllib3--2.1.0/src/urllib3/util/retry.py@6164954?L1-100](/github.com/sg-evals/urllib3--2.1.0@61649544cd0e6e5c45327c0dd8fcaae0d4fa0361/-/blob/src/urllib3/util/retry.py?L1-100)\n- [github.com/sg-evals/requests--v2.31.0/requests/utils.py@888b11e?L1-60](/github.com/sg-evals/requests--v2.31.0@888b11ea9c865915151fc53f9feb080c32399f32/-/blob/requests/utils.py?L1-60)\n- [DEFAULT_CA_BUNDLE_PATH repo:github.com/sg-evals/requests--v2.31.0](/search?q=patterntype:keyword%20DEFAULT_CA_BUNDLE_PATH%20repo:github.com%2Fsg-evals%2Frequests--v2.31.0)\n- [github.com/sg-evals/urllib3--2.1.0/src/urllib3/util/retry.py@6164954?L350-500](/github.com/sg-evals/urllib3--2.1.0@61649544cd0e6e5c45327c0dd8fcaae0d4fa0361/-/blob/src/urllib3/util/retry.py?L350-500)\n- [github.com/sg-evals/urllib3--2.1.0/src/urllib3/util/retry.py@6164954?L500-560](/github.com/sg-evals/urllib3--2.1.0@61649544cd0e6e5c45327c0dd8fcaae0d4fa0361/-/blob/src/urllib3/util/retry.py?L500-560)\n- [github.com/sg-evals/urllib3--2.1.0/src/urllib3/poolmanager.py@6164954?L1-80](/github.com/sg-evals/urllib3--2.1.0@61649544cd0e6e5c45327c0dd8fcaae0d4fa0361/-/blob/src/urllib3/poolmanager.py?L1-80)\n- [github.com/sg-evals/urllib3--2.1.0/src/urllib3/poolmanager.py@6164954?L80-200](/github.com/sg-evals/urllib3--2.1.0@61649544cd0e6e5c45327c0dd8fcaae0d4fa0361/-/blob/src/urllib3/poolmanager.py?L80-200)\n- [github.com/sg-evals/urllib3--2.1.0/src/urllib3/poolmanager.py@6164954?L200-310](/github.com/sg-evals/urllib3--2.1.0@61649544cd0e6e5c45327c0dd8fcaae0d4fa0361/-/blob/src/urllib3/poolmanager.py?L200-310)\n\n\nGenerated files:\n- files/ERROR_PROVENANCE.json: /.api/agent-files/v1/deep-search/84981f24-49b4-4697-a8f4-a8251b0e1c77/files/ERROR_PROVENANCE.json\n- files/ERROR_PROVENANCE_md.json: /.api/agent-files/v1/deep-search/84981f24-49b4-4697-a8f4-a8251b0e1c77/files/ERROR_PROVENANCE_md.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "err-provenance-dual-requests-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.2184
+    },
+    "mrr": 0.1667,
+    "map_score": 0.0833,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0769,
+    "n_retrieved": 13,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "requests/api.py",
+    "requests/sessions.py",
+    "src/requests/adapters.py",
+    "requests/utils.py",
+    "requests/certs.py",
+    "src/urllib3/connectionpool.py",
+    "src/urllib3/connection.py",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/exceptions.py",
+    "src/urllib3/util/retry.py",
+    "requests/exceptions.py",
+    "src/urllib3/poolmanager.py",
+    "Modules/_ssl.c"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "err-provenance-dual-requests-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.2184
+    },
+    "mrr": 0.1667,
+    "map_score": 0.0833,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0769,
+    "n_retrieved": 13,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

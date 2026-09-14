@@ -1,0 +1,33 @@
+{
+  "task_id": "support-mapping-dual-react-relay-suspense-001",
+  "checkpoints": {
+    "error_source": {
+      "expected_solution": "The cross-repo path crosses these required files: react/packages/react-reconciler/src/ReactFiberSuspenseComponent.js, react/packages/react-reconciler/src/ReactFiberBeginWork.js, relay/packages/relay-runtime/store/RelayModernEnvironment.js, relay/packages/react-relay/relay-hooks/useFragmentInternal.js. Each file must be cited with the specific class, function, or construct relevant to the symptom (not just the file path).",
+      "evaluation_criteria": [
+        "Must identify react/packages/react-reconciler/src/ReactFiberSuspenseComponent.js as part of the error source",
+        "Must identify react/packages/react-reconciler/src/ReactFiberBeginWork.js as part of the error source",
+        "Must identify relay/packages/relay-runtime/store/RelayModernEnvironment.js as part of the error source",
+        "Must identify relay/packages/react-relay/relay-hooks/useFragmentInternal.js as part of the error source",
+        "Must reference a specific class, function, or method (not just the file path)"
+      ]
+    },
+    "error_chain": {
+      "expected_solution": "Cross-repo propagation chain: (1) Relay's RelayModernEnvironment.executeMutation calls store.publish which bumps the store version and fans out to all subscribed snapshots -> (2) useFragmentInternal subscribes via useSyncExternalStore so any version bump triggers React to re-evaluate the snapshot, even if the fragment data did not change -> (3) When Relay's snapshot rebuild encounters a missing record (because an invalidator widened the scope), useFragmentInternal throws a promise to suspend the component -> (4) ReactFiberBeginWork sees the thrown promise and forces the nearest Suspense boundary into pending state; ReactFiberSuspenseComponent discards the previous tree state per the offscreen-mount semantics -> (5) The boundary's children unmount and remount when the mutation settles, dropping all client-side state under the boundary.",
+      "evaluation_criteria": [
+        "Must describe the step: Relay's RelayModernEnvironment.executeMutation calls store.publish which bumps t...",
+        "Must describe the step: useFragmentInternal subscribes via useSyncExternalStore so any version bump trig...",
+        "Must include all intermediate steps in the correct causal order",
+        "Must cite at least one file from each repo in the propagation path"
+      ]
+    },
+    "trigger_conditions": {
+      "expected_solution": "Trigger conditions: (1) A Relay mutation calls commitMutation with an updater that invalidates a record, bumping the global store version; (2) A useFragment under the Suspense boundary subscribes to the same store and triggers a snapshot rebuild that suspends; (3) React's Suspense boundary, when its child suspends, discards the concurrent-mode offscreen state because the reconciler treats the remount as a fresh subtree.",
+      "evaluation_criteria": [
+        "Must identify the condition: A Relay mutation calls commitMutation with an updater that invalidates a record,...",
+        "Must identify the condition: A useFragment under the Suspense boundary subscribes to the same store and trigg...",
+        "Must identify the condition: React's Suspense boundary, when its child suspends, discards the concurrent-mode...",
+        "Must explain the combined conditions necessary to reproduce the customer's reported behavior"
+      ]
+    }
+  }
+}

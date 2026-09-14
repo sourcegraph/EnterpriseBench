@@ -1,0 +1,121 @@
+# support_code_mapping: Map customer Alembic autogenerate producing empty migrations after SQLAlchemy 2.x model refactor to the Alembic env.py / SQLAlchemy MetaData boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "sqlalchemy-alembic-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-sqlalchemy-alembic-metadata-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Map customer Alembic autogenerate producing empty migrations after SQLAlchemy 2.x model refactor to the Alembic env.py / SQLAlchemy MetaData boundary"
+prompt = """
+A customer reports that after upgrading SQLAlchemy from 1.4 to 2.0
+and refactoring their models into separate modules, alembic
+revision --autogenerate produces empty migrations. The models clearly
+differ from the database schema, but Alembic detects no changes.
+
+Your task:
+1. Find where Alembic's env.py imports the customer's MetaData and
+   passes target_metadata to context.configure.
+2. Find where SQLAlchemy 2.0's DeclarativeBase registers tables on a
+   shared MetaData, and how splitting models across modules can
+   create multiple unrelated MetaData instances.
+3. Trace the cross-repo path: alembic command -> env.py import ->
+   SQLAlchemy DeclarativeBase.metadata -> MetaData.tables -> Alembic
+   autogenerate compare_metadata. Cite each file and the function
+   responsible.
+4. Identify why the customer's split-module refactor (each file
+   declares its own DeclarativeBase) produces multiple MetaData
+   instances, and only the one referenced in env.py is compared.
+"""
+
+[[repos]]
+url = "https://github.com/sqlalchemy/sqlalchemy"
+rev = "rel_2_0_29"
+path = "sqlalchemy"
+role = "upstream"
+
+[[repos]]
+url = "https://github.com/sqlalchemy/alembic"
+rev = "rel_1_13_1"
+path = "alembic"
+role = "primary"
+
+[metadata]
+languages = ["python"]
+total_loc = 400000
+dependency_depth = 2
+frameworks = ["sqlalchemy", "alembic"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Empty-migration regression is split between Alembic's autogenerate and SQLAlchemy's DeclarativeBase metadata semantics. Cross-repo navigation is required to see why split-module models produce multiple MetaData instances."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "alembic/alembic/autogenerate/compare.py"
+repo = "alembic"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "alembic/alembic/runtime/environment.py"
+repo = "alembic"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "sqlalchemy/lib/sqlalchemy/orm/decl_api.py"
+repo = "sqlalchemy"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "sqlalchemy/lib/sqlalchemy/sql/schema.py"
+repo = "sqlalchemy"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "alembic/alembic/autogenerate/api.py"
+repo = "alembic"
+confidence = 0.75
+
+[[ground_truth.sufficient_files]]
+path = "sqlalchemy/lib/sqlalchemy/orm/decl_base.py"
+repo = "sqlalchemy"
+confidence = 0.7

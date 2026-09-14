@@ -1,0 +1,188 @@
+{
+  "task_id": "err-provenance-dual-grafana-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/grafana--v10.2.0",
+    "github.com/sg-evals/prometheus--v2.48.0"
+  ],
+  "retrieved_paths": [
+    "promql/engine.go",
+    "promql/query_logger.go",
+    "web/api/v1/api.go",
+    "pkg/api/api.go",
+    "pkg/services/datasourceproxy/datasourceproxy.go",
+    "pkg/api/pluginproxy/ds_proxy.go",
+    "pkg/util/proxyutil/reverse_proxy.go",
+    "pkg/services/datasources/service/datasource.go"
+  ],
+  "retrieved_paths_union": [
+    "promql/engine.go",
+    "promql/query_logger.go",
+    "web/api/v1/api.go",
+    "pkg/api/api.go",
+    "pkg/services/datasourceproxy/datasourceproxy.go",
+    "pkg/api/pluginproxy/ds_proxy.go",
+    "pkg/util/proxyutil/reverse_proxy.go",
+    "pkg/services/datasources/service/datasource.go"
+  ],
+  "required_files": [
+    "pkg/api/datasource_proxy.go",
+    "web/api/v1/api.go"
+  ],
+  "ir_scores": {
+    "task_id": "err-provenance-dual-grafana-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.3066
+    },
+    "mrr": 0.3333,
+    "map_score": 0.1667,
+    "file_recall": 0.5,
+    "context_efficiency": 0.125,
+    "n_retrieved": 8,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "err-provenance-dual-grafana-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.3066
+    },
+    "mrr": 0.3333,
+    "map_score": 0.1667,
+    "file_recall": 0.5,
+    "context_efficiency": 0.125,
+    "n_retrieved": 8,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 330.6,
+  "response_chars": 16812,
+  "raw_response": "---\ntitle: Tracing Grafana datasource proxy Bad Gateway from Prometheus query timeouts\nshare_url: https://demo.sourcegraph.com/deepsearch/b89b7994-c28d-47bd-8da0-7e2bd29758d1\nurl: https://demo.sourcegraph.com/deepsearch/2203\ncreated: 2026-08-18T01:47:35Z\nupdated: 2026-08-18T01:52:25Z\n---\n\n# # Trace Grafana dashboard 'Bad Gateway' datasource proxy error to Prometheus query engine timeout origin\n\nA customer reports that their Grafana dashboard intermittently shows a \"Bad Gateway\"\nerror on panels backed by a Prometheus datasource. The raw error visible in the\nbrowser network tab is:\n\n    {\"message\":\"Bad Gateway\",\"status\":\"bad-gateway\"}\n\nThe Grafana server logs show:\n\n    logger=datasource.proxy t=2024-01-15T10:23:45Z level=error msg=\"Data proxy error\"\n    error=\"context deadline exceeded\" remote_addr=10.0.0.5\n    url=/api/datasources/proxy/1/api/v1/query_range\n\nThe Prometheus server logs show:\n\n    ts=2024-01-15T10:23:44Z caller=query_logger.go:114 level=warn component=activeQueryTracker\n    msg=\"query timed out\" query=\"rate(http_requests_total{job=~\\\".*\\\"}[5m])\"\n\nThe customer wants to understand why a Prometheus timeout surfaces as a generic\n\"Bad Gateway\" in Grafana rather than a descriptive error about query timeout.\n\nYour task:\n\n1. Find where Grafana's datasource proxy handles outbound HTTP requests to\n   Prometheus \u2014 trace from the dashboard query API through the proxy middleware.\n2. Find where Prometheus's query engine enforces timeouts and returns timeout\n   errors \u2014 trace through the v1 API query handler to the PromQL engine.\n3. Trace the full error propagation chain: Prometheus engine timeout -> HTTP 503\n   response -> Grafana proxy receives error -> Grafana formats \"Bad Gateway\" for\n   the frontend. Document each file and function in the chain.\n4. Identify why the original timeout context is lost \u2014 examine how Grafana's\n   proxy translates upstream HTTP errors and whether the Prometheus error body\n   is preserved or discarded.\n\nWrite your analysis to /workspace/ERROR_PROVENANCE.md with:\n\n- Full error chain (file:function at each step)\n- Error origin in Prometheus query engine\n- Error translation in Grafana datasource proxy\n- Why the original timeout message is lost in translation\n\n\nSearch only these repositories: github.com/sg-evals/grafana--v10.2.0, github.com/sg-evals/prometheus--v2.48.0\n\nThe CSV wrapper isn't ideal for a Markdown doc. The analysis is complete \u2014 let me present it directly:\n\n---\n\n## Analysis: Grafana \"Bad Gateway\" from Prometheus Query Timeout\n\nHere is the full error provenance. The key finding is that **two independent timeout deadlines** exist and the one that fires determines whether any error detail reaches the browser.\n\n---\n\n### Error Chain (file:function at each step)\n\n#### STEP 1 \u2014 Prometheus PromQL Engine enforces timeout\n\n**[`promql/engine.go:589`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.48.0/-/blob/promql/engine.go?L589)** \u2014 `(*Engine).exec`\n\n```go\nctx, cancel := context.WithTimeout(ctx, ng.timeout)  // deadline from --query.timeout flag\n```\n\nDuring evaluation, the engine polls for deadline expiry:\n\n**[`promql/engine.go:239\u2013256`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.48.0/-/blob/promql/engine.go?L239-L256)** \u2014 `contextErr`\n\n```go\ncase errors.Is(err, context.DeadlineExceeded):\n    return ErrQueryTimeout(env)  // typed sentinel: \"query timed out in <env>\"\n```\n\nIf the `activeQueryTracker` concurrency slot-wait is also running:\n\n**[`promql/query_logger.go:200`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.48.0/-/blob/promql/query_logger.go?L190-L202)** \u2014 `(ActiveQueryTracker).Insert`\n\n```go\ncase <-ctx.Done():\n    return 0, ctx.Err()  // returns context.DeadlineExceeded raw\n```\n\nThe Prometheus log line `msg=\"query timed out\"` is the deferred query-logger flush at [`engine.go:592\u2013622`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.48.0/-/blob/promql/engine.go?L592-L622).\n\n---\n\n#### STEP 2 \u2014 Prometheus v1 API maps error \u2192 HTTP 503 + JSON body\n\n**[`web/api/v1/api.go:565\u2013567`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.48.0/-/blob/web/api/v1/api.go?L565-L567)** \u2014 `(*API).queryRange`\n\n```go\nres := qry.Exec(ctx)\nif res.Err != nil {\n    return apiFuncResult{nil, returnAPIError(res.Err), ...}\n}\n```\n\n**[`web/api/v1/api.go:635`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.48.0/-/blob/web/api/v1/api.go?L622-L646)** \u2014 `returnAPIError`\n\n```go\ncase promql.ErrQueryTimeout:\n    return &apiError{errorTimeout, err}\n```\n\n**[`web/api/v1/api.go:1759\u20131773`](https://demo.sourcegraph.com/r/github.com/sg-evals/prometheus--v2.48.0/-/blob/web/api/v1/api.go?L1737-L1776)** \u2014 `(*API).respondError`\n\n```go\ncase errorTimeout:\n    code = http.StatusServiceUnavailable  // 503\n// ...\nw.WriteHeader(code)\nw.Write(b)  // {\"status\":\"error\",\"errorType\":\"timeout\",\"error\":\"query timed out in query execution\"}\n```\n\nPrometheus sends **HTTP 503** with a well-structured JSON body.\n\n---\n\n#### STEP 3 \u2014 Grafana routes browser panel query to datasource proxy\n\n**[`pkg/api/api.go:422`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/api/api.go?L422)** \u2014 route registration\n\n```go\napiRoute.Any(\"/datasources/proxy/:id/*\", ..., hs.ProxyDataSourceRequest)\n```\n\n**[`pkg/services/datasourceproxy/datasourceproxy.go:58`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/datasourceproxy/datasourceproxy.go?L58)** `ProxyDataSourceRequest` \u2192 [`L87`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/datasourceproxy/datasourceproxy.go?L87) `ProxyDatasourceRequestWithID` \u2192 [`L110`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/datasourceproxy/datasourceproxy.go?L110) `proxyDatasourceRequest`\n\n```go\nproxy, _ := pluginproxy.NewDataSourceProxy(ds, plugin.Routes, c, ...)\nproxy.HandleRequest()  // L136\n```\n\n---\n\n#### STEP 4 \u2014 Grafana builds `httputil.ReverseProxy` with custom `errorHandler`\n\n**[`pkg/api/pluginproxy/ds_proxy.go:102\u2013158`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/api/pluginproxy/ds_proxy.go?L102-L158)** \u2014 `(*DataSourceProxy).HandleRequest`\n\n```go\ntransport, _ := proxy.dataSourcesService.GetHTTPTransport(ctx, proxy.ds, ...)\nreverseProxy := proxyutil.NewReverseProxy(\n    proxyErrorLogger,\n    proxy.director,\n    proxyutil.WithTransport(transport),\n    proxyutil.WithModifyResponse(modifyResponse),\n)\nreverseProxy.ServeHTTP(proxy.ctx.Resp, proxy.ctx.Req)\n```\n\n**[`pkg/util/proxyutil/reverse_proxy.go:36\u201341`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/util/proxyutil/reverse_proxy.go?L36-L41)** \u2014 `NewReverseProxy`\n\n```go\np := &httputil.ReverseProxy{\n    ErrorHandler: errorHandler(logger),  // custom handler installed here\n    ...\n}\n```\n\n---\n\n#### STEP 5 \u2014 Grafana's transport deadline fires; `errorHandler` writes HTTP 502 with no body\n\n**[`pkg/util/proxyutil/reverse_proxy.go:123\u2013144`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/util/proxyutil/reverse_proxy.go?L123-L144)** \u2014 `errorHandler`\n\n```go\nfunc errorHandler(logger glog.Logger) func(http.ResponseWriter, *http.Request, error) {\n    return func(w http.ResponseWriter, r *http.Request, err error) {\n\n        if errors.Is(err, context.Canceled) {       // L128 \u2014 MISS\n            w.WriteHeader(499); return\n        }\n\n        // L135 \u2014 MISS: context.DeadlineExceeded has no Timeout() method\n        if timeoutErr, ok := err.(timeoutError); ok && timeoutErr.Timeout() {\n            w.WriteHeader(504); return\n        }\n\n        // Falls here for context.DeadlineExceeded:\n        ctxLogger.Error(\"Proxy request failed\", \"err\", err)  // logs \"context deadline exceeded\"\n        w.WriteHeader(http.StatusBadGateway)                 // L142 \u2014 HTTP 502, NO body\n    }\n}\n```\n\n---\n\n#### STEP 6 \u2014 Browser receives `{\"message\":\"Bad Gateway\",\"status\":\"bad-gateway\"}`\n\nGrafana's web middleware wraps the bare 502 status code into its standard JSON error envelope for the frontend. The Prometheus datasource plugin displays this verbatim.\n\n---\n\n### Why the Original Timeout Message Is Lost\n\n**Reason 1 \u2014 Two separate timeout deadlines; Grafana's fires first.**\n\n`httputil.ReverseProxy` has a binary code path:\n- `RoundTrip()` returns an **error** \u2192 `ErrorHandler(w, r, err)` is called. There is no `*http.Response` object. The Prometheus 503 body was never received.\n- `RoundTrip()` returns a **`*http.Response`** \u2192 `ModifyResponse` is called; the response (including any 503 + JSON body) is streamed to the browser transparently.\n\nThe Grafana log `error=\"context deadline exceeded\"` confirms the first path was taken. Grafana's `DataProxyTimeout` (or the parent request context) expired before the full Prometheus 503 response arrived, so the Prometheus JSON never entered Grafana's memory.\n\n**Reason 2 \u2014 `errorHandler` writes no body and performs no upstream error extraction.**\n\nEven in the error path, [`errorHandler` at L142](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/util/proxyutil/reverse_proxy.go?L142) calls `w.WriteHeader(http.StatusBadGateway)` and returns immediately \u2014 no body, no attempt to parse or relay the upstream error.\n\n**Reason 3 \u2014 `context.DeadlineExceeded` does not satisfy the `timeoutError` interface.**\n\nThe [`timeoutError` interface at L113\u2013116](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/util/proxyutil/reverse_proxy.go?L113-L116) requires `Timeout() bool`. `context.DeadlineExceeded` does not implement it. The check at L135 therefore misses, and the error falls through to the catch-all 502 path instead of the (more descriptive) 504 path.\n\n---\n\n### Summary Table\n\n| Step | File:Function | Output |\n|---|---|---|\n| Engine deadline | `promql/engine.go:589` `exec` | `context.WithTimeout` \u2192 query deadline |\n| Context translation | `promql/engine.go:251` `contextErr` | `DeadlineExceeded` \u2192 `ErrQueryTimeout` |\n| API error mapping | `web/api/v1/api.go:635` `returnAPIError` | `ErrQueryTimeout` \u2192 `apiError{errorTimeout}` |\n| HTTP status | `web/api/v1/api.go:1760` `respondError` | `errorTimeout` \u2192 HTTP 503 + JSON body |\n| Grafana route | `pkg/api/api.go:422` | `/api/datasources/proxy/:id/*` |\n| Proxy construction | `pkg/api/pluginproxy/ds_proxy.go:133` `HandleRequest` | `NewReverseProxy` with `errorHandler` |\n| Transport timeout | `pkg/api/pluginproxy/ds_proxy.go:158` | `RoundTrip` returns `context.DeadlineExceeded` |\n| Error handler miss #1 | `pkg/util/proxyutil/reverse_proxy.go:128` | `context.Canceled` check \u2014 false |\n| Error handler miss #2 | `pkg/util/proxyutil/reverse_proxy.go:135` | `timeoutError` interface check \u2014 false |\n| **Final output** | `pkg/util/proxyutil/reverse_proxy.go:142` | **`w.WriteHeader(502)` \u2014 no body, error discarded** |\n\n### Recommended Fixes\n\n1. **Align timeouts**: Make `DataProxyTimeout` longer than `--query.timeout`. Then Prometheus returns 503 + JSON before Grafana times out, `RoundTrip` succeeds, `ModifyResponse` is called, and the Prometheus error JSON is forwarded transparently.\n\n2. **Fix `errorHandler` for `context.DeadlineExceeded`**: Add an explicit check before the `timeoutError` interface test:\n   ```go\n   if errors.Is(err, context.DeadlineExceeded) {\n       w.WriteHeader(http.StatusGatewayTimeout)  // 504 instead of 502\n       _, _ = w.Write([]byte(`{\"message\":\"upstream query timed out\",\"status\":\"gateway-timeout\"}`))\n       return\n   }\n   ```\n\n3. **Surface upstream error body**: When `RoundTrip` returns an error, if a partial response is available, read and relay its body in `errorHandler`.\n\n## Sources\n\n- [github.com/sg-evals/prometheus--v2.48.0/web/api/v1/api.go@076cd00?L505-660](/github.com/sg-evals/prometheus--v2.48.0@076cd00748b7b93b5f2d6f72b2bf94fe4fe3a9cd/-/blob/web/api/v1/api.go?L505-660)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/util/proxyutil/reverse_proxy.go@6e54105](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/util/proxyutil/reverse_proxy.go)\n- [github.com/sg-evals/prometheus--v2.48.0/promql/engine.go@076cd00?L80-260](/github.com/sg-evals/prometheus--v2.48.0@076cd00748b7b93b5f2d6f72b2bf94fe4fe3a9cd/-/blob/promql/engine.go?L80-260)\n- [github.com/sg-evals/prometheus--v2.48.0/promql/engine.go@076cd00?L560-650](/github.com/sg-evals/prometheus--v2.48.0@076cd00748b7b93b5f2d6f72b2bf94fe4fe3a9cd/-/blob/promql/engine.go?L560-650)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/api/pluginproxy/ds_proxy.go@6e54105?L1-180](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/api/pluginproxy/ds_proxy.go?L1-180)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/services/datasourceproxy/datasourceproxy.go@6e54105?L90-160](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/services/datasourceproxy/datasourceproxy.go?L90-160)\n- [repo:^github.com/sg-evals/prometheus--v2.48.0$ func respond apiError errorTimeout](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fprometheus--v2.48.0$%20func%20respond%20apiError%20errorTimeout)\n- [github.com/sg-evals/prometheus--v2.48.0/web/api/v1/api.go@076cd00?L60-100](/github.com/sg-evals/prometheus--v2.48.0@076cd00748b7b93b5f2d6f72b2bf94fe4fe3a9cd/-/blob/web/api/v1/api.go?L60-100)\n- [github.com/sg-evals/prometheus--v2.48.0/web/api/v1/api.go@076cd00?L1700-1790](/github.com/sg-evals/prometheus--v2.48.0@076cd00748b7b93b5f2d6f72b2bf94fe4fe3a9cd/-/blob/web/api/v1/api.go?L1700-1790)\n- [repo:^github.com/sg-evals/prometheus--v2.48.0$ errorTimeout errorCanceled StatusServiceUnavailable](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fprometheus--v2.48.0$%20errorTimeout%20errorCanceled%20StatusServiceUnavailable)\n- [repo:^github.com/sg-evals/grafana--v10.2.0$ \"bad-gateway\" OR \"bad gateway\" status message](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fgrafana--v10.2.0$%20%22bad-gateway%22%20OR%20%22bad%20gateway%22%20status%20message)\n- [repo:^github.com/sg-evals/grafana--v10.2.0$ \"Bad Gateway\" message json response write](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fgrafana--v10.2.0$%20%22Bad%20Gateway%22%20message%20json%20response%20write)\n- [repo:^github.com/sg-evals/grafana--v10.2.0$ w.WriteHeader StatusBadGateway 502](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fgrafana--v10.2.0$%20w.WriteHeader%20StatusBadGateway%20502)\n- [repo:^github.com/sg-evals/grafana--v10.2.0$ logger=datasource.proxy \"Proxy request failed\" OR \"Proxy request error\"](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fgrafana--v10.2.0$%20logger=datasource.proxy%20%22Proxy%20request%20failed%22%20OR%20%22Proxy%20request%20error%22)\n- [repo:^github.com/sg-evals/grafana--v10.2.0$ \"data-proxy-log\" OR \"datasource.proxy\" glog.New](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fgrafana--v10.2.0$%20%22data-proxy-log%22%20OR%20%22datasource.proxy%22%20glog.New)\n- [repo:^github.com/sg-evals/grafana--v10.2.0$ datasource proxy middleware logging \"Data proxy error\"](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fgrafana--v10.2.0$%20datasource%20proxy%20middleware%20logging%20%22Data%20proxy%20error%22)\n- [repo:^github.com/sg-evals/prometheus--v2.48.0$ queueActive func](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fprometheus--v2.48.0$%20queueActive%20func)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/api/api.go@6e54105?L420-428](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/api/api.go?L420-428)\n- [github.com/sg-evals/prometheus--v2.48.0/promql/engine.go@076cd00?L655-680](/github.com/sg-evals/prometheus--v2.48.0@076cd00748b7b93b5f2d6f72b2bf94fe4fe3a9cd/-/blob/promql/engine.go?L655-680)\n- [github.com/sg-evals/prometheus--v2.48.0/promql/query_logger.go@076cd00?L100-220](/github.com/sg-evals/prometheus--v2.48.0@076cd00748b7b93b5f2d6f72b2bf94fe4fe3a9cd/-/blob/promql/query_logger.go?L100-220)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/services/datasources/service/datasource.go@6e54105?L290-360](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/services/datasources/service/datasource.go?L290-360)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/services/datasourceproxy/datasourceproxy.go@6e54105?L1-90](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/services/datasourceproxy/datasourceproxy.go?L1-90)\n\n\nGenerated files:\n- files/ERROR_PROVENANCE.json: /.api/agent-files/v1/deep-search/b89b7994-c28d-47bd-8da0-7e2bd29758d1/files/ERROR_PROVENANCE.json\n- files/ERROR_PROVENANCE.csv: /.api/agent-files/v1/deep-search/b89b7994-c28d-47bd-8da0-7e2bd29758d1/files/ERROR_PROVENANCE.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "err-provenance-dual-grafana-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.3066
+    },
+    "mrr": 0.3333,
+    "map_score": 0.1667,
+    "file_recall": 0.5,
+    "context_efficiency": 0.125,
+    "n_retrieved": 8,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "promql/engine.go",
+    "promql/query_logger.go",
+    "web/api/v1/api.go",
+    "pkg/api/api.go",
+    "pkg/services/datasourceproxy/datasourceproxy.go",
+    "pkg/api/pluginproxy/ds_proxy.go",
+    "pkg/util/proxyutil/reverse_proxy.go",
+    "pkg/services/datasources/service/datasource.go"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "err-provenance-dual-grafana-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3066,
+      "5": 0.3066,
+      "10": 0.3066
+    },
+    "mrr": 0.3333,
+    "map_score": 0.1667,
+    "file_recall": 0.5,
+    "context_efficiency": 0.125,
+    "n_retrieved": 8,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

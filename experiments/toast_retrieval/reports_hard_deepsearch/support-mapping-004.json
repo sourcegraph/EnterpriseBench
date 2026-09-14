@@ -1,0 +1,210 @@
+{
+  "task_id": "support-mapping-004",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/grafana--v10.2.0",
+    "github.com/sg-evals/alertmanager--v0.26.0"
+  ],
+  "retrieved_paths": [
+    "pkg/services/ngalert/schedule/schedule.go",
+    "pkg/setting/setting_unified_alerting.go",
+    "pkg/services/ngalert/schedule/registry.go",
+    "pkg/services/ngalert/metrics/scheduler.go",
+    "pkg/services/ngalert/eval/eval.go",
+    "api/v2/api.go",
+    "dispatch/dispatch.go",
+    "notify/notify.go",
+    "silence/silence.go",
+    "inhibit/inhibit.go",
+    "dispatch/route.go",
+    "nflog/nflog.go",
+    "metrics/scheduler.go",
+    "github.com/sg-evals/grafana--v10.2.0",
+    "github.com/sg-evals/alertmanager--v0.26.0"
+  ],
+  "retrieved_paths_union": [
+    "pkg/services/ngalert/schedule/schedule.go",
+    "pkg/setting/setting_unified_alerting.go",
+    "pkg/services/ngalert/schedule/registry.go",
+    "pkg/services/ngalert/metrics/scheduler.go",
+    "pkg/services/ngalert/eval/eval.go",
+    "api/v2/api.go",
+    "dispatch/dispatch.go",
+    "notify/notify.go",
+    "silence/silence.go",
+    "inhibit/inhibit.go",
+    "dispatch/route.go",
+    "nflog/nflog.go",
+    "metrics/scheduler.go",
+    "github.com/sg-evals/grafana--v10.2.0",
+    "github.com/sg-evals/alertmanager--v0.26.0"
+  ],
+  "required_files": [
+    "pkg/services/ngalert/schedule/schedule.go",
+    "dispatch/dispatch.go",
+    "notify/notify.go"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-004",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.7737
+    },
+    "mrr": 1.0,
+    "map_score": 0.5536,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 15,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-004",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.7737
+    },
+    "mrr": 1.0,
+    "map_score": 0.5536,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 15,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 121.7,
+  "response_chars": 19486,
+  "raw_response": "---\ntitle: Investigating Grafana alert evaluation delays and missing Alertmanager notifications\nshare_url: https://demo.sourcegraph.com/deepsearch/ed194640-b86d-4dc5-96ff-c0711535f53f\nurl: https://demo.sourcegraph.com/deepsearch/2208\ncreated: 2026-08-18T01:52:44Z\nupdated: 2026-08-18T01:53:31Z\n---\n\n# # Support Ticket: Alert notifications coming late or not at all\n\n**Priority:** High\n**Submitted by:** SRE Team\n**Product:** Grafana Alerting (self-hosted) with Alertmanager integration\n\n---\n\nHi,\n\nWe're having a serious issue with our alerting setup. We have about 200 alert rules configured in Grafana and they've been working fine for months. Starting last week, some alerts are firing way later than expected -- like 10-15 minutes after the condition is met -- and a few don't seem to fire at all.\n\nWe checked the Grafana server logs and see warnings about \"alert evaluation took longer than expected\" but we're not sure what that means or what's causing it. The database and data sources all seem healthy. The Grafana server isn't running out of memory or CPU.\n\nThe weird thing is that simple alerts still work fine. It's mainly the ones with complex queries or rules that have multiple conditions that seem to be delayed. We haven't added many new rules recently, maybe 20 or so in the past month.\n\nAdditionally, for some alerts that DO fire in Grafana, the actual notifications never arrive. We use Alertmanager as our notification backend and we're seeing some alerts get routed but the notifications seem to get stuck or silenced unexpectedly. We checked and there are no active silences we created, but some alerts still don't result in delivered notifications. We also noticed that a few notification integrations are timing out.\n\nWe need to understand:\n\n1. What controls alert evaluation timing in Grafana's codebase? How does Grafana decide when to check each rule and what happens when a check takes too long?\n2. How does Alertmanager process alerts received from Grafana? Where could alerts get lost between Grafana firing and the notification actually being delivered?\n3. What related source files and components across both repos are involved in the end-to-end alert flow?\n\nRepos are available at:\n\n- `/workspace/grafana/` \u2014 Grafana source\n- `/workspace/alertmanager/` \u2014 Prometheus Alertmanager source\n\nRegards,\nMarcus\n\n\nSearch only these repositories: github.com/sg-evals/grafana--v10.2.0, github.com/sg-evals/alertmanager--v0.26.0\n\nHere is a thorough breakdown of the end-to-end alert flow and the root causes behind both symptoms Marcus described.\n\n---\n\n## 1. Alert Evaluation Timing in Grafana\n\n### How the Scheduler Works\n\nThe entry point is [`schedule.go: Run()`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/ngalert/schedule/schedule.go?L135-L144), which starts a fixed-interval ticker driven by the **base interval** (default: **10 seconds**, defined in [`setting_unified_alerting.go:60`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/setting/setting_unified_alerting.go?L57-L64)).\n\nEach tick calls [`processTick()`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/ngalert/schedule/schedule.go?L221-L346), which:\n\n1. **Reloads rules from the database** (`updateSchedulableAlertRules`) on every tick.\n2. For each rule, computes whether it is due to run this tick using modulo arithmetic ([L273-L274](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/ngalert/schedule/schedule.go?L273-L274)):\n   ```go\n   itemFrequency := item.IntervalSeconds / int64(sch.baseInterval.Seconds())\n   isReadyToRun := item.IntervalSeconds != 0 && tickNum%itemFrequency == 0\n   ```\n3. **Staggers** the dispatch of all due rules evenly across the tick interval ([L316-L336](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/ngalert/schedule/schedule.go?L316-L336)) using `time.AfterFunc`.\n\nEach rule has a dedicated goroutine (`ruleRoutine`) that owns a single-slot `evalCh` channel, started in [`registry.go:83-86`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/ngalert/schedule/registry.go?L83-L86).\n\n### What Happens When an Evaluation is Too Slow\n\nThis is the core of your issue. The `eval()` method on `alertRuleInfo` ([`registry.go:95-109`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/ngalert/schedule/registry.go?L95-L109)) is deliberately **non-blocking**:\n\n```go\nfunc (a *alertRuleInfo) eval(eval *evaluation) (bool, *evaluation) {\n    var droppedMsg *evaluation\n    select {\n    case droppedMsg = <-a.evalCh:  // drain any pending evaluation\n    default:\n    }\n    select {\n    case a.evalCh <- eval:         // send the new one\n        return true, droppedMsg\n    case <-a.ctx.Done():\n        return false, droppedMsg\n    }\n}\n```\n\n**If `ruleRoutine` is still busy executing the previous evaluation when the next tick arrives**, the pending evaluation on the channel is replaced. Back in `processTick`:\n\n```go\nif dropped != nil {\n    sch.log.Warn(\"Tick dropped because alert rule evaluation is too slow\", ...)\n    sch.metrics.EvaluationMissed.WithLabelValues(orgID, item.rule.Title).Inc()\n}\n```\n\nThat warning \u2014 **\"Tick dropped because alert rule evaluation is too slow\"** \u2014 is what you're seeing in logs as _\"alert evaluation took longer than expected\"_. The missed tick is counted in the `schedule_rule_evaluations_missed_total` metric ([`metrics/scheduler.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/ngalert/metrics/scheduler.go?L136-L145)).\n\nThe consequence: **a rule can miss multiple consecutive evaluation cycles**, causing multi-minute delays in state transitions. The rule is not evaluated until a future tick where the previous evaluation has finally completed.\n\n### Evaluation Execution and the Timeout\n\nInside `ruleRoutine`, each evaluation is executed by [`conditionEvaluator.EvaluateRaw()`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/ngalert/eval/eval.go?L57-L77), which wraps the datasource/expression pipeline call in a `context.WithTimeout`:\n\n```go\nif r.evalTimeout >= 0 {\n    timeoutCtx, cancel := context.WithTimeout(ctx, r.evalTimeout)\n    defer cancel()\n    execCtx = timeoutCtx\n}\nreturn r.expressionService.ExecutePipeline(execCtx, now, r.pipeline)\n```\n\nThe default timeout is **30 seconds** ([`setting_unified_alerting.go:47`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/setting/setting_unified_alerting.go?L47)). Complex queries with multi-condition expressions or chained datasource calls can approach or exceed this, causing the evaluation to block for its full duration \u2014 which then causes the next scheduled tick to be dropped.\n\nThe `ruleRoutine` also retries failed evaluations up to `maxAttempts` (default: **3**, [`setting_unified_alerting.go:50`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/setting/setting_unified_alerting.go?L50)) via [`retryIfError()`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/ngalert/schedule/schedule.go?L445-L455). Each retry attempt adds latency.\n\n---\n\n## 2. How Alertmanager Processes Alerts \u2014 Where Notifications Get Lost\n\n### Ingestion\n\nGrafana sends firing alerts as HTTP POST to Alertmanager's `/api/v2/alerts` ([`api/v2/api.go:307`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/api/v2/api.go?L307-L361)). From there, alerts enter the in-memory alert provider and are published to subscribers.\n\n### Dispatcher and Aggregation Groups\n\nThe [`Dispatcher`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/dispatch/dispatch.go?L74-L94) subscribes to the alert provider and calls [`processAlert()`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/dispatch/dispatch.go?L305-L356) for each incoming alert. This:\n\n1. Matches the alert against the routing tree via `d.route.Match(alert.Labels)`.\n2. Computes group labels to find or create an **aggregation group** (`aggrGroup`).\n3. **Silent alert loss:** if `MaxNumberOfAggregationGroups` is configured and the limit is reached, the alert is **silently dropped** with only an error log ([L326-L329](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/dispatch/dispatch.go?L326-L329)):\n   ```go\n   if limit := d.limits.MaxNumberOfAggregationGroups(); limit > 0 && d.aggrGroupsNum >= limit {\n       d.metrics.aggrGroupLimitReached.Inc()\n       level.Error(d.logger).Log(\"msg\", \"Too many aggregation groups, cannot create new group for alert\", ...)\n       return\n   }\n   ```\n\nEach `aggrGroup` runs its own goroutine ([`ag.run()`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/dispatch/dispatch.go?L425-L466)) with timers:\n\n- **`group_wait`**: how long to wait before sending the first notification for a new group.\n- **`group_interval`**: how often to re-notify after the initial flush.\n- **`repeat_interval`**: used by `DedupStage` to suppress re-notifications.\n\nThe notification context is given a timeout of `ag.timeout(ag.opts.GroupInterval)` ([L434](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/dispatch/dispatch.go?L434)). If the entire notification pipeline takes longer than this, the context is cancelled and delivery is aborted.\n\n### The Notification Pipeline \u2014 Where Alerts Can Be Silenced\n\nOnce a group flushes, it calls the full pipeline ([`notify.go:331-346`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/notify/notify.go?L331-L346)):\n\n```\nGossipSettleStage \u2192 MuteStage (inhibitor) \u2192 TimeActiveStage \u2192 TimeMuteStage \u2192 MuteStage (silencer) \u2192 [per-receiver: WaitStage \u2192 DedupStage \u2192 RetryStage \u2192 SetNotifiesStage]\n```\n\nEach stage is a filter \u2014 if it returns an empty alert list, the pipeline stops and no notification is sent. The key suppression points:\n\n| Stage | Where | What causes suppression |\n|---|---|---|\n| **GossipSettleStage** | [`notify.go:450-457`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/notify/notify.go?L450-L457) | Alertmanager cluster gossip not yet settled; blocks until ready or context cancelled |\n| **MuteStage (inhibitor)** | [`notify.go:470-481`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/notify/notify.go?L470-L481) | Alert matches an inhibition rule's target matchers AND a source alert is firing \u2014 this is the **\"no active silences but still muted\"** scenario you described |\n| **TimeMuteStage** | same pipeline | Alert falls within a configured `mute_time_interval` |\n| **TimeActiveStage** | same pipeline | Alert falls outside a configured `active_time_interval` |\n| **MuteStage (silencer)** | [`silence/silence.go:93`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/silence/silence.go?L93-L135) | An active silence matches \u2014 even system-created or API-created silences not created by your team |\n| **DedupStage** | [`notify.go:598-646`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/notify/notify.go?L598-L646) | Notification log says this group was already notified within `repeat_interval`; no new firing alerts have appeared |\n| **RetryStage (timeout)** | [`notify.go:720-765`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/notify/notify.go?L720-L765) | Integration HTTP call times out or errors; retry loop is bounded by the group's context timeout |\n\n### The Inhibition Issue \u2014 \"No Silences But Still Muted\"\n\nThe most likely culprit for your unexplained muting is **inhibition rules**. The `Inhibitor.Mutes()` check ([`inhibit/inhibit.go:128-146`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/inhibit/inhibit.go?L128-L146)) is completely separate from explicit silences. If any currently-firing alert matches the `source_matchers` of an inhibition rule, and the target alert matches `target_matchers` with equal label values, the target alert is silenced by inhibition \u2014 not by a user-created silence. The marker is set via `marker.SetInhibited()` \u2014 inspecting the Alertmanager `/api/v2/alerts` endpoint will show `inhibitedBy` populated on suppressed alerts even when no explicit silences exist.\n\n---\n\n## 3. End-to-End Component Map\n\n```\nGrafana: tick \u2192 processTick() \u2192 ruleRoutine \u2192 conditionEvaluator.Evaluate()\n                                     \u2193\n                            stateManager.ProcessEvalResults()\n                                     \u2193\n                            alertsSender.Send() \u2192 HTTP POST /api/v2/alerts\n                                                         \u2193\nAlertmanager:                                     api/v2/api.go (ingestion)\n                                                         \u2193\n                                                  provider (in-memory store)\n                                                         \u2193\n                                                  Dispatcher.run() \u2192 processAlert()\n                                                         \u2193\n                                                  aggrGroup.run() [timers: group_wait, group_interval]\n                                                         \u2193\n                                        GossipSettleStage \u2192 InhibitMuteStage \u2192 TimeMuteStage\n                                                         \u2193\n                                        SilenceMuteStage \u2192 WaitStage \u2192 DedupStage \u2192 RetryStage \u2192 SetNotifiesStage\n```\n\n### Key Source Files\n\n**Grafana (`github.com/sg-evals/grafana--v10.2.0`)**\n\n| File | Role |\n|---|---|\n| [`pkg/services/ngalert/schedule/schedule.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/ngalert/schedule/schedule.go) | Scheduler loop, `processTick`, `ruleRoutine`, dropped tick logic |\n| [`pkg/services/ngalert/schedule/registry.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/ngalert/schedule/registry.go) | Per-rule `alertRuleInfo`, non-blocking `eval()` channel dispatch |\n| [`pkg/services/ngalert/eval/eval.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/ngalert/eval/eval.go) | `conditionEvaluator`, evaluation timeout wrapping |\n| [`pkg/setting/setting_unified_alerting.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/setting/setting_unified_alerting.go) | Default base interval (10s), eval timeout (30s), max attempts (3) |\n| [`pkg/services/ngalert/metrics/scheduler.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/grafana--v10.2.0/-/blob/pkg/services/ngalert/metrics/scheduler.go) | `schedule_rule_evaluations_missed_total` metric |\n\n**Alertmanager (`github.com/sg-evals/alertmanager--v0.26.0`)**\n\n| File | Role |\n|---|---|\n| [`api/v2/api.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/api/v2/api.go) | Alert ingestion endpoint |\n| [`dispatch/dispatch.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/dispatch/dispatch.go) | Dispatcher, aggregation group timers, group limit enforcement |\n| [`dispatch/route.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/dispatch/route.go) | Route matching, `group_wait`/`group_interval`/`repeat_interval` options |\n| [`notify/notify.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/notify/notify.go) | Full notification pipeline: all mute/dedup/retry stages |\n| [`inhibit/inhibit.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/inhibit/inhibit.go) | Inhibition rule evaluation (`Mutes()`) |\n| [`silence/silence.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/silence/silence.go) | Silence matching |\n| [`nflog/nflog.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/alertmanager--v0.26.0/-/blob/nflog/nflog.go) | Notification log used by `DedupStage` |\n\n---\n\n## Recommended Actions for Marcus\n\n**For delayed evaluations (Grafana):**\n- Check the `schedule_rule_evaluations_missed_total` metric broken down by rule title \u2014 this directly identifies which rules are causing dropped ticks.\n- Look at `eval_duration_seconds` to find rules with query execution times approaching or exceeding the 30s timeout.\n- Increase `evaluation_timeout` in `[unified_alerting]` config, or optimize the complex query expressions on slow rules.\n- Consider increasing the rule's own `IntervalSeconds` for slow-running rules so missed ticks are less impactful.\n\n**For missing notifications (Alertmanager):**\n- Query `GET /api/v2/alerts?active=true` \u2014 check the `inhibitedBy`, `silencedBy`, and `status.state` fields on alerts you expect to be notified about. The API exposes exactly which suppression mechanism applied.\n- Check for **inhibition rules** in your Alertmanager config (`inhibit_rules:`). A high-severity firing alert may be inhibiting lower-severity targets without any user-created silence.\n- Check `mute_time_intervals` and `active_time_intervals` on your routes \u2014 a misconfigured time window can suppress during business hours.\n- For integration timeouts: the `RetryStage` retries indefinitely but the entire attempt is bounded by the `group_interval` context timeout. If the integration (e.g. PagerDuty, Slack) consistently times out within that window, notifications are dropped after the context expires. Check `notification_requests_failed_total` metrics per integration.\n\n## Sources\n\n- [github.com/sg-evals/grafana--v10.2.0/pkg/services/ngalert/schedule/schedule.go@6e54105?L135-545](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/services/ngalert/schedule/schedule.go?L135-545)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/services/ngalert/eval/eval.go@6e54105?L1-120](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/services/ngalert/eval/eval.go?L1-120)\n- [github.com/sg-evals/alertmanager--v0.26.0/dispatch/dispatch.go@fbc1fdc?L73-470](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/dispatch/dispatch.go?L73-470)\n- [github.com/sg-evals/alertmanager--v0.26.0/notify/notify.go@fbc1fdc?L331-730](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/notify/notify.go?L331-730)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/services/ngalert/schedule/registry.go@6e54105?L1-160](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/services/ngalert/schedule/registry.go?L1-160)\n- [github.com/sg-evals/grafana--v10.2.0/pkg/setting/setting_unified_alerting.go@6e54105?L40-100](/github.com/sg-evals/grafana--v10.2.0@6e54105447cef3c8b1025b1a3d5e76cd20213659/-/blob/pkg/setting/setting_unified_alerting.go?L40-100)\n- [github.com/sg-evals/alertmanager--v0.26.0/inhibit/inhibit.go@fbc1fdc?L125-190](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/inhibit/inhibit.go?L125-190)\n- [github.com/sg-evals/alertmanager--v0.26.0/notify/notify.go@fbc1fdc?L730-790](/github.com/sg-evals/alertmanager--v0.26.0@fbc1fdc7d367c8fd1a72a375aae39f37844f37bc/-/blob/notify/notify.go?L730-790)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-004",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.7737
+    },
+    "mrr": 1.0,
+    "map_score": 0.5536,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 15,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "pkg/services/ngalert/schedule/schedule.go",
+    "pkg/setting/setting_unified_alerting.go",
+    "pkg/services/ngalert/schedule/registry.go",
+    "pkg/services/ngalert/metrics/scheduler.go",
+    "pkg/services/ngalert/eval/eval.go",
+    "api/v2/api.go",
+    "dispatch/dispatch.go",
+    "notify/notify.go",
+    "silence/silence.go",
+    "inhibit/inhibit.go",
+    "dispatch/route.go",
+    "nflog/nflog.go",
+    "metrics/scheduler.go",
+    "github.com/sg-evals/grafana--v10.2.0",
+    "github.com/sg-evals/alertmanager--v0.26.0"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-004",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.3333,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.5,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.4615
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.4693,
+      "10": 0.7737
+    },
+    "mrr": 1.0,
+    "map_score": 0.5536,
+    "file_recall": 1.0,
+    "context_efficiency": 0.2,
+    "n_retrieved": 15,
+    "n_ground_truth": 3,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

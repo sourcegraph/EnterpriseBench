@@ -1,0 +1,191 @@
+{
+  "task_id": "support-mapping-002",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/llvm-project--llvmorg-18.1.0"
+  ],
+  "retrieved_paths": [
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeIntegerTypes.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeFloatTypes.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.h",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeTypesGeneric.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeVectorTypes.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeDAG.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/TargetLowering.cpp",
+    "llvm/test/CodeGen/AVR/expand-integer-failure.ll"
+  ],
+  "retrieved_paths_union": [
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeIntegerTypes.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeFloatTypes.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.h",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeTypesGeneric.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeVectorTypes.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeDAG.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/TargetLowering.cpp",
+    "llvm/test/CodeGen/AVR/expand-integer-failure.ll"
+  ],
+  "required_files": [
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeDAG.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.cpp",
+    "llvm/include/llvm/CodeGen/ValueTypes.h"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-002",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.2346,
+      "10": 0.3911
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2063,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-002",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.2346,
+      "10": 0.3911
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2063,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 110.3,
+  "response_chars": 14329,
+  "raw_response": "---\ntitle: Identify compiler component causing type expansion assertion in crashing CI build\nshare_url: https://demo.sourcegraph.com/deepsearch/2b9b22d4-1a67-4543-ad31-c9d89ea88596\nurl: https://demo.sourcegraph.com/deepsearch/2195\ncreated: 2026-08-18T01:43:06Z\nupdated: 2026-08-18T01:44:32Z\n---\n\n# # Support Ticket: Build pipeline crashing with compiler error\n\n**Priority:** High\n**Submitted by:** Build Infrastructure Engineer\n**Product:** Internal CI/CD Pipeline (LLVM-based toolchain)\n\n**Codebase:** Available at `/workspace/llvm-project/`\n\n---\n\nHello,\n\nOur CI pipeline started crashing yesterday when building one of our internal projects. The build log shows the compiler dying with an assertion failure that says something about \"Cannot expand this type\" and then the whole thing aborts.\n\nThis is blocking all of our builds on the affected platform. It only happens when targeting one specific architecture -- our other build targets compile fine. We recently updated the compiler toolchain but nothing else changed in our source code.\n\nThe crash happens deep in the compilation process, not during parsing or anything obvious. It looks like it gets partway through generating machine code and then gives up.\n\nWe need to understand what part of the compiler is responsible for \"expanding types\" during code generation and why it would fail. Our team doesn't have deep compiler expertise so we need your help mapping this error to the right area of the codebase.\n\nPlease also identify any related source files or components involved in the type legalization pipeline beyond the core crash site (e.g., related type expansion code for other data types, DAG lowering utilities).\n\nThanks,\nPriya\n\n\nSearch only these repositories: github.com/sg-evals/llvm-project--llvmorg-18.1.0\n\nHere is a comprehensive breakdown of the crash and the relevant codebase area:\n\n---\n\n## \"Cannot Expand This Type\" \u2014 What It Is and Where It Lives\n\n### The Crash Site\n\nThe assertion failure you are seeing is a `report_fatal_error` triggered inside the **DAG Type Legalizer**, specifically in one of two dispatch functions depending on whether the type being expanded is an integer or a float:\n\n**Integer result expansion** \u2014 [`LegalizeIntegerTypes.cpp` L2590\u20132606](https://demo.sourcegraph.com/r/github.com/sg-evals/llvm-project--llvmorg-18.1.0/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeIntegerTypes.cpp?L2590-2606):\n```cpp\nvoid DAGTypeLegalizer::ExpandIntegerResult(SDNode *N, unsigned ResNo) {\n  // ...\n  switch (N->getOpcode()) {\n  default:\n    dbgs() << \"ExpandIntegerResult #\" << ResNo << \": \";\n    N->dump(&DAG); dbgs() << \"\\n\";\n    report_fatal_error(\"Do not know how to expand the result of this operator!\");\n```\n\n**Integer operand expansion** \u2014 [`LegalizeIntegerTypes.cpp` L5083\u20135096](https://demo.sourcegraph.com/r/github.com/sg-evals/llvm-project--llvmorg-18.1.0/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeIntegerTypes.cpp?L5083-5096):\n```cpp\nbool DAGTypeLegalizer::ExpandIntegerOperand(SDNode *N, unsigned OpNo) {\n  // ...\n  switch (N->getOpcode()) {\n  default:\n    report_fatal_error(\"Do not know how to expand this operator's operand!\");\n```\n\nThe same pattern exists for floats in [`LegalizeFloatTypes.cpp`](https://demo.sourcegraph.com/r/github.com/sg-evals/llvm-project--llvmorg-18.1.0/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeFloatTypes.cpp):\n- **Float result expansion** \u2014 L1270\u20131286: `ExpandFloatResult` \u2192 `report_fatal_error(\"Do not know how to expand the result of this operator!\")`\n- **Float operand expansion** \u2014 L1875\u20131889: `ExpandFloatOperand` \u2192 `report_fatal_error(\"Do not know how to expand this operator's operand!\")`\n\n---\n\n### Root Cause: What \"Expanding a Type\" Means\n\nDuring machine code generation, LLVM builds a **SelectionDAG** representing your program's operations. The **type legalization** pass then walks this DAG and transforms every value type into something the target architecture natively supports. The possible transformations are:\n\n| Action | Meaning |\n|---|---|\n| `TypeLegal` | Already fine for the target \u2014 no change |\n| `TypePromoteInteger` | Widen a small int to the next legal size |\n| `TypeExpandInteger` | Split a large int into two half-sized ints |\n| `TypeSoftenFloat` | Replace a float op with an integer library call |\n| `TypeExpandFloat` | Split a large float into two halves |\n| `TypeSplitVector` | Split a vector into two shorter vectors |\n| `TypeWidenVector` | Pad a vector to the next legal width |\n\nThe main dispatch loop is in [`LegalizeTypes.cpp` L202\u2013370](https://demo.sourcegraph.com/r/github.com/sg-evals/llvm-project--llvmorg-18.1.0/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.cpp?L202-370) (`DAGTypeLegalizer::run()`). It iterates over all nodes in the DAG, queries `getTypeAction(VT)` for each value produced or consumed, and calls the appropriate handler.\n\nWhen the action is `TypeExpandInteger` or `TypeExpandFloat`, it reaches `ExpandIntegerResult` / `ExpandFloatResult`. These are large `switch` statements over every known IR opcode. If the node has an opcode that **no case in the switch handles**, execution falls to the `default:` branch and fires the fatal error you're seeing.\n\n**This means:** your target architecture's type configuration is declaring some type (e.g., an `i64` or `f128`) as needing expansion, but the specific IR operation used in your code has no expansion implementation for that opcode. This is always architecture-specific \u2014 a different target compiles fine because it either has native support for the type (making it `TypeLegal`) or doesn't use that opcode in the type-illegal context.\n\n---\n\n### The Type Legalization Pipeline \u2014 Files Involved\n\n| File | Role |\n|---|---|\n| [`LegalizeTypes.cpp`](https://demo.sourcegraph.com/r/github.com/sg-evals/llvm-project--llvmorg-18.1.0/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.cpp) | Core orchestration: the `run()` loop, worklist, state management, shared helpers (`GetExpandedInteger`, `SetExpandedFloat`, etc.) |\n| [`LegalizeTypes.h`](https://demo.sourcegraph.com/r/github.com/sg-evals/llvm-project--llvmorg-18.1.0/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.h) | Full `DAGTypeLegalizer` class declaration \u2014 all expansion/promotion/split method signatures |\n| [`LegalizeIntegerTypes.cpp`](https://demo.sourcegraph.com/r/github.com/sg-evals/llvm-project--llvmorg-18.1.0/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeIntegerTypes.cpp) | **Primary crash site** for integer types. Contains `ExpandIntegerResult`, `ExpandIntegerOperand`, and all `ExpandIntRes_*` helpers (e.g., `ExpandIntRes_MUL`, `ExpandIntRes_UDIV`, `ExpandIntRes_UREM`, `ExpandIntRes_VSCALE`, etc.) |\n| [`LegalizeFloatTypes.cpp`](https://demo.sourcegraph.com/r/github.com/sg-evals/llvm-project--llvmorg-18.1.0/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeFloatTypes.cpp) | **Primary crash site** for float types. Contains `ExpandFloatResult`, `ExpandFloatOperand`, and all float expansion helpers. Also handles `SoftenFloat*` and `PromoteFloat*` paths. |\n| [`LegalizeTypesGeneric.cpp`](https://demo.sourcegraph.com/r/github.com/sg-evals/llvm-project--llvmorg-18.1.0/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeTypesGeneric.cpp) | **Type-agnostic** expansion helpers shared by both integer and float paths: `ExpandRes_BITCAST`, `ExpandOp_BITCAST`, `ExpandOp_BUILD_VECTOR`, `ExpandOp_EXTRACT_ELEMENT`, and generic split routines. Called from both `LegalizeIntegerTypes.cpp` and `LegalizeFloatTypes.cpp`. |\n| [`LegalizeVectorTypes.cpp`](https://demo.sourcegraph.com/r/github.com/sg-evals/llvm-project--llvmorg-18.1.0/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeVectorTypes.cpp) | Handles vector-specific type actions (`TypeSplitVector`, `TypeWidenVector`, `TypeScalarizeVector`). Related but a separate path. |\n| [`LegalizeDAG.cpp`](https://demo.sourcegraph.com/r/github.com/sg-evals/llvm-project--llvmorg-18.1.0/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeDAG.cpp) | A separate, later pass \u2014 legalizes **operations** (not types) after type legalization is complete. |\n| [`TargetLowering.cpp`](https://demo.sourcegraph.com/r/github.com/sg-evals/llvm-project--llvmorg-18.1.0/-/blob/llvm/lib/CodeGen/SelectionDAG/TargetLowering.cpp) | `getTypeAction()` is defined here \u2014 this is what determines which legalization path each type takes. Your target backend's `ISelLowering.cpp` overrides `addRegisterClass` and `setOperationAction` to configure this. |\n\n---\n\n### Why This Happens After a Toolchain Update\n\nWhen you updated the toolchain, one of the following likely changed:\n\n1. **A new IR opcode was introduced** (or used by a new optimization pass) that has no `ExpandIntegerResult`/`ExpandFloatResult` case for your target's type configuration.\n2. **The target's type actions changed** \u2014 e.g., a previously legal type is now classified as `TypeExpandInteger` on your architecture, exposing an expansion gap.\n3. **A new pass generates a node type** that the expansion switch never handled for the combination of opcode + value type your code exercises.\n\nThe debug output from the crash (printed before the `report_fatal_error`) will name the specific opcode (e.g., `t42: i64 = SomeOp`) \u2014 that opcode is the one missing from the `ExpandIntegerResult` or `ExpandFloatResult` switch. Your team should look at what that opcode is, which target backend you are using, and whether the target's `ISelLowering.cpp` needs a `setOperationAction(..., Expand)` or a custom lowering hook for that opcode.\n\n## Sources\n\n- [repo:^github.com/sg-evals/llvm-project--llvmorg-18.1.0$ \"cannot expand\" type legalization](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fllvm-project--llvmorg-18.1.0$%20%22cannot%20expand%22%20type%20legalization)\n- [repo:^github.com/sg-evals/llvm-project--llvmorg-18.1.0$ \"llvm_unreachable\" \"expand\" LegalizeTypesGeneric](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fllvm-project--llvmorg-18.1.0$%20%22llvm_unreachable%22%20%22expand%22%20LegalizeTypesGeneric)\n- [repo:^github.com/sg-evals/llvm-project--llvmorg-18.1.0$ LegalizeTypesGeneric ExpandInteger ExpandFloat](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fllvm-project--llvmorg-18.1.0$%20LegalizeTypesGeneric%20ExpandInteger%20ExpandFloat)\n- [repo:^github.com/sg-evals/llvm-project--llvmorg-18.1.0$ \"llvm_unreachable\" file:LegalizeIntegerTypes.cpp expand](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fllvm-project--llvmorg-18.1.0$%20%22llvm_unreachable%22%20file:LegalizeIntegerTypes.cpp%20expand)\n- [github.com/sg-evals/llvm-project--llvmorg-18.1.0](/github.com/sg-evals/llvm-project--llvmorg-18.1.0)\n- [repo:^github.com/sg-evals/llvm-project--llvmorg-18.1.0$ file:LegalizeTypes.cpp \"llvm_unreachable\" expand](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fllvm-project--llvmorg-18.1.0$%20file:LegalizeTypes.cpp%20%22llvm_unreachable%22%20expand)\n- [repo:^github.com/sg-evals/llvm-project--llvmorg-18.1.0$ cannot expand type unreachable LegalizeTypes](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fllvm-project--llvmorg-18.1.0$%20cannot%20expand%20type%20unreachable%20LegalizeTypes)\n- [github.com/sg-evals/llvm-project--llvmorg-18.1.0/llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.cpp@e22b4c8?L1-100](/github.com/sg-evals/llvm-project--llvmorg-18.1.0@e22b4c87a5a27fbd824ae22344da96f4b0afee7e/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.cpp?L1-100)\n- [github.com/sg-evals/llvm-project--llvmorg-18.1.0/llvm/test/CodeGen/AVR/expand-integer-failure.ll@e22b4c8](/github.com/sg-evals/llvm-project--llvmorg-18.1.0@e22b4c87a5a27fbd824ae22344da96f4b0afee7e/-/blob/llvm/test/CodeGen/AVR/expand-integer-failure.ll)\n- [repo:^github.com/sg-evals/llvm-project--llvmorg-18.1.0$ \"do not know how to expand\" OR \"do not know how to legalize\" file:LegalizeIntegerTypes.cpp](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fllvm-project--llvmorg-18.1.0$%20%22do%20not%20know%20how%20to%20expand%22%20OR%20%22do%20not%20know%20how%20to%20legalize%22%20file:LegalizeIntegerTypes.cpp)\n- [repo:^github.com/sg-evals/llvm-project--llvmorg-18.1.0$ \"do not know how to expand\" OR \"do not know how to legalize\" file:LegalizeFloatTypes.cpp](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fllvm-project--llvmorg-18.1.0$%20%22do%20not%20know%20how%20to%20expand%22%20OR%20%22do%20not%20know%20how%20to%20legalize%22%20file:LegalizeFloatTypes.cpp)\n- [github.com/sg-evals/llvm-project--llvmorg-18.1.0/llvm/lib/CodeGen/SelectionDAG/LegalizeIntegerTypes.cpp@e22b4c8?L2560-2610](/github.com/sg-evals/llvm-project--llvmorg-18.1.0@e22b4c87a5a27fbd824ae22344da96f4b0afee7e/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeIntegerTypes.cpp?L2560-2610)\n- [github.com/sg-evals/llvm-project--llvmorg-18.1.0/llvm/lib/CodeGen/SelectionDAG/LegalizeIntegerTypes.cpp@e22b4c8?L5060-5100](/github.com/sg-evals/llvm-project--llvmorg-18.1.0@e22b4c87a5a27fbd824ae22344da96f4b0afee7e/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeIntegerTypes.cpp?L5060-5100)\n- [github.com/sg-evals/llvm-project--llvmorg-18.1.0/llvm/lib/CodeGen/SelectionDAG/LegalizeFloatTypes.cpp@e22b4c8?L1240-1295](/github.com/sg-evals/llvm-project--llvmorg-18.1.0@e22b4c87a5a27fbd824ae22344da96f4b0afee7e/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeFloatTypes.cpp?L1240-1295)\n- [github.com/sg-evals/llvm-project--llvmorg-18.1.0/llvm/lib/CodeGen/SelectionDAG/LegalizeFloatTypes.cpp@e22b4c8?L1840-1895](/github.com/sg-evals/llvm-project--llvmorg-18.1.0@e22b4c87a5a27fbd824ae22344da96f4b0afee7e/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeFloatTypes.cpp?L1840-1895)\n- [github.com/sg-evals/llvm-project--llvmorg-18.1.0/llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.cpp@e22b4c8?L200-370](/github.com/sg-evals/llvm-project--llvmorg-18.1.0@e22b4c87a5a27fbd824ae22344da96f4b0afee7e/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.cpp?L200-370)\n- [github.com/sg-evals/llvm-project--llvmorg-18.1.0/llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.h@e22b4c8?L1-80](/github.com/sg-evals/llvm-project--llvmorg-18.1.0@e22b4c87a5a27fbd824ae22344da96f4b0afee7e/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.h?L1-80)\n- [github.com/sg-evals/llvm-project--llvmorg-18.1.0/llvm/lib/CodeGen/SelectionDAG/LegalizeTypesGeneric.cpp@e22b4c8?L1-80](/github.com/sg-evals/llvm-project--llvmorg-18.1.0@e22b4c87a5a27fbd824ae22344da96f4b0afee7e/-/blob/llvm/lib/CodeGen/SelectionDAG/LegalizeTypesGeneric.cpp?L1-80)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-002",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.2346,
+      "10": 0.3911
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2063,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeIntegerTypes.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeFloatTypes.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeTypes.h",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeTypesGeneric.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeVectorTypes.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/LegalizeDAG.cpp",
+    "llvm/lib/CodeGen/SelectionDAG/TargetLowering.cpp",
+    "llvm/test/CodeGen/AVR/expand-integer-failure.ll"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-002",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.3333,
+      "10": 0.6667
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.25,
+      "10": 0.3077
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.2346,
+      "10": 0.3911
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2063,
+    "file_recall": 0.6667,
+    "context_efficiency": 0.2222,
+    "n_retrieved": 9,
+    "n_ground_truth": 3,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

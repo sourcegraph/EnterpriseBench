@@ -1,0 +1,59 @@
+{
+  "task_id": "support-mapping-dual-spring-kafka-001",
+  "task_type": "support_code_mapping",
+  "repos": [
+    {
+      "url": "https://github.com/spring-projects/spring-kafka",
+      "rev": "v3.0.9",
+      "path": "spring-kafka"
+    },
+    {
+      "url": "https://github.com/spring-projects/spring-boot",
+      "rev": "v3.1.2",
+      "path": "spring-boot"
+    }
+  ],
+  "required_files": [
+    {
+      "path": "spring-kafka/src/main/java/org/springframework/kafka/listener/KafkaMessageListenerContainer.java",
+      "repo": "spring-kafka",
+      "confidence": 0.95,
+      "source": "deterministic"
+    },
+    {
+      "path": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/kafka/KafkaAutoConfiguration.java",
+      "repo": "spring-boot",
+      "confidence": 0.9,
+      "source": "deterministic"
+    }
+  ],
+  "sufficient_files": [
+    {
+      "path": "spring-kafka/src/main/java/org/springframework/kafka/listener/DefaultErrorHandler.java",
+      "repo": "spring-kafka",
+      "confidence": 0.85
+    },
+    {
+      "path": "spring-kafka/src/main/java/org/springframework/kafka/support/serializer/ErrorHandlingDeserializer.java",
+      "repo": "spring-kafka",
+      "confidence": 0.8
+    }
+  ],
+  "error_chain": [
+    "Kafka consumer poll() encounters a record with unexpected schema, KafkaConsumer throws SerializationException during deserialization",
+    "SerializationException is thrown before the record reaches Spring Kafka's MessageListener, so it occurs at the poll level in KafkaMessageListenerContainer",
+    "KafkaMessageListenerContainer catches the SerializationException in its ListenerConsumer.run() loop but it bypasses the configured ErrorHandler because no ConsumerRecord exists to pass to it",
+    "DeadLetterPublishingRecoverer requires a ConsumerRecord to publish to the DLT, but deserialization failure means no record was created",
+    "The correct fix is wrapping the deserializer with ErrorHandlingDeserializer which catches the exception and creates a ConsumerRecord with the error in headers"
+  ],
+  "trigger_conditions": [
+    "SerializationException occurs during Kafka consumer poll(), before records reach Spring Kafka's error handler chain",
+    "DefaultErrorHandler and DeadLetterPublishingRecoverer only handle exceptions from message processing, not from deserialization",
+    "ErrorHandlingDeserializer is the correct wrapper to convert deserialization errors into processable records with error headers"
+  ],
+  "expected_answer": {
+    "error_origin": "Kafka consumer poll() deserialization in KafkaMessageListenerContainer before records reach the ErrorHandler",
+    "bypass_reason": "DeadLetterPublishingRecoverer requires a ConsumerRecord which does not exist when deserialization itself fails",
+    "correct_config": "Use ErrorHandlingDeserializer as the value.deserializer which wraps the actual deserializer and converts failures into records with error headers"
+  }
+}

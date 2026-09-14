@@ -1,0 +1,41 @@
+{
+  "task_id": "schema-evolution-tri-supabase-001",
+  "checkpoints": {
+    "schema_change": {
+      "expected_solution": "Supabase v0.24.03 ships its auth-schema baseline (auth.users, auth.sessions, RLS policies) in `docker/volumes/db/init/data.sql`. A migration that modifies RLS policies on `auth.users` (e.g., adds a column-referencing policy) and reshapes `auth.sessions` (e.g., new columns or constraints) is the schema-change source. Because Supabase ships PostgreSQL DDL via init scripts and downstream migrations, the change is in this SQL file and any incremental migration directory under `docker/volumes/db/init/`. PostgREST and GoTrue both consume the resulting database schema, but neither sees the migration as a code artifact — they observe it via runtime introspection (`src/PostgREST/SchemaCache.hs`) or by issuing SQL with hardcoded column expectations (`internal/models/user.go`).",
+      "evaluation_criteria": [
+        "Must reference docker/volumes/db/init/data.sql as the Supabase auth-schema source",
+        "Must explain that PostgREST observes the schema via runtime introspection rather than code artifacts",
+        "Must explain that GoTrue carries hardcoded column expectations in its Go code",
+        "Should mention RLS policies on auth.users and the auth.sessions structure as the affected surface"
+      ]
+    },
+    "direct_refs": {
+      "expected_solution": "Direct references in PostgREST and GoTrue: (1) `src/PostgREST/SchemaCache.hs` — PostgREST's central schema-cache module that introspects table metadata, enumerates RLS policies, and decides which API endpoints to expose; on schema change it must reload to avoid serving stale policies. (2) `internal/models/user.go` — GoTrue's User struct that mirrors `auth.users` columns; any column rename or removal here causes the Go ORM-level mapping to silently drop fields. (3) `src/PostgREST/ApiRequest.hs` — request-evaluation module that references the schema cache to resolve permissions; if the cache doesn't yet contain the new policy column, requests resolve to 403. (4) `internal/api/token.go` — GoTrue's token-refresh endpoint queries `auth.sessions` directly; any structural change here breaks refresh.",
+      "evaluation_criteria": [
+        "Must cite src/PostgREST/SchemaCache.hs as the PostgREST introspection layer",
+        "Must cite internal/models/user.go as the GoTrue auth.users mapping",
+        "Must cite src/PostgREST/ApiRequest.hs and internal/api/token.go as the impact-surfacing files",
+        "Should explain that PostgREST returns 403 because the cache does not yet reflect the new policy column"
+      ]
+    },
+    "indirect_refs": {
+      "expected_solution": "Indirect cross-repo dependencies: (1) the connection lifecycle in PostgREST — when the database emits a `pg_notify` schema change signal, PostgREST should reload its cache; if the listener is not configured, PostgREST keeps serving stale RLS policies that reference deleted/renamed columns and uniformly returns 403; (2) GoTrue's session-management code paths beyond `internal/api/token.go` (token issuance, magic-link, OAuth callbacks) all dereference fields on `internal/models/user.go`'s `User` struct, so any schema drift cascades; (3) the operator-supplied SQL migrations in `docker/volumes/db/init/data.sql` (and successor migrations) are the only place where the three repos visibly meet — neither PostgREST nor GoTrue declares the schema, only consumes it. The impact chain is: SQL migration → stale `src/PostgREST/SchemaCache.hs` → 403 from `src/PostgREST/ApiRequest.hs` → GoTrue token refresh in `internal/api/token.go` fails because session columns no longer match.",
+      "evaluation_criteria": [
+        "Must describe the impact chain from SQL migration → PostgREST schema cache → 403 → GoTrue token refresh failure",
+        "Must mention pg_notify / cache-reload as the missing signal that allows the stale state to persist",
+        "Must explain that all cross-repo coupling is mediated by the SQL schema (not code-level imports)",
+        "Should mention that GoTrue's wider session/token surface (beyond token.go) cascades from internal/models/user.go drift"
+      ]
+    },
+    "test_impact": {
+      "expected_solution": "Test coverage required: (1) Supabase-side — SQL fixture tests that exercise migrations under `docker/volumes/db/init/data.sql` (apply baseline, run the new migration, assert tables/columns/policies exist and are well-formed). (2) PostgREST — round-trip tests for `src/PostgREST/SchemaCache.hs` that simulate a schema change and verify the cache reloads correctly; permission-evaluation tests for `src/PostgREST/ApiRequest.hs` covering RLS policies that reference newly added columns. (3) GoTrue — Go unit tests on `internal/models/user.go` for column-mapping completeness and integration tests on `internal/api/token.go` (token refresh path) that exercise the new `auth.sessions` shape. (4) Cross-repo integration test that spins up the Supabase stack with the new migration applied, then runs PostgREST + GoTrue end-to-end and verifies authenticated requests succeed and token refresh works.",
+      "evaluation_criteria": [
+        "Must mention SQL-fixture / migration tests on docker/volumes/db/init/data.sql",
+        "Must mention schema-cache reload tests for src/PostgREST/SchemaCache.hs",
+        "Must mention Go-side tests for internal/models/user.go and internal/api/token.go",
+        "Should describe a cross-repo integration test that runs all three components with the new schema applied"
+      ]
+    }
+  }
+}

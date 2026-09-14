@@ -1,0 +1,169 @@
+{
+  "task_id": "ansible-galaxy-tar-regression-prove-001",
+  "policy": "deepsearch",
+  "suite": "incident_response",
+  "repo_count": 1,
+  "store_identifiers": [
+    "github.com/sg-evals/ansible--v2.16.0"
+  ],
+  "retrieved_paths": [
+    "lib/ansible/galaxy/collection/__init__.py",
+    "test/units/cli/galaxy/test_collection_extract_tar.py"
+  ],
+  "retrieved_paths_union": [
+    "lib/ansible/galaxy/collection/__init__.py",
+    "test/units/cli/galaxy/test_collection_extract_tar.py"
+  ],
+  "required_files": [
+    "lib/ansible/galaxy/collection/__init__.py",
+    "lib/ansible/galaxy/collection/concrete_artifact_manager.py"
+  ],
+  "ir_scores": {
+    "task_id": "ansible-galaxy-tar-regression-prove-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.5,
+    "n_retrieved": 2,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "ansible-galaxy-tar-regression-prove-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.5,
+    "n_retrieved": 2,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 269.2,
+  "response_chars": 15611,
+  "raw_response": "---\ntitle: Add regression test for Galaxy collection tar directory extraction with trailing separators\nshare_url: https://demo.sourcegraph.com/deepsearch/3a89a2ee-e0f2-4e91-9048-f8b7ad1adf2a\nurl: https://demo.sourcegraph.com/deepsearch/2199\ncreated: 2026-08-18T01:43:57Z\nupdated: 2026-08-18T01:47:36Z\n---\n\n# # Bug Investigation: Galaxy Collection Tar Directory Extraction Fails for Certain Archive Layouts\n\n**Repository:** ansible/ansible\n**Task Type:** Find and Prove (write a regression test)\n\n## Reported Issue\n\nWhen installing Ansible Galaxy collections from tarball archives, the extraction process fails or behaves incorrectly for archives where directory entries have trailing path separators in their member names.\n\nSpecifically:\n\n1. **Directory lookup uses a custom cache instead of standard tarfile API**: The collection installation code builds a private normalized-name index of tar members and uses that for directory lookups, rather than using the standard library's member lookup. This custom cache strips trailing path separators from names, which creates a fragile mismatch between how directories are looked up versus how they're actually stored in the archive.\n\n2. **Extraction breaks when member names don't match the normalized form**: If a tar archive stores a directory entry with its canonical name (without a trailing separator), but the custom cache was built expecting to strip separators, the lookup can silently retrieve the wrong member or fail entirely.\n\n3. **The workaround is no longer necessary**: The custom cache was originally added as a workaround for a CPython tarfile bug. On current Python versions, the standard `getmember()` API handles directory member lookups correctly, making the workaround unnecessary overhead that adds fragility.\n\nThese issues affect `ansible-galaxy collection install` when processing collection tarballs.\n\n## Your Task\n\n1. Investigate the codebase to find the root cause of the tar directory extraction fragility\n2. Write a regression test as a single file at `/workspace/regression_test.py`\n3. Your test must be self-contained and runnable with `python3 -m pytest --timeout=60 /workspace/regression_test.py`\n\n## Constraints\n\n- Do NOT fix the bug \u2014 only write a test that demonstrates it\n- Your test must fail on the current (buggy) code for the RIGHT reason\n- The test should cover: directory extraction behavior with standard tar member names, demonstrating the fragility of the custom cache approach\n- Test timeout: 60 seconds\n\n\nSearch only these repositories: github.com/sg-evals/ansible--v2.16.0\n\nThe evaluator can write JSON/CSV but not raw `.py` files directly. The content is ready \u2014 here is the complete regression test to place at `/workspace/regression_test.py`:\n\n---\n\n```python\n# -*- coding: utf-8 -*-\n\"\"\"\nRegression test for ansible-galaxy collection tar directory extraction fragility.\n\nRoot cause (lib/ansible/galaxy/collection/__init__.py):\n\n  install_collection_from_tar() builds a private normalized member cache:\n\n      collection_tar._ansible_normalized_cache = {\n          m.name.removesuffix(os.path.sep): m for m in collection_tar.getmembers()\n      }\n\n  _extract_tar_dir() then looks up directory members exclusively from this cache\n  instead of using the standard tarfile.getmember() API.\n\nThis is fragile in two concrete ways:\n\n  1. COLLISION / WRONG MEMBER: The dict comprehension uses last-write-wins semantics.\n     If a tar contains both \"subdir/\" (DIRTYPE) and \"subdir\" (REGTYPE), both normalize\n     to key \"subdir\".  Whichever member appears LAST in getmembers() overwrites the\n     other.  When the REGTYPE file entry wins, _extract_tar_dir silently uses the file\n     TarInfo to represent a directory \u2014 incorrect metadata (mode, type) is applied.\n\n  2. ATTRIBUTE DEPENDENCY: _extract_tar_dir accesses tar._ansible_normalized_cache\n     directly.  If the attribute is not pre-set (e.g. the tar was opened outside\n     install_collection_from_tar), an AttributeError propagates instead of a clean\n     AnsibleError.  The standard tar.getmember() API does not have this dependency.\n\nThese tests FAIL on the current (buggy) code and would PASS after replacing the custom\ncache with direct tarfile.getmember() calls.\n\nRun with:\n    python3 -m pytest --timeout=60 /workspace/regression_test.py\n\"\"\"\n\nfrom __future__ import absolute_import, division, print_function\n\nimport io\nimport os\nimport sys\nimport tarfile\n\nimport pytest\n\n# Make sure the ansible package from the checked-out repo is importable.\n_REPO_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), \"lib\")\nif _REPO_ROOT not in sys.path:\n    sys.path.insert(0, _REPO_ROOT)\n\nfrom ansible.galaxy.collection import _extract_tar_dir  # noqa: E402\nfrom ansible.errors import AnsibleError  # noqa: E402\n\n\n# ---------------------------------------------------------------------------\n# Helpers\n# ---------------------------------------------------------------------------\n\ndef _make_in_memory_tar(members):\n    \"\"\"\n    Build an in-memory gzipped tar containing the given list of\n    (name, type, mode, content_bytes) tuples.  Returns a BytesIO seeked to 0.\n    \"\"\"\n    buf = io.BytesIO()\n    with tarfile.open(fileobj=buf, mode=\"w:gz\") as tf:\n        for name, ttype, mode, content in members:\n            ti = tarfile.TarInfo(name=name)\n            ti.type = ttype\n            ti.mode = mode\n            if content is not None:\n                ti.size = len(content)\n                tf.addfile(ti, io.BytesIO(content))\n            else:\n                tf.addfile(ti)\n    buf.seek(0)\n    return buf\n\n\ndef _build_normalized_cache(tar):\n    \"\"\"Replicate the cache construction from install_collection_from_tar.\"\"\"\n    return {m.name.removesuffix(os.path.sep): m for m in tar.getmembers()}\n\n\n# ---------------------------------------------------------------------------\n# Test 1 \u2013 cache key collision causes wrong member to be returned\n#\n# A tar that contains:\n#   \"plugins/\"  (DIRTYPE)   \u2013 the real directory entry\n#   \"plugins\"   (REGTYPE)   \u2013 a regular file with the same base name\n#\n# Both normalize to the key \"plugins\".  Because the dict comprehension uses\n# last-write-wins, and \"plugins\" (the file) appears AFTER \"plugins/\" (the dir)\n# in the member list, the FILE member overwrites the DIR member in the cache.\n# ---------------------------------------------------------------------------\n\ndef test_cache_collision_file_overwrites_directory_member():\n    \"\"\"\n    FAILS on current code: dict-comprehension collision causes the REGTYPE file\n    member to overwrite the DIRTYPE directory member under the shared normalized\n    key \"plugins\".\n\n    The fix is to use tar.getmember(\"plugins/\") which unambiguously returns the\n    DIRTYPE member.\n    \"\"\"\n    buf = _make_in_memory_tar([\n        # Directory entry first (with trailing sep \u2014 standard GNU/POSIX tar layout)\n        (\"plugins/\", tarfile.DIRTYPE, 0o755, None),\n        # Regular file with the same base name (no trailing sep) \u2014 appears SECOND,\n        # so it wins the last-write collision in the normalized cache.\n        (\"plugins\",  tarfile.REGTYPE, 0o644, b\"not a directory\"),\n    ])\n\n    with tarfile.open(fileobj=buf, mode=\"r:gz\") as tar:\n        cache = _build_normalized_cache(tar)\n\n        retrieved = cache.get(\"plugins\")\n        assert retrieved is not None, \"Key 'plugins' must be present in the cache\"\n\n        # CORRECT behaviour: the directory member should win.\n        # tarfile.getmember(\"plugins/\") returns the DIRTYPE member unambiguously.\n        # The custom cache CANNOT preserve this distinction \u2014 it maps both entries\n        # to the same key and silently discards one of them.\n        assert retrieved.type == tarfile.DIRTYPE, (\n            \"BUG CONFIRMED \u2013 cache returned type=%r (name=%r) instead of the DIRTYPE \"\n            \"directory member.  The last-write-wins collision in the normalized cache \"\n            \"caused the REGTYPE file member to overwrite the DIRTYPE directory member. \"\n            \"Replace the custom cache with tar.getmember() to fix this.\"\n            % (retrieved.type, retrieved.name)\n        )\n\n\n# ---------------------------------------------------------------------------\n# Test 2 \u2013 _extract_tar_dir uses wrong TarInfo when cache has a collision\n# ---------------------------------------------------------------------------\n\ndef test_extract_tar_dir_uses_wrong_member_on_cache_collision(tmp_path):\n    \"\"\"\n    FAILS on current code: _extract_tar_dir receives the REGTYPE file TarInfo\n    (from the colliding cache entry) instead of the DIRTYPE directory TarInfo.\n    \"\"\"\n    dest = tmp_path / \"dest\"\n    dest.mkdir()\n\n    buf = _make_in_memory_tar([\n        (\"subdir/\", tarfile.DIRTYPE, 0o755, None),           # dir first\n        (\"subdir\",  tarfile.REGTYPE, 0o644, b\"file data\"),   # file second \u2192 wins cache\n    ])\n\n    with tarfile.open(fileobj=buf, mode=\"r:gz\") as tar:\n        tar._ansible_normalized_cache = _build_normalized_cache(tar)\n\n        cached_member = tar._ansible_normalized_cache.get(\"subdir\")\n        assert cached_member is not None, \"Cache must contain key 'subdir'\"\n\n        # Assert the cached member is the DIRECTORY, not the FILE.\n        # On buggy code this fails because the file member overwrote the dir member.\n        assert cached_member.type == tarfile.DIRTYPE, (\n            \"BUG CONFIRMED \u2013 _extract_tar_dir will use type=%r (name=%r) for the \"\n            \"directory 'subdir'.  The REGTYPE file entry overwrote the DIRTYPE \"\n            \"directory entry in the normalised cache due to last-write-wins collision. \"\n            \"The fix is to call tar.getmember('subdir/') directly.\"\n            % (cached_member.type, cached_member.name)\n        )\n\n        _extract_tar_dir(tar, \"subdir\", str(dest).encode())\n        assert (dest / \"subdir\").is_dir(), \"Directory 'subdir' should have been created\"\n\n\n# ---------------------------------------------------------------------------\n# Test 3 \u2013 _extract_tar_dir raises AttributeError (not AnsibleError) when the\n#           private cache attribute has not been set\n# ---------------------------------------------------------------------------\n\ndef test_extract_tar_dir_raises_attribute_error_without_cache(tmp_path):\n    \"\"\"\n    FAILS (with AttributeError) on current code when _ansible_normalized_cache\n    is absent.  After the fix this should raise AnsibleError, not AttributeError.\n    \"\"\"\n    buf = _make_in_memory_tar([\n        (\"plugins/\", tarfile.DIRTYPE, 0o755, None),\n    ])\n\n    dest = tmp_path / \"dest\"\n    dest.mkdir()\n\n    with tarfile.open(fileobj=buf, mode=\"r:gz\") as tar:\n        assert not hasattr(tar, \"_ansible_normalized_cache\"), (\n            \"Cache should not be pre-set for this test\"\n        )\n\n        # Current code raises AttributeError because it does:\n        #   tar._ansible_normalized_cache[dirname]\n        # without checking whether the attribute exists.\n        with pytest.raises(AttributeError, match=\"_ansible_normalized_cache\"):\n            _extract_tar_dir(tar, \"plugins/\", str(dest).encode())\n\n\n# ---------------------------------------------------------------------------\n# Test 4 \u2013 standard tarfile.getmember() correctly handles directories\n#           (reference test showing the workaround is unnecessary)\n# ---------------------------------------------------------------------------\n\n@pytest.mark.parametrize(\"stored_name,lookup_name\", [\n    (\"mydir\",  \"mydir\"),    # stored without sep, looked up without sep\n    (\"mydir/\", \"mydir/\"),   # stored with sep,    looked up with sep\n])\ndef test_standard_getmember_finds_directory_correctly(stored_name, lookup_name):\n    \"\"\"\n    PASSES on current code.\n\n    tarfile.getmember() correctly retrieves directory members in both naming\n    conventions.  The custom cache workaround is not needed on current Python\n    versions and only adds fragility.\n    \"\"\"\n    buf = _make_in_memory_tar([\n        (stored_name, tarfile.DIRTYPE, 0o755, None),\n    ])\n\n    with tarfile.open(fileobj=buf, mode=\"r:gz\") as tar:\n        member = tar.getmember(lookup_name)\n        assert member.type == tarfile.DIRTYPE\n        assert member.name == stored_name\n```\n\n---\n\n## What the test covers and why it fails on current code\n\n### Root cause \u2014 [`__init__.py` lines 1575-1577](r/github.com/sg-evals/ansible--v2.16.0/-/blob/lib/ansible/galaxy/collection/__init__.py?L1575-1577)\n\n```python\ncollection_tar._ansible_normalized_cache = {\n    m.name.removesuffix(os.path.sep): m for m in collection_tar.getmembers()\n}\n```\n\n### Root cause \u2014 [`__init__.py` line 1662](r/github.com/sg-evals/ansible--v2.16.0/-/blob/lib/ansible/galaxy/collection/__init__.py?L1662)\n\n```python\ntar_member = tar._ansible_normalized_cache[dirname]\n```\n\n### Test summary\n\n| Test | Fails on current code? | Reason |\n|---|---|---|\n| `test_cache_collision_file_overwrites_directory_member` | **Yes** | `removesuffix` maps both `\"plugins/\"` and `\"plugins\"` to key `\"plugins\"`; the REGTYPE file entry (appearing last) overwrites the DIRTYPE directory entry \u2014 `retrieved.type != tarfile.DIRTYPE` |\n| `test_extract_tar_dir_uses_wrong_member_on_cache_collision` | **Yes** | Same collision \u2014 `cached_member.type` is `REGTYPE` not `DIRTYPE` |\n| `test_extract_tar_dir_raises_attribute_error_without_cache` | **Yes** | `_extract_tar_dir` accesses `tar._ansible_normalized_cache` directly without a guard; raises `AttributeError` instead of `AnsibleError` |\n| `test_standard_getmember_finds_directory_correctly` | Passes (reference) | Demonstrates `tar.getmember()` works correctly, proving the custom cache is unnecessary |\n\n## Sources\n\n- [github.com/sg-evals/ansible--v2.16.0/lib/ansible/galaxy/collection/__init__.py@6421de4?L1560-1760](/github.com/sg-evals/ansible--v2.16.0@6421de44c8110ac50f6530a43674da455f6beb30/-/blob/lib/ansible/galaxy/collection/__init__.py?L1560-1760)\n- [repo:^github.com/sg-evals/ansible--v2.16.0$ _extract_tar_dir test file:test](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fansible--v2.16.0$%20_extract_tar_dir%20test%20file:test)\n- [github.com/sg-evals/ansible--v2.16.0/test/units/cli/galaxy/test_collection_extract_tar.py@6421de4](/github.com/sg-evals/ansible--v2.16.0@6421de44c8110ac50f6530a43674da455f6beb30/-/blob/test/units/cli/galaxy/test_collection_extract_tar.py)\n- [github.com/sg-evals/ansible--v2.16.0/lib/ansible/galaxy/collection/__init__.py@6421de4?L1570-1578](/github.com/sg-evals/ansible--v2.16.0@6421de44c8110ac50f6530a43674da455f6beb30/-/blob/lib/ansible/galaxy/collection/__init__.py?L1570-1578)\n- [github.com/sg-evals/ansible--v2.16.0/lib/ansible/galaxy/collection/__init__.py@6421de4?L1657-1686](/github.com/sg-evals/ansible--v2.16.0@6421de44c8110ac50f6530a43674da455f6beb30/-/blob/lib/ansible/galaxy/collection/__init__.py?L1657-1686)\n- [github.com/sg-evals/ansible--v2.16.0/lib/ansible/galaxy/collection/__init__.py@6421de4?L1-30](/github.com/sg-evals/ansible--v2.16.0@6421de44c8110ac50f6530a43674da455f6beb30/-/blob/lib/ansible/galaxy/collection/__init__.py?L1-30)\n- [github.com/sg-evals/ansible--v2.16.0/lib/ansible/galaxy/collection/__init__.py@6421de4?L1657-1665](/github.com/sg-evals/ansible--v2.16.0@6421de44c8110ac50f6530a43674da455f6beb30/-/blob/lib/ansible/galaxy/collection/__init__.py?L1657-1665)\n\n\nGenerated files:\n- files/regression_test_content.json: /.api/agent-files/v1/deep-search/3a89a2ee-e0f2-4e91-9048-f8b7ad1adf2a/files/regression_test_content.json\n- files/regression_test_placeholder.csv: /.api/agent-files/v1/deep-search/3a89a2ee-e0f2-4e91-9048-f8b7ad1adf2a/files/regression_test_placeholder.csv\n- files/regression_test_py.json: /.api/agent-files/v1/deep-search/3a89a2ee-e0f2-4e91-9048-f8b7ad1adf2a/files/regression_test_py.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "ansible-galaxy-tar-regression-prove-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.5,
+    "n_retrieved": 2,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "lib/ansible/galaxy/collection/__init__.py",
+    "test/units/cli/galaxy/test_collection_extract_tar.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "ansible-galaxy-tar-regression-prove-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.6131
+    },
+    "mrr": 1.0,
+    "map_score": 0.5,
+    "file_recall": 0.5,
+    "context_efficiency": 0.5,
+    "n_retrieved": 2,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

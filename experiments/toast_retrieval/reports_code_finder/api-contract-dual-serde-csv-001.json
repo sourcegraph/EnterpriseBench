@@ -1,0 +1,179 @@
+{
+  "task_id": "api-contract-dual-serde-csv-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/serde--v1.0.193",
+    "github.com/sg-evals/rust-csv--1.3.0"
+  ],
+  "retrieved_paths": [
+    "serde/src/de/mod.rs",
+    "serde_derive/src/de.rs",
+    "src/string_record.rs",
+    "src/deserializer.rs",
+    "src/reader.rs"
+  ],
+  "retrieved_paths_union": [
+    "serde/src/de/mod.rs",
+    "serde_derive/src/de.rs",
+    "src/string_record.rs",
+    "src/deserializer.rs",
+    "src/reader.rs"
+  ],
+  "required_files": [
+    "serde/serde/src/de/mod.rs",
+    "csv/src/deserializer.rs"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-serde-csv-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.8772,
+      "10": 0.8772
+    },
+    "mrr": 1.0,
+    "map_score": 0.75,
+    "file_recall": 1.0,
+    "context_efficiency": 0.4,
+    "n_retrieved": 5,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-serde-csv-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.8772,
+      "10": 0.8772
+    },
+    "mrr": 1.0,
+    "map_score": 0.75,
+    "file_recall": 1.0,
+    "context_efficiency": 0.4,
+    "n_retrieved": 5,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 24.9,
+  "response_chars": 3051,
+  "raw_response": "I\u2019m unable to write `/workspace/analysis/IMPACT_REPORT.md` because the available search tools do not provide filesystem write access. Findings so far:\n\n- `serde`\u2019s contract is `serde::de::Deserializer<'de>` in `serde/src/de/mod.rs`, especially:\n  - `deserialize_any` (`L864-L924`) for self-describing formats.\n  - Typed entry points such as `deserialize_seq`, `deserialize_map`, and `deserialize_struct` (`L1086-L1121`).\n  - `Visitor` methods including `visit_seq`, `visit_map`, and `visit_newtype_struct` (`L1626-L1659`).\n- `serde_derive` generates struct deserialization in `serde_derive/src/de.rs`:\n  - Ordinary structs dispatch through `Deserializer::deserialize_struct` (`L1027-L1035`).\n  - Flattened structs dispatch through `deserialize_map` (`L1027-L1030`).\n  - Internally tagged and untagged shapes use `deserialize_any` (`L1043-L1048`).\n  - Struct visitors implement both sequence and map paths (`L963-L990`, `L1070-L1075`).\n- `csv` declares `serde = \"1.0.55\"` in `Cargo.toml` (`L23-L31`), allowing Cargo to resolve newer compatible 1.0.x releases such as 1.0.193.\n- CSV\u2019s record deserialization starts in `src/string_record.rs`:\n  - `StringRecord::deserialize` delegates to `deserialize_string_record` (`L292-L297`).\n  - The documented behavior is positional without headers and name-based with headers (`L220-L291`).\n- `src/deserializer.rs` implements the Serde contract:\n  - `deserialize_string_record` / `deserialize_byte_record` construct `DeRecordWrap` and call `D::deserialize` (`L21-L53`).\n  - `deserialize_any` infers booleans, integers, floats, or strings from the next CSV field (`L203-L229`, `L347-L352`).\n  - `deserialize_seq` and `deserialize_tuple_struct` call `visitor.visit_seq` (`L483-L505`).\n  - `deserialize_struct` calls `visit_seq` without headers and `visit_map` with headers (`L518-L529`).\n  - `SeqAccess::next_element_seed` consumes fields sequentially (`L610-L624`).\n  - `MapAccess` consumes headers as keys and row fields as values (`L627-L649`).\n  - `deserialize_newtype_struct` calls `visitor.visit_newtype_struct(self)` (`L475-L481`).\n- `Reader::deserialize` creates `DeserializeRecordsIter` (`src/reader.rs:L1048-L1053`); each iterator `next` reads one row and calls `StringRecord::deserialize` with stored headers (`L1997-L2007`).\n\nThe affected category is likely **flattened struct definitions** (and potentially other struct shapes whose generated Serde code relies on `deserialize_any`), because Serde derive\u2019s dispatch differs by struct form while CSV\u2019s `deserialize_any` consumes a single scalar field rather than presenting a row as a sequence/map. This can alter output for the same CSV input when the resolved Serde version changes generated/deserialization behavior around those forms. Migration should avoid relying on `deserialize_any` for non-self-describing CSV row shapes, prefer ordinary named structs with headers or explicit positional tuple structs, and use `StringRecord::deserialize(Some(&headers))` when field-name mapping is required.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-serde-csv-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.2641
+    },
+    "mrr": 0.25,
+    "map_score": 0.125,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2,
+    "n_retrieved": 5,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "serde/serde/src/de/mod.rs",
+    "serde_derive/src/de.rs",
+    "src/string_record.rs",
+    "csv/src/deserializer.rs",
+    "src/reader.rs"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-serde-csv-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.2641
+    },
+    "mrr": 0.25,
+    "map_score": 0.125,
+    "file_recall": 0.5,
+    "context_efficiency": 0.2,
+    "n_retrieved": 5,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

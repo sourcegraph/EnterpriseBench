@@ -1,0 +1,121 @@
+# support_code_mapping: Map customer Jest tests passing once but failing on rerun after Babel plugin upgrade to the babel-jest transform-cache key boundary
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "jest-babel-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-jest-babel-cache-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "medium"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Map customer Jest tests passing once but failing on rerun after Babel plugin upgrade to the babel-jest transform-cache key boundary"
+prompt = """
+A customer reports that after upgrading @babel/plugin-transform-runtime
+their Jest test suite passes once on a clean checkout but every rerun
+fails with 'ReferenceError: regeneratorRuntime is not defined' in async
+tests. Clearing node_modules/.cache makes it pass once again.
+
+Your task:
+1. Find where Jest's runtime invokes its transformer to compile source
+   files and how it decides whether to use a cached transform output.
+2. Find where babel-jest computes the transform cache key (file content,
+   babel config, plugin versions) and which inputs it includes.
+3. Trace the cross-repo path: jest-runtime ScriptTransformer.transform()
+   -> babel-jest getCacheKey -> babel-core loadOptions / partialConfig
+   -> plugin signature inputs. Cite each file and the function
+   responsible.
+4. Identify why a plugin upgrade that does NOT bump the package.json
+   version (for example a local lockfile resolution change) can
+   produce a stale cache hit, and what makes the second run fail
+   when the first one passed.
+"""
+
+[[repos]]
+url = "https://github.com/jestjs/jest"
+rev = "v29.7.0"
+path = "jest"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/babel/babel"
+rev = "v7.24.0"
+path = "babel"
+role = "upstream"
+
+[metadata]
+languages = ["javascript", "typescript"]
+total_loc = 400000
+dependency_depth = 2
+frameworks = ["jest", "babel"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.4
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the correct source files across both repos"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.3
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full propagation chain across the boundary"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.3
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the conditions producing the symptom"
+timeout_seconds = 120
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "The cache-mismatch lives between Jest's ScriptTransformer cache key policy and Babel's plugin loader; understanding why a plugin upgrade produces a stale hit requires cross-repo navigation."
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "jest/packages/jest-runtime/src/index.ts"
+repo = "jest"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "jest/packages/jest-transform/src/ScriptTransformer.ts"
+repo = "jest"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "babel/packages/babel-core/src/config/full.ts"
+repo = "babel"
+confidence = 0.85
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "babel/packages/babel-core/src/config/partial.ts"
+repo = "babel"
+confidence = 0.8
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "jest/packages/babel-jest/src/index.ts"
+repo = "jest"
+confidence = 0.9
+
+[[ground_truth.sufficient_files]]
+path = "babel/packages/babel-core/src/config/files/plugins.ts"
+repo = "babel"
+confidence = 0.7

@@ -1,0 +1,182 @@
+{
+  "task_id": "api-contract-dual-fastapi-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/fastapi--0.109.0",
+    "github.com/sg-evals/httpx--0.26.0"
+  ],
+  "retrieved_paths": [
+    "fastapi/routing.py",
+    "fastapi/dependencies/utils.py",
+    "fastapi/_compat.py",
+    "httpx/_client.py",
+    "httpx/_models.py",
+    "httpx/_content.py"
+  ],
+  "retrieved_paths_union": [
+    "fastapi/routing.py",
+    "fastapi/dependencies/utils.py",
+    "fastapi/_compat.py",
+    "httpx/_client.py",
+    "httpx/_models.py",
+    "httpx/_content.py"
+  ],
+  "required_files": [
+    "fastapi/routing.py",
+    "httpx/_content.py"
+  ],
+  "ir_scores": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8316
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 6,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8316
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 6,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 31.7,
+  "response_chars": 7571,
+  "raw_response": "I could not write `/workspace/analysis/IMPACT_REPORT.md` because the available tools only support repository search/read operations, not filesystem writes. Findings so far:\n\n## FastAPI request-validation chain\n\n- [`fastapi/routing.py?L196-L249`](/r/github.com/sg-evals/fastapi--0.109.0/-/blob/fastapi/routing.py?L196-L249) \u2014 `get_request_handler()` reads the request body, negotiates `Content-Type`, and calls `request.json()` for `application/json` and `+json` media types. Invalid JSON becomes a `RequestValidationError`.\n- [`fastapi/routing.py?L274-L291`](/r/github.com/sg-evals/fastapi--0.109.0/-/blob/fastapi/routing.py?L274-L291) \u2014 invokes dependency solving and converts validation errors into HTTP 422 responses.\n- [`fastapi/dependencies/utils.py?L570-L647`](/r/github.com/sg-evals/fastapi--0.109.0/-/blob/fastapi/dependencies/utils.py?L570-L647) \u2014 `solve_dependencies()` resolves dependencies and passes parsed body data to `request_body_to_args()`.\n- [`fastapi/dependencies/utils.py?L685-L764`](/r/github.com/sg-evals/fastapi--0.109.0/-/blob/fastapi/dependencies/utils.py?L685-L764) \u2014 extracts body fields, applies embedding rules, distinguishes missing/`None`, applies defaults, and validates each field.\n- [`fastapi/_compat.py?L83-L156`](/r/github.com/sg-evals/fastapi--0.109.0/-/blob/fastapi/_compat.py?L83-L156) \u2014 Pydantic v2 integration. `ModelField` constructs a `TypeAdapter`; validation uses `validate_python()`, including nested models and unions.\n- [`fastapi/dependencies/utils.py?L767-L816`](/r/github.com/sg-evals/fastapi--0.109.0/-/blob/fastapi/dependencies/utils.py?L767-L816) \u2014 constructs a combined body model when multiple body parameters or embedding require an outer object.\n- [`fastapi/dependencies/utils.py?L404-L449`](/r/github.com/sg-evals/fastapi--0.109.0/-/blob/fastapi/dependencies/utils.py?L404-L449) \u2014 infers non-scalar parameters as body fields and determines aliases/requiredness.\n\n## httpx request-encoding chain\n\n- [`httpx/_client.py?L321-L370`](/r/github.com/sg-evals/httpx--0.26.0/-/blob/httpx/_client.py?L321-L370) \u2014 `Client.build_request()` merges URL, headers, cookies, and delegates request construction.\n- [`httpx/_models.py?L306-L390`](/r/github.com/sg-evals/httpx--0.26.0/-/blob/httpx/_models.py?L306-L390) \u2014 `Request` calls `encode_request()`, applies generated headers, and loads byte-stream bodies.\n- [`httpx/_content.py?L176-L216`](/r/github.com/sg-evals/httpx--0.26.0/-/blob/httpx/_content.py?L176-L216) \u2014 selects content encoding. `json=` takes precedence after `content=`, `files=`, and truthy `data=`.\n- [`httpx/_content.py?L176-L181`](/r/github.com/sg-evals/httpx--0.26.0/-/blob/httpx/_content.py?L176-L181) \u2014 JSON encoding uses Python `json.dumps()`, UTF-8 bytes, and automatically sets `Content-Type: application/json` plus `Content-Length`.\n- [`httpx/_content.py?L136-L149`](/r/github.com/sg-evals/httpx--0.26.0/-/blob/httpx/_content.py?L136-L149) \u2014 form encoding converts values with `primitive_value_to_str`; nested dictionaries are not JSON-serialized when passed through `data=`.\n- [`httpx/_content.py?L110-L133`](/r/github.com/sg-evals/httpx--0.26.0/-/blob/httpx/_content.py?L110-L133) \u2014 raw `content=` sends bytes/text without automatically adding a JSON content type.\n\n## Contract drift points\n\n1. **`json=` versus `data=`**\n   - FastAPI only deserializes JSON when the content type is absent or `application/json`/`+json` ([routing chain above]).\n   - `httpx(json=payload)` produces JSON and the correct header ([`_content.py?L176-L181`] link above).\n   - `httpx(data=payload)` produces URL-encoded form data ([`_content.py?L136-L149`] link above), which will not satisfy a JSON body model and can result in 422 unless the endpoint declares `Form`.\n   - Recommended fix: use `json=payload` for JSON endpoints; do not manually JSON-encode into `data=`.\n\n2. **Nested dictionaries/models**\n   - FastAPI\u2019s Pydantic `TypeAdapter.validate_python()` recursively validates nested models and expects the declared object shape ([`_compat.py?L106-L131`] link above).\n   - httpx does not perform model serialization. `json=` delegates directly to `json.dumps()` ([`_content.py?L176-L181`] link above). Pydantic models are not JSON serializable by default.\n   - Recommended fix: call `model_dump(mode=\"json\", by_alias=True, exclude_none=...)` before passing to `json=`, or use an explicit encoder.\n\n3. **Missing keys versus explicit `null`**\n   - FastAPI\u2019s body extraction treats `value is None` as absent for purposes of required/default handling ([`dependencies/utils.py?L706-L729`] link above). Optional fields receive their declared default when no usable value is present.\n   - Python `json.dumps()` preserves dictionary entries whose values are `None` as JSON `null`; it does not omit them ([`_content.py?L176-L181`] link above).\n   - This can differ for Pydantic fields whose semantics distinguish an omitted field from an explicit `None`, especially nested models, validators, and union branches.\n   - Recommended fix: choose an explicit policy and serialize with `exclude_none=True` when omission is required; otherwise ensure the server annotation accepts `None`.\n\n4. **Optional fields with defaults**\n   - FastAPI/Pydantic determines requiredness from `FieldInfo.is_required()` and obtains defaults through `get_default(call_default_factory=True)` ([`_compat.py?L95-L114`] link above).\n   - httpx does not apply Pydantic defaults; it transmits exactly the supplied mapping. A client-created dict may omit defaults, while a dumped model may include them, depending on `exclude_unset`/`exclude_defaults`.\n   - Recommended fix: serialize client models consistently, e.g. `model_dump(mode=\"json\", by_alias=True, exclude_unset=False, exclude_defaults=False)` when the API contract requires defaults.\n\n5. **Union representation**\n   - FastAPI validates union input through Pydantic v2 `TypeAdapter.validate_python()` ([`_compat.py?L116-L131`] link above), so the JSON shape and discriminator/branch-compatible types matter.\n   - httpx merely emits the Python JSON representation and performs no union/discriminator normalization ([`_content.py?L176-L181`] link above). A client may send a structurally valid JSON value that selects a different union branch\u2014or no branch\u2014than intended.\n   - Recommended fix: use discriminated unions with explicit discriminator fields and serialize through the same Pydantic model/schema used by the server.\n\n6. **Body embedding**\n   - For one unembedded body parameter, FastAPI accepts the parameter value directly; for multiple parameters or `embed=True`, it expects an outer object keyed by aliases ([`dependencies/utils.py?L691-L705`] and [`L767-L816`] links above).\n   - httpx sends whatever object is supplied and does not know FastAPI\u2019s embedding rules.\n   - Recommended fix: match the endpoint\u2019s exact shape, e.g. `json={\"item\": {...}}` for an embedded `item`, versus `json={...}` for an unembedded model.\n\n## Recommended remediation\n\n- Define shared request/response Pydantic models and serialize client payloads with `model_dump(mode=\"json\", by_alias=True, ...)`.\n- Use `httpx(..., json=payload)` for JSON request bodies.\n- Establish explicit policies for `None`, omitted fields, defaults, aliases, and union discriminators.\n- Add contract tests that inspect the actual outgoing HTTP body and headers, then submit them to FastAPI endpoints and assert both successful validation and expected 422 behavior.\n- For every endpoint, verify whether FastAPI expects a direct model object or an embedded outer body object.\n\nSub-agent reached the turn limit and stopped early.",
+  "ir_scores_unaligned": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8316
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 6,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "fastapi/routing.py",
+    "fastapi/dependencies/utils.py",
+    "fastapi/_compat.py",
+    "httpx/_client.py",
+    "httpx/_models.py",
+    "httpx/_content.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "api-contract-dual-fastapi-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.5,
+      "3": 0.5,
+      "5": 0.5,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.6667,
+      "3": 0.4,
+      "5": 0.2857,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.6131,
+      "5": 0.6131,
+      "10": 0.8316
+    },
+    "mrr": 1.0,
+    "map_score": 0.6667,
+    "file_recall": 1.0,
+    "context_efficiency": 0.3333,
+    "n_retrieved": 6,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

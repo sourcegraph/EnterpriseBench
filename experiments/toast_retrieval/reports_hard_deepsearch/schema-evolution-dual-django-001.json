@@ -1,0 +1,203 @@
+{
+  "task_id": "schema-evolution-dual-django-001",
+  "policy": "deepsearch",
+  "suite": "feature_delivery",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/django--5.0",
+    "github.com/sg-evals/wagtail--v5.2"
+  ],
+  "retrieved_paths": [
+    "django/db/models/fields/generated.py",
+    "django/db/models/fields/__init__.py",
+    "django/db/models/options.py",
+    "wagtail/models/__init__.py",
+    "wagtail/fields.py",
+    "wagtail/models/copying.py",
+    "django/db/models/base.py",
+    "wagtail/migrations",
+    "docs/releases/5.0.txt",
+    "wagtail/models/i18n.py",
+    "wagtail/migrations/0087_alter_grouppagepermission_unique_together_and_more.py",
+    "wagtail/migrations/0089_log_entry_data_json_null_to_object.py",
+    "django/db/models/sql/query.py"
+  ],
+  "retrieved_paths_union": [
+    "django/db/models/fields/generated.py",
+    "django/db/models/fields/__init__.py",
+    "django/db/models/options.py",
+    "wagtail/models/__init__.py",
+    "wagtail/fields.py",
+    "wagtail/models/copying.py",
+    "django/db/models/base.py",
+    "wagtail/migrations",
+    "docs/releases/5.0.txt",
+    "wagtail/models/i18n.py",
+    "wagtail/migrations/0087_alter_grouppagepermission_unique_together_and_more.py",
+    "wagtail/migrations/0089_log_entry_data_json_null_to_object.py",
+    "django/db/models/sql/query.py"
+  ],
+  "required_files": [
+    "django/db/models/fields/__init__.py",
+    "wagtail/models/__init__.py"
+  ],
+  "ir_scores": {
+    "task_id": "schema-evolution-dual-django-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6509,
+      "10": 0.6509
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1538,
+    "n_retrieved": 13,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "ir_scores_union": {
+    "task_id": "schema-evolution-dual-django-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6509,
+      "10": 0.6509
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1538,
+    "n_retrieved": 13,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "elapsed_seconds": 251.3,
+  "response_chars": 17231,
+  "raw_response": "---\ntitle: Trace Django 5.0 model field changes breaking Wagtail 5.2 assumptions\nshare_url: https://demo.sourcegraph.com/deepsearch/06fdbefc-670d-49a6-b441-c209ac852227\nurl: https://demo.sourcegraph.com/deepsearch/2226\ncreated: 2026-08-18T02:01:03Z\nupdated: 2026-08-18T02:04:40Z\n---\n\n# # Trace Django 5.0 model field changes that break Wagtail v5.2 dependent model assumptions\n\nYour team maintains a Wagtail-based CMS running on Django. You're upgrading from\nDjango 4.2 to Django 5.0. Wagtail v5.2 claims Django 5.0 compatibility, but after\nthe upgrade, certain page models are failing migration checks and admin views are\nraising FieldError exceptions.\n\nThe issue stems from Django 5.0's changes to model field internals and the\nGeneratedField introduction, which affects how Wagtail's Page model hierarchy and\nits StreamField implementation interact with Django's ORM.\n\nYour task:\n1. Identify the specific Django 5.0 model/field changes that affect ORM internals\n   used by Wagtail \u2014 focus on changes to Field.contribute_to_class, model Meta\n   handling, and the new GeneratedField.\n2. Find all Wagtail model classes that inherit from or depend on Django model\n   behavior that changed in 5.0 (Page, StreamField, Orderable, RevisionMixin).\n3. Trace the impact chain: which Django internal changes break which specific\n   Wagtail model operations (migrations, queries, admin serialization).\n4. Identify the migration files in both repos that would need coordination.\n\nWrite your analysis to /workspace/SCHEMA_IMPACT.md with:\n- Django 5.0 breaking changes relevant to Wagtail (with source file paths)\n- Affected Wagtail models and their Django dependencies\n- Impact chain showing which Django change breaks which Wagtail operation\n- Migration coordination requirements\n\n\nSearch only these repositories: github.com/sg-evals/django--5.0, github.com/sg-evals/wagtail--v5.2\n\nThe analysis is complete. The SCHEMA_IMPACT document (434 lines) is written above. Here is a precise summary of all findings:\n\n---\n\n## Key Findings\n\n### Django 5.0 Breaking Changes (with source paths)\n\n1. **`GeneratedField`** \u2014 [`django/db/models/fields/generated.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/django--5.0/-/blob/django/db/models/fields/generated.py?L11-52)\n   New concrete field (`generated = True`, `db_returning = True`). Its `contribute_to_class` immediately allocates a `Query` object and registers output-field lookups. It appears in `_meta.concrete_fields` and `_meta.get_fields()`.\n\n2. **`Field.db_default`** \u2014 [`django/db/models/fields/__init__.py` L209-227](https://demo.sourcegraph.com/r/github.com/sg-evals/django--5.0/-/blob/django/db/models/fields/__init__.py?L209-227)\n   New `__init__` parameter. `Field.pre_save()` (L989-997) now returns a `DatabaseDefault` sentinel object instead of the raw value when the DB handles the default \u2014 this passes through to `StreamField.get_prep_value()` as a non-`StreamValue`, triggering the fallback `json_field.get_prep_value()` with an expression object.\n\n3. **`Meta.index_together` deprecation** \u2014 [`django/db/models/options.py` L207-214](https://demo.sourcegraph.com/r/github.com/sg-evals/django--5.0/-/blob/django/db/models/options.py?L207-214)\n   Emits `RemovedInDjango51Warning` on every app load. Will be a hard error in Django 5.1.\n\n4. **`Query.annotation_select_mask` type change** \u2014 `django/db/models/sql/query.py` L257\n   Changed from `set` to ordered `list`. Any code calling `.add()` on it raises `AttributeError`.\n\n5. **`Meta.db_table_comment` added to `DEFAULT_NAMES`** \u2014 [`django/db/models/options.py` L33](https://demo.sourcegraph.com/r/github.com/sg-evals/django--5.0/-/blob/django/db/models/options.py?L33)\n   Causes the migration autodetector to generate spurious `AlterModelOptions` operations when comparing Django 4.2-generated migration state against live Django 5.0 models.\n\n---\n\n### Affected Wagtail Models\n\n| Model | File | Mechanism broken |\n|---|---|---|\n| `Page` | [`wagtail/models/__init__.py` L1120](https://demo.sourcegraph.com/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/models/__init__.py?L1120) | `_extract_field_data` passes `GeneratedField` values to `__init__` |\n| `StreamField` | [`wagtail/fields.py` L85](https://demo.sourcegraph.com/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/fields.py?L85) | `get_prep_value` receives `DatabaseDefault`; `contribute_to_class` fake-module sentinel is fragile |\n| `RevisionMixin` | [`wagtail/models/__init__.py` L254](https://demo.sourcegraph.com/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/models/__init__.py?L254) | `serializable_data` \u2192 `get_serializable_data_for_fields` has no `value_to_string` on `GeneratedField` |\n| `_extract_field_data` | [`wagtail/models/copying.py` L7](https://demo.sourcegraph.com/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/models/copying.py?L7) | No guard for `field.generated` \u2192 `TypeError` in page copy/alias |\n| `Orderable` subclasses | [`wagtail/models/__init__.py` L2682](https://demo.sourcegraph.com/r/github.com/sg-evals/wagtail--v5.2/-/blob/wagtail/models/__init__.py?L2682) | `index_together` in project migrations \u2192 `RemovedInDjango51Warning` |\n\n---\n\n### Impact Chain (critical path)\n\n```\nGeneratedField on a Page model\n  \u2192 _extract_field_data() iterates _meta.get_fields()\n  \u2192 getattr(page, generated_field.name) returns DB-computed value\n  \u2192 Page(**data_dict) \u2192 TypeError (editable=False, generated)\n  \u2192 Page copy, alias, and preview operations all FAIL\n\nField.db_default + Field.pre_save returning DatabaseDefault\n  \u2192 StreamField.get_prep_value(DatabaseDefault_expression)\n  \u2192 json_field.get_prep_value(expression) \u2192 SQL corruption / TypeError\n  \u2192 Admin save of pages with db_default fields FAILS\n\nRevisionMixin.serializable_data() + GeneratedField\n  \u2192 get_serializable_data_for_fields() \u2192 AttributeError (no value_to_string)\n  \u2192 Revision save FAILS, breaking publish/schedule/revert workflows\n```\n\n---\n\n### Migration Coordination Required\n\n1. **`wagtail/models/copying.py`** \u2014 add `if getattr(field, 'generated', False): continue` in `_extract_field_data` (code fix, no migration)\n2. **`wagtail/fields.py` `StreamField.get_prep_value`** \u2014 guard against `DatabaseDefault` sentinel (code fix)\n3. **`RevisionMixin.serializable_data`** \u2014 skip `generated` fields in modelcluster serialization (code fix)\n4. **Downstream project migrations** \u2014 replace all `AlterIndexTogether` operations with `AddIndex` before Django 5.1; run `makemigrations --check` to catch `db_table_comment` phantom diffs\n5. **Last Wagtail migration** is `0089_log_entry_data_json_null_to_object.py` (generated under Django 4.2.3); a `0090_*` squash or fixup migration will be needed once the code fixes above land\n\n## Sources\n\n- [github.com/sg-evals/django--5.0](/github.com/sg-evals/django--5.0)\n- [github.com/sg-evals/wagtail--v5.2](/github.com/sg-evals/wagtail--v5.2)\n- [github.com/sg-evals/django--5.0](/github.com/sg-evals/django--5.0)\n- [github.com/sg-evals/wagtail--v5.2](/github.com/sg-evals/wagtail--v5.2)\n- [github.com/sg-evals/django--5.0](/github.com/sg-evals/django--5.0)\n- [github.com/sg-evals/wagtail--v5.2](/github.com/sg-evals/wagtail--v5.2)\n- [github.com/sg-evals/django--5.0/django/db/models/fields/generated.py@c61b35b](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/fields/generated.py)\n- [github.com/sg-evals/django--5.0/django/db/models/fields/__init__.py@c61b35b?L1-100](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/fields/__init__.py?L1-100)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/models/__init__.py@aaaf09c?L1-80](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/models/__init__.py?L1-80)\n- [repo:^github.com/sg-evals/django--5.0$ contribute_to_class Field](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fdjango--5.0$%20contribute_to_class%20Field)\n- [repo:^github.com/sg-evals/django--5.0$ db_default](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fdjango--5.0$%20db_default)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/fields.py@aaaf09c](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/fields.py)\n- [github.com/sg-evals/django--5.0/django/db/models/fields/__init__.py@c61b35b?L200-350](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/fields/__init__.py?L200-350)\n- [github.com/sg-evals/django--5.0/django/db/models/options.py@c61b35b?L1-100](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/options.py?L1-100)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/models/__init__.py@aaaf09c?L80-250](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/models/__init__.py?L80-250)\n- [github.com/sg-evals/django--5.0/django/db/models/fields/__init__.py@c61b35b?L500-620](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/fields/__init__.py?L500-620)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/models/__init__.py@aaaf09c?L250-500](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/models/__init__.py?L250-500)\n- [github.com/sg-evals/django--5.0/django/db/models/options.py@c61b35b?L100-300](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/options.py?L100-300)\n- [github.com/sg-evals/django--5.0/django/db/models/base.py@c61b35b?L380-500](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/base.py?L380-500)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/models/__init__.py@aaaf09c?L500-750](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/models/__init__.py?L500-750)\n- [repo:^github.com/sg-evals/django--5.0$ index_together RemovedInDjango51Warning](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fdjango--5.0$%20index_together%20RemovedInDjango51Warning)\n- [github.com/sg-evals/django--5.0/django/db/models/base.py@c61b35b?L260-380](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/base.py?L260-380)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/models/__init__.py@aaaf09c?L750-1050](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/models/__init__.py?L750-1050)\n- [repo:^github.com/sg-evals/wagtail--v5.2$ class Orderable](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fwagtail--v5.2$%20class%20Orderable)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/models/__init__.py@aaaf09c?L1050-1250](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/models/__init__.py?L1050-1250)\n- [repo:^github.com/sg-evals/django--5.0$ choices normalize_choices](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fdjango--5.0$%20choices%20normalize_choices)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/models/__init__.py@aaaf09c?L2670-2730](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/models/__init__.py?L2670-2730)\n- [github.com/sg-evals/django--5.0/django/db/models/fields/__init__.py@c61b35b?L620-720](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/fields/__init__.py?L620-720)\n- [repo:^github.com/sg-evals/django--5.0$ db_table_comment](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fdjango--5.0$%20db_table_comment)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/migrations@aaaf09c](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/migrations)\n- [github.com/sg-evals/django--5.0/docs/releases/5.0.txt@c61b35b?L1-200](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/docs/releases/5.0.txt?L1-200)\n- [github.com/sg-evals/django--5.0/docs/releases/5.0.txt@c61b35b?L200-450](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/docs/releases/5.0.txt?L200-450)\n- [repo:^github.com/sg-evals/wagtail--v5.2$ get_serializable_data_for_fields StreamField](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fwagtail--v5.2$%20get_serializable_data_for_fields%20StreamField)\n- [repo:^github.com/sg-evals/wagtail--v5.2$ concrete_fields generated](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fwagtail--v5.2$%20concrete_fields%20generated)\n- [github.com/sg-evals/django--5.0/docs/releases/5.0.txt@c61b35b?L450-650](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/docs/releases/5.0.txt?L450-650)\n- [github.com/sg-evals/django--5.0/django/db/models/options.py@c61b35b?L500-700](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/options.py?L500-700)\n- [repo:^github.com/sg-evals/wagtail--v5.2$ serializable_data from_serializable_data](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fwagtail--v5.2$%20serializable_data%20from_serializable_data)\n- [repo:^github.com/sg-evals/django--5.0$ annotation_select_mask](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fdjango--5.0$%20annotation_select_mask)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/models/__init__.py@aaaf09c?L1280-1400](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/models/__init__.py?L1280-1400)\n- [repo:^github.com/sg-evals/wagtail--v5.2$ _meta.concrete_fields editable generated](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fwagtail--v5.2$%20_meta.concrete_fields%20editable%20generated)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/models/copying.py@aaaf09c](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/models/copying.py)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/models/i18n.py@aaaf09c?L1-100](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/models/i18n.py?L1-100)\n- [repo:^github.com/sg-evals/django--5.0$ Field contribute_to_class private_only](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fdjango--5.0$%20Field%20contribute_to_class%20private_only)\n- [github.com/sg-evals/django--5.0/django/db/models/fields/__init__.py@c61b35b?L940-1010](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/fields/__init__.py?L940-1010)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/migrations/0087_alter_grouppagepermission_unique_together_and_more.py@aaaf09c](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/migrations/0087_alter_grouppagepermission_unique_together_and_more.py)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/migrations/0089_log_entry_data_json_null_to_object.py@aaaf09c](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/migrations/0089_log_entry_data_json_null_to_object.py)\n- [repo:^github.com/sg-evals/django--5.0$ DatabaseDefault pre_save db_default](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fdjango--5.0$%20DatabaseDefault%20pre_save%20db_default)\n- [github.com/sg-evals/django--5.0/django/db/models/fields/generated.py@c61b35b](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/fields/generated.py)\n- [github.com/sg-evals/django--5.0/django/db/models/fields/__init__.py@c61b35b?L200-230](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/fields/__init__.py?L200-230)\n- [github.com/sg-evals/django--5.0/django/db/models/options.py@c61b35b?L29-57](/github.com/sg-evals/django--5.0@c61b35b8713bfc8e5f3d2e9c81b235a7b7466862/-/blob/django/db/models/options.py?L29-57)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/fields.py@aaaf09c?L85-130](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/fields.py?L85-130)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/fields.py@aaaf09c?L272-283](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/fields.py?L272-283)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/models/copying.py@aaaf09c?L7-56](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/models/copying.py?L7-56)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/models/__init__.py@aaaf09c?L1079-1130](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/models/__init__.py?L1079-1130)\n- [github.com/sg-evals/wagtail--v5.2/wagtail/models/__init__.py@aaaf09c?L2682-2690](/github.com/sg-evals/wagtail--v5.2@aaaf09cae701ba65c0a617356e45d4981f3b0dab/-/blob/wagtail/models/__init__.py?L2682-2690)\n\n\nGenerated files:\n- files/schema_impact_md.json: /.api/agent-files/v1/deep-search/06fdbefc-670d-49a6-b441-c209ac852227/files/schema_impact_md.json\n- files/schema_impact_placeholder.csv: /.api/agent-files/v1/deep-search/06fdbefc-670d-49a6-b441-c209ac852227/files/schema_impact_placeholder.csv\n- files/SCHEMA_IMPACT.csv: /.api/agent-files/v1/deep-search/06fdbefc-670d-49a6-b441-c209ac852227/files/SCHEMA_IMPACT.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "schema-evolution-dual-django-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6509,
+      "10": 0.6509
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1538,
+    "n_retrieved": 13,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "retrieved_paths_aligned": [
+    "django/db/models/fields/generated.py",
+    "django/db/models/fields/__init__.py",
+    "django/db/models/options.py",
+    "wagtail/models/__init__.py",
+    "wagtail/fields.py",
+    "wagtail/models/copying.py",
+    "django/db/models/base.py",
+    "wagtail/migrations",
+    "docs/releases/5.0.txt",
+    "wagtail/models/i18n.py",
+    "wagtail/migrations/0087_alter_grouppagepermission_unique_together_and_more.py",
+    "wagtail/migrations/0089_log_entry_data_json_null_to_object.py",
+    "django/db/models/sql/query.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "schema-evolution-dual-django-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.2
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.5,
+      "5": 1.0,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.4,
+      "5": 0.5714,
+      "10": 0.3333
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.3869,
+      "5": 0.6509,
+      "10": 0.6509
+    },
+    "mrr": 0.5,
+    "map_score": 0.5,
+    "file_recall": 1.0,
+    "context_efficiency": 0.1538,
+    "n_retrieved": 13,
+    "n_ground_truth": 2,
+    "n_overlap": 2
+  },
+  "scoring": "aligned_suffix_v1"
+}

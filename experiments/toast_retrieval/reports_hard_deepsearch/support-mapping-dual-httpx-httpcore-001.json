@@ -1,0 +1,190 @@
+{
+  "task_id": "support-mapping-dual-httpx-httpcore-001",
+  "policy": "deepsearch",
+  "suite": "customer_escalation",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/httpx--0.27.0",
+    "github.com/sg-evals/httpcore--1.0.5"
+  ],
+  "retrieved_paths": [
+    "httpx/_config.py",
+    "httpx/_client.py",
+    "httpx/_api.py",
+    "httpx/_transports/default.py",
+    "httpcore/_async/connection_pool.py",
+    "httpcore/_async/connection.py",
+    "httpcore/_async/http11.py",
+    "httpcore/_backends/anyio.py"
+  ],
+  "retrieved_paths_union": [
+    "httpx/_config.py",
+    "httpx/_client.py",
+    "httpx/_api.py",
+    "httpx/_transports/default.py",
+    "httpcore/_async/connection_pool.py",
+    "httpcore/_async/connection.py",
+    "httpcore/_async/http11.py",
+    "httpcore/_backends/anyio.py"
+  ],
+  "required_files": [
+    "httpx/httpx/_config.py",
+    "httpx/httpx/_transports/default.py",
+    "httpcore/httpcore/_async/connection_pool.py",
+    "httpcore/httpcore/_async/http11.py"
+  ],
+  "ir_scores": {
+    "task_id": "support-mapping-dual-httpx-httpcore-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.6,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.75,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.6667,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.7095,
+      "10": 0.8397
+    },
+    "mrr": 1.0,
+    "map_score": 0.6679,
+    "file_recall": 1.0,
+    "context_efficiency": 0.5,
+    "n_retrieved": 8,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "ir_scores_union": {
+    "task_id": "support-mapping-dual-httpx-httpcore-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.6,
+      "10": 0.4
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.75,
+      "10": 1.0
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.6667,
+      "10": 0.5714
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.7095,
+      "10": 0.8397
+    },
+    "mrr": 1.0,
+    "map_score": 0.6679,
+    "file_recall": 1.0,
+    "context_efficiency": 0.5,
+    "n_retrieved": 8,
+    "n_ground_truth": 4,
+    "n_overlap": 4
+  },
+  "elapsed_seconds": 119.4,
+  "response_chars": 17873,
+  "raw_response": "---\ntitle: Trace httpx timeout=None ReadTimeout across httpx to httpcore boundary\nshare_url: https://demo.sourcegraph.com/deepsearch/371b5e86-f7e6-444d-9b5c-98baf60abf53\nurl: https://demo.sourcegraph.com/deepsearch/2215\ncreated: 2026-08-18T01:55:52Z\nupdated: 2026-08-18T01:56:50Z\n---\n\n# # Map customer httpx ReadTimeout-with-timeout=None complaint across the httpx -> httpcore boundary\n\nA customer reports that their httpx async streaming download still raises\nhttpx.ReadTimeout even though they explicitly disable timeouts. Their code:\n\n    timeout = httpx.Timeout(timeout=None)\n    async with httpx.AsyncClient(timeout=timeout) as client:\n        async with client.stream(\"GET\", \"https://example.com/big.bin\") as resp:\n            async for chunk in resp.aiter_bytes():\n                ...\n\nAfter roughly 5 seconds of an idle server they get:\n\n    httpx.ReadTimeout\n\nThey expect timeout=None to mean wait indefinitely. They are confused that\n\"None\" is somehow being upgraded to a 5-second cap somewhere in the stack.\n\nYour task:\n\n1. Find where httpx defines its public Timeout configuration -- trace the\n   Timeout class fields (connect / read / write / pool), how None is normalized,\n   and the global default that applies when nothing is passed in.\n2. Find where httpx hands the timeout to httpcore -- trace the AsyncHTTPTransport\n   construction of httpcore.ConnectionPool and the per-request handle_async_request\n   path, and identify exactly how the four timeout dimensions are propagated\n   (note: they are NOT passed to the ConnectionPool constructor).\n3. Trace the full code path: httpx.AsyncClient.stream -> AsyncHTTPTransport\n   .handle_async_request -> httpcore.Request extensions -> httpcore connection\n   pool / AsyncHTTP11Connection -> per-operation timeout enforcement -> httpcore\n   ReadTimeout -> mapped back to httpx.ReadTimeout via HTTPCORE_EXC_MAP. Cite\n   each file and the function or attribute responsible at every step.\n4. Identify the *real* reason the customer still sees a ~5 second timeout when\n   timeout=None should disable it. The explanation must reference both repos and\n   the marshaling boundary between them.\n\n- Full code path from public Timeout config to httpcore per-op timeout\n- Why DEFAULT_TIMEOUT_CONFIG vs an explicit Timeout(None) differ in effect\n- The mapping that converts httpcore.ReadTimeout into httpx.ReadTimeout\n\n\nSearch only these repositories: github.com/sg-evals/httpx--0.27.0, github.com/sg-evals/httpcore--1.0.5\n\nHere is the complete, step-by-step analysis.\n\n---\n\n## 1. httpx `Timeout` class and `DEFAULT_TIMEOUT_CONFIG`\n\n**File:** [`httpx/_config.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_config.py?L194-L368)\n\n### Class fields and normalization\n\n[`Timeout.__init__`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_config.py?L208-L252) stores four optional float fields: `connect`, `read`, `write`, and `pool`.\n\nWhen called as `Timeout(timeout=None)` (the customer's case), execution falls into the `else` branch at [L243-L252](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_config.py?L243-L252):\n\n```python\nself.connect = timeout if isinstance(connect, UnsetType) else connect  # \u2192 None\nself.read    = timeout if isinstance(read,    UnsetType) else read     # \u2192 None\nself.write   = timeout if isinstance(write,   UnsetType) else write    # \u2192 None\nself.pool    = timeout if isinstance(pool,    UnsetType) else pool     # \u2192 None\n```\n\n`None` is stored literally \u2014 no normalization to a sentinel value, no clamping.\n\n### `DEFAULT_TIMEOUT_CONFIG`\n\nAt [L368](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_config.py?L368):\n\n```python\nDEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)\n```\n\nThis sets all four fields to `5.0`. It is used as the default value in:\n- [`AsyncClient.__init__`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_client.py?L1377) \u2014 `timeout: TimeoutTypes = DEFAULT_TIMEOUT_CONFIG`\n- [`Client.__init__`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_client.py?L632)\n- The top-level functional API in [`httpx/_api.py`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_api.py?L40)\n\n---\n\n## 2. How httpx hands the timeout to httpcore\n\n### Pool constructor \u2014 timeout is **not** passed\n\n[`AsyncHTTPTransport.__init__`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_transports/default.py?L262-L292) constructs `httpcore.AsyncConnectionPool` with connection-pool bookkeeping args (`max_connections`, `keepalive_expiry`, etc.) **but no timeout argument**:\n\n```python\nself._pool = httpcore.AsyncConnectionPool(\n    ssl_context=ssl_context,\n    max_connections=limits.max_connections,\n    ...\n    # \u2190 no timeout here\n)\n```\n\nThe `AsyncConnectionPool` constructor ([`httpcore/_async/connection_pool.py:48-126`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/connection_pool.py?L48-L126)) has no `timeout` parameter at all \u2014 timeouts are never pool-level config.\n\n### Per-request path \u2014 timeout travels as a request extension\n\nIn [`build_request`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_client.py?L349-L356), the resolved `Timeout` object is serialized via `timeout.as_dict()` and stored directly on the request:\n\n```python\nif \"timeout\" not in extensions:\n    timeout = (\n        self.timeout                    # \u2190 client's Timeout object\n        if isinstance(timeout, UseClientDefault)\n        else Timeout(timeout)\n    )\n    extensions = dict(**extensions, timeout=timeout.as_dict())\n```\n\n`Timeout.as_dict()` ([L254-L260](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_config.py?L254-L260)) returns:\n\n```python\n{\"connect\": self.connect, \"read\": self.read, \"write\": self.write, \"pool\": self.pool}\n```\n\nFor `Timeout(None)` this is `{\"connect\": None, \"read\": None, \"write\": None, \"pool\": None}`.  \nFor the **default** (`DEFAULT_TIMEOUT_CONFIG`) this is `{\"connect\": 5.0, \"read\": 5.0, \"write\": 5.0, \"pool\": 5.0}`.\n\nIn [`AsyncHTTPTransport.handle_async_request`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_transports/default.py?L354-L373), the httpcore request is built by passing through `extensions=request.extensions` verbatim \u2014 the `\"timeout\"` dict rides along untouched:\n\n```python\nreq = httpcore.Request(\n    ...\n    extensions=request.extensions,   # \u2190 includes {\"timeout\": {...}}\n)\n```\n\n---\n\n## 3. Full code path: stream \u2192 ReadTimeout \u2192 httpx.ReadTimeout\n\n### Step 1 \u2014 `AsyncClient.stream`\n[`httpx/_client.py:1576-1618`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_client.py?L1576-L1618)  \nCalls `build_request` (which sets `request.extensions[\"timeout\"]`) then `self.send(request)`.\n\n### Step 2 \u2014 `AsyncHTTPTransport.handle_async_request`\n[`httpx/_transports/default.py:354-373`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_transports/default.py?L354-L373)  \nWraps the pool call in `map_httpcore_exceptions()` and forwards the request with its extensions to `self._pool.handle_async_request(req)`.\n\n### Step 3 \u2014 `AsyncConnectionPool.handle_async_request`\n[`httpcore/_async/connection_pool.py:159-228`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/connection_pool.py?L159-L228)  \nExtracts the pool timeout:\n\n```python\ntimeouts = request.extensions.get(\"timeout\", {})\ntimeout  = timeouts.get(\"pool\", None)\n```\n\nUses it at `pool_request.wait_for_connection(timeout=timeout)`. Then dispatches to the connection.\n\n### Step 4 \u2014 `AsyncHTTPConnection._connect`\n[`httpcore/_async/connection.py:103-163`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/connection.py?L103-L163)  \nReads the connect timeout:\n\n```python\ntimeouts = request.extensions.get(\"timeout\", {})\ntimeout  = timeouts.get(\"connect\", None)\n```\n\nPasses it to `network_backend.connect_tcp(timeout=timeout)`.\n\n### Step 5 \u2014 `AsyncHTTP11Connection._receive_response_headers` / `_receive_response_body`\n[`httpcore/_async/http11.py:147-214`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http11.py?L147-L214)  \nEach I/O method independently extracts its dimension from the extensions:\n\n```python\n# _send_request_headers / _send_request_body (write):\ntimeouts = request.extensions.get(\"timeout\", {})\ntimeout  = timeouts.get(\"write\", None)\n\n# _receive_response_headers / _receive_response_body (read):\ntimeouts = request.extensions.get(\"timeout\", {})\ntimeout  = timeouts.get(\"read\", None)\n```\n\nThe read timeout is threaded down through `_receive_event` \u2192 `self._network_stream.read(max_bytes, timeout=timeout)`.\n\n### Step 6 \u2014 `AnyIOStream.read` \u2014 where the clock ticks\n[`httpcore/_backends/anyio.py:23-37`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_backends/anyio.py?L23-L37)\n\n```python\nasync def read(self, max_bytes: int, timeout: Optional[float] = None) -> bytes:\n    exc_map = {\n        TimeoutError: ReadTimeout,\n        ...\n    }\n    with map_exceptions(exc_map):\n        with anyio.fail_after(timeout):       # \u2190 THE deadline gate\n            return await self._stream.receive(max_bytes=max_bytes)\n```\n\n`anyio.fail_after(None)` is a no-op (no deadline). `anyio.fail_after(5.0)` fires after 5 seconds, raising `TimeoutError`, which is immediately mapped to `httpcore.ReadTimeout`.\n\n### Step 7 \u2014 Exception propagates up through `map_httpcore_exceptions`\n[`httpx/_transports/default.py:66-86`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_transports/default.py?L66-L86)  \nThe context manager iterates `HTTPCORE_EXC_MAP` and maps the most specific match:\n\n```python\nHTTPCORE_EXC_MAP = {\n    httpcore.ReadTimeout: ReadTimeout,   # \u2192 httpx.ReadTimeout\n    ...\n}\n```\n\nThe `httpcore.ReadTimeout` is re-raised as `httpx.ReadTimeout`.\n\nBecause the customer is streaming body chunks (each chunk is a new `read()` call in [`_receive_response_body`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpcore--1.0.5/-/blob/httpcore/_async/http11.py?L205-L214)), the `map_httpcore_exceptions()` context in the transport's `AsyncResponseStream.__aiter__` ([`httpx/_transports/default.py:239-253`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_transports/default.py?L107-L119)) is still active during the body read, so the mapping still applies.\n\n---\n\n## 4. The real reason the customer still sees ~5 seconds\n\nThe bug is at the **marshaling boundary** in [`httpx/_client.py:349-356`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_client.py?L349-L356).\n\nWhen the customer writes:\n\n```python\ntimeout = httpx.Timeout(timeout=None)\nasync with httpx.AsyncClient(timeout=timeout) as client:\n```\n\n`AsyncClient.__init__` passes `timeout` up to `BaseClient.__init__`, which calls `self.timeout = timeout`. The `timeout` setter ([L237](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_client.py?L237)) wraps it: `self._timeout = Timeout(timeout)`. Since `timeout` is already a `Timeout` instance, the copy-constructor branch at [L217-L226](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_config.py?L217-L226) preserves all four `None` fields correctly \u2014 **so `self.timeout` is correct**.\n\nHowever, `build_request` in `stream()` is called **without an explicit `timeout=` argument**. The call at [L1604](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_client.py?L1604) does not pass `timeout`:\n\n```python\nrequest = self.build_request(\n    method=method,\n    url=url,\n    ...\n    timeout=timeout,     # \u2190 this is the stream() parameter, default=USE_CLIENT_DEFAULT\n    ...\n)\n```\n\nIn `build_request` [L351-L356](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_client.py?L349-L356):\n\n```python\ntimeout = (\n    self.timeout                        # USE_CLIENT_DEFAULT \u2192 use self.timeout\n    if isinstance(timeout, UseClientDefault)\n    else Timeout(timeout)\n)\nextensions = dict(**extensions, timeout=timeout.as_dict())\n```\n\nIf `self.timeout` is `Timeout(None)` (customer's case), `timeout.as_dict()` gives `{\"read\": None, ...}` which correctly propagates `None` all the way to `anyio.fail_after(None)` \u2014 **no timeout enforced**.\n\n**So the customer's explicit code path is correct \u2014 if they actually constructed the client as written, it should work.** The most likely actual cause is one of the following (both rooted in the marshaling boundary):\n\n### Most probable cause: they did not pass the timeout to the client, or used a functional API shortcut\n\nIf they instead use `httpx.get(...)` or `httpx.AsyncClient()` (no `timeout=` argument), the client is initialized with `DEFAULT_TIMEOUT_CONFIG = Timeout(timeout=5.0)` ([`httpx/_config.py:368`](https://demo.sourcegraph.com/r/github.com/sg-evals/httpx--0.27.0/-/blob/httpx/_config.py?L368)). That puts `{\"read\": 5.0, ...}` into `request.extensions[\"timeout\"]`, which arrives at `anyio.fail_after(5.0)` in httpcore's `AnyIOStream.read` and fires after exactly 5 seconds on an idle server \u2014 the ~5 second figure the customer reports.\n\n### Why `DEFAULT_TIMEOUT_CONFIG` and `Timeout(None)` differ in effect\n\n| | `DEFAULT_TIMEOUT_CONFIG` | `Timeout(timeout=None)` |\n|---|---|---|\n| `read` field | `5.0` | `None` |\n| `request.extensions[\"timeout\"][\"read\"]` | `5.0` | `None` |\n| `anyio.fail_after(...)` in `AnyIOStream.read` | `fail_after(5.0)` \u2014 deadline set | `fail_after(None)` \u2014 no-op |\n| Result after idle server | `TimeoutError` \u2192 `httpcore.ReadTimeout` \u2192 `httpx.ReadTimeout` | waits indefinitely |\n\nThe marshaling chain is entirely correct \u2014 `None` is never upgraded to `5.0` by httpcore. The issue is that the `5.0` is injected by httpx at **client construction time** via `DEFAULT_TIMEOUT_CONFIG`, before the request is even built. If the customer did not pass `timeout=httpx.Timeout(None)` to the `AsyncClient` constructor (e.g. relied on a default, or used a proxy/transport wrapper that reconstructs the client internally), the `5.0` default silently takes over and is faithfully propagated through the entire call chain to `anyio.fail_after`.\n\n### Summary of the exception mapping\n\n```\nanyio.fail_after(5.0) fires\n  \u2192 anyio raises TimeoutError\n  \u2192 httpcore/_backends/anyio.py:26-33: exc_map {TimeoutError: ReadTimeout}\n  \u2192 httpcore.ReadTimeout raised\n  \u2192 httpcore/_async/http11.py bubbles up through AsyncHTTP11Connection\n  \u2192 httpcore/_async/connection_pool.py bubbles up\n  \u2192 httpx/_transports/default.py:66-86: map_httpcore_exceptions()\n      iterates HTTPCORE_EXC_MAP {httpcore.ReadTimeout: httpx.ReadTimeout}\n  \u2192 httpx.ReadTimeout raised to caller\n```\n\n## Sources\n\n- [github.com/sg-evals/httpx--0.27.0/httpx/_config.py@3a7d067?L194-280](/github.com/sg-evals/httpx--0.27.0@3a7d0672239ee8b616ccf2861607b21bc9598a05/-/blob/httpx/_config.py?L194-280)\n- [github.com/sg-evals/httpx--0.27.0/httpx/_transports/default.py@3a7d067?L89-160](/github.com/sg-evals/httpx--0.27.0@3a7d0672239ee8b616ccf2861607b21bc9598a05/-/blob/httpx/_transports/default.py?L89-160)\n- [github.com/sg-evals/httpcore--1.0.5/httpcore/_async/connection_pool.py@21db646?L43-139](/github.com/sg-evals/httpcore--1.0.5@21db64629e9da54f3cc544c0ec9c68bfbc1491d8/-/blob/httpcore/_async/connection_pool.py?L43-139)\n- [github.com/sg-evals/httpcore--1.0.5/httpcore/_async/http11.py@21db646?L50-243](/github.com/sg-evals/httpcore--1.0.5@21db64629e9da54f3cc544c0ec9c68bfbc1491d8/-/blob/httpcore/_async/http11.py?L50-243)\n- [github.com/sg-evals/httpx--0.27.0/httpx/_transports/default.py@3a7d067?L262-380](/github.com/sg-evals/httpx--0.27.0@3a7d0672239ee8b616ccf2861607b21bc9598a05/-/blob/httpx/_transports/default.py?L262-380)\n- [github.com/sg-evals/httpcore--1.0.5/httpcore/_async/connection_pool.py@21db646?L140-230](/github.com/sg-evals/httpcore--1.0.5@21db64629e9da54f3cc544c0ec9c68bfbc1491d8/-/blob/httpcore/_async/connection_pool.py?L140-230)\n- [github.com/sg-evals/httpcore--1.0.5/httpcore/_backends/anyio.py@21db646](/github.com/sg-evals/httpcore--1.0.5@21db64629e9da54f3cc544c0ec9c68bfbc1491d8/-/blob/httpcore/_backends/anyio.py)\n- [github.com/sg-evals/httpx--0.27.0/httpx/_config.py@3a7d067?L280-368](/github.com/sg-evals/httpx--0.27.0@3a7d0672239ee8b616ccf2861607b21bc9598a05/-/blob/httpx/_config.py?L280-368)\n- [github.com/sg-evals/httpx--0.27.0/httpx/_client.py@3a7d067?L1576-1618](/github.com/sg-evals/httpx--0.27.0@3a7d0672239ee8b616ccf2861607b21bc9598a05/-/blob/httpx/_client.py?L1576-1618)\n- [repo:^github.com/sg-evals/httpx--0.27.0$ timeout extensions request.extensions](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fhttpx--0.27.0$%20timeout%20extensions%20request.extensions)\n- [github.com/sg-evals/httpx--0.27.0/httpx/_transports/default.py@3a7d067?L60-90](/github.com/sg-evals/httpx--0.27.0@3a7d0672239ee8b616ccf2861607b21bc9598a05/-/blob/httpx/_transports/default.py?L60-90)\n- [github.com/sg-evals/httpcore--1.0.5/httpcore/_async/connection.py@21db646?L73-163](/github.com/sg-evals/httpcore--1.0.5@21db64629e9da54f3cc544c0ec9c68bfbc1491d8/-/blob/httpcore/_async/connection.py?L73-163)\n- [github.com/sg-evals/httpx--0.27.0/httpx/_client.py@3a7d067?L340-360](/github.com/sg-evals/httpx--0.27.0@3a7d0672239ee8b616ccf2861607b21bc9598a05/-/blob/httpx/_client.py?L340-360)\n- [repo:^github.com/sg-evals/httpx--0.27.0$ DEFAULT_TIMEOUT_CONFIG timeout](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fhttpx--0.27.0$%20DEFAULT_TIMEOUT_CONFIG%20timeout)\n- [github.com/sg-evals/httpx--0.27.0/httpx/_client.py@3a7d067?L1376-1430](/github.com/sg-evals/httpx--0.27.0@3a7d0672239ee8b616ccf2861607b21bc9598a05/-/blob/httpx/_client.py?L1376-1430)\n\n",
+  "ir_scores_unaligned": {
+    "task_id": "support-mapping-dual-httpx-httpcore-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.3904
+    },
+    "mrr": 1.0,
+    "map_score": 0.25,
+    "file_recall": 0.25,
+    "context_efficiency": 0.125,
+    "n_retrieved": 8,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "retrieved_paths_aligned": [
+    "httpx/httpx/_config.py",
+    "httpx/_client.py",
+    "httpx/_api.py",
+    "httpx/httpx/_transports/default.py",
+    "httpcore/httpcore/_async/connection_pool.py",
+    "httpcore/_async/connection.py",
+    "httpcore/httpcore/_async/http11.py",
+    "httpcore/_backends/anyio.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "support-mapping-dual-httpx-httpcore-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 1.0,
+      "3": 0.3333,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.25,
+      "3": 0.25,
+      "5": 0.25,
+      "10": 0.25
+    },
+    "f1": {
+      "1": 0.4,
+      "3": 0.2857,
+      "5": 0.2222,
+      "10": 0.1429
+    },
+    "ndcg": {
+      "1": 1.0,
+      "3": 0.4693,
+      "5": 0.3904,
+      "10": 0.3904
+    },
+    "mrr": 1.0,
+    "map_score": 0.25,
+    "file_recall": 0.25,
+    "context_efficiency": 0.125,
+    "n_retrieved": 8,
+    "n_ground_truth": 4,
+    "n_overlap": 1
+  },
+  "scoring": "aligned_suffix_v1"
+}

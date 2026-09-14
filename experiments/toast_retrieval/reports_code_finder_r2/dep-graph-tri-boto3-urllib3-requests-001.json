@@ -1,0 +1,208 @@
+{
+  "task_id": "dep-graph-tri-boto3-urllib3-requests-001",
+  "policy": "code_finder",
+  "suite": "dependency_management",
+  "repo_count": 3,
+  "store_identifiers": [
+    "github.com/sg-evals/urllib3--2.0.0",
+    "github.com/sg-evals/requests--v2.31.0",
+    "github.com/sg-evals/botocore--1.31.0"
+  ],
+  "retrieved_paths": [
+    "setup.py",
+    "requests/__init__.py",
+    "requests/adapters.py",
+    "botocore/httpsession.py",
+    "botocore/awsrequest.py",
+    "botocore/endpoint.py",
+    "botocore/response.py",
+    "botocore/exceptions.py",
+    "botocore/vendored/requests/packages/urllib3/__init__.py",
+    "tests/unit/test_http_client_exception_mapping.py",
+    "docs/source/index.rst",
+    "docs/v2-migration-guide.rst",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/response.py"
+  ],
+  "retrieved_paths_union": [
+    "setup.py",
+    "requests/__init__.py",
+    "requests/adapters.py",
+    "botocore/httpsession.py",
+    "botocore/awsrequest.py",
+    "botocore/endpoint.py",
+    "botocore/response.py",
+    "botocore/exceptions.py",
+    "botocore/vendored/requests/packages/urllib3/__init__.py",
+    "tests/unit/test_http_client_exception_mapping.py",
+    "docs/source/index.rst",
+    "docs/v2-migration-guide.rst",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/response.py"
+  ],
+  "required_files": [
+    "urllib3/CHANGES.rst",
+    "requests/setup.cfg",
+    "botocore/setup.py"
+  ],
+  "ir_scores": {
+    "task_id": "dep-graph-tri-boto3-urllib3-requests-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "ir_scores_union": {
+    "task_id": "dep-graph-tri-boto3-urllib3-requests-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "elapsed_seconds": 23.2,
+  "response_chars": 5317,
+  "raw_response": "I\u2019m unable to write `/workspace/analysis/IMPACT_REPORT.md` because this interface provides repository search/read tools but no filesystem-write tool. Relevant findings for the report are below.\n\n- [sg-evals/requests--v2.31.0:setup.py?L61-L66](/r/github.com/sg-evals/requests--v2.31.0/-/blob/setup.py?L61-L66) \u2014 Requests requires `urllib3>=1.21.1,<3`, so it permits urllib3 1.26.x and 2.x.\n- [sg-evals/requests--v2.31.0:requests/__init__.py?L58-L115](/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/__init__.py?L58-L115) \u2014 `check_compatibility()` validates urllib3 major/minor versions; urllib3 2.x passes the current check.\n- [sg-evals/requests--v2.31.0:requests/adapters.py?L20-L27](/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L20-L27) \u2014 `HTTPAdapter` imports `PoolManager`, `proxy_from_url`, `Retry`, timeout, URL, and exception APIs from urllib3.\n- [sg-evals/requests--v2.31.0:requests/adapters.py?L100-L190](/r/github.com/sg-evals/requests--v2.31.0/-/blob/requests/adapters.py?L100-L190) \u2014 `HTTPAdapter` constructs and manages urllib3 connection pools.\n- [sg-evals/botocore--1.31.0:setup.py?L25-L29](/r/github.com/sg-evals/botocore--1.31.0/-/blob/setup.py?L25-L29) \u2014 Botocore requires `urllib3>=1.25.4,<1.27`; this excludes all urllib3 2.x releases.\n- [sg-evals/botocore--1.31.0:botocore/httpsession.py?L9-L57](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/httpsession.py?L9-L57) \u2014 `URLLib3Session` integration imports urllib3 pool, timeout, proxy, exceptions, retry, SSL, URL APIs; compatibility fallbacks explicitly anticipate urllib3 2.0.\n- [sg-evals/botocore--1.31.0:botocore/httpsession.py?L102-L124](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/httpsession.py?L102-L124) \u2014 Botocore\u2019s vendored `create_urllib3_context()` preserves stdlib SSL behavior and handles absent `DEFAULT_CIPHERS`.\n- [sg-evals/botocore--1.31.0:botocore/awsrequest.py?L17-L20](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/awsrequest.py?L17-L20) \u2014 AWS request classes directly subclass/use upstream urllib3 connection types.\n- [sg-evals/botocore--1.31.0:botocore/endpoint.py?L27-L29](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/endpoint.py?L27-L29) \u2014 Endpoint pipeline creates `URLLib3Session`.\n- [sg-evals/botocore--1.31.0:botocore/response.py?L18-L24](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/response.py?L18-L24) \u2014 Response handling depends on urllib3 `ProtocolError` and `ReadTimeoutError`.\n- [sg-evals/botocore--1.31.0:botocore/exceptions.py?L15-L17](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/exceptions.py?L15-L17) \u2014 Legacy exception compatibility imports vendored Requests and vendored urllib3.\n- [sg-evals/botocore--1.31.0:botocore/vendored/requests/packages/urllib3/__init__.py?L1-L10](/r/github.com/sg-evals/botocore--1.31.0/-/blob/botocore/vendored/requests/packages/urllib3/__init__.py?L1-L10) \u2014 Vendored urllib3 is a separate embedded copy with an empty `__version__`, not upstream 2.0.\n- [sg-evals/botocore--1.31.0:tests/unit/test_http_client_exception_mapping.py?L3-L35](/r/github.com/sg-evals/botocore--1.31.0/-/blob/tests/unit/test_http_client_exception_mapping.py?L3-L35) \u2014 Tests require new Botocore exceptions to remain catchable as old vendored Requests/urllib3 exceptions.\n- [sg-evals/botocore--1.31.0:docs/source/index.rst?L137-L149](/r/github.com/sg-evals/botocore--1.31.0/-/blob/docs/source/index.rst?L137-L149) \u2014 Documents migration away from vendored Requests/urllib3 and toward direct upstream urllib3.\n- [sg-evals/urllib3--2.0.0:docs/v2-migration-guide.rst?L43-L57](/r/github.com/sg-evals/urllib3--2.0.0/-/blob/docs/v2-migration-guide.rst?L43-L57) \u2014 urllib3 2.0 removes old Python/OpenSSL/TLS support, `contrib.ntlmpool`, default cipher set, and hostname `commonName` verification; deprecates PyOpenSSL/SecureTransport and response header methods.\n- [sg-evals/urllib3--2.0.0:docs/v2-migration-guide.rst?L64-L72](/r/github.com/sg-evals/urllib3--2.0.0/-/blob/docs/v2-migration-guide.rst?L64-L72) \u2014 Maintainers are advised to support both urllib3 1.26.x and 2.x during transition.\n- [sg-evals/urllib3--2.0.0:docs/v2-migration-guide.rst?L118-L146](/r/github.com/sg-evals/urllib3--2.0.0/-/blob/docs/v2-migration-guide.rst?L118-L146) \u2014 Applications cannot install two versions in one environment; every dependency in the diamond must support 2.x.\n- [sg-evals/urllib3--2.0.0:src/urllib3/util/ssl_.py?L208-L240](/r/github.com/sg-evals/urllib3--2.0.0/-/blob/src/urllib3/util/ssl_.py?L208-L240) \u2014 `create_urllib3_context()` adds `ssl_minimum_version`/`ssl_maximum_version`; `ssl_version` is deprecated.\n- [sg-evals/urllib3--2.0.0:src/urllib3/response.py?L470-L487](/r/github.com/sg-evals/urllib3--2.0.0/-/blob/src/urllib3/response.py?L470-L487) \u2014 `HTTPResponse.getheaders()`/`getheader()` remain only as deprecated compatibility methods.\n\n**Migration recommendation:** first release a Botocore version changing its constraint to a range including 2.x, remove reliance on deprecated `contrib.pyopenssl`, `DEFAULT_CIPHERS`, and legacy vendored exception paths, then test Boto3/Botocore with urllib3 1.26.x and 2.x. Requests already permits both ranges, but its adapter and exception imports should be tested against urllib3 2.x. Consumers should upgrade Botocore before allowing a resolver to select urllib3 2.x.",
+  "ir_scores_unaligned": {
+    "task_id": "dep-graph-tri-boto3-urllib3-requests-001",
+    "config_name": "code_finder",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "setup.py",
+    "requests/__init__.py",
+    "requests/adapters.py",
+    "botocore/httpsession.py",
+    "botocore/awsrequest.py",
+    "botocore/endpoint.py",
+    "botocore/response.py",
+    "botocore/exceptions.py",
+    "botocore/vendored/requests/packages/urllib3/__init__.py",
+    "tests/unit/test_http_client_exception_mapping.py",
+    "docs/source/index.rst",
+    "docs/v2-migration-guide.rst",
+    "src/urllib3/util/ssl_.py",
+    "src/urllib3/response.py"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "dep-graph-tri-boto3-urllib3-requests-001",
+    "config_name": "code_finder_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 14,
+    "n_ground_truth": 3,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

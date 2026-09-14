@@ -1,0 +1,37 @@
+{
+  "task_id": "incident-investigation-dual-cilium-001",
+  "checkpoints": {
+    "root_cause_identification": {
+      "expected_solution": "Agent must identify the cilium-side wrapper (pkg/bpf/collection.go::LoadCollectionSpec) that hands a shared reader/MapSpec to cilium/ebpf, AND the cilium/ebpf side (map.go::createMap or collection.go that consumes it). The report must name both files and explain that mutation of shared state across goroutines is the source of corruption.",
+      "evaluation_criteria": [
+        "Names pkg/bpf/collection.go (or equivalent) on the Cilium side",
+        "Names cilium/ebpf map.go and/or collection.go as the consumer",
+        "States that shared mutable state (reader cursor or MapSpec field) causes the corruption"
+      ]
+    },
+    "error_chain_trace": {
+      "expected_solution": "Agent must trace at least four hops: regenerateBPF (or equivalent endpoint regen entry) -> datapath loadDatapath -> LoadCollectionSpec -> cilium/ebpf MapSpec consumption -> bpf() syscall returns error. The report must show that two concurrent pod starts share state at the cilium/ebpf seam.",
+      "evaluation_criteria": [
+        "Mentions endpoint regeneration as the trigger",
+        "Mentions the datapath loader (loadDatapath or netlink.go)",
+        "Mentions LoadCollectionSpec or pkg/bpf/collection.go",
+        "Mentions the cilium/ebpf library as the consumer of shared state"
+      ]
+    },
+    "affected_components": {
+      "expected_solution": "Agent must name the Cilium endpoint manager, the datapath loader, and the cilium/ebpf library as the affected components.",
+      "evaluation_criteria": [
+        "Names Cilium endpoint manager (pkg/endpoint or equivalent)",
+        "Names the datapath loader (pkg/datapath/loader)",
+        "Names the cilium/ebpf library"
+      ]
+    },
+    "remediation_proposal": {
+      "expected_solution": "Agent must propose at least one concrete remediation: (a) serialize regenerations with a mutex, (b) deep-copy the MapSpec or reader per call, OR (c) upstream fix in cilium/ebpf to enforce caller-private readers.",
+      "evaluation_criteria": [
+        "Proposes one of: serialization/mutex, deep-copy/clone, or upstream library fix",
+        "Identifies where the fix would live (Cilium loader, Cilium pkg/bpf wrapper, or cilium/ebpf)"
+      ]
+    }
+  }
+}

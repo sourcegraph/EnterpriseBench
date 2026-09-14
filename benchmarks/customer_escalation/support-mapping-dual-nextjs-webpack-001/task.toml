@@ -1,0 +1,122 @@
+# Support Code Mapping: Next.js build failure to webpack module resolution conflict
+
+difficulty_stratum = "dual_repo"
+mcp_suite = "eb_v1"
+repo_set_id = "nextjs-webpack-ecosystem"
+org_scale = true
+verification_modes = ["deterministic", "llm_curator"]
+
+[task]
+id = "support-mapping-dual-nextjs-webpack-001"
+suite = "customer_escalation"
+task_type = "support_code_mapping"
+difficulty = "hard"
+estimated_duration_minutes = 30
+session_type = "single"
+description = "Map Next.js production build failure to webpack module federation resolve conflict in shared dependencies"
+prompt = """
+A customer reports that their Next.js application builds successfully in
+development but fails in production builds with:
+
+    ModuleBuildError: Module build failed (from ./node_modules/next/dist/build/webpack/loaders/next-swc-loader.js):
+    Error: Failed to load SWC binary for linux/x64
+
+After working around the SWC issue, they get a different error:
+
+    Error: Conflicting exports for 'default' in ./node_modules/react-dom/index.js
+    Module not found: Can't resolve 'react-dom/client' in '/app/pages/_app.js'
+
+The issue appears when using Next.js with a custom webpack configuration that
+adds Module Federation plugin. The module resolution conflict occurs between
+Next.js's internal webpack configuration and the customer's custom config.
+
+Your task:
+1. Find where Next.js configures webpack internally — trace from the build
+   entry point through the webpack config generation, identifying how Next.js
+   sets resolve.alias and module rules for React/React-DOM.
+2. Find where webpack resolves conflicting module exports — trace through
+   webpack's module factory and resolution algorithm to identify how multiple
+   export definitions for the same module are handled.
+3. Map the conflict path: Next.js sets react-dom alias -> customer adds Module
+   Federation -> webpack resolver encounters two definitions -> error. Document
+   each file and function in the chain.
+4. Identify the resolution order and why Next.js's internal aliases conflict
+   with Module Federation's shared scope.
+
+- Full module resolution chain from Next.js config through webpack resolver
+- Why Module Federation conflicts with Next.js react-dom alias
+- Correct configuration approach for combining Next.js with Module Federation
+"""
+
+[[repos]]
+url = "https://github.com/vercel/next.js"
+rev = "v13.5.6"
+path = "nextjs"
+role = "primary"
+
+[[repos]]
+url = "https://github.com/webpack/webpack"
+rev = "v5.88.2"
+path = "webpack"
+role = "upstream"
+
+[metadata]
+languages = ["typescript", "javascript"]
+total_loc = 1_200_000
+dependency_depth = 2
+frameworks = ["next.js", "webpack"]
+multi_repo_pattern = "investigate"
+
+[[checkpoints]]
+name = "error_source"
+weight = 0.40
+verifier = "checks/check_error_source.sh"
+description = "Agent identifies the module resolution conflict source files"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "error_chain"
+weight = 0.30
+verifier = "checks/check_error_chain.sh"
+description = "Agent traces the full config-to-error chain"
+timeout_seconds = 120
+
+[[checkpoints]]
+name = "trigger_conditions"
+weight = 0.30
+verifier = "checks/check_trigger_conditions.sh"
+description = "Agent identifies the alias conflict between Next.js and Module Federation"
+timeout_seconds = 60
+
+[artifacts]
+required = ["answer"]
+optional = []
+
+[tool_access]
+expected_mcp_benefit = "high"
+mcp_benefit_rationale = "Tracing module resolution from Next.js internal webpack config through webpack's resolver requires cross-repo search to understand alias precedence and Module Federation shared scope"
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "packages/next/src/build/webpack-config.ts"
+repo = "nextjs"
+confidence = 0.95
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "lib/NormalModuleFactory.js"
+repo = "webpack"
+confidence = 0.90
+source = "deterministic"
+
+[[ground_truth.sufficient_files]]
+path = "packages/next/src/build/webpack/plugins/next-trace-entrypoints-plugin.ts"
+repo = "nextjs"
+confidence = 0.75
+
+[[ground_truth.sufficient_files]]
+path = "lib/sharing/SharePlugin.js"
+repo = "webpack"
+confidence = 0.80

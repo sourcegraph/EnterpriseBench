@@ -110,6 +110,20 @@ _MCP_SEARCH_TOOLS = frozenset(
         "mcp__sourcegraph__sg_commit_search", "mcp__sourcegraph__commit_search",
         "mcp__sourcegraph__sg_compare_revisions", "mcp__sourcegraph__compare_revisions",
         "mcp__github__search_code", "mcp__github__get_repository_tree",
+        # Agentic retrieval tools. These answer in prose with citations rather
+        # than a result list, so their paths arrive as Sourcegraph blob URLs
+        # and backticked inline references, not a "path" JSON field. Without
+        # them a mcp_code_finder run -- which by contract calls nothing else --
+        # yields no retrieved paths at all, and its recall reads as undefined
+        # rather than low.
+        "mcp__sourcegraph__code_finder", "mcp__sourcegraph__sg_code_finder",
+        "mcp__sourcegraph__deepsearch", "mcp__sourcegraph__sg_deepsearch",
+        "mcp__sourcegraph__deepsearch_read", "mcp__sourcegraph__sg_deepsearch_read",
+        # Toast-1, offered to the agent as a tool by the mcp_toast arm's
+        # host-side MCP server. It renders each hit under a
+        # "<repo>/-/blob/<path>" header for the same reason: so the paths it
+        # credits are extractable from the trace.
+        "mcp__toast__toast_search",
     }
 )
 _LOCAL_FILE_TOOLS = frozenset({"Read", "Grep", "Glob"})
@@ -124,6 +138,10 @@ _GH_URL_IN_TEXT_RE = re.compile(
 _BACKTICK_PATH_RE = re.compile(r"`([a-zA-Z][\w/.-]+/[\w.-]+\.\w{1,5})`")
 _PATH_PREFIX_RE = re.compile(r"(?:^|\n|\\n)Path: ([^\n\\]+\.\w{1,5})")
 _QUERY_PATH_RE = re.compile(r"([a-zA-Z][\w/.-]+/[\w.-]+\.\w{1,5})")
+# Sourcegraph instance file links: .../r/<repo>/-/blob/<path>, optionally with
+# a ?L10-20 range or a #fragment. Distinct from _GH_URL_IN_TEXT_RE, which
+# expects GitHub's /blob/<rev>/<path> shape and does not match these.
+_SG_BLOB_RE = re.compile(r"/-/blob/([^)\s?#\]\"']+)")
 
 
 def _looks_like_file(path: str) -> bool:
@@ -214,6 +232,8 @@ def retrieved_files_from_trace(trace_path: Path) -> list[str]:
             for m in _PATH_PREFIX_RE.finditer(content):
                 _add(m.group(1).strip())
             for m in _BACKTICK_PATH_RE.finditer(content):
+                _add(m.group(1))
+            for m in _SG_BLOB_RE.finditer(content):
                 _add(m.group(1))
         elif tool_name in ("WebSearch", "WebFetch"):
             for m in _GH_URL_IN_TEXT_RE.finditer(content):

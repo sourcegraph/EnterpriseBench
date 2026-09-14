@@ -1,0 +1,209 @@
+{
+  "task_id": "refactor-dual-axum-tower-001",
+  "policy": "deepsearch",
+  "suite": "technical_debt",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/axum--axum-v0.7.0",
+    "github.com/sg-evals/tower--tower-0.4.13"
+  ],
+  "retrieved_paths": [
+    "axum/CHANGELOG.md",
+    "tower-service/src/lib.rs",
+    "tower-layer/src/lib.rs",
+    "axum/src/routing/mod.rs",
+    "axum/src/routing/route.rs",
+    "axum-core/src/body.rs",
+    "axum/src/lib.rs",
+    "axum-core/src",
+    "axum/src/body/mod.rs",
+    "axum-core/src/extract/mod.rs",
+    "axum/src/middleware/mod.rs",
+    "CHANGELOG.md",
+    "axum/Cargo.toml",
+    "tower/src/util/mod.rs",
+    "axum/src/middleware/from_fn.rs"
+  ],
+  "retrieved_paths_union": [
+    "axum/CHANGELOG.md",
+    "tower-service/src/lib.rs",
+    "tower-layer/src/lib.rs",
+    "axum/src/routing/mod.rs",
+    "axum/src/routing/route.rs",
+    "axum-core/src/body.rs",
+    "axum/src/lib.rs",
+    "axum-core/src",
+    "axum/src/body/mod.rs",
+    "axum-core/src/extract/mod.rs",
+    "axum/src/middleware/mod.rs",
+    "CHANGELOG.md",
+    "axum/Cargo.toml",
+    "tower/src/util/mod.rs",
+    "axum/src/middleware/from_fn.rs"
+  ],
+  "required_files": [
+    "axum/axum/src/routing/mod.rs",
+    "tower/tower/src/lib.rs"
+  ],
+  "ir_scores": {
+    "task_id": "refactor-dual-axum-tower-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.2641
+    },
+    "mrr": 0.25,
+    "map_score": 0.125,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0667,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "ir_scores_union": {
+    "task_id": "refactor-dual-axum-tower-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2,
+      "10": 0.1
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.5,
+      "10": 0.5
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2857,
+      "10": 0.1667
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.2641,
+      "10": 0.2641
+    },
+    "mrr": 0.25,
+    "map_score": 0.125,
+    "file_recall": 0.5,
+    "context_efficiency": 0.0667,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 1
+  },
+  "elapsed_seconds": 220.5,
+  "response_chars": 8397,
+  "raw_response": "---\ntitle: Debugging axum 0.7 router and tower middleware type breakage\nshare_url: https://demo.sourcegraph.com/deepsearch/4abdc412-4db1-48f5-9632-0043e4631c18\nurl: https://demo.sourcegraph.com/deepsearch/2237\ncreated: 2026-08-18T02:12:14Z\nupdated: 2026-08-18T02:15:04Z\n---\n\n#         # refactor-dual-axum-tower-001\n\n        **Suite:** technical_debt | **Type:** refactor_orchestration | **Difficulty:** hard\n        **Repos:** axum + tower\n\n        ## Context\n\n        A team upgraded a Rust service from axum 0.6 to axum 0.7, and a\ncustom tower middleware wrapping their router now fails to compile. The\nbuild errors point at the router's type parameters and at the request\nbody type flowing through the middleware stack.\n\nYour task:\n1. Investigate how the router type is declared in the axum repository and\n   how its type parameters differ between the two versions in scope.\n2. Investigate how tower's middleware-composition traits are declared and\n   how they relate to a request's body type.\n3. Trace exactly which axum change breaks the middleware composition, and\n   why.\n4. Document concrete steps so the tower middleware compiles again against\n   the newer axum.\n\nWrite your analysis to /workspace/analysis/IMPACT_REPORT.md\n\n        ## Expected Output\n\n        Write your analysis to `/workspace/analysis/IMPACT_REPORT.md`.\n\n        Your report should include:\n        - File paths from each repository that are relevant\n        - Specific code symbols, functions, or types involved\n        - The nature of each change (removal, rename, signature change, behavioral)\n        - Migration recommendations\n\n        ## Hints\n\n        - All repos are cloned under `/workspace/`\n        - Focus on import/dependency declarations first, then trace into the relevant source files\n        - Check version constraints in dependency manifests (Cargo.toml, go.mod, pom.xml, requirements.txt)\n\n\nSearch only these repositories: github.com/sg-evals/axum--axum-v0.7.0, github.com/sg-evals/tower--tower-0.4.13\n\nThe report has been written. Here is a summary of the findings:\n\n---\n\n## Key Findings\n\n### The Core Breaking Change\n\naxum 0.7 **removed the body type parameter `B`** from every major public type. The CHANGELOG ([`axum/CHANGELOG.md`](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.7.0/-/blob/axum/CHANGELOG.md?L15-L30)) lists the full set: `Router`, `Route`, `RouteFuture`, `Handler`, `MethodRouter`, `Next`, `FromRequest`, and more.\n\n| Type | 0.6 | 0.7 |\n|------|-----|-----|\n| `Router` | `Router<B = Body, S = ()>` | `Router<S = ()>` |\n| `Route` | `Route<B, E = Infallible>` | `Route<E = Infallible>` |\n| `Next` | `Next<B>` | `Next` |\n\n### Why Tower Middleware Breaks\n\nTower's `Service` and `Layer` traits ([`tower-service/src/lib.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/tower--tower-0.4.13/-/blob/tower-service/src/lib.rs?L311), [`tower-layer/src/lib.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/tower--tower-0.4.13/-/blob/tower-layer/src/lib.rs?L94)) are generic over the request type. A 0.6 middleware `impl<S, B> Service<Request<B>> for MyMiddleware<S>` fails in 0.7 because:\n\n1. **`Router::layer`** now requires `L::Service: Service<Request>` where `Request = http::Request<axum::body::Body>` \u2014 a concrete type, not a generic `B`. See [`axum/src/routing/mod.rs` lines 233-247](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.7.0/-/blob/axum/src/routing/mod.rs?L233-247).\n2. **Body erasure happens at `Route::call`** ([`route.rs` line 99](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.7.0/-/blob/axum/src/routing/route.rs?L99)): `req.map(Body::new)` converts any `B` to `axum::body::Body` at the outermost boundary. Inside the layer stack, body is always `axum::body::Body`.\n3. **`hyper::Body` is gone**: axum 0.7 introduces its own `axum::body::Body` ([`axum-core/src/body.rs`](https://demo.sourcegraph.com/r/github.com/sg-evals/axum--axum-v0.7.0/-/blob/axum-core/src/body.rs?L39)) wrapping `UnsyncBoxBody<Bytes, Error>`, required because hyper 1.0 removed `hyper::Body`.\n\n### Fix in One Sentence\n\nChange `impl<S, B> Service<Request<B>> for MyMiddleware<S>` to `impl<S> Service<Request> for MyMiddleware<S>` (where `Request = http::Request<axum::body::Body>`), remove `B` from all router/route type annotations, and replace `hyper::Body` with `axum::body::Body`.\n\nThe full migration guide with code examples and a complete breaking-changes table is in the report file above.\n\n## Sources\n\n- [github.com/sg-evals/axum--axum-v0.7.0](/github.com/sg-evals/axum--axum-v0.7.0)\n- [github.com/sg-evals/tower--tower-0.4.13](/github.com/sg-evals/tower--tower-0.4.13)\n- [github.com/sg-evals/axum--axum-v0.7.0](/github.com/sg-evals/axum--axum-v0.7.0)\n- [github.com/sg-evals/tower--tower-0.4.13](/github.com/sg-evals/tower--tower-0.4.13)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum/src/routing/mod.rs@f762e62](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum/src/routing/mod.rs)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum/src/lib.rs@f762e62](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum/src/lib.rs)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum-core/src@f762e62](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum-core/src)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum-core/src/body.rs@f762e62](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum-core/src/body.rs)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum/src/body/mod.rs@f762e62](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum/src/body/mod.rs)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum/src/routing/route.rs@f762e62](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum/src/routing/route.rs)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum-core/src/extract/mod.rs@f762e62](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum-core/src/extract/mod.rs)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum/src/middleware/mod.rs@f762e62](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum/src/middleware/mod.rs)\n- [github.com/sg-evals/tower--tower-0.4.13/tower-service/src/lib.rs@2b06e5c](/github.com/sg-evals/tower--tower-0.4.13@2b06e5caf42ceba7feff497933f12fe6183b08e8/-/blob/tower-service/src/lib.rs)\n- [github.com/sg-evals/tower--tower-0.4.13/tower-layer/src/lib.rs@2b06e5c](/github.com/sg-evals/tower--tower-0.4.13@2b06e5caf42ceba7feff497933f12fe6183b08e8/-/blob/tower-layer/src/lib.rs)\n- [github.com/sg-evals/axum--axum-v0.7.0/CHANGELOG.md@f762e62?L1-120](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/CHANGELOG.md?L1-120)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum/CHANGELOG.md@f762e62?L1-150](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum/CHANGELOG.md?L1-150)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum/Cargo.toml@f762e62](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum/Cargo.toml)\n- [github.com/sg-evals/tower--tower-0.4.13/tower/src/util/mod.rs@2b06e5c?L1-60](/github.com/sg-evals/tower--tower-0.4.13@2b06e5caf42ceba7feff497933f12fe6183b08e8/-/blob/tower/src/util/mod.rs?L1-60)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum/src/middleware/from_fn.rs@f762e62?L1-80](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum/src/middleware/from_fn.rs?L1-80)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum/src/middleware/from_fn.rs@f762e62?L80-200](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum/src/middleware/from_fn.rs?L80-200)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum/src/middleware/from_fn.rs@f762e62?L200-290](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum/src/middleware/from_fn.rs?L200-290)\n- [github.com/sg-evals/axum--axum-v0.7.0/axum/src/middleware/from_fn.rs@f762e62?L290-360](/github.com/sg-evals/axum--axum-v0.7.0@f762e625beb21d3636d78f98923f4137f2114b19/-/blob/axum/src/middleware/from_fn.rs?L290-360)\n\n\nGenerated files:\n- files/IMPACT_REPORT.json: /.api/agent-files/v1/deep-search/4abdc412-4db1-48f5-9632-0043e4631c18/files/IMPACT_REPORT.json\n",
+  "ir_scores_unaligned": {
+    "task_id": "refactor-dual-axum-tower-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "retrieved_paths_aligned": [
+    "axum/CHANGELOG.md",
+    "tower-service/src/lib.rs",
+    "tower-layer/src/lib.rs",
+    "axum/axum/src/routing/mod.rs",
+    "axum/src/routing/route.rs",
+    "axum-core/src/body.rs",
+    "axum/src/lib.rs",
+    "axum-core/src",
+    "axum/src/body/mod.rs",
+    "axum-core/src/extract/mod.rs",
+    "axum/src/middleware/mod.rs",
+    "CHANGELOG.md",
+    "axum/Cargo.toml",
+    "tower/src/util/mod.rs",
+    "axum/src/middleware/from_fn.rs"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "refactor-dual-axum-tower-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.0,
+      "5": 0.0,
+      "10": 0.0
+    },
+    "mrr": 0.0,
+    "map_score": 0.0,
+    "file_recall": 0.0,
+    "context_efficiency": 0.0,
+    "n_retrieved": 15,
+    "n_ground_truth": 2,
+    "n_overlap": 0
+  },
+  "scoring": "aligned_suffix_v1"
+}

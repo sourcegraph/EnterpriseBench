@@ -1,0 +1,196 @@
+{
+  "task_id": "incident-investigation-dual-cilium-001",
+  "policy": "deepsearch",
+  "suite": "incident_response",
+  "repo_count": 2,
+  "store_identifiers": [
+    "github.com/sg-evals/cilium--v1.16.4",
+    "github.com/sg-evals/ebpf--v0.16.0"
+  ],
+  "retrieved_paths": [
+    "pkg/datapath/loader/cache.go",
+    "pkg/datapath/loader/template.go",
+    "pkg/datapath/loader/netlink.go",
+    "pkg/datapath/loader/loader.go",
+    "map.go",
+    "pkg/endpoint/bpf.go",
+    "pkg/maps/policymap/policymap.go",
+    "collection.go",
+    "github.com/sg-evals/cilium--v1.16.4",
+    "github.com/sg-evals/ebpf--v0.16.0"
+  ],
+  "retrieved_paths_union": [
+    "pkg/datapath/loader/cache.go",
+    "pkg/datapath/loader/template.go",
+    "pkg/datapath/loader/netlink.go",
+    "pkg/datapath/loader/loader.go",
+    "map.go",
+    "pkg/endpoint/bpf.go",
+    "pkg/maps/policymap/policymap.go",
+    "collection.go",
+    "github.com/sg-evals/cilium--v1.16.4",
+    "github.com/sg-evals/ebpf--v0.16.0"
+  ],
+  "required_files": [
+    "pkg/datapath/loader/netlink.go",
+    "pkg/bpf/collection.go",
+    "map.go",
+    "collection.go"
+  ],
+  "ir_scores": {
+    "task_id": "incident-investigation-dual-cilium-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.3462,
+      "10": 0.4694
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2771,
+    "file_recall": 0.75,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "ir_scores_union": {
+    "task_id": "incident-investigation-dual-cilium-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.3462,
+      "10": 0.4694
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2771,
+    "file_recall": 0.75,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "elapsed_seconds": 440.8,
+  "response_chars": 28130,
+  "raw_response": "---\ntitle: Investigate Cilium BPF load failures caused by data race during pod churn\nshare_url: https://demo.sourcegraph.com/deepsearch/8387fef1-adf0-4424-8d24-1211da9fc443\nurl: https://demo.sourcegraph.com/deepsearch/2227\ncreated: 2026-08-18T02:02:47Z\nupdated: 2026-08-18T02:09:27Z\n---\n\n# # Incident: Cilium agent intermittently fails to load BPF programs during high pod churn\n\n## Alert\n\nCilium 1.16.4 agents on a Kubernetes cluster log intermittent BPF program\nload failures during periods of high pod churn:\n\n```\nlevel=error msg=\"Failed to load policy program\" error=\"program too large\"\nlevel=error msg=\"failed to attach lxc_egress\" error=\"map create: invalid argument\"\nfatal: panic: BPF map definition corrupt: max_entries=2147483647\n```\n\n## Symptoms\n\n- Errors only occur when multiple endpoint regenerations happen in the same\n  second.\n- The agent recovers when the workload calms; restarting the agent clears\n  the failure transiently.\n- A debug build with the Go race detector confirms a `DATA RACE` somewhere\n  in the BPF loading path when two regenerations run concurrently \u2014 the\n  detector output alone does not pinpoint which function or data structure\n  is being torn.\n\n## Environment\n\n- `/workspace/cilium/` \u2014 `cilium/cilium` v1.16.4\n- `/workspace/ebpf/` \u2014 `cilium/ebpf` v0.16.0\n\nBoth Go projects. The failure lives at the seam between Cilium's datapath\nloading code and the underlying `cilium/ebpf` library; you will need to read\nboth repos to locate it.\n\n## What I need\n\nInvestigate the two codebases and write an incident report grounded in the\nactual code \u2014 cite the specific files and functions you found, not general\neBPF theory.\n\n1. **Root cause** \u2014 name the specific file and function on each side of the\n   race: the Cilium code that prepares and hands off BPF objects during\n   endpoint regeneration, and the `cilium/ebpf` code that consumes them when\n   creating a map. Explain what shared, mutable data structure is actually\n   being torn.\n2. **Race trace** \u2014 trace, hop by hop, how two concurrent endpoint\n   regenerations reach the same shared resource and produce the observed\n   failure. Tie each hop to a code path you identified.\n3. **Affected components** \u2014 list every component across both repos that\n   participates in this failure path.\n4. **Remediation** \u2014 propose a concrete, code-grounded fix and say where it\n   belongs (which repo and file).\n\n## Output\n\nWrite your incident report to `/workspace/cilium/INCIDENT_REPORT.md`.\n\n\nSearch only these repositories: github.com/sg-evals/cilium--v1.16.4, github.com/sg-evals/ebpf--v0.16.0\n\nThe file writing tools produce CSV/JSON artifacts, not raw `.md`. The user asked the report to go to `/workspace/cilium/INCIDENT_REPORT.md` \u2014 that is a workspace filesystem path that I cannot write to directly via the evaluator's sandboxed environment. I'll deliver the full report inline as Markdown now, which is the authoritative output.\n\n---\n\n# Cilium 1.16.4 Incident Report \u2014 BPF Program Load Failures During High Pod Churn\n\n**Date:** 2026-08-18\n**Severity:** High\n**Affected versions:** Cilium 1.16.4 / cilium/ebpf v0.16.0\n\n---\n\n## Executive Summary\n\nIntermittent BPF program load failures (`program too large`, `map create: invalid argument`, `BPF map definition corrupt: max_entries=2147483647`) occur during high pod churn because two concurrent endpoint regeneration goroutines share a **partially-copied `*ebpf.CollectionSpec`** that still contains aliased `*bytes.Reader` objects (`MapSpec.Extra`) and shallow-copied `MapKV` interface values (`MapSpec.Contents`). One goroutine mutates these shared structures while the other is reading them inside the ebpf library's map-creation path, producing the torn state observed in the error messages.\n\n---\n\n## 1. Root Cause\n\n### Cilium side\n\n#### `objectCache.fetchOrCompile` \u2014 [`pkg/datapath/loader/cache.go:162-231`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/cache.go?L162-231)\n\nThe cache stores a single compiled `*ebpf.CollectionSpec` per configuration hash in `cachedSpec.spec`. On a cache hit (the common case during high pod churn, when many endpoints share the same compiled template), each requesting goroutine receives a \"copy\" produced by the local `copySpec` closure (lines 168-177):\n\n```go\ncopySpec := func(s *ebpf.CollectionSpec) *ebpf.CollectionSpec {\n    s = s.Copy()\n    for _, m := range s.Maps {\n        if m.Extra != nil {\n            cpy := *m.Extra\n            m.Extra = &cpy\n        }\n    }\n    return s\n}\n```\n\n`s.Copy()` calls `CollectionSpec.Copy()` from the ebpf library, which calls `MapSpec.Copy()` for every map. `MapSpec.Copy()` performs a **shallow clone** of the `Contents` slice:\n\n```go\ncpy.Contents = slices.Clone(cpy.Contents)\n```\n\n`slices.Clone` copies the slice header and element array but each `MapKV` element holds `Key interface{}` and `Value interface{}`. An interface value is two machine words (type pointer + data pointer). `slices.Clone` copies those words verbatim. **Both the original spec and the clone share the same underlying data for pointer-bearing interface values.**\n\nThe `copySpec` closure correctly re-allocates `Extra *bytes.Reader` for each `MapSpec` \u2014 the acknowledged workaround for [cilium/ebpf#1517](https://github.com/cilium/ebpf/issues/1517). However, the fix is incomplete for maps subsequently processed by `renameMaps`.\n\n#### `renameMaps` \u2014 [`pkg/datapath/loader/template.go:281-304`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/template.go?L281-304)\n\nCalled from `loadDatapath` ([`netlink.go:52`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/netlink.go?L52)), `renameMaps` builds a new `CollectionSpec`:\n\n```go\ncoll = &ebpf.CollectionSpec{\n    Maps:      maps.Clone(coll.Maps),  // shallow: same *MapSpec pointers for non-renamed maps\n    Programs:  coll.Programs,\n    ...\n}\nfor name, rename := range renames {\n    mapSpec = mapSpec.Copy()           // only renamed maps get a new *MapSpec\n    ...\n}\n```\n\n`maps.Clone` copies the `map[string]*MapSpec` header \u2014 the **pointer values for maps not in the rename set are shared verbatim**. Any `*MapSpec` correctly isolated by the `Extra` re-allocation in `copySpec` that does NOT appear in the rename set is re-aliased here. Both goroutines then pass this re-aliased pointer into `bpf.LoadCollection`.\n\n#### `reloadDatapath` \u2014 [`pkg/datapath/loader/loader.go:449-468`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/loader.go?L449-468)\n\nBefore calling `loadDatapath`, `reloadDatapath` directly mutates `pm.Contents[i].Key` on the `*MapSpec` retrieved from `spec.Maps`:\n\n```go\nfor i, kv := range pm.Contents {\n    if kv.Key == (uint32)(templateLxcID) {\n        pm.Contents[i].Key = (uint32)(ep.GetID())\n    }\n}\n```\n\nThis is an **unsynchronized write** to a `MapKV.Key interface{}` field. If a second goroutine holds an alias to the same `*MapSpec` and is concurrently reading `pm.Contents[i]` during map finalization inside the ebpf library, the write and read on the same interface pair constitute a data race \u2014 exactly what the Go race detector confirms.\n\n### ebpf library side\n\n#### `MapSpec.Copy` \u2014 [`map.go:95-120`](https://demo.sourcegraph.com/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/map.go?L95-120)\n\n```go\nfunc (ms *MapSpec) Copy() *MapSpec {\n    cpy := *ms\n    cpy.Contents = slices.Clone(cpy.Contents)   // shallow: interface values share backing data\n    ...\n    return &cpy\n}\n```\n\nThe `Contents` copy is element-wise shallow. For `uint32` keys Cilium uses for policy call maps, the interface boxing typically stores the value inline (no heap allocation), but the race still exists at the **interface-word level**: `pm.Contents[i].Key = ...` is a non-atomic two-word store while another goroutine may be reading the same two words.\n\n#### `MapSpec.createMap` \u2014 [`map.go:390-465`](https://demo.sourcegraph.com/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/map.go?L390-465)\n\n```go\nif spec.Extra != nil {\n    if _, err := io.Copy(internal.DiscardZeroes{}, spec.Extra); err != nil {\n        return nil, errors.New(\"extra contains unhandled non-zero bytes, drain before creating map\")\n    }\n}\n```\n\n`spec.Extra` is a `*bytes.Reader`. `io.Copy` **advances the reader's internal offset** destructively. Two goroutines sharing the same `*bytes.Reader` (re-introduced by `renameMaps`) cause the second goroutine to see a reader at EOF. This bypasses the trailing-byte corruption check for maps using the old `bpf_map_def` ELF format, and passes uninspected bytes onward. The subsequent call to `spec.fixupMagicFields()` and construction of `sys.MapCreateAttr` then operates on a partially torn `MaxEntries` value \u2014 producing the observed `max_entries=2147483647` (consistent with a half-written 64-bit interface word whose upper bits still carry the template value `math.MaxUint32`).\n\n### The shared mutable data structure being torn\n\nThe central victim is **`MapSpec.Contents []MapKV`** and specifically the `Key interface{}` field inside each element. Both goroutines hold what appear to be independent `*MapSpec` values (because `CollectionSpec.Copy()` was called), but `slices.Clone` produces a new slice header over the **same backing array**:\n\n- Goroutine A **writes** `pm.Contents[i].Key` (endpoint ID substitution in `reloadDatapath`)\n- Goroutine B **reads** `pm.Contents[i].Key` during map content encoding in `populateDeferredMaps`\n\nThis is an unsynchronized concurrent read/write on the same memory locations.\n\nA secondary victim is **`MapSpec.Extra *bytes.Reader`** for maps re-aliased by `renameMaps`.\n\n---\n\n## 2. Race Trace\n\n```\nGoroutine A (endpoint X)                       Goroutine B (endpoint Y)\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nEndpoint.regenerateBPF()                       Endpoint.regenerateBPF()\n[pkg/endpoint/bpf.go:520]                     [pkg/endpoint/bpf.go:520]\n  \u2514\u2500 realizeBPFState()                           \u2514\u2500 realizeBPFState()\n       \u2514\u2500 loader.ReloadDatapath()                     \u2514\u2500 loader.ReloadDatapath()\n            [loader.go:615]                               [loader.go:615]\n            \u2514\u2500 templateCache.fetchOrCompile()        \u2514\u2500 templateCache.fetchOrCompile()\n                 [cache.go:162]                           [cache.go:162]\n                 obj.Lock()  \u2190 serializes compile         obj.Lock() blocks, then:\n                 cache hit \u2192 copySpec(obj.spec)           cache hit \u2192 copySpec(obj.spec)\n                   CollectionSpec.Copy()                    CollectionSpec.Copy()\n                     MapSpec.Copy() per map                   MapSpec.Copy() per map\n                       Contents=slices.Clone(\u2026)                 Contents=slices.Clone(\u2026)\n                         \u2191 new header, SAME array                 \u2191 new header, SAME array\n                   Extra re-allocated \u2713                   Extra re-allocated \u2713\n            \u2514\u2500 reloadDatapath(ep, spec)              \u2514\u2500 reloadDatapath(ep, spec)\n                 [loader.go:449]                          [loader.go:449]\n                 pm = spec.Maps[PolicyCallMapName]        pm = spec.Maps[PolicyCallMapName]\n                 // both pm point to same *MapSpec\n\n  WRITE: pm.Contents[i].Key = ep_X.GetID()   READ: kv := pm.Contents[i]\n         [loader.go:465]                      \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 DATA RACE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n            \u2514\u2500 loadDatapath(spec, renames, \u2026)\n                 [netlink.go:51]\n                 renameMaps(spec, renames)\n                 [template.go:281]\n                   maps.Clone(coll.Maps)\n                   // non-renamed *MapSpec ptrs re-aliased\n                 bpf.LoadCollection(spec, opts)\n                   NewCollectionWithOptions()\n                   [collection.go:366]\n                     loadMap(mapName)\n                     [collection.go:448]\n                       newMapWithOptions(mapSpec, opts)\n                       [map.go:312]\n                         createMap(nil, opts)\n                         [map.go:392]\n                           io.Copy(DiscardZeroes, spec.Extra)\n                           // goroutine B: Extra already drained \u2192 silent pass\n                           spec.fixupMagicFields()\n                           sys.MapCreate(&attr)\n                           // torn MaxEntries \u2192 EINVAL\n                           // \"map create: invalid argument\"\n                           // \"max_entries=2147483647\"\n```\n\n**Hop-by-hop:**\n\n1. **[`Endpoint.regenerateBPF`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/endpoint/bpf.go?L520)** \u2014 Two goroutines enter concurrently for endpoints that share the same compiled template hash. No per-call lock prevents simultaneous execution.\n\n2. **[`loader.ReloadDatapath`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/loader.go?L615)** \u2014 Calls `templateCache.fetchOrCompile` then `reloadDatapath`.\n\n3. **[`objectCache.fetchOrCompile`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/cache.go?L196-210)** \u2014 `obj.Lock()` serializes compilation but not cache-hit delivery. Both goroutines receive specs with shared `Contents` backing arrays via `copySpec`.\n\n4. **[`reloadDatapath` \u2014 Contents mutation](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/loader.go?L453-468)** \u2014 Goroutine A writes `pm.Contents[i].Key`; Goroutine B holds an alias to the same backing array element. **Race detector fires here.**\n\n5. **[`loadDatapath` \u2192 `renameMaps`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/template.go?L281-304)** \u2014 Re-introduces aliased `*MapSpec` pointers for maps not in the rename set; also undoes `Extra` isolation from `copySpec` for those maps.\n\n6. **[`bpf.LoadCollection` \u2192 `NewCollectionWithOptions` \u2192 `loadMap` \u2192 `createMap`](https://demo.sourcegraph.com/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/map.go?L392-464)** \u2014 Consumes the aliased `MapSpec`, drains the shared `Extra *bytes.Reader` destructively via `io.Copy`, and passes a torn `MaxEntries` field to the kernel.\n\n7. **`sys.MapCreate`** \u2014 Returns `EINVAL`; surfaced as `map create: invalid argument`. A torn `MaxEntries` produces `max_entries=2147483647`. An oversized program instruction array rejected by the verifier produces `program too large`.\n\n---\n\n## 3. Affected Components\n\n### cilium/cilium ([`github.com/sg-evals/cilium--v1.16.4`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/))\n\n| Component | File | Role in failure path |\n|---|---|---|\n| Endpoint BPF regeneration | [`pkg/endpoint/bpf.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/endpoint/bpf.go) | Entry point; concurrent goroutines per endpoint |\n| Template object cache | [`pkg/datapath/loader/cache.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/cache.go) | `copySpec` workaround is incomplete; shallow `Contents` survives into callers |\n| Datapath loader | [`pkg/datapath/loader/loader.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/loader.go) | Mutates `Contents[i].Key` without exclusive ownership of the slice backing array |\n| Map rename / ELF substitution | [`pkg/datapath/loader/template.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/template.go) | `renameMaps` shallow-clones `Maps` map, re-aliasing non-renamed `*MapSpec` pointers |\n| Datapath netlink loader | [`pkg/datapath/loader/netlink.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/netlink.go) | Calls `bpf.LoadCollection` with the partially corrupt spec |\n| Policy map | [`pkg/maps/policymap/policymap.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/maps/policymap/policymap.go) | Provides `PolicyCallMapName`/`PolicyEgressCallMapName`; their `*MapSpec.Contents` is the torn slice |\n\n### cilium/ebpf ([`github.com/sg-evals/ebpf--v0.16.0`](https://demo.sourcegraph.com/r/github.com/sg-evals/ebpf--v0.16.0/))\n\n| Component | File | Role in failure path |\n|---|---|---|\n| `CollectionSpec.Copy` | [`collection.go:50-72`](https://demo.sourcegraph.com/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/collection.go?L50-72) | Calls `MapSpec.Copy` per map; does not deep-copy `Contents` element values |\n| `MapSpec.Copy` | [`map.go:95-120`](https://demo.sourcegraph.com/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/map.go?L95-120) | `slices.Clone(Contents)` \u2014 alias-safe for inline value types only; interface pairs share data |\n| `collectionLoader.loadMap` | [`collection.go:448-485`](https://demo.sourcegraph.com/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/collection.go?L448-485) | Passes aliased `*MapSpec` to `newMapWithOptions` |\n| `newMapWithOptions` / `createMap` | [`map.go:312-465`](https://demo.sourcegraph.com/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/map.go?L312-465) | Drains `spec.Extra` destructively via `io.Copy`; passes torn `MaxEntries` to kernel |\n| `MapSpec.fixupMagicFields` | [`map.go:128-167`](https://demo.sourcegraph.com/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/map.go?L128-167) | Operates on torn input when invoked from `createMap` |\n| `sys.MapCreate` | `internal/sys/` | Kernel syscall; rejects invalid `MaxEntries` with `EINVAL` |\n\n---\n\n## 4. Remediation\n\nThree concrete fixes, in priority order.\n\n### Fix A (immediate) \u2014 cilium/cilium: take exclusive ownership of `MapSpec` before mutating `Contents`\n\n**Repo:** `github.com/sg-evals/cilium--v1.16.4`\n**File:** [`pkg/datapath/loader/loader.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/loader.go)\n**Location:** `reloadDatapath`, lines 453-468\n\nCall `.Copy()` on the retrieved `*MapSpec` and replace `spec.Maps[name]` with the copy **before** writing to `Contents[i].Key`. `MapSpec.Copy()` calls `slices.Clone(Contents)` which produces a new backing array, isolating this goroutine's writes from any other goroutine's reads:\n\n```go\nfor _, name := range []string{\n    policymap.PolicyCallMapName,\n    policymap.PolicyEgressCallMapName,\n} {\n    pm, ok := spec.Maps[name]\n    if !ok {\n        continue\n    }\n\n    // Take exclusive ownership before mutating Contents.\n    pm = pm.Copy()\n    spec.Maps[name] = pm\n\n    for i, kv := range pm.Contents {\n        if kv.Key == (uint32)(templateLxcID) {\n            pm.Contents[i].Key = (uint32)(ep.GetID())\n        }\n    }\n}\n```\n\nThis eliminates the write/read race on `Contents[i].Key` \u2014 the primary trigger of the data race.\n\n### Fix B (immediate) \u2014 cilium/cilium: deep-copy all `*MapSpec` values in `renameMaps`\n\n**Repo:** `github.com/sg-evals/cilium--v1.16.4`\n**File:** [`pkg/datapath/loader/template.go`](https://demo.sourcegraph.com/r/github.com/sg-evals/cilium--v1.16.4/-/blob/pkg/datapath/loader/template.go)\n**Location:** `renameMaps`, lines 281-304\n\nChange the shallow `maps.Clone` to call `.Copy()` on every `*MapSpec` rather than only renamed ones. This eliminates re-aliasing of non-renamed map specs and makes the `Extra` isolation from `copySpec` durable through this pass:\n\n```go\nfunc renameMaps(coll *ebpf.CollectionSpec, renames map[string]string) (*ebpf.CollectionSpec, error) {\n    newMaps := make(map[string]*ebpf.MapSpec, len(coll.Maps))\n    for k, v := range coll.Maps {\n        newMaps[k] = v.Copy() // deep-copy every MapSpec, not just renamed ones\n    }\n    coll = &ebpf.CollectionSpec{\n        Maps:      newMaps,\n        Programs:  coll.Programs,\n        Types:     coll.Types,\n        ByteOrder: coll.ByteOrder,\n    }\n    for name, rename := range renames {\n        mapSpec := coll.Maps[name]\n        if mapSpec == nil {\n            return nil, fmt.Errorf(\"unknown map %q: can't rename to %q\", name, rename)\n        }\n        // mapSpec is already a fresh copy; just update the name.\n        mapSpec.Name = rename\n        coll.Maps[name] = mapSpec\n    }\n    return coll, nil\n}\n```\n\nThis also makes the `Extra` re-allocation in `copySpec` redundant for the `renameMaps` path (though retaining it is harmless and guards against future regressions).\n\n### Fix C (upstream) \u2014 cilium/ebpf: document and/or fix `MapSpec.Copy` shallow `Contents` semantics\n\n**Repo:** `github.com/sg-evals/ebpf--v0.16.0`\n**File:** [`map.go:95-120`](https://demo.sourcegraph.com/r/github.com/sg-evals/ebpf--v0.16.0/-/blob/map.go?L95-120)\n\nAt minimum, add a documentation clarification to `MapSpec.Copy`:\n\n```go\n// Copy returns a copy of the spec.\n//\n// MapSpec.Contents is a shallow copy: the MapKV slice header is new, but\n// the Key and Value interface values within each element share the same\n// underlying data as the original. Callers that intend to mutate Contents\n// elements must allocate a fresh slice and copy each element independently.\nfunc (ms *MapSpec) Copy() *MapSpec {\n```\n\nA structural fix would iterate `Contents` and deep-copy each element for pointer-bearing types. File as a follow-up to issue #1517 against `cilium/ebpf`.\n\n### Priority summary\n\n| Fix | Repo | File | Effect |\n|---|---|---|---|\n| **A** | cilium/cilium | `pkg/datapath/loader/loader.go` | Eliminates write/read race on `Contents[i].Key` \u2014 **primary fix** |\n| **B** | cilium/cilium | `pkg/datapath/loader/template.go` | Eliminates re-aliasing of `*MapSpec` in `renameMaps`; closes the `Extra` escape path |\n| **C** | cilium/ebpf | `map.go` | Upstream contract clarification; prevents recurrence in future callers |\n\n## Sources\n\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/loader.go@f8b1681?L445-540](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/loader.go?L445-540)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/netlink.go@f8b1681?L1-130](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/netlink.go?L1-130)\n- [github.com/sg-evals/ebpf--v0.16.0/collection.go@07c339d?L406-560](/github.com/sg-evals/ebpf--v0.16.0@07c339d0dda659a89701915d0d283cfa7a809bac/-/blob/collection.go?L406-560)\n- [github.com/sg-evals/ebpf--v0.16.0/map.go@07c339d?L50-120](/github.com/sg-evals/ebpf--v0.16.0@07c339d0dda659a89701915d0d283cfa7a809bac/-/blob/map.go?L50-120)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/loader.go@f8b1681?L580-680](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/loader.go?L580-680)\n- [github.com/sg-evals/ebpf--v0.16.0/map.go@07c339d?L281-475](/github.com/sg-evals/ebpf--v0.16.0@07c339d0dda659a89701915d0d283cfa7a809bac/-/blob/map.go?L281-475)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/template.go@f8b1681?L1-200](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/template.go?L1-200)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/loader.go@f8b1681?L1-100](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/loader.go?L1-100)\n- [repo:^github.com/sg-evals/cilium--v1.16.4$ templateCache fetchOrCompile CollectionSpec cache](/search?q=patterntype:nls%20repo:%5Egithub.com%2Fsg-evals%2Fcilium--v1.16.4$%20templateCache%20fetchOrCompile%20CollectionSpec%20cache)\n- [github.com/sg-evals/ebpf--v0.16.0/collection.go@07c339d?L1-100](/github.com/sg-evals/ebpf--v0.16.0@07c339d0dda659a89701915d0d283cfa7a809bac/-/blob/collection.go?L1-100)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/cache.go@f8b1681](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/cache.go)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/template.go@f8b1681?L270-320](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/template.go?L270-320)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/loader.go@f8b1681?L440-485](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/loader.go?L440-485)\n- [github.com/sg-evals/ebpf--v0.16.0/map.go@07c339d?L95-130](/github.com/sg-evals/ebpf--v0.16.0@07c339d0dda659a89701915d0d283cfa7a809bac/-/blob/map.go?L95-130)\n- [github.com/sg-evals/ebpf--v0.16.0/collection.go@07c339d?L310-410](/github.com/sg-evals/ebpf--v0.16.0@07c339d0dda659a89701915d0d283cfa7a809bac/-/blob/collection.go?L310-410)\n- [github.com/sg-evals/ebpf--v0.16.0/map.go@07c339d?L122-200](/github.com/sg-evals/ebpf--v0.16.0@07c339d0dda659a89701915d0d283cfa7a809bac/-/blob/map.go?L122-200)\n- [repo:^github.com/sg-evals/cilium--v1.16.4$ reloadDatapath spec.Maps Contents pm.Contents](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fcilium--v1.16.4$%20reloadDatapath%20spec.Maps%20Contents%20pm.Contents)\n- [repo:^github.com/sg-evals/ebpf--v0.16.0$ Extra bytes.Reader fixupMagicFields MaxEntries](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Febpf--v0.16.0$%20Extra%20bytes.Reader%20fixupMagicFields%20MaxEntries)\n- [repo:^github.com/sg-evals/cilium--v1.16.4$ \"issue 1517\" OR \"ebpf/issues/1517\" OR \"bug in cilium/ebpf\"](/search?q=patterntype:keyword%20repo:%5Egithub.com%2Fsg-evals%2Fcilium--v1.16.4$%20%22issue%201517%22%20OR%20%22ebpf%2Fissues%2F1517%22%20OR%20%22bug%20in%20cilium%2Febpf%22)\n- [github.com/sg-evals/ebpf--v0.16.0/map.go@07c339d?L390-420](/github.com/sg-evals/ebpf--v0.16.0@07c339d0dda659a89701915d0d283cfa7a809bac/-/blob/map.go?L390-420)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/endpoint/bpf.go@f8b1681?L511-620](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/endpoint/bpf.go?L511-620)\n- [github.com/sg-evals/ebpf--v0.16.0/map.go@07c339d?L200-285](/github.com/sg-evals/ebpf--v0.16.0@07c339d0dda659a89701915d0d283cfa7a809bac/-/blob/map.go?L200-285)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/cache.go@f8b1681?L155-232](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/cache.go?L155-232)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/template.go@f8b1681?L281-305](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/template.go?L281-305)\n- [github.com/sg-evals/ebpf--v0.16.0/map.go@07c339d?L467-510](/github.com/sg-evals/ebpf--v0.16.0@07c339d0dda659a89701915d0d283cfa7a809bac/-/blob/map.go?L467-510)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/cache.go@f8b1681](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/cache.go)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/loader.go@f8b1681?L445-485](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/loader.go?L445-485)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/template.go@f8b1681?L281-304](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/template.go?L281-304)\n- [github.com/sg-evals/cilium--v1.16.4/pkg/datapath/loader/netlink.go@f8b1681?L51-123](/github.com/sg-evals/cilium--v1.16.4@f8b168167757a1505f243134b4545d8ff0cb1e29/-/blob/pkg/datapath/loader/netlink.go?L51-123)\n- [github.com/sg-evals/ebpf--v0.16.0/map.go@07c339d?L95-120](/github.com/sg-evals/ebpf--v0.16.0@07c339d0dda659a89701915d0d283cfa7a809bac/-/blob/map.go?L95-120)\n- [github.com/sg-evals/ebpf--v0.16.0/map.go@07c339d?L390-465](/github.com/sg-evals/ebpf--v0.16.0@07c339d0dda659a89701915d0d283cfa7a809bac/-/blob/map.go?L390-465)\n- [github.com/sg-evals/ebpf--v0.16.0/collection.go@07c339d?L50-72](/github.com/sg-evals/ebpf--v0.16.0@07c339d0dda659a89701915d0d283cfa7a809bac/-/blob/collection.go?L50-72)\n\n\nGenerated files:\n- files/INCIDENT_REPORT.json: /.api/agent-files/v1/deep-search/8387fef1-adf0-4424-8d24-1211da9fc443/files/INCIDENT_REPORT.json\n- files/INCIDENT_REPORT_md.csv: /.api/agent-files/v1/deep-search/8387fef1-adf0-4424-8d24-1211da9fc443/files/INCIDENT_REPORT_md.csv\n",
+  "ir_scores_unaligned": {
+    "task_id": "incident-investigation-dual-cilium-001",
+    "config_name": "deepsearch",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.3462,
+      "10": 0.4694
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2771,
+    "file_recall": 0.75,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "retrieved_paths_aligned": [
+    "pkg/datapath/loader/cache.go",
+    "pkg/datapath/loader/template.go",
+    "pkg/datapath/loader/netlink.go",
+    "pkg/datapath/loader/loader.go",
+    "map.go",
+    "pkg/endpoint/bpf.go",
+    "pkg/maps/policymap/policymap.go",
+    "collection.go",
+    "github.com/sg-evals/cilium--v1.16.4",
+    "github.com/sg-evals/ebpf--v0.16.0"
+  ],
+  "ir_scores_union_unaligned": {
+    "task_id": "incident-investigation-dual-cilium-001",
+    "config_name": "deepsearch_union",
+    "precision": {
+      "1": 0.0,
+      "3": 0.3333,
+      "5": 0.4,
+      "10": 0.3
+    },
+    "recall": {
+      "1": 0.0,
+      "3": 0.25,
+      "5": 0.5,
+      "10": 0.75
+    },
+    "f1": {
+      "1": 0.0,
+      "3": 0.2857,
+      "5": 0.4444,
+      "10": 0.4286
+    },
+    "ndcg": {
+      "1": 0.0,
+      "3": 0.2346,
+      "5": 0.3462,
+      "10": 0.4694
+    },
+    "mrr": 0.3333,
+    "map_score": 0.2771,
+    "file_recall": 0.75,
+    "context_efficiency": 0.3,
+    "n_retrieved": 10,
+    "n_ground_truth": 4,
+    "n_overlap": 3
+  },
+  "scoring": "aligned_suffix_v1"
+}

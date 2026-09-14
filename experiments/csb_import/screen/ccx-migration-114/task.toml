@@ -1,0 +1,106 @@
+# Imported from CodeScaleBench CCX-migration-114 (experiments/csb_import/convert_csb_task.py)
+
+difficulty_stratum = "large_single"
+mcp_suite = "eb_v1"
+org_scale = true
+verification_modes = ["deterministic"]
+
+[task]
+id = "ccx-migration-114"
+suite = "technical_debt"
+difficulty = "hard"
+session_type = "single"
+estimated_duration_minutes = 15
+description = "Migration Inventory: Kafka RecordAccumulator Rename Impact"
+
+[[repos]]
+url = "https://github.com/apache/kafka"
+rev = "0753c489"
+path = "kafka"
+role = "primary"
+
+[metadata]
+languages = ["java"]
+csb_mirror = "sg-evals/kafka--0753c489"
+csb_commit = "0753c489afad403fb6e78fda4c4a380e46f500c0"
+csb_family = "csb_org_migration"
+csb_category = "migration-inventory"
+
+[[checkpoints]]
+name = "csb_oracle_composite"
+weight = 1.0
+verifier = "checks/check_csb_oracle.sh"
+description = "CSB csb_sdlc_understand composite over answer.json (file set, symbols, chain, keywords)"
+timeout_seconds = 300
+
+[artifacts]
+required = ["answer"]
+
+[ground_truth]
+tiers = ["deterministic"]
+
+[[ground_truth.required_files]]
+path = "clients/src/main/java/org/apache/kafka/clients/producer/internals/RecordAccumulator.java"
+repo = "kafka"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "clients/src/main/java/org/apache/kafka/clients/producer/KafkaProducer.java"
+repo = "kafka"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "clients/src/main/java/org/apache/kafka/clients/producer/internals/Sender.java"
+repo = "kafka"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "clients/src/main/java/org/apache/kafka/clients/producer/internals/BuiltInPartitioner.java"
+repo = "kafka"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "clients/src/main/java/org/apache/kafka/common/Node.java"
+repo = "kafka"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "clients/src/test/java/org/apache/kafka/clients/producer/internals/RecordAccumulatorTest.java"
+repo = "kafka"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "clients/src/test/java/org/apache/kafka/clients/producer/internals/SenderTest.java"
+repo = "kafka"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "clients/src/test/java/org/apache/kafka/clients/producer/internals/TransactionManagerTest.java"
+repo = "kafka"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "clients/src/test/java/org/apache/kafka/clients/producer/KafkaProducerTest.java"
+repo = "kafka"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "jmh-benchmarks/src/main/java/org/apache/kafka/jmh/producer/RecordAccumulatorFlushBenchmark.java"
+repo = "kafka"
+confidence = 0.9
+source = "deterministic"
+
+[[ground_truth.required_files]]
+path = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/WorkerSourceTask.java"
+repo = "kafka"
+confidence = 0.9
+source = "deterministic"
