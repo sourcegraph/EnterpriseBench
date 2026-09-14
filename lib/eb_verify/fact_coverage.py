@@ -11,36 +11,56 @@ fraction of candidate facts grounded in GT (the ungrounded-assertion rate is
 
 The default embedder is a deterministic TF-IDF over character 3-5-grams
 (sklearn), fit per call on the union of GT + candidate statements. No network,
-no persisted state. A real embedding model can be plugged in later via the
-``Embedder`` Protocol.
+no persisted state. A real embedding model is available via
+``SentenceTransformerEmbedder`` (a pinned sentence-transformers model,
+implementing the same ``Embedder`` Protocol) for callers that need it.
 
-Deployment boundary (do not wire into adversarial scoring)
------------------------------------------------------------
-The TF-IDF default is suitable ONLY for cooperative partial-credit recall
-(honest agent output, missed-fact detection). Independent verification on
-held-out adversarial pairs showed it cannot be trusted where an agent could
-game the score: bag-of-ngrams is word-order-blind, so a direction-reversed
-relation ("scheduler restarts the worker" vs "worker restarts the scheduler")
-scores similarity 1.000; a negated statement scores ~0.956; and a genuine
-paraphrase with divergent surface forms can miss at ~0.30 (below the 0.40
-operating threshold). Swapping in a real sentence-transformer embedder does
-NOT close this gap either (see EnterpriseBench-8qya.1's calibration): both
-embedder families hit the identical best-F1 operating point on real GT-
-derived pairs and both fail the same order-reversed/negation cases.
+Deployment boundary (do not wire EITHER embedder into adversarial scoring)
+---------------------------------------------------------------------------
+Both embedders are suitable ONLY for cooperative partial-credit recall
+(honest agent output, missed-fact detection) — swapping TF-IDF for a real
+sentence-embedding model does **not** close the adversarial gap. Calibrated
+on ``fact_coverage_calibration``'s pair set (28 pairs grounded in real task
+``ground_truth.json`` statements, including hand-crafted negation/
+wrong-relation probes derived from them — see that module for provenance):
+both embedders clear the same overall F1 = 0.800 at their respective best
+threshold (TF-IDF: 0.40; ``SentenceTransformerEmbedder``: see
+``SENTENCE_TRANSFORMER_THRESHOLD``), and both get every paraphrase and every
+"different-symbol"/"different-repo" negative right — but **0 of 7**
+order/negation adversarial pairs (direction-reversed relations, negated
+statements) are correctly rejected by either embedder at that threshold: a
+direction-reversed relation ("scheduler restarts the worker" vs "worker
+restarts the scheduler") scores 1.000 under TF-IDF and 0.987 under the real
+embedder; a negated statement scores ~0.95-0.97 under both. This is a known
+property of general-purpose sentence encoders (trained for semantic/
+paraphrase similarity, not for polarity or argument order), not a defect
+specific to either implementation here — a bigger or newer embedding model
+would not be expected to fix it on its own.
 
 ``fact_polarity_check.apply_polarity_check`` (a sibling module) implements
-the LLM-backed post-check mitigation: it re-verifies each recovered
-``coverage()``/``precision()`` match's direction and polarity via an LLM
-(``eb_verify.judge``'s backend), downgrading only confirmed disagreements.
-It is opt-in and does not change this module's behavior or its "no network,
-no persisted state" guarantee. The deployment boundary above is NOT lifted
-by its existence alone -- that still requires validating it closes the gap
-on a real adversarial hold-out (see EnterpriseBench-i02m) and, for any live
-task wiring, provisioning eb_verify's Python deps into the scoring sandbox
-(neither is done yet). Note ``plugins/fact_triples.py``'s own semantic
-fallback matcher does not consume ``coverage()``/``FactMatch`` at all (it
-matches via its own greedy assignment over a raw similarity matrix), so it
-is unaffected by and not automatically improved by this post-check.
+the LLM-backed post-check mitigation this deployment boundary calls for: it
+re-verifies each recovered ``coverage()``/``precision()`` match's direction
+and polarity via an LLM (``eb_verify.judge``'s backend), downgrading only
+confirmed disagreements. It is opt-in and does not change this module's
+behavior or its "no network, no persisted state" guarantee. The deployment
+boundary above is NOT lifted by its existence alone -- that still requires
+validating it closes the gap on a real adversarial hold-out (see
+EnterpriseBench-i02m) and, for any live task wiring, provisioning
+eb_verify's Python deps into the scoring sandbox (neither is done yet). Note
+``plugins/fact_triples.py``'s own semantic fallback matcher does not consume
+``coverage()``/``FactMatch`` at all (it matches via its own greedy
+assignment over a raw similarity matrix), so it is unaffected by and not
+automatically improved by this post-check.
+
+Hermeticity note on ``SentenceTransformerEmbedder``: it loads a pinned
+model+revision from the local Hugging Face cache. To run without network
+access (sandboxed verification), pre-fetch the pinned revision at image-build
+time (``scripts/infra/prefetch_embedding_model.py``) and set ``HF_HUB_OFFLINE=1``
+in the runtime environment. No such pre-fetch step exists yet in any task
+sandbox image today, nor does any per-task sandbox image install this
+module's Python dependencies at all (they are ``docker cp``'d as raw source,
+relying on whatever the base image's ``python3`` already has) — wiring
+either up is separate infra work, not done by this module.
 
 Mapping onto lib/eb_verify/scoring.py checkpoints
 -------------------------------------------------
@@ -93,10 +113,16 @@ if TYPE_CHECKING:  # numpy/sklearn are imported lazily — see below.
 # not execute) or load_scoring_deps (definitive, does).
 
 # Calibrated on the labeled pair set in fact_coverage_calibration.py:
-# best F1 = 0.828 at threshold 0.40 for the TF-IDF char 3-5-gram default
-# embedder (perfect recall of paraphrase pairs; 5/12 near-miss false
-# positives, dominated by order-blind cases — see calibration module).
+# best F1 = 0.800 at threshold 0.40 for the TF-IDF char 3-5-gram default
+# embedder (perfect recall of paraphrase + easy-negative pairs; all 7
+# order/negation adversarial pairs are false positives — see module
+# docstring "Deployment boundary" and the calibration module for detail).
 DEFAULT_THRESHOLD = 0.40
+
+# Calibrated the same way for SentenceTransformerEmbedder: best F1 = 0.800
+# at threshold 0.75 (same adversarial blind spot as DEFAULT_THRESHOLD above —
+# see module docstring).
+SENTENCE_TRANSFORMER_THRESHOLD = 0.75
 
 
 class ScoringDepsUnavailable(RuntimeError):
@@ -168,7 +194,15 @@ class Fact:
 
 
 class Embedder(Protocol):
-    """Embeds texts into L2-normalized row vectors, shape (n, d)."""
+    """Embeds texts into L2-normalized row vectors, shape (n, d).
+
+    ``default_threshold`` is the embedder's own calibrated match threshold
+    (see fact_coverage_calibration.py) — ``coverage``/``precision`` use it
+    when no explicit ``threshold`` is passed, so the pairing can't drift out
+    of sync when a caller swaps embedders.
+    """
+
+    default_threshold: float
 
     def embed(self, texts: list[str]) -> np.ndarray: ...
 
@@ -180,6 +214,8 @@ class TfidfCharNgramEmbedder:
     GT and candidate statements must be embedded in a single call to share a
     vector space (``coverage`` does this).
     """
+
+    default_threshold: float = DEFAULT_THRESHOLD
 
     def __init__(self, ngram_range: tuple[int, int] = (3, 5)) -> None:
         self.ngram_range = ngram_range
@@ -198,6 +234,54 @@ class TfidfCharNgramEmbedder:
         )
         matrix = vectorizer.fit_transform(texts)
         return np.asarray(matrix.todense())
+
+
+class SentenceTransformerEmbedder:
+    """Real embedding backend: a pinned sentence-transformers model.
+
+    Deterministic across runs for a fixed (model_name, revision, device) —
+    the model is pinned by revision so scores don't drift under a dependency
+    or model-repo upgrade. Imports ``sentence_transformers`` lazily so that
+    merely importing this module (or using ``TfidfCharNgramEmbedder``) never
+    requires the ``sentence-transformers``/``torch`` extra to be installed.
+
+    Install with the ``embeddings`` extra: ``pip install 'eb-verify[embeddings]'``.
+    """
+
+    DEFAULT_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+    # Pinned Hugging Face repo revision (commit SHA), not a mutable tag —
+    # see module docstring for why this module refuses to float on "main".
+    DEFAULT_MODEL_REVISION = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+    default_threshold: float = SENTENCE_TRANSFORMER_THRESHOLD
+
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL_NAME,
+        revision: str = DEFAULT_MODEL_REVISION,
+        *,
+        device: str = "cpu",
+    ) -> None:
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as e:
+            raise ImportError(
+                "SentenceTransformerEmbedder requires the 'sentence-transformers' "
+                "package. Install with: pip install 'eb-verify[embeddings]'"
+            ) from e
+        self.model_name = model_name
+        self.revision = revision
+        self._model = SentenceTransformer(model_name, revision=revision, device=device)
+
+    def embed(self, texts: list[str]) -> np.ndarray:
+        if not texts:
+            return np.zeros((0, 0))
+        emb = self._model.encode(
+            texts,
+            convert_to_numpy=True,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+        )
+        return np.asarray(emb)
 
 
 @dataclass(frozen=True)
@@ -250,15 +334,21 @@ def coverage(
     gt_facts: Sequence[Fact],
     candidate_facts: Sequence[Fact],
     embedder: Embedder | None = None,
-    threshold: float = DEFAULT_THRESHOLD,
+    threshold: float | None = None,
 ) -> CoverageResult:
     """Recall of GT facts by the candidate set.
 
     A GT fact is *recovered* if its max cosine similarity against the
     candidate statements is >= ``threshold``. Empty GT is vacuous success
     (recall 1.0); empty candidate with non-empty GT is total miss (0.0, with
-    per-fact provenance recording no match).
+    per-fact provenance recording no match). ``threshold`` defaults to the
+    resolved embedder's own ``default_threshold`` so it can't be paired with
+    the wrong embedder's calibration.
     """
+    if embedder is None:
+        embedder = TfidfCharNgramEmbedder()
+    if threshold is None:
+        threshold = embedder.default_threshold
     _validate_threshold(threshold)
     _validate_facts(gt_facts, "gt_facts")
     _validate_facts(candidate_facts, "candidate_facts")
@@ -274,7 +364,7 @@ def coverage(
 
     import numpy as np
 
-    emb = (embedder or TfidfCharNgramEmbedder()).embed(
+    emb = embedder.embed(
         [f.statement for f in gt_facts] + [f.statement for f in candidate_facts]
     )
     n_gt = len(gt_facts)
@@ -305,7 +395,7 @@ def precision(
     candidate_facts: Sequence[Fact],
     gt_facts: Sequence[Fact],
     embedder: Embedder | None = None,
-    threshold: float = DEFAULT_THRESHOLD,
+    threshold: float | None = None,
 ) -> CoverageResult:
     """Fraction of candidate facts grounded in GT (coverage in reverse).
 
