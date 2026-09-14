@@ -1,0 +1,167 @@
+{
+  "audit": "docker-cp package-dir bug silent-zero audit -- broader blast radius (extends EnterpriseBench-hktt)",
+  "parent_audit": "results/audit_docker_cp_silent_zeros/AUDIT.md (branch audit/hktt-docker-cp-silent-zeros @78cfcd2, unmerged)",
+  "bead": "EnterpriseBench-s4a2",
+  "fingerprint": "topo_order checkpoint: score==0.0 AND exit_code==1 => docker_cp_silent_zero (ModuleNotFoundError swallowed). score==0.0 AND exit_code==0 => genuine_guard_zero (real agent miss, not the bug). Identical to hktt's fingerprint; this audit reapplies it outside the two rescore_* dirs hktt scanned.",
+  "locations_scanned": [
+    "results/runs/ (main checkout -- the LIVE source for aggregate_mcp_clean.py's 'locked N=105' set and, via rglob, scripts/analyze_scores.py's score_analysis.json)",
+    "results/rescore_aq8e/, results/rescore_uu17/ (hktt's original scope -- rescanned for consistency)",
+    "results/rerun_pt0n/ (in-progress post-fix rerun)",
+    "results/mcp_lift_study/",
+    "/home/ds/projects/EnterpriseBench-9awn/results/rerun_9awn/ (baseline arm feeding recompute_headline_aq8e.py's uu17_mixed)"
+  ],
+  "results_runs_findings": {
+    "note": "17 distinct docker_cp_silent_zero result files under results/runs/, spanning 8 of the 11 refactor-orchestration-family tasks. 16 are read live by aggregate_mcp_clean.py (task_dir/<mode>/results.json) and therefore feed recompute_headline_aq8e.py's 'old_locked' headline directly. The 17th is a March pre-mode-split flat file for refactor-orch-003 that aggregate_mcp_clean.py ignores (it only reads the mode-subdir form) -- but that same flat file IS consumed by scripts/analyze_scores.py (rglob('results.json')), whose dedup keeps the higher normalized_score rather than the newer file, so the buggy March score (0.6) currently wins over the corrected June rerun (0.5) in the live results/score_analysis.json (verified: per_task[92] for refactor-orch-003 shows baseline=0.6). This is a second, independent defect in analyze_scores.py's dedup rule, not the docker-cp bug itself, but it means the docker-cp contamination reaches score_analysis.json -- the file the paper cites for headline numbers -- through a path hktt's audit never considered.",
+    "affected_cells_live_amc": [
+      {
+        "task_id": "refactor-orch-001",
+        "mode": "mcp_only"
+      },
+      {
+        "task_id": "refactor-orch-002",
+        "mode": "hybrid"
+      },
+      {
+        "task_id": "refactor-orch-003",
+        "mode": "hybrid"
+      },
+      {
+        "task_id": "refactor-orch-004",
+        "mode": "baseline"
+      },
+      {
+        "task_id": "refactor-orch-006",
+        "mode": "mcp_only"
+      },
+      {
+        "task_id": "refactor-orch-007",
+        "mode": "baseline"
+      },
+      {
+        "task_id": "refactor-orch-007",
+        "mode": "hybrid"
+      },
+      {
+        "task_id": "refactor-orch-007",
+        "mode": "mcp_only"
+      },
+      {
+        "task_id": "refactor-orch-008",
+        "mode": "hybrid"
+      },
+      {
+        "task_id": "refactor-orch-008",
+        "mode": "mcp_only"
+      },
+      {
+        "task_id": "refactor-orchestration-tri-babel-001",
+        "mode": "baseline"
+      },
+      {
+        "task_id": "refactor-orchestration-tri-babel-001",
+        "mode": "hybrid"
+      },
+      {
+        "task_id": "refactor-orchestration-tri-babel-001",
+        "mode": "mcp_only"
+      },
+      {
+        "task_id": "refactor-orchestration-tri-tokio-001",
+        "mode": "baseline"
+      },
+      {
+        "task_id": "refactor-orchestration-tri-tokio-001",
+        "mode": "hybrid"
+      },
+      {
+        "task_id": "refactor-orchestration-tri-tokio-001",
+        "mode": "mcp_only"
+      }
+    ],
+    "affected_cell_dead_for_amc_but_live_for_analyze_scores": [
+      {
+        "task_id": "refactor-orch-003",
+        "mode": "baseline",
+        "file": "results/runs/refactor-orch-003/results.json",
+        "note": "flat legacy file (2026-03-31); superseded on disk by results/runs/refactor-orch-003/baseline/results.json (2026-06-04, genuine_guard_zero, score 0.5) but analyze_scores.py's rglob+highest-score dedup still selects this stale 0.6 file"
+      }
+    ],
+    "confirmed_clean_tasks": [
+      "refactor-orch-005 (all 3 modes genuine_guard_zero, no bug)"
+    ],
+    "unrelated_anomaly": {
+      "task_id": "refactor-orchestration-tri-spring-001",
+      "modes": [
+        "hybrid",
+        "mcp_only"
+      ],
+      "exit_code": 127,
+      "note": "different failure signature (exit 127 = command-not-found, not ModuleNotFoundError) -- NOT the docker-cp bug. Out of scope for this audit; worth its own investigation."
+    }
+  },
+  "rescore_aq8e_uu17_findings": {
+    "note": "Rescanned hktt's original scope for consistency. Result: unchanged, exactly the same 5 instances hktt found.",
+    "count": 5
+  },
+  "rerun_9awn_findings": {
+    "note": "The bead described only refactor-orch-{001,007} as affected here; direct rescan of all 6 present baseline-arm result files finds 5 affected (001,002,003,004,007) and only 1 clean (008). This baseline arm is read live and UNCONDITIONALLY TRUSTED by recompute_headline_aq8e.py's rerun_baseline dict whenever phase=='complete' and success==True -- it does not check checkpoint exit_code, so all 5 buggy task_scores currently flow uncorrected into the 'uu17_mixed' headline (the accepted/closed recompute).",
+    "affected_cells": [
+      {
+        "task_id": "refactor-orch-001",
+        "mode": "baseline"
+      },
+      {
+        "task_id": "refactor-orch-002",
+        "mode": "baseline"
+      },
+      {
+        "task_id": "refactor-orch-003",
+        "mode": "baseline"
+      },
+      {
+        "task_id": "refactor-orch-004",
+        "mode": "baseline"
+      },
+      {
+        "task_id": "refactor-orch-007",
+        "mode": "baseline"
+      }
+    ],
+    "genuine_guard_zero_cells": [
+      {
+        "task_id": "refactor-orch-008",
+        "mode": "baseline",
+        "exit_code": 0,
+        "note": "the only clean cell among the 6 rerun_9awn baseline-arm files scanned"
+      }
+    ]
+  },
+  "rerun_pt0n_findings": {
+    "note": "pt0n is the in-progress post-fix rerun. Currently covers only 3 cells, all baseline mode, all now genuine_guard_zero (exit_code=0) -- confirms the 07-04 fix resolves the ModuleNotFoundError. IMPORTANT SCOPE GAP: pt0n's 3 cells (001/004/007 baseline) do not fully overlap hktt's original 5 (which were aq8e/004+007 baseline AND uu17/001+007+008 mcp_only) -- it misses all 3 uu17 mcp_only cells entirely, and covers none of the 16 newly-found results/runs/ cells or the 5 newly-found rerun_9awn cells.",
+    "cells_rerun": [
+      {
+        "task_id": "refactor-orch-001",
+        "mode": "baseline",
+        "post_fix_result": "genuine_guard_zero (exit_code=0)"
+      },
+      {
+        "task_id": "refactor-orch-004",
+        "mode": "baseline",
+        "post_fix_result": "genuine_guard_zero (exit_code=0)"
+      },
+      {
+        "task_id": "refactor-orch-007",
+        "mode": "baseline",
+        "post_fix_result": "genuine_guard_zero (exit_code=0)"
+      }
+    ],
+    "caveat": "post-fix topo_order is STILL 0.0 for all 3 -- the fix stops the infra crash but does not by itself recover a nonzero score; each cell needs the agent's REFACTOR_PLAN.md to actually be present/valid for topo_order to score >0."
+  },
+  "total_distinct_docker_cp_silent_zero_cells_all_locations": 27,
+  "breakdown": {
+    "rescore_aq8e_uu17": 5,
+    "results_runs_live_amc": 16,
+    "results_runs_dead_for_amc_live_for_analyze_scores": 1,
+    "rerun_9awn_baseline_arm": 5
+  }
+}
