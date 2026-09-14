@@ -501,7 +501,10 @@ def _result_object(content: str) -> dict[str, Any] | None:
 
     try:
         whole = json.loads(content)
-    except ValueError:  # JSONDecodeError is a ValueError subclass
+    except (ValueError, RecursionError):
+        # JSONDecodeError is a ValueError subclass. A 4300-digit int literal
+        # raises a bare ValueError (CPython int-str guard) and a deeply-nested
+        # payload raises RecursionError; treat both as unreadable, not a crash.
         whole = None
 
     if isinstance(whole, dict) and isinstance(whole.get("modelUsage"), dict):
@@ -513,7 +516,9 @@ def _result_object(content: str) -> dict[str, Any] | None:
             continue
         try:
             obj = json.loads(line)
-        except ValueError:  # JSONDecodeError is a ValueError subclass
+        except (ValueError, RecursionError):
+            # JSONDecodeError is a ValueError subclass; a deeply-nested line
+            # raises RecursionError. Skip both — the next candidate line wins.
             continue
         if isinstance(obj, dict) and isinstance(obj.get("modelUsage"), dict):
             return obj

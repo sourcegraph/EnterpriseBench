@@ -132,6 +132,35 @@ def test_retrieved_files_deeply_nested_line_skipped(tmp_path: Path) -> None:
     assert retrieved_files_from_trace(trace) == [WORKER]
 
 
+def test_retrieved_files_stringified_tool_input_recursionerror(tmp_path: Path) -> None:
+    # A tool_use whose 'input' is a *stringified* deeply-nested payload makes the
+    # inner json.loads raise RecursionError (a RuntimeError, NOT a ValueError
+    # subclass). That parse runs OUTSIDE the widened per-line try/except, so
+    # uncaught it aborts the whole trace scan, not one line. The valid Read that
+    # follows must still be captured.
+    nested = "[" * 10_000 + "]" * 10_000
+    trace = tmp_path / "agent_trace.jsonl"
+    trace.write_text(
+        _assistant_tool_use("t1", "Read", nested) + "\n"
+        + _assistant_tool_use("t2", "Read", {"file_path": WORKER}) + "\n"
+    )
+    assert retrieved_files_from_trace(trace) == [WORKER]
+
+
+def test_retrieved_files_stringified_tool_input_bigint(tmp_path: Path) -> None:
+    # A stringified tool_input carrying a 4300+-digit int literal makes json.loads
+    # raise a *bare* ValueError (CPython int-str conversion guard), NOT a
+    # JSONDecodeError. The site caught only JSONDecodeError, so this escaped the
+    # scan entirely. It must be treated as malformed and skipped.
+    bigint_input = '{"file_path": ' + "1" * 4400 + "}"
+    trace = tmp_path / "agent_trace.jsonl"
+    trace.write_text(
+        _assistant_tool_use("t1", "Read", bigint_input) + "\n"
+        + _assistant_tool_use("t2", "Read", {"file_path": WORKER}) + "\n"
+    )
+    assert retrieved_files_from_trace(trace) == [WORKER]
+
+
 def test_retrieved_files_parses_bash_read_commands(tmp_path: Path) -> None:
     trace = _write_trace(
         tmp_path / "agent_trace.jsonl",
