@@ -21,8 +21,14 @@ scoring = [
     "numpy>=1.24",
     "scikit-learn>=1.3",
 ]
+# lib/eb_metrics imports codeprobe.analysis.trace_quality (PyPI package, source
+# at github.com/sourcegraph/codeprobe). Kept out of [project] dependencies so a
+# verifier-only sandbox install stays small.
+metrics = [
+    "codeprobe>=0.14",
+]
 dev = [
-    "eb-verify[scoring]",
+    "eb-verify[scoring,metrics]",
     "pytest>=7.0",
     "pytest-cov>=4.0",
     # scripts/generate_charts.py, covered by tests/test_generate_charts.py.

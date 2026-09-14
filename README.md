@@ -8,9 +8,9 @@ Existing benchmarks (SWE-bench, ITBench, DevOps-Gym) test agents in isolated, si
 
 ## Key Properties
 
-- **112 tasks** across 10 task types, organized into 7 enterprise workflow suites
+- **141 tasks** across 10 task types, organized into 7 enterprise workflow suites
 - **Real OSS codebases only** — no synthetic or toy repositories
-- **Multi-repo by default** — 51% of tasks span 2-5 repos connected by real dependency chains
+- **Multi-repo by default** — 64% of tasks span 2-5 repos connected by real dependency chains
 - **Diverse artifacts** — code patches, incident reports, runbooks, configs, security assessments, call graphs
 - **Checkpoint-based scoring** — 2-5 graduated checkpoints per task for partial credit
 - **Tool-access as a controlled variable** — baseline, MCP-only, and hybrid modes
@@ -20,12 +20,12 @@ Existing benchmarks (SWE-bench, ITBench, DevOps-Gym) test agents in isolated, si
 
 | Suite                 | Tasks | Example Work                                                      |
 | --------------------- | ----: | ----------------------------------------------------------------- |
-| Dependency Management |    27 | Trace breaking changes across `grpc-go` -> `etcd` -> `kubernetes` |
-| Customer Escalation   |    24 | Map error messages to root causes across service boundaries       |
+| Dependency Management |    38 | Trace breaking changes across `grpc-go` -> `etcd` -> `kubernetes` |
+| Customer Escalation   |    31 | Map error messages to root causes across service boundaries       |
+| Incident Response     |    22 | Investigate alerts spanning multiple interconnected services      |
 | Technical Debt        |    19 | Orchestrate refactors and dead code removal across repos          |
 | Feature Delivery      |    18 | Assess schema evolution impact across monorepo packages           |
-| Incident Response     |    12 | Investigate alerts spanning multiple interconnected services      |
-| Platform Engineering  |    10 | Detect configuration drift between IaC definitions and live state |
+| Platform Engineering  |    11 | Detect configuration drift between IaC definitions and live state |
 | Security Operations   |     2 | Assess vulnerabilities across dependency trees                    |
 
 ## Task Types
@@ -47,18 +47,20 @@ Existing benchmarks (SWE-bench, ITBench, DevOps-Gym) test agents in isolated, si
 
 | Stratum                | Share | Tasks |
 | ---------------------- | ----: | ----: |
-| Calibration            | 12.5% |    14 |
-| Large single-repo      | 25.9% |    29 |
-| Dual-repo              | 25.0% |    28 |
-| Tri-repo               | 14.3% |    16 |
-| Multi-repo (4-5)       | 11.6% |    13 |
-| Monorepo cross-package | 10.7% |    12 |
+| Calibration            |  9.9% |    14 |
+| Large single-repo      | 17.7% |    25 |
+| Dual-repo              | 39.0% |    55 |
+| Tri-repo               | 14.9% |    21 |
+| Multi-repo (4-5)       |  9.9% |    14 |
+| Monorepo cross-package |  8.5% |    12 |
+
+Counts as of 2026-09-14. Regenerate with `make verify-mix`, which also reports that the Go ecosystem share of multi-repo tasks (49%) is above the 40% target.
 
 ## Repository Structure
 
 ```
 EnterpriseBench/
-├── benchmarks/              # 112 active task definitions by suite
+├── benchmarks/              # 141 active task definitions by suite
 │   ├── dependency_management/
 │   ├── customer_escalation/
 │   ├── feature_delivery/
@@ -66,7 +68,7 @@ EnterpriseBench/
 │   ├── incident_response/
 │   ├── platform_engineering/
 │   ├── security_operations/
-│   └── _archived/           # 28 retired tasks (preserved for reference)
+│   └── _archived/           # 31 retired tasks (preserved for reference)
 ├── lib/
 │   └── eb_verify/           # Centralized verification library
 │       └── plugins/         # 9 artifact validators

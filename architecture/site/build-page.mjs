@@ -1,6 +1,6 @@
 // Model-driven landing-page generator for LikeC4 architecture sites.
 // Reads a model JSON (`likec4 export json`) + the exported figures dir, and
-// emits a static index.html styled by styles.css (the sjarmak.ai design system).
+// emits a static index.html styled by styles.css (a small static design system).
 //
 // Usage:
 //   node build-page.mjs --model model.json --figures _site/figures \
@@ -151,9 +151,8 @@ const html = `<!doctype html>
       <div class="container site-header__inner">
         <a class="site-header__brand" href="#top">${esc(brand)}</a>
         <nav class="site-header__nav" aria-label="Primary">
-          <a class="nav-extra" href="https://sjarmak.ai">sjarmak.ai</a>
           <a href="${esc(explore)}">Explorer</a>
-          <a class="nav-extra" href="https://github.com/sjarmak/${esc(repo)}">GitHub</a>
+          <a class="nav-extra" href="https://github.com/sourcegraph/${esc(repo)}">GitHub</a>
           <button class="theme-toggle" type="button" aria-label="Toggle color theme" data-theme-toggle>
             <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
             <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" /></svg>
@@ -170,7 +169,7 @@ const html = `<!doctype html>
           <p class="lead">${esc(heroLead)}</p>
           <div class="cluster">
             <a class="btn" href="${esc(explore)}">Open the interactive explorer →</a>
-            <a class="btn btn--ghost" href="https://github.com/sjarmak/${esc(repo)}">View on GitHub</a>
+            <a class="btn btn--ghost" href="https://github.com/sourcegraph/${esc(repo)}">View on GitHub</a>
           </div>
           <div class="legend" aria-label="Delivery-state legend">
             <span><i class="swatch" style="background: var(--tag-built)"></i> built</span>
@@ -198,8 +197,7 @@ ${sections.join("\n")}
     <footer class="site-footer">
       <nav class="container" aria-label="Elsewhere">
         <ul>
-          <li><a href="https://sjarmak.ai">sjarmak.ai</a></li>
-          <li><a href="https://github.com/sjarmak/${esc(repo)}">Repository</a></li>
+          <li><a href="https://github.com/sourcegraph/${esc(repo)}">Repository</a></li>
           <li><a href="${esc(explore)}">Interactive explorer</a></li>
           <li><a href="https://likec4.dev">Built with LikeC4</a></li>
         </ul>
