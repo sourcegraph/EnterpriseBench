@@ -137,17 +137,19 @@ class TestValidationResult:
 # ---------------------------------------------------------------------------
 
 class TestConfigValidator:
-    def test_no_artifacts_passes(self, tmp_path):
-        workspace = tmp_path / "ws"
-        workspace.mkdir()
+    @pytest.fixture
+    def workspace(self, tmp_path):
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        return ws
+
+    def test_no_artifacts_passes(self, workspace):
         validator = ConfigValidator()
         result = validator.validate(workspace)
         assert result.valid is True
         assert "No config" in result.detail
 
-    def test_valid_json_in_output_dir(self, tmp_path):
-        workspace = tmp_path / "ws"
-        workspace.mkdir()
+    def test_valid_json_in_output_dir(self, workspace):
         output = workspace / "output"
         output.mkdir()
         (output / "config.json").write_text('{"key": "value"}')
@@ -156,9 +158,7 @@ class TestConfigValidator:
         result = validator.validate(workspace)
         assert result.valid is True
 
-    def test_invalid_json_fails(self, tmp_path):
-        workspace = tmp_path / "ws"
-        workspace.mkdir()
+    def test_invalid_json_fails(self, workspace):
         output = workspace / "output"
         output.mkdir()
         (output / "config.json").write_text("{bad json:::}")
@@ -168,9 +168,7 @@ class TestConfigValidator:
         assert result.valid is False
         assert "config.json" in result.detail
 
-    def test_valid_json_in_artifacts_dir(self, tmp_path):
-        workspace = tmp_path / "ws"
-        workspace.mkdir()
+    def test_valid_json_in_artifacts_dir(self, workspace):
         arts = workspace / "artifacts"
         arts.mkdir()
         (arts / "settings.json").write_text('{"a": 1}')
@@ -178,6 +176,58 @@ class TestConfigValidator:
         validator = ConfigValidator()
         result = validator.validate(workspace)
         assert result.valid is True
+
+    def test_invalid_json_at_workspace_root_is_checked(self, workspace):
+        # Regression: only the first CONFIG_GLOBS pattern (**/*.yaml) used to be
+        # checked at the workspace-root tier, so a malformed top-level .json
+        # (or .yml/.toml/.hcl) was silently never validated.
+        (workspace / "bad.json").write_text("{bad json:::}")
+
+        validator = ConfigValidator()
+        result = validator.validate(workspace)
+        assert result.valid is False
+        assert "bad.json" in result.detail
+
+    def test_invalid_yaml_and_toml_at_workspace_root_are_checked(self, workspace):
+        # The original bug meant only the first pattern (**/*.yaml) ever ran at
+        # workspace root; cover .yml and .toml too so the fix isn't proven for
+        # .json alone.
+        (workspace / "bad.yml").write_text("key: [unclosed\n")
+        (workspace / "bad.toml").write_bytes(b"[section\nbad toml [[[")
+
+        validator = ConfigValidator()
+        result = validator.validate(workspace)
+        assert result.valid is False
+        assert "bad.yml" in result.detail
+        assert "bad.toml" in result.detail
+
+    def test_valid_json_in_nested_output_subdir(self, workspace):
+        # Guards the recursive/non-recursive split this fix introduces:
+        # output/ and artifacts/ must keep scanning recursively, unlike the
+        # workspace-root tier.
+        nested = workspace / "output" / "nested" / "deep"
+        nested.mkdir(parents=True)
+        (nested / "config.json").write_text('{"a": 1}')
+
+        validator = ConfigValidator()
+        result = validator.validate(workspace)
+        assert result.valid is True
+        assert "Validated 1 config files" in result.detail
+
+    def test_workspace_root_does_not_recurse_into_cloned_repos(self, workspace):
+        # EnterpriseBench sandboxes clone full OSS repos as direct children of
+        # workspace (see docs/TASK_AUTHORING_GUIDE.md). The workspace-root tier
+        # must only check files directly in workspace, not walk into those
+        # repos — otherwise a cloned repo's own malformed test fixtures would
+        # cause spurious validation failures unrelated to the agent's work.
+        nested = workspace / "some-cloned-repo" / "testdata"
+        nested.mkdir(parents=True)
+        (nested / "bad.json").write_text("{intentionally malformed for repo's own tests")
+
+        validator = ConfigValidator()
+        result = validator.validate(workspace)
+        assert result.valid is True
+        assert "No config" in result.detail
 
     def test_nonexistent_workspace(self, tmp_path):
         validator = ConfigValidator()
