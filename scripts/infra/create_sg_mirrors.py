@@ -46,6 +46,9 @@ from mirror_naming import GITHUB_REPO_NAME_RE, ORG, derive_mirror_name, is_hex_r
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MANIFEST_DIR = REPO_ROOT / "configs" / "runs"
 
+sys.path.insert(0, str(REPO_ROOT / "scripts" / "lib"))
+from validation import validate_repo_entry  # noqa: E402
+
 
 # ═══════════════════════════════════════════════════════════════
 #  TASK.TOML PARSING
@@ -211,6 +214,7 @@ def extract_mirrors_from_task(task_data: dict, task_file: Path) -> list[dict]:
         rev = repo.get("rev", "")
         if not url or not rev:
             continue
+        validate_repo_entry(repo)
 
         # Normalize URL: strip https://, trailing .git
         upstream = url.replace("https://", "").replace("http://", "").rstrip("/")
