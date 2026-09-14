@@ -56,6 +56,16 @@ LIB_DIR="$(cd "$SCRIPT_DIR/../../../../lib" 2>/dev/null && pwd || echo "")"
 # eb_verify four levels up (a -d check would wave through) must not shadow
 # the PYTHONPATH the harness exports. See EnterpriseBench-4du6t.
 [[ -f "$LIB_DIR/eb_verify/plugins/path_match.py" ]] || LIB_DIR=""
+# ...and only when the harness told us where lib/ is at all. The -f guard above
+# authenticates PRESENCE, not CONTENT: with PYTHONPATH set, the guessed dir is
+# appended BEHIND the authoritative lib and cannot win. With PYTHONPATH empty it
+# IS the import source, so an eb_verify planted four levels up would be imported
+# unchallenged and could forge a passing verdict. Fail closed there; a human
+# running a check by hand outside the harness opts back in explicitly.
+# See EnterpriseBench-0idmk.
+if [[ -z "${PYTHONPATH:-}" && "${EB_ALLOW_GUESSED_LIB:-}" != "1" ]]; then
+    LIB_DIR=""
+fi
 
 python3 - "$LIB_DIR" <<'PYEOF'
 import json, os, sys

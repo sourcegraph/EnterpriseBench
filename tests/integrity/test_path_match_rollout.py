@@ -109,13 +109,23 @@ def _plant(
     return planted
 
 
-def _run_planted(planted: Path, tmp_path: Path) -> subprocess.CompletedProcess:
+def _run_planted(
+    planted: Path,
+    tmp_path: Path,
+    *,
+    answer: dict | None = None,
+    with_pythonpath: bool = True,
+) -> subprocess.CompletedProcess:
     """Drive *planted* far enough to reach the eb_verify import.
 
     The check short-circuits before the import unless ground_truth.json (in
     TASK_DIR) and agent_output/answer.json (in WORKSPACE) both exist. Minimal
     valid contents let a healthy check run clean through to a real score, so any
     VERIFIER_INFRA_ERROR / crash the twin observes is the shadow, not the gate.
+
+    ``with_pythonpath=False`` drops the harness lib from the environment — the
+    regime where the guessed dir is not a loser appended behind the real lib but
+    the only import source there is.
     """
     task_dir = planted.parent.parent
     (task_dir / "ground_truth.json").write_text(
@@ -124,17 +134,19 @@ def _run_planted(planted: Path, tmp_path: Path) -> subprocess.CompletedProcess:
     workspace = tmp_path / "workspace"
     (workspace / "agent_output").mkdir(parents=True)
     (workspace / "agent_output" / "answer.json").write_text(
-        json.dumps({"source_files": ["app/main.py"]})
+        json.dumps({"source_files": ["app/main.py"]} if answer is None else answer)
     )
+    env = {
+        "PATH": "/usr/bin:/bin",
+        "WORKSPACE": str(workspace),
+        "TASK_DIR": str(task_dir),
+    }
+    if with_pythonpath:
+        # What the harness really exports as the authoritative lib.
+        env["PYTHONPATH"] = str(REPO_ROOT / "lib")
     return subprocess.run(
         ["bash", str(planted)],
-        env={
-            "PATH": "/usr/bin:/bin",
-            "WORKSPACE": str(workspace),
-            "TASK_DIR": str(task_dir),
-            # What the harness really exports as the authoritative lib.
-            "PYTHONPATH": str(REPO_ROOT / "lib"),
-        },
+        env=env,
         capture_output=True,
         text=True,
         timeout=60,
@@ -201,4 +213,75 @@ def test_the_prefix_pattern_would_shadow_non_vacuity(tmp_path: Path) -> None:
     assert _shadow_reason(proc) is not None, (
         "the pre-fix insert(0) pattern did NOT shadow the booby-trapped stale "
         "sibling — the stale-sibling assertions above are vacuous."
+    )
+
+
+# --- Empty PYTHONPATH: the guessed dir is the ONLY import source -------------
+#
+# EnterpriseBench-0idmk. The -f module guard authenticates PRESENCE, not
+# CONTENT. With PYTHONPATH set the guessed dir loses to the real lib appended
+# ahead of it, so a planted module is inert. With PYTHONPATH empty it is the
+# import source, and a planted path_match returning 1.0 forges a pass off an
+# empty answer. Fail closed instead: no authoritative lib, no verdict but
+# VERIFIER_INFRA_ERROR.
+
+# Not stale, not broken — a working module that grades every answer as perfect.
+FORGING_PATH_MATCH = (
+    "def extract_claimed_paths(answer):\n"
+    "    return ['app/main.py']\n"
+    "\n"
+    "def path_match_score(claimed, required, sufficient=None):\n"
+    "    return 1.0\n"
+)
+
+# The block under test, as each converted check carries it.
+GUESSED_LIB_GUARD = (
+    'if [[ -z "${PYTHONPATH:-}" && "${EB_ALLOW_GUESSED_LIB:-}" != "1" ]]; then\n'
+    '    LIB_DIR=""\n'
+    "fi\n"
+)
+
+
+@pytest.mark.parametrize("script", CONVERTED, ids=_ids)
+def test_guessed_lib_is_gated_on_the_harness_pythonpath(script: Path) -> None:
+    assert GUESSED_LIB_GUARD in script.read_text(), (
+        f"{script.relative_to(REPO_ROOT)} trusts its guessed lib/ even when no "
+        "harness PYTHONPATH is set, where a planted module cannot be outranked."
+    )
+
+
+@pytest.mark.parametrize("script", CONVERTED, ids=_ids)
+def test_an_empty_pythonpath_fails_closed_not_forged(script: Path, tmp_path: Path) -> None:
+    """No authoritative lib + a forging module planted => infra error, not 1.0."""
+    planted = _plant(script, tmp_path, FORGING_PATH_MATCH)
+    # An EMPTY answer: any score above 0.0 can only have come from the forger.
+    proc = _run_planted(planted, tmp_path, answer={}, with_pythonpath=False)
+
+    assert proc.stdout.strip(), (
+        f"no verdict at all (rc={proc.returncode} stderr={proc.stderr!r}) — "
+        "fail-closed still has to emit VERIFIER_INFRA_ERROR so scorer_guard can "
+        "route the re-run."
+    )
+    verdict = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert "VERIFIER_INFRA_ERROR" in verdict["detail"], (
+        f"{script.relative_to(REPO_ROOT)} imported an unauthenticated planted "
+        f"path_match and returned {verdict!r} for an empty answer."
+    )
+    assert verdict["score"] == 0.0 and verdict["passed"] is False
+
+
+def test_trusting_the_guessed_lib_would_forge_non_vacuity(tmp_path: Path) -> None:
+    """Prove the test bites: without the gate, the planted module forges a pass."""
+    script = CONVERTED[0]
+    content = script.read_text()
+    vulnerable = content.replace(GUESSED_LIB_GUARD, "")
+    assert vulnerable != content, "could not synthesise the ungated pattern"
+
+    planted = _plant(script, tmp_path, FORGING_PATH_MATCH, content=vulnerable)
+    proc = _run_planted(planted, tmp_path, answer={}, with_pythonpath=False)
+
+    verdict = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert verdict["score"] == 1.0 and verdict["passed"] is True, (
+        "the ungated pattern did NOT forge a pass off an empty answer — the "
+        f"fail-closed assertions above are vacuous (got {verdict!r})."
     )
