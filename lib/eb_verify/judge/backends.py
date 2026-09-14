@@ -207,6 +207,10 @@ class ClaudeCodeBackend:
             envelope = json.loads(result.stdout)
         except json.JSONDecodeError as exc:
             raise JudgeBackendError(f"Failed to parse claude CLI output: {exc}")
+        if not isinstance(envelope, dict):
+            raise JudgeBackendError(
+                f"Malformed claude CLI envelope: {result.stdout[:200]}"
+            )
 
         if envelope.get("is_error"):
             error_msg = envelope.get("result", "unknown error")

@@ -397,12 +397,19 @@ class TestClaudeCodeBackend:
             with pytest.raises(JudgeBackendError, match="empty result"):
                 backend._raw_call("sys", "user")
 
+    @pytest.mark.parametrize(
+        "stdout,match",
+        [
+            ("not json", "parse claude CLI output"),
+            ("true", "Malformed claude CLI envelope"),
+        ],
+    )
     @patch("eb_verify.judge.backends.shutil.which", return_value="/usr/bin/claude")
-    def test_raw_call_unparseable_stdout_raises(self, _which):
+    def test_raw_call_malformed_stdout_raises(self, _which, stdout, match):
         backend = ClaudeCodeBackend(model="haiku")
-        completed = subprocess.CompletedProcess([], 0, stdout="not json", stderr="")
+        completed = subprocess.CompletedProcess([], 0, stdout=stdout, stderr="")
         with patch("eb_verify.judge.backends.subprocess.run", return_value=completed):
-            with pytest.raises(JudgeBackendError, match="parse claude CLI output"):
+            with pytest.raises(JudgeBackendError, match=match):
                 backend._raw_call("sys", "user")
 
     @patch("eb_verify.judge.backends.time.sleep")
