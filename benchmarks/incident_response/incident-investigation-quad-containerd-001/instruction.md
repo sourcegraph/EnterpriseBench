@@ -22,20 +22,19 @@ Pods using the `RuntimeDefault` seccomp profile continue to work correctly. Only
 
 ## What We Know
 
-- The custom seccomp profiles were authored against kernel 5.10 and have not been updated for newer syscalls (`clone3`, `close_range`, `openat2`, `faccessat2`)
-- The cluster nodes are running kernel 6.1, which uses these newer syscalls in glibc
-- The CRI seccomp flow is: kubelet SecurityContext conversion -> containerd CRI plugin -> OCI runtime spec -> runc BPF filter
-- moby's default seccomp profile includes these newer syscalls; the custom profiles do not
+- The node kernel was upgraded (5.10 -> 6.1) in the same maintenance window as the container runtime upgrade.
+- The custom seccomp profiles predate this window and were not revisited as part of it.
+- Only pods with a custom profile are affected; pods left on the platform default are unaffected.
 
 ## Your Task
 
-Investigate the full seccomp profile handling chain across all four repositories to determine:
+The failure spans four repositories: `kubernetes` (kubelet), `containerd`, `runc`, and `moby`. Read the actual code in each — do not rely on general seccomp/CRI knowledge — and determine, citing the specific file(s) and function(s) you find in each repo:
 
-1. Where and how kubelet converts pod-level seccomp profiles into CRI requests
-2. How containerd's CRI plugin maps the seccomp profile into the OCI runtime specification
-3. How runc's libcontainer generates the BPF seccomp filter and handles unrecognized syscalls
-4. How moby's default seccomp profile differs from the failing custom profiles
-5. The complete error propagation path from runc filter failure back to the user-visible kubelet error
+1. Where and how kubelet converts a pod's seccomp profile into the request it hands to the container runtime.
+2. Where the container runtime maps that request into the on-disk runtime spec the low-level OCI runtime consumes.
+3. Where the low-level OCI runtime turns that spec into an enforced syscall filter, and what it does with a syscall the filter doesn't recognize.
+4. What the platform's own default profile permits that the failing custom profile does not, and why that particular gap matters given the kernel upgrade.
+5. The complete failure path, hop by hop, from the low-level filter decision back to the error the user sees.
 
 ## Deliverable
 

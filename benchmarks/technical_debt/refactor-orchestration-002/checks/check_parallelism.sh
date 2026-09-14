@@ -34,9 +34,17 @@ graph_nodes = set(dep_graph.keys())
 # Look for parallel annotations in the answer (e.g., 'parallel:', 'concurrent:', 'independent:')
 parallel_section = re.findall(r'(?:parallel|concurrent|independent|simultaneously)[:\s]*([^\n]+(?:\n\s*[-*]\s*[^\n]+)*)', answer, re.IGNORECASE)
 
+grounded = bool(graph_nodes) and all(node.lower() in answer.lower() for node in graph_nodes)
+
 if not parallel_section and not gt_parallel:
-    # No parallelism expected and none claimed
-    print(json.dumps({'score': 1.0, 'passed': True, 'reason': 'No parallelism expected or claimed'}))
+    # No parallelism claimed and none expected — but this must not reward a
+    # blank/irrelevant report. Require the plan to actually ground both
+    # dependency-graph repos (spf13/cobra, kubernetes/kubernetes) by name, not
+    # just be silent on parallelism.
+    if grounded:
+        print(json.dumps({'score': 1.0, 'passed': True, 'reason': 'No parallelism expected or claimed, and plan grounds both dependency-graph repos'}))
+    else:
+        print(json.dumps({'score': 0.0, 'passed': False, 'reason': 'Report does not ground the dependency-graph repos (spf13/cobra, kubernetes/kubernetes) needed to justify no-parallelism'}))
 elif not parallel_section and gt_parallel:
     # Parallelism exists but agent did not identify any
     print(json.dumps({'score': 0.2, 'passed': False, 'reason': 'Agent did not identify parallelizable steps'}))

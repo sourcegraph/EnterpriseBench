@@ -2,29 +2,28 @@
 
 ## Context
 
-grpc-ecosystem/go-grpc-middleware v1 has been archived. The removal requires
-a multi-step cascade:
-
-1. etcd migrates logging to middleware v2 (PR #20420, merged 2025-08-07)
-2. etcd removes v1 dependency entirely (PR #21295, merged 2026-02-12)
-3. k8s drops go-grpc-prometheus which depended on middleware v1
-   (PR #135538, merged 2025-12-18)
-
-Complications:
-- v1 and v2 have incompatible APIs
-- go-grpc-prometheus is a separate archived dependency
-- Some functionality must be reimplemented, not just version-bumped
+grpc-ecosystem/go-grpc-middleware v1 has been archived. Removing it cleanly
+is not a single version bump: v1 and v2 have incompatible interceptor APIs,
+some functionality has no direct v2 equivalent and must be reimplemented
+rather than swapped in, and the library is consumed both directly and
+transitively (through other archived middleware packages) by downstream
+services. The removal has to happen as an ordered, multi-repo cascade —
+some consumers can move first, others must wait until an upstream consumer
+has cleared the way.
 
 ## Task
 
-Given these repos at their pre-removal state, produce a topologically sorted
-execution plan.
+Given these repos at their pre-removal state, investigate how each one
+actually uses go-grpc-middleware v1 (direct import, transitive dependency,
+which interceptors/features, vendored copies, etc.), determine every
+component that has to change, and produce a topologically sorted execution
+plan for removing the archived dependency across all of them.
 
 ## Repos in Workspace
 
-- `/workspace/go-grpc-middleware/` — go-grpc-middleware v1.4.0 (archived)
-- `/workspace/etcd/` — etcd v3.5.17 (still depends on v1)
-- `/workspace/kubernetes/` — Kubernetes v1.33.0 (depends on go-grpc-prometheus)
+- `/workspace/go-grpc-middleware/` — go-grpc-middleware v1.4.0 (archived upstream)
+- `/workspace/etcd/` — etcd v3.5.17
+- `/workspace/kubernetes/` — Kubernetes v1.33.0
 
 ## Expected Output
 
@@ -32,12 +31,6 @@ Write `/workspace/REFACTOR_PLAN.md` containing:
 
 1. Numbered list of changes in order
 2. Dependency graph
-3. Migration strategy per component
+3. Migration strategy per component (v2 update vs. reimplement vs. remove)
 4. Parallelization annotations
 5. Risk assessment
-
-## Reference
-
-- etcd-io/etcd PR #20420: Migrate grpc-logging to grpc-middleware v2
-- etcd-io/etcd PR #21295: Remove go-grpc-middleware dependency
-- kubernetes/kubernetes PR #135538: Drop go-grpc-prometheus

@@ -9,8 +9,11 @@ fi
 
 FOUND=0
 TOTAL=2
-if grep -qiE 'spring.boot|spring-boot' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'dropwizard' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# The actual module/manifest that directly declares the jackson-databind
+# dependency in each framework repo -- not just the framework's name (which
+# is already given in the task's environment listing).
+if grep -qiE 'dropwizard-jackson' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+if grep -qiE 'spring-boot-starter-web' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

@@ -14,10 +14,12 @@ TEXT=$(tr '[:upper:]' '[:lower:]' < "$ANSWER")
 FOUND=0
 TOTAL=4
 
+# Repo-specific symbols only — the task prompt never names these classes, so
+# credit requires the agent to have actually located them in the repo.
 echo "$TEXT" | grep -q "routereifier\|route.*reifier" && FOUND=$((FOUND + 1))
 echo "$TEXT" | grep -q "routedefinition\|route.*definition" && FOUND=$((FOUND + 1))
-echo "$TEXT" | grep -q "pipeline" && FOUND=$((FOUND + 1))
-echo "$TEXT" | grep -q "channel" && FOUND=$((FOUND + 1))
+echo "$TEXT" | grep -qE "pipeline\.java|processor/pipeline" && FOUND=$((FOUND + 1))
+echo "$TEXT" | grep -qE "defaultchannel|channel\.java" && FOUND=$((FOUND + 1))
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 PASSED=$([ "$FOUND" -ge 2 ] && echo true || echo false)

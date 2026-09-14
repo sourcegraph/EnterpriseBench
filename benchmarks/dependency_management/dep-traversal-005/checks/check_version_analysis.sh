@@ -9,8 +9,12 @@ fi
 
 FOUND=0
 TOTAL=2
-if grep -qiE 'go\.sum|go\.mod|resolved|pinned|version' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'affected|vulnerable|patched|needs.*upgrade|< *0\.7' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific artifact: the actual resolved golang.org/x/net version each
+# repo pins (v0.10.0 at the pinned revs) — only discoverable by reading
+# go.mod/go.sum, not by generic words like "version"/"resolved"/"pinned"
+# which already appear in the prompt's own framing.
+if grep -qiE '0\.10\.0' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+if grep -qiE 'affected|vulnerable|patched|not affected|unaffected|already fixed' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

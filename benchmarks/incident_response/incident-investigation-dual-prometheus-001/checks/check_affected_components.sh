@@ -16,8 +16,9 @@ if grep -qiE 'recording.*rule|rules.*manager|rule.*evaluat' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention inhibition pipeline as affected
-if grep -qiE 'inhibit.*pipeline|inhibit.*process|dispatch|notification.*pipeline' "$REPORT"; then
+# Must mention the actual Alertmanager inhibition/dispatch source files, not
+# just the generic "dispatch" word already used in the prompt's own symptoms.
+if grep -qiE 'inhibit/inhibit(or)?\.go|dispatch/dispatch\.go|type[[:space:]]+Inhibitor|func.*Mutes\(|hasEqual\(' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

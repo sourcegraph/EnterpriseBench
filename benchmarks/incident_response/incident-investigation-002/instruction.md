@@ -18,11 +18,7 @@ SRE team has identified a subtle data consistency issue: Kubernetes informers oc
 2. An object currently in the watched namespace is modified so it moves to a different namespace (or its labels change so it no longer matches the filter)
 3. The watch cache correctly converts this to a DELETE event
 4. Inspect the resourceVersion on the DELETE event -- it shows the old object's version, not the event's version
-5. The etcd3 direct watcher handles this case correctly by copying the event resourceVersion onto the previous object
-
-## Key Observation
-
-The etcd3 watcher and the legacy etcd watcher both have logic to set the correct resourceVersion on delete events. The watch cache layer appears to be missing this logic.
+5. Watching etcd directly (bypassing the watch cache) does not reproduce this symptom, so whatever is wrong is isolated to the watch cache's own event-conversion path
 
 ## Environment
 
@@ -32,13 +28,13 @@ The etcd3 watcher and the legacy etcd watcher both have logic to set the correct
 
 ## What I Need
 
-1. **Root Cause**: Find the exact code in the watch cache filtering logic that sends PrevObject without updating its resourceVersion for DELETE events.
+1. **Root Cause**: Find the exact code where the watch cache converts a filtered-out modification into a DELETE event, and determine why the resourceVersion it attaches to that event is wrong.
 
-2. **Error Chain**: Trace the full path from a client-go informer watch through the API server to the watch cache event processing, and compare with the etcd direct watcher path.
+2. **Error Chain**: Trace the full path from a client-go informer watch through the API server to the watch cache event processing, and compare with how a direct storage watcher (bypassing the cache) handles the same object transition.
 
 3. **Affected Components**: What components are affected by this bug?
 
-4. **Remediation**: How should the watch cache be fixed? Reference the existing correct implementations in the etcd watchers.
+4. **Remediation**: How should the watch cache be fixed? Look for how the codebase already solves this same problem correctly elsewhere, and use that as your reference implementation.
 
 ## Output
 

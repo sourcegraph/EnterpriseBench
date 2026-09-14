@@ -9,8 +9,11 @@ fi
 
 FOUND=0
 TOTAL=2
-if grep -qiE 'go\.sum|go\.mod|resolved|version|1\.3[0-9]' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'affected|vulnerable|patched|needs.*upgrade|< *1\.33' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific artifacts only — a concrete resolved version number, not just
+# the generic words "version"/"go.mod" that already appear in the prompt.
+if grep -qiE 'v1\.3[0-9]\.[0-9]+' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# and an explicit affected/not-affected call tied to the 1.33.0 boundary.
+if grep -qiE '(affected|vulnerable|not affected|unaffected|patched).*1\.33\.0|1\.33\.0.*(affected|vulnerable|not affected|unaffected|patched)' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

@@ -10,7 +10,10 @@ fi
 FOUND=0
 TOTAL=2
 if grep -qiE 'lock.*file|package.lock|yarn\.lock|resolved.*version' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'affected|vulnerable|patched|6\.10\.3|6\.11\.3|needs.*upgrade' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific: the fixed release number is never stated in the prompt (only
+# the vulnerable range is) — citing it requires actually determining the patch
+# boundary, not just echoing the brief.
+if grep -qiE '6\.10\.3|6\.11\.3' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

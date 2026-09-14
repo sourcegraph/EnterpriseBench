@@ -4,22 +4,17 @@
 
 Log4Shell. You know this one. CVE-2021-44228 is a critical RCE in Apache Log4j 2. A crafted string in a log message triggers JNDI lookup, allowing remote code execution. It affected virtually every Java application that uses log4j-core.
 
-Our Java infrastructure includes Spring Boot services and Kafka. I need a thorough blast radius assessment that goes beyond just checking pom.xml — there are shaded JARs, relocated packages, and OSGi bundles that repackage log4j under different artifact coordinates.
+Our Java infrastructure includes Spring Boot services and Kafka. I need a thorough blast radius assessment that goes beyond just checking pom.xml — repos sometimes pull in the vulnerable code indirectly through an intermediate module, or repackage/relocate it under different artifact coordinates entirely.
 
 ## What I Need
 
-1. **CVE and Artifact Identification**: Not just log4j-core. Also identify pax-logging-log4j2 (OSGi repackaging) and any other artifacts that contain the vulnerable code.
+1. **CVE and Artifact Identification**: Confirm the CVE and the primary vulnerable artifact. Then check each workspace repo for whether it ALSO ships the vulnerable classes a second time, repackaged or relocated under a different artifact name — a manifest scan for `log4j-core` alone will miss this.
 
-2. **Direct Dependents**: How does each workspace repo pull in log4j? Spring Boot uses an optional starter (spring-boot-starter-log4j2). Kafka may use it directly.
+2. **Direct Dependents**: For each workspace repo, find exactly how (if at all) it declares a dependency on log4j-core. Cite the manifest file and the specific module/artifact that declares it.
 
-3. **Transitive Paths**: Map through Spring Boot's starter system and Kafka's module structure. Are there shaded JARs that bundle log4j classes under different package names? These are invisible to simple dependency scanning.
+3. **Transitive Paths**: For each dependent you find, trace the path from the vulnerable artifact through any intermediary module(s) to the actual consumer. Note anything that would be invisible to a simple top-level manifest scan.
 
-4. **Fix Version Complexity**: There are multiple fix versions:
-   - 2.15.0 (partial fix, still exploitable under certain configs)
-   - 2.16.0 (full fix)
-   - 2.3.1 (backport for Java 6)
-   - 2.12.2 (backport for Java 7)
-   Classify each consumer and note if they need 2.16.0+ for a complete fix.
+4. **Fix Version Complexity**: There are multiple fix versions in play — an initial fix that turned out to still be exploitable under certain configs, a later fix that fully closed the hole, and separate backports for teams still on older Java runtimes. For each consumer, determine which log4j version it's actually pinned/resolved to and classify whether that pinned version needs the full fix.
 
 ## Output
 

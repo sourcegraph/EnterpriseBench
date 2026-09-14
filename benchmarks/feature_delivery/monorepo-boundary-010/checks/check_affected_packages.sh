@@ -10,10 +10,14 @@ fi
 
 FOUND=0
 TOTAL=4
-if grep -qiE 'rustc_const_eval|const_eval' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'rustc_metadata|metadata' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'rustc_mir_transform|mir_transform' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'miri' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# rustc_const_eval: interpreter-side files that actually change (per expected_solution.json)
+if grep -qiE 'eval_context\.rs|eval_queries\.rs|rustc_const_eval/src' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# rustc_metadata: encoder/decoder of the new metadata-based statics
+if grep -qiE 'rmeta/encoder\.rs|rmeta/decoder|rustc_metadata/src/rmeta' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# rustc_mir_transform: the GVN transform that consumes the new representation
+if grep -qiE 'mir_transform/src/gvn\.rs|[^a-z]gvn\.rs' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# miri: the shim that needs updating for the new representation
+if grep -qiE 'tools/miri/src/shims/intrinsics|shims/intrinsics/mod\.rs' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 # Compute score as proper decimal
 if [ "$TOTAL" -gt 0 ]; then

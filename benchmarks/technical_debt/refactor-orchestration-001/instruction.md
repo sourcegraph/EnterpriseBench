@@ -28,5 +28,7 @@ Write `/workspace/REFACTOR_PLAN.md` containing:
 
 ## Reference
 
-- etcd-io/etcd 3.6 release notes
-- kubernetes/kubernetes PR #128419: etcd 3.6 client update
+- etcd-io/etcd 3.6 release notes describe the dependency reduction
+- Check each repo's own go.mod / dependency-management history to confirm
+  which module paths and versions are actually involved before ordering the
+  update

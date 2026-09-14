@@ -14,14 +14,22 @@ import re, json, sys
 with open('${REPORT}') as f:
     content = f.read().lower()
 
-# Three required signals from the ground truth:
-#   1. Changed construct name: TSPropertySignature or initializer
-#   2. Semver level: patch
-#   3. Package reference: @babel/types (or babel/types or babel-types)
+# Three required signals, each anchored to a repo artifact from the ground
+# truth (none of these strings appear in instruction.md — the prompt only
+# names the source-of-truth file and the generic major/minor/patch/none
+# options, so pasting the prompt back cannot satisfy any of these):
+#   1. Parser-side evidence: the hand-written declaration file that has to
+#      drop the field, tied to its patch-level classification.
+#   2. Generator-side evidence: the printer file, or the 'unreachable output'
+#      reasoning that justifies why dropping it is patch-level, not a break.
+#   3. The semver word 'patch' co-located with a concrete repo artifact,
+#      not just recited from the multiple-choice list in the prompt.
+ARTIFACT_RE = r'types\.d\.ts|generators/typescript\.ts|\bunreachable\b|ast-types/generated|builders/generated'
+
 signals = {
-    'construct': bool(re.search(r'tspropertysi[g]nature|initializer', content)),
-    'semver':    bool(re.search(r'\bpatch\b', content)),
-    'package':   bool(re.search(r'@babel/types|babel[/-]types', content)),
+    'parser_evidence':    bool(re.search(r'types\.d\.ts', content)),
+    'generator_evidence': bool(re.search(r'generators/typescript\.ts|\bunreachable\b', content)),
+    'semver_grounded':    bool(re.search(r'\bpatch\b', content)) and bool(re.search(ARTIFACT_RE, content)),
 }
 
 matched = sum(signals.values())

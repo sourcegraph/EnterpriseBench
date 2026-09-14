@@ -4,17 +4,18 @@
 
 Jackson is the default JSON library in the Spring ecosystem. When a developer
 registers a custom Jackson Module bean in a Spring Boot application, it should
-be auto-detected and applied to all REST endpoints. But the path from bean
-definition to actual serialization crosses three repositories:
-
-- Jackson provides ObjectMapper and the Module registration API
-- Spring Framework provides Jackson2ObjectMapperBuilder and MappingJackson2HttpMessageConverter
-- Spring Boot provides JacksonAutoConfiguration that wires everything together
+be auto-detected and applied to all REST endpoints. A developer just reported
+that their custom module's serializers are not being picked up by any REST
+endpoint, even though the bean is registered in the ApplicationContext. The
+path from bean definition to actual serialization crosses three repositories.
 
 ## Task
 
-Trace how a custom Jackson Module bean flows from Spring Boot autoconfiguration
-through Spring Framework's builder into Jackson's ObjectMapper.
+Trace how a custom Jackson Module bean flows from Spring Boot's
+autoconfiguration layer, through the Spring Framework code that builds and
+configures the shared ObjectMapper, into Jackson's own module-registration
+machinery. Identify every hop in that chain and where a module bean could fail
+to be picked up.
 
 ## Repos in Workspace
 
@@ -24,9 +25,17 @@ through Spring Framework's builder into Jackson's ObjectMapper.
 
 ## Expected Output
 
-Write `/workspace/DEPENDENCY_TRACE.md` containing:
+Write `/workspace/DEPENDENCY_TRACE.md` containing, with each claim cited to a
+specific file path and class/method name you found in the repos above:
 
-1. Key classes and methods in jackson-databind for module registration
-2. How Spring Framework's Jackson2ObjectMapperBuilder and MappingJackson2HttpMessageConverter integrate with Jackson
-3. How Spring Boot's JacksonAutoConfiguration auto-detects and registers Module beans
-4. The complete class/method chain from Module bean to REST serialization
+1. The jackson-databind classes and methods responsible for module
+   registration and resolution during JSON processing.
+2. The Spring Framework class(es) that build and configure the ObjectMapper
+   used for REST message conversion, and how they hook into Jackson's
+   module-registration API.
+3. The Spring Boot autoconfiguration class that auto-detects Module beans from
+   the ApplicationContext and wires them into the builder -- including the
+   annotations that gate when it activates and any intermediary bean(s) that
+   carry module registrations from Spring Boot into the builder.
+4. The complete class/method chain from Module bean definition to REST
+   serialization, naming every class the call passes through.

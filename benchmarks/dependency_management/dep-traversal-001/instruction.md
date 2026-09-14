@@ -14,7 +14,7 @@ I need you to determine the full blast radius. Don't just check direct dependenc
 
 3. **Transitive Paths**: Trace the full dependency chain. For example, if `jest-haste-map` depends on lodash, and `jest` depends on `jest-haste-map`, that's a 2-hop transitive path. Map all such paths.
 
-4. **Version Analysis**: For each consumer, check whether their resolved lodash version falls within the vulnerable range (< 4.17.21). Some may have already upgraded.
+4. **Version Analysis**: For each consumer (and for lodash itself as checked out in the workspace), determine the exact resolved/pinned lodash version and state whether it is affected. Some may have already upgraded past the fix.
 
 ## Output
 

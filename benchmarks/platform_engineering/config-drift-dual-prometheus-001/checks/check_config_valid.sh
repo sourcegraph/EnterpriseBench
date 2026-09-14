@@ -1,49 +1,50 @@
 #!/usr/bin/env bash
-# Checkpoint 3: Validate corrected configuration if provided
+# Checkpoint: Agent produces a structurally valid, repo-grounded DRIFT_REPORT.json
 set -euo pipefail
 
-export WORKSPACE="${WORKSPACE:-/workspace}"
-export CHART_DIR="$WORKSPACE/charts/bitnami/consul"
-export REPORT="$WORKSPACE/charts/DRIFT_REPORT.json"
+export REPORT="${WORKSPACE:-/workspace}/DRIFT_REPORT.json"
 
 if [[ ! -f "$REPORT" ]]; then
   printf '{"score": 0.0, "passed": false, "reason": "DRIFT_REPORT.json not found"}\n'
   exit 0
 fi
 
-# Check if corrected config files were provided
-export CORRECTED_SERVICE="$CHART_DIR/templates/consul-headless-service.yaml"
-if [[ ! -f "$CORRECTED_SERVICE" ]]; then
-  # No corrected config is optional — give partial credit for the report alone
-  printf '{"score": 1.0, "passed": true, "reason": "Corrected config not provided (optional checkpoint — skipped)"}\n'
-  exit 0
-fi
+# Structural validity: must be JSON with a non-empty drift_points array, and
+# at least one entry must carry a real Go source file on BOTH sides (not a
+# placeholder like "N/A" or an empty string) plus a multi-hop override_chain.
+# A generic or garbage report (no real file citations) scores 0 here.
+SCORE=$(python3 -c "
+import json
 
-# If helm is available, try to template the corrected chart
-if command -v helm &>/dev/null; then
-  if helm template test-consul "$CHART_DIR" --dry-run 2>/dev/null | grep -q 'kind:'; then
-    printf '{"score": 1.0, "passed": true, "reason": "Corrected chart templates successfully"}\n'
-  else
-    printf '{"score": 0.25, "passed": false, "reason": "Corrected chart fails helm template"}\n'
-  fi
+try:
+    report = json.load(open('$REPORT'))
+except Exception:
+    print(0.0)
+    raise SystemExit
+
+points = report.get('drift_points', [])
+if not isinstance(points, list) or not points:
+    print(0.0)
+    raise SystemExit
+
+valid = 0
+for p in points:
+    if not isinstance(p, dict):
+        continue
+    prom_file = str(p.get('prometheus_source_file', ''))
+    thanos_file = str(p.get('thanos_source_file', ''))
+    chain = p.get('override_chain', [])
+    prom_ok = prom_file.endswith('.go') and ('/' in prom_file or prom_file.startswith('tsdb') or prom_file.startswith('cmd'))
+    thanos_ok = thanos_file.endswith('.go') and ('/' in thanos_file or thanos_file.startswith('cmd') or thanos_file.startswith('pkg'))
+    chain_ok = isinstance(chain, list) and len(chain) >= 2
+    if prom_ok and thanos_ok and chain_ok:
+        valid += 1
+
+print(1.0 if valid >= 1 else 0.0)
+" 2>/dev/null || echo "0.0")
+
+if awk "BEGIN {exit !($SCORE >= 1.0)}"; then
+  printf '{"score": 1.0, "passed": true, "reason": "Report has at least one drift point with real Go source citations on both sides and a multi-hop override chain"}\n'
 else
-  # No helm available — check that the corrected file has consistent port references
-  if python3 -c "
-import os
-service_file = os.path.join(os.environ['CHART_DIR'], 'templates', 'consul-headless-service.yaml')
-content = open(service_file).read()
-# Basic check: serflan-udp should reference serfLAN, serfwan-udp should reference serfWAN
-lines = content.split('\n')
-ok = True
-for i, line in enumerate(lines):
-    if 'serflan' in line.lower() and 'serfWAN' in line:
-        ok = False
-    if 'serfwan' in line.lower() and 'serfLAN' in line and 'serfWAN' not in line:
-        ok = False
-exit(0 if ok else 1)
-" 2>/dev/null; then
-    printf '{"score": 1.0, "passed": true, "reason": "Corrected config has consistent port references"}\n'
-  else
-    printf '{"score": 0.25, "passed": false, "reason": "Corrected config still has inconsistent port references"}\n'
-  fi
+  printf '{"score": 0.0, "passed": false, "reason": "Report missing a valid drift_point with real prometheus_source_file/thanos_source_file (.go paths) and override_chain"}\n'
 fi

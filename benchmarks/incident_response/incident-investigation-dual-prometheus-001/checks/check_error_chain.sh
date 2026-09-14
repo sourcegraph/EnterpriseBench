@@ -21,8 +21,10 @@ if grep -qiE 'perpetual|always.*fir|permanent.*fir|NodeNotReady' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention inhibition rule matching
-if grep -qiE 'inhibit|suppress|silenc' "$REPORT"; then
+# Discriminating hop: must cite the actual Alertmanager inhibition matcher
+# code path, not just the generic "inhibit/suppress" vocabulary already given
+# in the prompt's own symptom description.
+if grep -qiE 'inhibit/inhibit(or)?\.go|type[[:space:]]+Inhibitor|func.*Mutes\(|hasEqual\(|InhibitRule' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

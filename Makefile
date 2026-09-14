@@ -37,7 +37,11 @@ help:
 	@awk 'BEGIN { FS = ":.*## " } /^[a-zA-Z0-9_-]+:.*## / { printf "  %-22s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 .PHONY: verify
-verify: verify-mix verify-tasks verify-crnt ## Run all task validation checks
+verify: verify-mix verify-tasks verify-crnt verify-closed-book ## Run all task validation checks
+
+.PHONY: verify-closed-book
+verify-closed-book: ## Fail on checkpoints answerable from the prompt alone (leakage ratchet)
+	$(PYTHON) scripts/validation/verify_closed_book.py --check
 
 .PHONY: verify-mix
 verify-mix: ## Validate task mix against PRD targets

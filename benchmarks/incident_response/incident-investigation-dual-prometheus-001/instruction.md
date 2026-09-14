@@ -10,18 +10,8 @@ A critical disk-usage alert (`DiskUsageCritical`) failed to fire during a produc
 - Prometheus sends the alert to Alertmanager (confirmed in Prometheus logs)
 - Alertmanager receives the alert but never dispatches notification
 - Alertmanager UI shows the alert as "suppressed" by an inhibition rule
-- The inhibiting alert is `NodeNotReady`, which fires based on a recording rule
-- The recording rule `node:ready:condition` has a subtle label mismatch
-
-## Investigation So Far
-
-The team traced the suppression to the Alertmanager inhibition pipeline:
-
-1. Alertmanager inhibition rules suppress alerts when a "source" alert matches
-2. The `NodeNotReady` alert fires from recording rule `node:ready:condition`
-3. The recording rule aggregates `kube_node_status_condition` but drops the `condition` label during aggregation, causing it to always evaluate to 1
-4. This means `NodeNotReady` is perpetually firing, inhibiting `DiskUsageCritical`
-5. The inhibition rule matches on `severity` label: source=critical inhibits target=critical
+- The inhibiting alert is `NodeNotReady`, which fires based on a recording rule named `node:ready:condition`
+- `NodeNotReady` appears to be firing continuously, even when nodes report healthy
 
 ## Environment
 
@@ -31,13 +21,26 @@ The team traced the suppression to the Alertmanager inhibition pipeline:
 
 ## What I Need
 
-1. **Root Cause**: Find where Alertmanager implements inhibition rule matching and where Prometheus evaluates recording rules with label manipulation.
+Investigate both codebases and write an incident report grounded in the actual
+code — cite the specific files and functions you found, not general
+inhibition-rule or recording-rule theory.
 
-2. **Error Chain**: Trace the full inhibition chain: recording rule misconfiguration -> perpetual source alert -> inhibition match -> suppressed target alert.
+1. **Root Cause**: Find where Alertmanager implements inhibition rule matching
+   (name the file and the type/function that decides which alerts get muted),
+   and find where Prometheus evaluates recording rules (name the file). Explain
+   what about the recording rule's label handling could make `NodeNotReady`
+   fire continuously.
 
-3. **Affected Components**: Which alerting components and alert rules are affected by this pattern?
+2. **Error Chain**: Trace the full chain from recording-rule evaluation through
+   to the suppressed notification, with each hop tied to a specific code path
+   you identified in the repos (not just the symptom text above).
 
-4. **Remediation**: How should the recording rule and/or inhibition rule be fixed?
+3. **Affected Components**: Which alerting components and alert rules are
+   affected by this pattern? Identify them by the actual source files/paths
+   that implement each stage of the pipeline.
+
+4. **Remediation**: How should the recording rule and/or inhibition rule be
+   fixed, and where (which repo/file) does that fix belong?
 
 ## Output
 

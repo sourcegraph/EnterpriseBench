@@ -9,14 +9,22 @@ if [[ ! -f "$REPORT" ]]; then
 fi
 
 FOUND=0
-TOTAL=2
+TOTAL=3
 
-# Must mention Prometheus datasource
-if grep -qiE 'prometheus.*datasource|prometheus.*data.?source|prometheus.*plugin' "$REPORT"; then
+# Must cite the converter implementation file where the shared bug lives --
+# "Prometheus/Loki datasource" alone is given in the prompt and proves nothing.
+if grep -qiE 'pkg/util/converter/prom\.go|util/converter/prom\.go' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention Loki datasource as also affected
+# Must cite the reference/test file, or explicitly name the shared code path,
+# showing the agent looked at how the converter is exercised/reused.
+if grep -qiE 'prom_test\.go|shares?.*the.*converter|shared.*converter.*(path|code)' "$REPORT"; then
+  FOUND=$((FOUND + 1))
+fi
+
+# Must mention Loki as also affected (given in prompt, but only credited
+# alongside the file-level evidence above)
 if grep -qiE 'loki' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
@@ -26,7 +34,7 @@ if [ "$TOTAL" -gt 0 ]; then
 else
   SCORE="0.00"
 fi
-if [ "$FOUND" -ge 1 ]; then
+if [ "$FOUND" -ge 2 ]; then
   PASSED=true
 else
   PASSED=false

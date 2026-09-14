@@ -11,23 +11,26 @@ fi
 FOUND=0
 TOTAL=4
 
-# Must mention stale/old status conditions from pre-upgrade
-if grep -qiE 'stale.*condition|old.*condition|pre.?upgrade.*condition|in.?progress.*upgrade' "$REPORT"; then
+# Must mention the helm-controller v0.36 -> v0.37 upgrade as the trigger for
+# in-progress HelmReleases retaining old-format conditions.
+if grep -qiE 'v0\.36.*v0\.37|0\.36.*0\.37|helm-controller.*upgrad.*(0\.36|0\.37)' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention reconciler parsing failure
-if grep -qiE 'reconcil.*cannot.*pars|reconcil.*fail|cannot.*interpret|mismatch' "$REPORT"; then
+# Must name the helm-controller release writer that emits new-format conditions
+if grep -qiE 'internal/reconcile/release\.go' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention not-ready status result
-if grep -qiE 'not.?ready|Ready.*False|ArtifactFailed|ReconciliationFailed' "$REPORT"; then
+# Must name the helm-controller reconciler that misparses old-format conditions
+if grep -qiE 'internal/controller/helmrelease_controller\.go|helmrelease_controller\.go' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention infinite reconciliation loop
-if grep -qiE 'infinite.*loop|reconcil.*loop|re.?reconcil|endless.*reconcil' "$REPORT"; then
+# Must describe the infinite reconcile loop and downstream impact on
+# kustomize-controller / Flux CLI consumers (the discriminating hop — not
+# just re-stating the "not ready" symptom already given in the prompt).
+if grep -qiE 'infinite.*loop|reconcil.*loop|re.?reconcil.*loop|endless.*reconcil' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

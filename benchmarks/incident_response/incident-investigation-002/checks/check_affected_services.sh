@@ -11,18 +11,21 @@ fi
 FOUND=0
 TOTAL=3
 
-# Must mention apiserver
-if grep -qiE 'api.?server|kube-apiserver' "$REPORT"; then
+# Repo-specific artifacts only -- generic incident terms (apiserver, informer,
+# namespace-scoped watch) are given in the prompt and must not earn credit.
+
+# Must cite the actual bug-location file
+if grep -qiE 'cacher\.go|storage/cacher' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention client-go or informers or controllers
-if grep -qiE 'client.go|informer|controller' "$REPORT"; then
+# Must cite at least one of the reference-implementation files (correct behavior)
+if grep -qiE 'etcd3/watcher\.go|etcd/etcd_watcher\.go|etcd_watcher\.go' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention namespace-scoped watches or filtered watches
-if grep -qiE 'namespace.*watch|filtered.*watch|label.*watch|scoped.*watch' "$REPORT"; then
+# Must name the specific function/consumer, not just the generic terms
+if grep -qiE 'processEvent|client.go.*informer|informer.*controller' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

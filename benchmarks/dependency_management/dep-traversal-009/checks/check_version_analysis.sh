@@ -9,8 +9,13 @@ fi
 
 FOUND=0
 TOTAL=2
-# Version range and branch analysis
-if grep -qiE '1\.x|2\.x|branch|1\.26|2\.0|version.*range' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Must cite the actual resolved/pinned version evidence found in the repos —
+# urllib3's own checked-out version (src/urllib3/_version.py: 1.26.16) or
+# requests' pin range on it (setup.cfg: >=1.21.1,<1.27) — not generic branch
+# talk, which is no longer in the prompt.
+if grep -qiE '1\.26\.16|1\.21\.1|<\s*1\.27\b' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Explicit affected/patched classification, paired implicitly with (1) above
+# for full credit.
 if grep -qiE 'vendor|pin|affected|vulnerable|patched|needs.*upgrade' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")

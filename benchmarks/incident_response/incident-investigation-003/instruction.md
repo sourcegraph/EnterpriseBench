@@ -12,33 +12,23 @@ Multiple users have reported that Grafana dashboards are displaying incomplete o
 - Both Prometheus and Loki datasources are affected
 - The issue appeared after setting `[dataproxy] response_limit` in Grafana configuration
 
-## Investigation So Far
-
-The team has narrowed the issue to the response parsing pipeline:
-
-1. Prometheus returns a valid, complete JSON response
-2. Grafana's data proxy enforces `response_limit`, truncating the response body
-3. The truncated JSON is passed to the response parser
-4. The parser processes whatever valid JSON it can extract and silently stops
-5. Partial data frames are returned to the frontend with no error
-
-The JSON parser uses the `json-iterator/go` library (jsoniter), which has an unusual error handling pattern: methods like `ReadString()`, `ReadFloat64()`, etc. do NOT return errors. Instead, they set `iter.Error` which must be checked separately after each operation.
-
 ## Environment
 
 - Grafana v10.1.0 at `/workspace/grafana/`
 - Prometheus v2.46.0 at `/workspace/prometheus/` (for understanding the API response format)
-- Focus on the Go backend, specifically the Prometheus response converter
+- Both repos are Go; the failure lives somewhere in the response-handling path
+  between the two, so you will likely need to read both to understand the
+  data flow.
 
 ## What I Need
 
-1. **Root Cause**: Find the exact file and code where JSON parsing errors from jsoniter are not being checked. Where does `iter.Error` go unchecked?
+1. **Root Cause**: Investigate why parsing errors from the response body are not surfacing as errors. Find the specific file and function(s) responsible, name the JSON parsing mechanism involved, and explain exactly how a truncated or malformed response ends up as silent partial data instead of a visible error.
 
-2. **Error Chain**: Trace the full data flow: Prometheus HTTP API response -> Grafana data proxy (response_limit) -> response converter -> JSON parser. How does the truncated response become silent partial data?
+2. **Error Chain**: Trace the full data flow, hop by hop, from the Prometheus HTTP API response through Grafana's data proxy (`response_limit` enforcement) to wherever the parsing error is ultimately dropped. Cite the file/function at each hop.
 
-3. **Affected Components**: Which Grafana datasources and code paths are affected by this unchecked error?
+3. **Affected Components**: Which Grafana datasources and code paths share this bug? Cite the specific source files involved, not just the datasource names.
 
-4. **Remediation**: How should the code be fixed? What should happen when `iter.Error` is set?
+4. **Remediation**: Propose a concrete, code-grounded fix. Where exactly should error checks be added, and what should happen when a parsing error is detected?
 
 ## Output
 

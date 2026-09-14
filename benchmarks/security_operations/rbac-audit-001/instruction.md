@@ -18,23 +18,27 @@ gap that allows unauthorized tier changes.
 
 ## What I Need
 
-1. **Affected policy types**: Identify all policy types that support tier
-   assignment (hint: look in `apiserver/pkg/registry/projectcalico/` for
-   storage implementations).
+1. **Affected policy types**: Identify all Calico network policy types whose
+   tier assignment is enforced through the apiserver's custom resource storage
+   layer for policies.
 
-2. **Apiserver authorization analysis**: In each policy type's storage
-   `Update()` method, trace what tier authorization check is performed. Does it
-   check the old tier, the new tier, or both?
+2. **Apiserver authorization analysis**: For each affected policy type, locate
+   the code path in its storage layer that runs on a policy update and
+   determine exactly which tier(s) it authorizes against before allowing the
+   change.
 
-3. **Webhook authorization analysis**: In `webhooks/pkg/rbac/rbac.go`, find the
-   `authorize()` function. On UPDATE operations, which object does it inspect
-   for tier — the old object, the new object, or both?
+3. **Webhook authorization analysis**: Locate the admission webhook's RBAC
+   authorization logic for policies. On an update, determine exactly which
+   version of the policy object it inspects when deciding which tier to
+   authorize against.
 
-4. **The bypass**: Describe the specific scenario. If the apiserver only checks
-   tier X and the webhook only checks tier Y, explain how a user could exploit
-   this inconsistency.
+4. **The bypass**: Compare the two authorization paths you traced above and
+   describe the specific scenario where they disagree. Explain concretely how
+   a user could exploit that disagreement to move a policy into a tier they
+   don't have permission on.
 
-5. **Remediation**: What changes would close the gap?
+5. **Remediation**: What changes to the code would close the gap? Be specific
+   about which function(s) need to change and how.
 
 ## Output
 

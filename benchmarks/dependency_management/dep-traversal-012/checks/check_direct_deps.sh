@@ -9,9 +9,12 @@ fi
 
 FOUND=0
 TOTAL=3
-if grep -qiE 'curl' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE '\bgit\b' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'kubernetes|python.*ssl|node.*crypto' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# curl's own build config must be cited as the evidence for its OpenSSL dependency
+if grep -qiE 'curl' "$REPORT" && grep -qiE 'configure\.ac|CMakeLists\.txt' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# git's own build config must be cited as the evidence for its curl dependency
+if grep -qiE '\bgit\b' "$REPORT" && grep -qiE 'Makefile' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# kubernetes's own module/build config must be cited as the evidence for its crypto/tls path
+if grep -qiE 'kubernetes' "$REPORT" && grep -qiE 'go\.mod|hack/lib/golang\.sh' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

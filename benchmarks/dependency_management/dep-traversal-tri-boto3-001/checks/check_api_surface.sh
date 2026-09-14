@@ -10,9 +10,17 @@ fi
 
 FOUND=0
 TOTAL=3
-if grep -qiE 'upload_file|S3Transfer|S3.resource' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'TransferManager|MultipartUploader|s3transfer' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'botocore.*client|create_multipart_upload|upload_part' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific artifacts only. "upload_file", "TransferManager", "s3transfer"
+# and "botocore ... client" are already in the prompt (repo list / task
+# framing), so a plain grep on those is satisfiable from instruction.md alone.
+# Require the actual canonical basename or a symbol/option name that only
+# shows up by reading the source (boto3/s3/transfer.py, s3transfer/manager.py
+# or tasks.py, botocore/client.py or serialize.py; S3Transfer is matched
+# case-sensitively so it can't be satisfied by the lowercase "s3transfer"
+# package name that appears throughout the prompt).
+if grep -qE 'transfer\.py|S3Transfer' "$REPORT" || grep -qiE 'S3\.resource|multipart_threshold' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+if grep -qE 'manager\.py|tasks\.py|MultipartUploader|UploadSubmissionTask' "$REPORT" || grep -qiE 'max_request_concurrency|max_submission_concurrency|multipart_chunksize' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+if grep -qE 'client\.py|serialize\.py' "$REPORT" || grep -qiE 'create_multipart_upload|upload_part|connect_timeout|read_timeout' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge "$TOTAL" ]; then PASSED=true; else PASSED=false; fi

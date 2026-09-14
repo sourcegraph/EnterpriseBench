@@ -2,7 +2,7 @@
 
 ## Context
 
-Hey team — we're preparing the v7.23.6 patch release and one of the changes removes the `initializer` field from the `TSPropertySignature` AST node in `@babel/types`. The change is in `packages/babel-types/src/definitions/typescript.ts`.
+Hey team — we're preparing the v7.23.6 release and one of the changes removes the `initializer` field from the `TSPropertySignature` AST node in `@babel/types`. The change is in `packages/babel-types/src/definitions/typescript.ts`.
 
 Before we ship, I need a thorough impact analysis across the monorepo. TypeScript interface properties shouldn't have initializers (that's a class thing), so we're cleaning up the AST, but I want to make sure we haven't missed anything.
 

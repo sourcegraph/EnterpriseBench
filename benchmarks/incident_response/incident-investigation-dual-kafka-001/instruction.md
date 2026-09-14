@@ -13,17 +13,6 @@ A production Kafka Connect cluster running JDBC Sink Connectors is experiencing 
 - Connector status shows tasks cycling between RUNNING and FAILED
 - The JDBC connection pool shows connections in "idle in transaction" state
 
-## Investigation So Far
-
-The team has narrowed the issue to the interaction between batch processing and database transactions:
-
-1. Kafka Connect's WorkerSinkTask handles the put() -> flush() -> commit cycle
-2. The JDBC Sink Connector wraps batch inserts in a database transaction
-3. The offset commit happens after the JDBC transaction is committed
-4. When the batch is large, the JDBC transaction takes longer than the DB timeout (PostgreSQL `statement_timeout` = 30s)
-5. The error propagation from JDBC driver through the connector to the Connect framework obscures the root cause
-6. The WorkerSinkTask's `offset.flush.timeout.ms` interacts with the DB timeout
-
 ## Environment
 
 - Apache Kafka 3.6.0 at `/workspace/kafka/`
@@ -33,9 +22,9 @@ The team has narrowed the issue to the interaction between batch processing and 
 
 ## What I Need
 
-1. **Root Cause**: Find where Kafka Connect's WorkerSinkTask orchestrates the put/flush/commit cycle and where the JDBC connector manages database transactions.
+1. **Root Cause**: Investigate both codebases and identify, by file and function, the Kafka Connect component that drives a sink task's poll/put/flush/offset-commit cycle, and the JDBC connector component that owns the database transaction around a batch insert. Explain how the two interact to produce this failure.
 
-2. **Error Chain**: Trace the full failure: large batch -> long JDBC transaction -> DB timeout -> connector exception -> task failure -> restart loop.
+2. **Error Chain**: Trace the full failure path, from the large batch being handed to the connector through to the task entering a restart loop, tying each hop to the actual code you found.
 
 3. **Affected Configurations**: Which connector and Connect framework settings interact to cause this?
 

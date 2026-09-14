@@ -31,11 +31,30 @@ parallel_steps = gt.get('parallelizable_steps', [])
 # Check if agent addresses parallelism at all
 mentions_parallel = any(term in answer_text for term in ['parallel', 'concurrent', 'simultaneous', 'independent'])
 
+# 'depends on' is deliberately excluded here — it's a phrase from the prompt's
+# own output-format instructions ('Dependency graph (who depends on whom)'),
+# not evidence the agent investigated anything.
+no_parallel_stmt = any(term in answer_text for term in [
+    'no parallelizable', 'not parallelizable', 'sequential', 'serial',
+    'no parallel', 'fully sequential', 'strictly linear', 'strictly sequential',
+    'cannot be parallelized', 'cannot run in parallel',
+])
+# Repo-specific breaking-change grounding: only a plan that actually cites the
+# concrete artifacts from the repos (not just the prompt's generic framing)
+# earns full credit for this checkpoint.
+breaking_change_grounded = any(term in answer_text for term in [
+    'partition assignment', 'partition-assignment', 'listener.concurrency',
+    'kafkaproperties.listener.concurrency', 'concurrentmessagelistenercontainer',
+])
+
 if not parallel_steps:
     # No parallel steps expected — agent should note sequential dependency
-    if any(term in answer_text for term in ['sequential', 'serial', 'no parallel', 'cannot.*parallel', 'depends on']):
+    if no_parallel_stmt and breaking_change_grounded:
         score = 1.0
-        detail = 'Correctly identified no parallelizable steps (sequential chain)'
+        detail = 'Correctly identified no parallelizable steps (sequential chain), grounded in repo-specific breaking changes'
+    elif no_parallel_stmt:
+        score = 0.6
+        detail = 'Identified sequential chain but did not ground breaking changes in repo-specific artifacts'
     elif mentions_parallel:
         score = 0.3
         detail = 'Mentions parallelism but chain is fully sequential'

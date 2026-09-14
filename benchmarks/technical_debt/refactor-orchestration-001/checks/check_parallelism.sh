@@ -34,27 +34,46 @@ graph_nodes = set(dep_graph.keys())
 # Look for parallel annotations in the answer (e.g., 'parallel:', 'concurrent:', 'independent:')
 parallel_section = re.findall(r'(?:parallel|concurrent|independent|simultaneously)[:\s]*([^\n]+(?:\n\s*[-*]\s*[^\n]+)*)', answer, re.IGNORECASE)
 
-if not parallel_section and not gt_parallel:
-    # No parallelism expected and none claimed
-    print(json.dumps({'score': 1.0, 'passed': True, 'reason': 'No parallelism expected or claimed'}))
+# Silence must not be scored the same as a correct, explicit claim — an
+# empty/garbage report mentions none of this and must not pass. Require the
+# report to actually engage with parallelization, and for the no-parallelism
+# case (this task's ground truth), require an explicit statement to that
+# effect rather than crediting the absence of the word 'parallel'.
+addresses_parallelism = bool(re.search(r'parallel|concurren|independent step|simultaneously', answer, re.IGNORECASE))
+explicit_no_parallel = bool(re.search(
+    r'no parallel|not parallel|cannot be (run )?in parallel|no independent steps|'
+    r'strictly sequential|sequential(ly)? only|zero parallel(izable)? steps|'
+    r'no steps? (can|may) (be )?(run )?in parallel',
+    answer, re.IGNORECASE))
+
+if not gt_parallel:
+    if explicit_no_parallel:
+        # Correctly and explicitly matches the ground truth's empty
+        # parallelizable_steps array.
+        print(json.dumps({'score': 1.0, 'passed': True, 'reason': 'Correctly and explicitly stated no parallelizable steps'}))
+    elif not addresses_parallelism:
+        print(json.dumps({'score': 0.0, 'passed': False, 'reason': 'Report does not address parallelization at all'}))
+    else:
+        # Mentions parallelism but without a clear 'none' statement — check
+        # whether specific repos were claimed parallel and validate them.
+        raw_tokens = re.findall(r'[@\w/.-]+', ' '.join(parallel_section))
+        claimed = [t for t in raw_tokens if t in graph_nodes]
+        violations = 0
+        for repo in claimed:
+            deps = dep_graph.get(repo, [])
+            for dep in deps:
+                if dep in claimed:
+                    violations += 1
+        if not claimed:
+            print(json.dumps({'score': 0.3, 'passed': False, 'reason': 'Parallelization discussed but not resolved — no explicit no-parallel statement and no specific repos claimed parallel'}))
+        elif violations == 0:
+            print(json.dumps({'score': 0.8, 'passed': True, 'reason': 'Parallel claims are valid (no dependency violations)'}))
+        else:
+            score = max(0.0, 1.0 - violations * 0.3)
+            print(json.dumps({'score': score, 'passed': score >= 0.5, 'reason': f'{violations} dependency violations in parallel claims'}))
 elif not parallel_section and gt_parallel:
     # Parallelism exists but agent did not identify any
     print(json.dumps({'score': 0.2, 'passed': False, 'reason': 'Agent did not identify parallelizable steps'}))
-elif parallel_section and not gt_parallel:
-    # Agent claimed parallelism where none exists — check if claims are at least valid
-    raw_tokens = re.findall(r'[@\w/.-]+', ' '.join(parallel_section))
-    claimed = [t for t in raw_tokens if t in graph_nodes]
-    violations = 0
-    for repo in claimed:
-        deps = dep_graph.get(repo, [])
-        for dep in deps:
-            if dep in claimed:
-                violations += 1
-    if violations == 0:
-        print(json.dumps({'score': 0.8, 'passed': True, 'reason': 'Parallel claims are valid (no dependency violations)'}))
-    else:
-        score = max(0.0, 1.0 - violations * 0.3)
-        print(json.dumps({'score': score, 'passed': score >= 0.5, 'reason': f'{violations} dependency violations in parallel claims'}))
 else:
     # Both exist — check for overlap and correctness
     raw_tokens = re.findall(r'[@\w/.-]+', ' '.join(parallel_section))

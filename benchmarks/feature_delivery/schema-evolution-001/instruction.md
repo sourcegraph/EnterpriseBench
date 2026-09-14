@@ -4,11 +4,11 @@
 
 We've been getting requests from large organizations to be able to deactivate user groups without deleting them. Right now, deleting a group is permanent and breaks any references to it in stream permissions, message mentions, etc.
 
-The plan is to add a `deactivated` boolean field to the `NamedUserGroup` model. The migration is already written (`zerver/migrations/0578_namedusergroup_deactivated.py`), but before we proceed I need a full impact analysis of what code needs to change.
+The plan is to add a `deactivated` boolean field to the `NamedUserGroup` model so groups can be soft-deleted instead of removed. A migration for this has already been written and merged somewhere under `zerver/migrations/` — before we proceed I need a full impact analysis of what code needs to change.
 
 ## What I Need
 
-1. **Schema change identification**: Confirm the migration and model change.
+1. **Schema change identification**: Locate the migration in the repo and confirm exactly which model file it changes and what column it adds.
 
 2. **Direct code references**: Find all Python code that queries, creates, updates, or filters `NamedUserGroup` objects. This includes the actions layer, views, and utility functions. We need to make sure deactivated groups are excluded from active queries but still accessible for admin operations.
 

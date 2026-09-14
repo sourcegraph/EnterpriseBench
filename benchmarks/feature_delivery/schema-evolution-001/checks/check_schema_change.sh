@@ -8,10 +8,13 @@ if [[ ! -f "$REPORT" ]]; then
   exit 0
 fi
 
+# Repo-specific artifacts only — the prompt names the feature (deactivated
+# field on NamedUserGroup) but not the migration filename or model file path,
+# so both conditions require the agent to have actually located them in the repo.
 FOUND=0
 TOTAL=2
-if grep -qE '0578.*deactivated|namedusergroup_deactivated' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qE 'models/groups\.py|NamedUserGroup' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+if grep -qE '0578[_.]*namedusergroup_deactivated|zerver/migrations/0578' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+if grep -qE 'zerver/models/groups\.py' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

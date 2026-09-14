@@ -4,18 +4,17 @@
 
 grpc-go deprecated `grpc.Dial` and `grpc.DialContext` in v1.64 (June 2024),
 replacing them with `grpc.NewClient`. The new API is non-blocking by default,
-changing connection semantics.
-
-The cascade:
-- grpc-go: deprecation and new API
-- etcd: PR #21282 migrated to NewClient (merged 2026-02-26), preserving
-  DialTimeout behavior via health endpoint checks
-- kubernetes: consumes etcd client library
+changing connection semantics. This deprecation cascades through any project
+that calls `grpc.Dial` directly or wraps it in its own client library.
 
 ## Task
 
-Given these repos, produce a topologically sorted execution plan for the
-Dial -> NewClient migration.
+Given these repos, determine which of them actually require this API
+migration, the order the migration must land in (respecting who depends on
+whom), and whether any of the steps can happen in parallel. Investigate each
+repo's real `grpc.Dial`/`grpc.DialContext` call sites, wrapper layers, and
+migration history — the actual ordering and evidence should come from what
+you find in the code and commit history, not be assumed.
 
 ## Repos in Workspace
 
@@ -31,10 +30,6 @@ Write `/workspace/REFACTOR_PLAN.md` containing:
 2. Dependency graph
 3. API migration details per repo
 4. Behavioral differences (blocking vs non-blocking)
-5. Parallelization annotations
-
-## Reference
-
-- grpc-go v1.64 deprecation notice
-- etcd-io/etcd PR #21282: replace Dial APIs with NewClient
-- kubernetes/kubernetes PR #128419: etcd 3.6 client update
+5. Parallelization annotations — state explicitly whether any steps can run
+   concurrently, or that the chain is strictly sequential, and ground that
+   claim in the actual dependency relationship between the repos

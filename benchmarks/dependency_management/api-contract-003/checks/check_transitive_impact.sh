@@ -9,12 +9,15 @@ fi
 
 FOUND=0
 TOTAL=3
-# Must identify three-repo chain
-if grep -qiE 'grpc.*etcd.*kubernetes|chain.*three|3.*repo' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-# Must identify vendoring as propagation mechanism
-if grep -qiE 'vendor|vendoring|go.*mod' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-# Must identify multiple k8s subsystems affected
-if grep -qiE 'kubelet|apiserver|kube.proxy|staging' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific artifacts only — the three-repo chain, "vendors", and
+# "apiserver/kubelet" subsystem names are already given verbatim in the
+# prompt and must not earn credit here.
+# Must cross-reference the consumer-side fix PR
+if grep -qiE 'kubernetes/kubernetes#57160|kubernetes[^0-9]{0,20}57160|#57160' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Must identify the transitive propagation mechanism (interceptor/middleware/wrapper), not just direct imports
+if grep -qiE 'interceptor|middleware|wrapper.*transport|transport.*wrapper|forward.*transport|proxy.*transport' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Must name at least one specific breaking symbol whose type/signature change propagates
+if grep -qiE 'ClientTransport|ServerTransport|NewClientTransport|transport\.Stream' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

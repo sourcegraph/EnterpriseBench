@@ -11,11 +11,64 @@ if [[ ! -f "$REPORT" ]]; then
   exit 0
 fi
 
+# The report must actually state the precise fix for the drift point: the
+# serflan-udp entry in consul-headless-service.yaml should reference the
+# Helm template expression .Values.containerPorts.serfLAN (not serfWAN). A
+# report that is empty, garbage, or that only echoes the generic "serfLAN" /
+# "serfWAN" vocabulary from the prompt without naming the actual template
+# expression and file does not demonstrate the fix was found in the repo.
+export FIX_OK=0
+if python3 -c "
+import json, os
+
+try:
+    report = json.load(open(os.environ['REPORT']))
+except Exception:
+    exit(1)
+
+points = report.get('drift_points', [])
+if not isinstance(points, list):
+    exit(1)
+
+for p in points:
+    if not isinstance(p, dict):
+        continue
+    file_ = str(p.get('file', '')).lower()
+    key = str(p.get('key', '')).lower()
+    expected = str(p.get('expected', '')).lower().replace(' ', '')
+    actual = str(p.get('actual', '')).lower().replace(' ', '')
+    chain = ' '.join(str(c) for c in p.get('override_chain', []) if isinstance(c, str)).lower()
+
+    if 'consul-headless-service.yaml' not in (file_ + ' ' + chain):
+        continue
+    if 'serflan' not in key and 'serflan' not in file_:
+        continue
+    # Expected value must name the real Helm template expression, not just
+    # the bare word 'serflan'.
+    if '.values.containerports.serflan' not in expected:
+        continue
+    # Actual (buggy) value must show it was wired to the wrong key.
+    if 'serfwan' not in actual:
+        continue
+    exit(0)
+
+exit(1)
+" 2>/dev/null; then
+  FIX_OK=1
+fi
+
+if [[ "$FIX_OK" -eq 0 ]]; then
+  printf '{"score": 0.0, "passed": false, "reason": "DRIFT_REPORT.json does not specify the corrected .Values.containerPorts.serfLAN wiring for consul-headless-service.yaml serflan-udp"}\n'
+  exit 0
+fi
+
 # Check if corrected config files were provided
 export CORRECTED_SERVICE="$CHART_DIR/templates/consul-headless-service.yaml"
 if [[ ! -f "$CORRECTED_SERVICE" ]]; then
-  # No corrected config is optional — give partial credit for the report alone
-  printf '{"score": 1.0, "passed": true, "reason": "Corrected config not provided (optional checkpoint — skipped)"}\n'
+  # No corrected config is optional — award credit for a report that already
+  # states the exact fix precisely (verified above), since providing a
+  # rewritten chart file is not required by this task's artifacts.
+  printf '{"score": 1.0, "passed": true, "reason": "Corrected config not provided, but report specifies the exact serfLAN fix"}\n'
   exit 0
 fi
 

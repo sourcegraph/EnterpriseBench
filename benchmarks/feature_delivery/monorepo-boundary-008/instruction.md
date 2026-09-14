@@ -2,22 +2,38 @@
 
 ## Context
 
-For the Next.js 14 release, we're moving `ImageResponse` from `next/server` to a dedicated `next/og` entry point. The old `next/server` export will be deprecated.
+For the Next.js 14 release, `ImageResponse` is being moved from `next/server`
+to a dedicated `next/og` entry point. The old `next/server` export will be
+deprecated.
 
 The main changes are in the `next` package:
-- New `og.js` and `og.d.ts` entry points
+- New entry point file(s) for `next/og`
 - Updated webpack config and middleware plugin
-- New `src/server/og/image-response.ts` module
+- A relocated implementation module for the OG image response
 
-Here's what concerns me: the Next.js monorepo has a Rust-based SWC compiler (`@next/swc`) that maintains its own import map for resolving `next/*` paths during compilation. If we move the export but don't update the Rust import map, SWC will still resolve `next/og` to the wrong location (or fail entirely).
+Here's what concerns me: this monorepo compiles TypeScript with a compiler
+written in a different, lower-level systems language, and that compiler
+maintains its own internal table for resolving `next/*` import paths at
+build time. If we move the export but don't update that compiler-side
+resolution table, module resolution could point at the wrong location (or
+fail entirely) for anyone building against the new path.
 
 ## What I Need
 
-1. **Affected packages**: What else in the monorepo references `ImageResponse` or the `next/server` export path? Check the SWC crates, the bundler configs, the compiled vendor packages, and the codemod package.
+1. **Affected packages**: What else in the monorepo references
+   `ImageResponse` or the `next/server` export path and needs updating?
+   Look beyond the `next` package itself — check anywhere that resolves or
+   hardcodes `next/*` import paths during compilation, plus any bundled/
+   vendored copies of the underlying image-response implementation.
 
-2. **Impact classification**: The `next` package itself is a major bump. What about `@next/swc`? Is updating an internal import map a major or patch change?
+2. **Impact classification**: Classify the semver impact (none/patch/minor/
+   major) for each affected package individually, and give an overall
+   classification for the change. Justify each classification by explaining
+   what breaks (or doesn't) for existing consumers.
 
-3. **Boundary violations**: Show me the exact files where `next/server` → `ImageResponse` is hardcoded. I particularly need to see the Rust file in the SWC crate.
+3. **Boundary violations**: Show me the exact files where the old
+   `next/server` → `ImageResponse` path is hardcoded or resolved, across
+   every language involved in the build.
 
 ## Output
 

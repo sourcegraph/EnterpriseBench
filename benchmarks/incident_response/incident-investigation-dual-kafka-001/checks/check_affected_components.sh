@@ -11,13 +11,17 @@ fi
 FOUND=0
 TOTAL=2
 
-# Must mention Kafka Connect task lifecycle
-if grep -qiE 'put.*flush.*commit|task.*lifecycle|WorkerSinkTask.*cycle|offset.*flush' "$REPORT"; then
+# Must name the Kafka Connect component that owns the put/flush/commit cycle
+# (repo-specific class name, not the generic lifecycle description already in
+# the prompt).
+if grep -qiE 'WorkerSinkTask' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention JDBC connector batch/transaction config
-if grep -qiE 'batch\.size|jdbc.*batch|transaction.*manag|BufferedRecords' "$REPORT"; then
+# Must name the JDBC connector component(s) that own the transaction/batch
+# insert (repo-specific class names, not the generic "batch.size" config
+# already given in the prompt).
+if grep -qiE 'JdbcSinkTask|BufferedRecords' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

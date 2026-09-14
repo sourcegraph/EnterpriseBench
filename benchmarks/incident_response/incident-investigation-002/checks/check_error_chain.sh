@@ -11,23 +11,27 @@ fi
 FOUND=0
 TOTAL=4
 
-# Must mention client-go or informer
+# Repo-specific artifacts only -- the entry point (client-go/informer) is a
+# given fact of the scenario; the other three hops must be tied to the
+# specific file/function the agent found in the repo, not the prompt's wording.
+
+# Must mention client-go or informer (entry point)
 if grep -qiE 'client.go|informer' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention cacher or watch cache filtering
-if grep -qiE 'cacher|watch.*cache.*filter|processEvent' "$REPORT"; then
+# Must cite the specific bug-location file
+if grep -qiE 'cacher\.go|storage/cacher' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention etcd3 watcher as the correct reference
-if grep -qiE 'etcd3.*watcher|etcd.*watcher\.go|etcd.*correct' "$REPORT"; then
+# Must cite the specific reference-implementation file (correct behavior)
+if grep -qiE 'etcd3/watcher\.go|etcd/etcd_watcher\.go|etcd_watcher\.go' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention the filter conversion (Modified -> Deleted)
-if grep -qiE 'filter|namespace.*match|curObjPasses|oldObjPasses|convert.*delete|modified.*delete' "$REPORT"; then
+# Must name the actual filter-conversion mechanism/symbols, not the generic word "filter"
+if grep -qiE 'processEvent|curObjPasses|oldObjPasses|PrevObject' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

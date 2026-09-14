@@ -11,8 +11,9 @@ FOUND=0
 TOTAL=3
 if grep -qiE 'spring.boot' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 if grep -qiE 'kafka' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-# Extra: shaded/pax-logging identification
-if grep -qiE 'pax.logging|shaded|relocated|repackage' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific: the actual dependent module/artifact names — not stated in the
+# prompt, only discoverable by reading the workspace repos' build manifests.
+if grep -qiE 'spring-boot-starter-log4j2|pax-logging-log4j2|kafka-clients' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

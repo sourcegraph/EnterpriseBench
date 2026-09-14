@@ -9,10 +9,11 @@ fi
 
 FOUND=0
 TOTAL=2
-# Grafana plugin SDK path
-if grep -qiE 'plugin.*sdk|grafana.*plugin|grafana.*axios' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-# Druid web-console path
-if grep -qiE 'web.console.*axios|druid.*web.*console' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific: the actual intermediary package name (grafana-plugin-sdk),
+# not just "grafana" or "plugin" mentioned near each other.
+if grep -qiE 'grafana[-_ ]?plugin[-_ ]?sdk' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific: the actual intermediary package name (druid-web-console).
+if grep -qiE 'druid[-_ ]?web[-_ ]?console' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

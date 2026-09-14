@@ -8,9 +8,29 @@ if [[ ! -f "$REPORT" ]]; then
   exit 0
 fi
 
-CONTENT=$(cat "$REPORT" | tr '[:upper:]' '[:lower:]')
-if echo "$CONTENT" | grep -q 'major'; then
-  printf '{"score": 1.0, "passed": true, "reason": "Correct classification found"}\n'
+# Repo-specific classification evidence only. "major" and "v10.0.0" alone are
+# already in the prompt (pnpm v10.0.0) and must not earn credit by themselves —
+# each criterion below also requires reasoning tied to the actual code change,
+# which is not stated in the prompt.
+FOUND=0
+TOTAL=3
+
+# 1. Overall major bump gated on the v10.0.0 release, stated together.
+if grep -qiE 'major.{0,40}v10\.0\.0|v10\.0\.0.{0,40}major' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+
+# 2. crypto.hash classified major with reasoning about the hash algorithm
+#    itself changing (not just "hash format changes are breaking").
+if grep -qiE 'crypto\.hash.{0,80}(algorithm|hash algorithm)|algorithm.{0,20}(shift|chang)' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+
+# 3. dependency-path classified major with reasoning about the *string output
+#    format* changing for affected names (not just "path encoding failures").
+if grep -qiE 'dependency-path.{0,80}(string|output) format|(string|output) format.{0,80}dependency-path' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+
+if [ "$TOTAL" -gt 0 ]; then
+  SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 else
-  printf '{"score": 0.0, "passed": false, "reason": "Expected major classification not found"}\n'
+  SCORE="0.00"
 fi
+if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi
+
+printf '{"score": %s, "passed": %s, "reason": "Found %d/%d classification criteria"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"

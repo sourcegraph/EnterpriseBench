@@ -31,12 +31,33 @@ for group in gt.get('parallelizable_steps', []):
 dep_graph = gt.get('dependency_graph', {})
 graph_nodes = set(dep_graph.keys())
 
+# Explicit negation ('no parallelizable steps', 'strictly sequential', ...)
+# must be stripped BEFORE the generic parallel/concurrent/independent
+# extractor below runs, otherwise 'no parallelizable steps' gets mistaken for
+# a positive claim (the word 'parallel' is a substring of 'parallelizable').
+negation_re = re.compile(
+    r'no\s+parallel\w*[^\n]*|not\s+parallelizable[^\n]*|zero\s+parallel\w*[^\n]*|'
+    r'strictly\s+(?:sequential|linear)[^\n]*|fully\s+sequential[^\n]*|entirely\s+sequential[^\n]*',
+    re.IGNORECASE,
+)
+no_parallel_claim = bool(negation_re.search(answer))
+stripped = negation_re.sub(' ', answer)
+
+# A grounded 'no parallelism' claim must be tied to repo-specific dependency
+# evidence (go.mod), not just the bare assertion — an empty/garbage report or
+# the prompt text alone (which never mentions go.mod) cannot satisfy this.
+cites_dep_evidence = bool(re.search(r'go\.mod', answer, re.IGNORECASE))
+
 # Look for parallel annotations in the answer (e.g., 'parallel:', 'concurrent:', 'independent:')
-parallel_section = re.findall(r'(?:parallel|concurrent|independent|simultaneously)[:\s]*([^\n]+(?:\n\s*[-*]\s*[^\n]+)*)', answer, re.IGNORECASE)
+parallel_section = re.findall(r'(?:parallel|concurrent|independent|simultaneously)[:\s]*([^\n]+(?:\n\s*[-*]\s*[^\n]+)*)', stripped, re.IGNORECASE)
 
 if not parallel_section and not gt_parallel:
-    # No parallelism expected and none claimed
-    print(json.dumps({'score': 1.0, 'passed': True, 'reason': 'No parallelism expected or claimed'}))
+    if no_parallel_claim and cites_dep_evidence:
+        print(json.dumps({'score': 1.0, 'passed': True, 'reason': 'Explicitly states no parallelizable steps, grounded in go.mod dependency evidence'}))
+    elif no_parallel_claim:
+        print(json.dumps({'score': 0.6, 'passed': True, 'reason': 'States no parallelizable steps but does not cite go.mod dependency evidence'}))
+    else:
+        print(json.dumps({'score': 0.0, 'passed': False, 'reason': 'Ground truth has no parallelizable steps, but the plan does not explicitly address parallelism'}))
 elif not parallel_section and gt_parallel:
     # Parallelism exists but agent did not identify any
     print(json.dumps({'score': 0.2, 'passed': False, 'reason': 'Agent did not identify parallelizable steps'}))

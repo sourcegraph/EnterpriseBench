@@ -8,13 +8,22 @@ if [[ ! -f "$ANSWER" ]]; then
   exit 0
 fi
 
+# Repo-specific evidence only — bare repo-name mentions are already given by
+# the "Repos in Workspace" list in the prompt and earn no credit on their own.
+# Each criterion requires a repo-specific artifact/symbol a correctly
+# code-grounded answer would cite (per expected_solution.json's
+# identify_repos criteria), none of which appear in instruction.md.
 FOUND=0
 TOTAL=3
-if grep -qiE 'grpc-go|grpc.go' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'etcd' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'kubernetes' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
+# grpc-go: must name the actual breaking symbol found in its source (the
+# ServiceRegistrar interface change), not just the repo name.
+if grep -qiE 'grpc-go|grpc.go' "$ANSWER" && grep -qiE 'ServiceRegistrar' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
+# etcd: must cite its go.mod requiring the grpc-go bump.
+if grep -qiE 'etcd' "$ANSWER" && grep -qiE 'go\.mod' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
+# kubernetes: must cite its go.mod requiring the grpc-go bump.
+if grep -qiE 'kubernetes' "$ANSWER" && grep -qiE 'go\.mod' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge "$TOTAL" ]; then PASSED=true; else PASSED=false; fi
 
-printf '{"score": %s, "passed": %s, "reason": "Found %d/%d repos in plan"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"
+printf '{"score": %s, "passed": %s, "reason": "Found %d/%d repo-specific artifacts"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"

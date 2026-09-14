@@ -26,8 +26,11 @@ configuration point.
 
 Write `/workspace/DEPENDENCY_TRACE.md` containing:
 
-1. Git's SSL configuration entry points (http.sslCAInfo, http.sslVerify, env vars)
-2. How git configures curl for TLS (curl_easy_setopt calls)
-3. Curl's OpenSSL backend integration (vtls/openssl.c)
+1. Git's SSL configuration entry points (the config keys and environment
+   variables that control CA trust, and where in git's source they are read)
+2. How git configures curl for TLS (the libcurl API calls git uses to pass
+   CA/verification options down to the transport library)
+3. Curl's OpenSSL backend integration (which source file bridges libcurl's
+   generic TLS layer to OpenSSL, and how it wires up certificate verification)
 4. OpenSSL's X509 certificate chain verification code path
 5. All configuration knobs across the three repos that affect verification

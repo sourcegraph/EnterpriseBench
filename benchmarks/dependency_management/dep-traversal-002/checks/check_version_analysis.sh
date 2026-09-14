@@ -8,9 +8,16 @@ if [[ ! -f "$REPORT" ]]; then
 fi
 
 FOUND=0
-TOTAL=2
-if grep -qiE 'affected|vulnerable|version.*range|< *0\.21' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'not.affected|unaffected|safe|patched|still.*vulnerable|needs.*upgrade' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+TOTAL=3
+# Specific version numbers (not just the generic word "vulnerable"/"affected").
+if grep -qiE '0\.21\.2' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Must cite a lockfile as the source of the resolved/pinned version.
+if grep -qiE 'yarn\.lock|package-lock\.json' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Must tie a named consumer to an explicit affected/not-affected verdict.
+if grep -qiE '(grafana|druid).{0,60}(not.affected|unaffected|still.*vulnerable|needs.*upgrade|patched|safe|affected|vulnerable)' "$REPORT" \
+   || grep -qiE '(not.affected|unaffected|still.*vulnerable|needs.*upgrade|patched|safe|affected|vulnerable).{0,60}(grafana|druid)' "$REPORT"; then
+  FOUND=$((FOUND + 1))
+fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

@@ -20,7 +20,7 @@ Your task:
 4. For each drift point, document: the ArgoCD default (with source file), the Helm
    override (with values.yaml path), and the potential impact.
 
-Write your analysis to /workspace/DRIFT_REPORT.json with:
+Write your analysis to /workspace/charts/DRIFT_REPORT.json with:
 {
   "drift_points": [
     {

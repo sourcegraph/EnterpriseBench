@@ -11,7 +11,7 @@ FOUND=0
 TOTAL=3
 if grep -qiE 'rbac|xds.*rbac|rbac.*engine' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 if grep -qiE 'authorization|authz' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'go\.mod|dependency.*version|upgrade' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+if grep -qiE 'go\.mod|go\.sum|dependency.*version' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

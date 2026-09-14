@@ -11,18 +11,19 @@ fi
 FOUND=0
 TOTAL=3
 
-# Must identify containerd CRI seccomp mapping file or function
-if grep -qiE 'container_create_linux|cri.*server.*seccomp|containerd.*cri.*plugin' "$REPORT"; then
+# Must name the actual containerd CRI seccomp mapping file (not just "containerd CRI plugin")
+if grep -qiE 'container_create_linux\.go|pkg/cri/server/container_create_linux|cri.*server.*container_create' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention OCI spec mapping or runtime spec generation
-if grep -qiE 'OCI.*spec|runtime.*spec|seccomp.*OCI|OCI.*seccomp|LinuxSeccomp' "$REPORT"; then
+# Must name the OCI runtime-spec seccomp field/struct actually populated (LinuxSeccomp / linux.seccomp),
+# not just the generic phrase "OCI runtime spec" already given in the prompt
+if grep -qiE 'LinuxSeccomp|linux\.seccomp|specs\.Linux\.Seccomp' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention containerd seccomp profile processing
-if grep -qiE 'containerd.*seccomp|seccomp_default|contrib.*seccomp|containerd.*profile' "$REPORT"; then
+# Must name the containerd seccomp helper file, not just say "containerd processes seccomp"
+if grep -qiE 'seccomp_default\.go|contrib/seccomp' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

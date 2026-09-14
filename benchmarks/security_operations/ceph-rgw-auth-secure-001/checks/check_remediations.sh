@@ -13,8 +13,20 @@ fi
 FOUND=0
 TOTAL=2
 
-grep -qiE "remediat|recommend|mitigat|fix|patch|harden" "$REPORT" && FOUND=$((FOUND + 1))
-grep -qiE "risk.*assessment\|summary\|overall\|conclusion" "$REPORT" && FOUND=$((FOUND + 1))
+# 1. A concrete remediation tied to a specific RGW source file — not just the
+#    prompt's generic "remediation recommendations" phrasing on its own.
+if grep -qiE 'rgw_auth_s3\.(cc|h)|rgw_auth\.(cc|h)|rgw_rest_s3\.cc' "$REPORT" && \
+   grep -qiE 'remediat|recommend|mitigat|fix|patch|harden|disable|replace|tighten' "$REPORT"; then
+    FOUND=$((FOUND + 1))
+fi
+
+# 2. A real risk-assessment conclusion tagged with an actual severity level —
+#    not just the prompt's bare "Summary risk assessment" checklist bullet
+#    (which never states a severity level itself).
+if grep -qiE 'risk assessment|overall risk|overall severity' "$REPORT" && \
+   grep -qiE '\b(critical|high|medium|low)\b' "$REPORT"; then
+    FOUND=$((FOUND + 1))
+fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 PASSED=$([ "$FOUND" -ge 1 ] && echo true || echo false)

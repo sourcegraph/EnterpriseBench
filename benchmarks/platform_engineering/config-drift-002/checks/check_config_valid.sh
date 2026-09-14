@@ -21,7 +21,30 @@ for f in "$CHART_DIR/values.yaml" "$CHART_DIR/templates/_helpers.tpl" "$CHART_DI
 done
 
 if [[ "$HAS_CORRECTED" = false ]]; then
-  printf '{"score": 1.0, "passed": true, "reason": "Corrected config not provided (optional checkpoint — skipped)"}\n'
+  # No corrected chart files provided. This checkpoint is only truly
+  # "optional" when the DRIFT_REPORT.json itself already spells out the
+  # concrete, repo-specific fix: the new values.yaml key needed to select a
+  # custom secret key, PLUS the rabbitmq.enabled conditional gating that
+  # _helpers.tpl needs for the password/erlangCookie validation, PLUS the
+  # override chain through _helpers.tpl and externalrabbitmq-secrets.yaml.
+  # None of these tokens appear in the task prompt, so a report that merely
+  # restates the prompt (or is empty/garbage) cannot satisfy this.
+  if python3 -c "
+import json, os
+report = json.load(open(os.environ['REPORT']))
+points = report.get('drift_points', [])
+text = json.dumps(points).lower()
+has_key = ('existingpasswordsecretpasswordkey' in text
+           or 'existingsecretpasswordkey' in text
+           or 'existingpasswordsecretkey' in text)
+has_gate = 'rabbitmq.enabled' in text and ('erlang' in text or 'password' in text)
+has_chain = '_helpers.tpl' in text and 'externalrabbitmq-secrets.yaml' in text
+exit(0 if (has_key and has_gate and has_chain) else 1)
+" 2>/dev/null; then
+    printf '{"score": 1.0, "passed": true, "reason": "DRIFT_REPORT specifies the concrete fix: new secret-key field, rabbitmq.enabled gating, and override chain"}\n'
+  else
+    printf '{"score": 0.25, "passed": false, "reason": "No corrected chart files provided and DRIFT_REPORT.json lacks the concrete fix (existingPasswordSecretPasswordKey-style field, rabbitmq.enabled gating, and _helpers.tpl/externalrabbitmq-secrets.yaml chain)"}\n'
+  fi
   exit 0
 fi
 

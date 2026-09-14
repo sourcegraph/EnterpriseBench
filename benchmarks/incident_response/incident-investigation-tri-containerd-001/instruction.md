@@ -11,18 +11,7 @@ A multi-architecture Kubernetes cluster reports that containers fail to start on
 - `docker inspect` shows the correct arm64 image is pulled
 - The error occurs in runc during process creation, not during image pull
 - containerd logs show the container is created successfully but start fails
-- The issue only affects images using a shell script as entrypoint with a missing or incorrect shebang line
-
-## Investigation So Far
-
-The team has identified the general area of the failure:
-
-1. Docker daemon delegates container lifecycle to containerd via gRPC
-2. containerd creates a shim process and delegates exec to runc
-3. runc uses the Linux kernel's execve() syscall to start the container process
-4. When the entrypoint is a script without a shebang, the kernel falls back to /bin/sh
-5. The image's /bin/sh may be a different architecture binary
-6. The error message varies: "exec format error" for wrong arch, "permission denied" for non-executable files
+- The same image works without issue on amd64 nodes; only specific images trigger the failure on arm64, and only on some of those images
 
 ## Environment
 
@@ -33,11 +22,21 @@ The team has identified the general area of the failure:
 
 ## What I Need
 
-1. **Root Cause**: Find where runc executes the container process using execve and how it handles the exec format error. Trace through all three repos.
+Investigate the three codebases and write an incident report grounded in the
+actual code — cite the specific files and functions you found, not general
+OCI runtime theory.
 
-2. **Error Chain**: Trace the full error propagation: runc execve failure -> containerd shim error -> Docker daemon error response -> user-visible error.
+1. **Root Cause**: Identify the exact code path in runc where the container's
+   entrypoint process is started, and explain precisely why that path
+   produces this error only for certain entrypoints on arm64 nodes. Cite the
+   file and function.
 
-3. **Affected Components**: Which components in each of the three repos are involved in the failure?
+2. **Error Chain**: Trace the full error propagation, hop by hop, from the
+   point of failure inside runc, through containerd, up to the user-visible
+   Docker daemon error. Tie each hop to the code you found.
+
+3. **Affected Components**: Which components in each of the three repos are
+   involved in the failure?
 
 4. **Remediation**: How should this be prevented or detected earlier?
 

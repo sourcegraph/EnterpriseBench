@@ -3,7 +3,6 @@
 set -euo pipefail
 
 WORKSPACE="${WORKSPACE:-/workspace}"
-GT_FILE="$TASK_DIR/ground_truth.json"
 
 # Check if agent referenced the key files
 FOUND=0
@@ -19,10 +18,15 @@ if [[ -d "$WORKSPACE/agent_output" ]]; then
     ALL_TEXT="$ALL_TEXT $(cat "$WORKSPACE/agent_output"/* 2>/dev/null)"
 fi
 
-if echo "$ALL_TEXT" | grep -qi "concrete_artifact_manager\|tar.*member\|getmember\|_tar_member"; then
+# Indicator 1: names the actual source file(s), not just the generic
+# "Galaxy collection installation code" phrasing already in the prompt.
+if echo "$ALL_TEXT" | grep -qiE "concrete_artifact_manager\.py|galaxy/collection/__init__\.py|collection/__init__\.py"; then
     FOUND=$((FOUND + 1))
 fi
-if echo "$ALL_TEXT" | grep -qi "collection.*init\|galaxy.*collection\|tarfile"; then
+# Indicator 2: names the specific fragile mechanism by its real symbol —
+# generic terms like "tar member"/"getmember"/"tarfile" already appear in
+# the prompt narrative and don't prove repo access on their own.
+if echo "$ALL_TEXT" | grep -qiE "_ansible_normalized_cache|_extract_tar_dir|install_artifact|_get_tar_file_member|removesuffix"; then
     FOUND=$((FOUND + 1))
 fi
 

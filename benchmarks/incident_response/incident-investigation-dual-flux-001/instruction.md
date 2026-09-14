@@ -13,17 +13,6 @@ After upgrading Flux from v2.1 to v2.2, several HelmRelease resources are stuck 
 - New HelmReleases created after the upgrade work correctly
 - Flux kustomize-controller also cannot see the HelmRelease as ready
 
-## Investigation So Far
-
-The team has identified the general area:
-
-1. Flux v2.2 updated the status condition API for HelmRelease resources
-2. helm-controller writes status conditions using the new API format
-3. Flux's reconciler reads status conditions to determine readiness
-4. HelmReleases that were in-progress during upgrade have old-format conditions
-5. The reconciler does not handle the transition from old to new condition format
-6. The stale condition causes an infinite reconciliation loop
-
 ## Environment
 
 - Flux v2.2.0 at `/workspace/flux2/`
@@ -32,13 +21,15 @@ The team has identified the general area:
 
 ## What I Need
 
-1. **Root Cause**: Find where Flux's reconciler evaluates HelmRelease readiness conditions and where helm-controller writes status conditions.
+Investigate both codebases and write an incident report grounded in the actual code — cite the specific files and functions you found, not general reconciliation theory.
 
-2. **Error Chain**: Trace the failure: old-format status condition -> Flux reconciler cannot parse -> reports not-ready -> triggers re-reconciliation -> infinite loop.
+1. **Root Cause**: Find where helm-controller's reconciler evaluates HelmRelease readiness status conditions, where it writes those conditions after a release, and where the HelmRelease status condition API surface is defined. Cite each by path and explain why the mismatch between them produces the symptoms above.
 
-3. **Affected Resources**: Which Flux components and Kubernetes resources are affected?
+2. **Error Chain**: Trace the failure from the helm-controller upgrade to the observed reconciliation behavior, tying each hop to a code path you identified. At least four hops.
 
-4. **Remediation**: How should the status condition transition be handled?
+3. **Affected Resources**: Which helm-controller/Flux components and Kubernetes resources are affected, and why?
+
+4. **Remediation**: How should the status condition transition be handled, and where would the fix live?
 
 ## Output
 

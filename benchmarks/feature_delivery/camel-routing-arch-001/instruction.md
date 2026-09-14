@@ -2,7 +2,7 @@
 
 ## Task
 
-Trace how Apache Camel routes a message from endpoint reception through the EIP pipeline to a destination. Map the complete Component→Endpoint→Consumer→Processor→Producer hierarchy, including the Pipeline processor chain, Channel interceptor wiring, and the RouteReifier model-to-runtime bridge.
+Trace how Apache Camel routes a message from endpoint reception through its internal message-processing machinery to a destination. Map the complete Component→Endpoint→Consumer→Processor→Producer hierarchy: how a component creates addressable endpoints, how those endpoints hand inbound messages to consumers, how the message moves step-by-step through processing, and how it finally reaches a downstream endpoint via a producer.
 
 ## Context
 
@@ -14,10 +14,10 @@ Trace how Apache Camel routes a message from endpoint reception through the EIP 
 
 ## Requirements
 
-1. Identify all relevant components in the Component→Endpoint→Consumer→Processor→Producer hierarchy (API interfaces + base implementations)
-2. Trace the dependency chain from route definition through reification to runtime message processing
-3. Document the Pipeline and Channel architecture (how processors are chained and intercepted)
-4. Explain how the RouteReifier bridges the DSL model (RouteDefinition) to the runtime Route
+1. Identify all relevant components in the Component→Endpoint→Consumer→Processor→Producer hierarchy (API interfaces + base implementations) and explain each one's responsibility.
+2. Trace the dependency chain from how a developer declares a route in code to how that becomes the live, running structure that actually processes messages at runtime — name every class/module the chain passes through.
+3. Document how the individual message-processing steps are strung together into a single execution path, and how cross-cutting concerns (error handling, instrumentation, interception) get layered around each step without the steps themselves knowing about it.
+4. Explain the specific mechanism (name the class and the module it lives in) that converts the declarative route model into the runtime objects that actually process messages.
 
 ## Expected Output
 

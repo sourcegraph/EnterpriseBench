@@ -11,23 +11,23 @@ fi
 FOUND=0
 TOTAL=4
 
-# Must mention kubelet role in the chain
-if grep -qiE 'kubelet.*CRI|kubelet.*seccomp|kubelet.*error|kubelet.*containerd' "$REPORT"; then
+# Must name the actual kubelet hop file — "kubelet ... CRI/seccomp" alone is the prompt's own phrasing
+if grep -qiE 'security_context\.go|kuberuntime_container_linux' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention containerd as intermediary in the chain
-if grep -qiE 'containerd.*runc|containerd.*OCI|containerd.*shim|CRI.*containerd' "$REPORT"; then
+# Must name the actual containerd hop file(s)
+if grep -qiE 'container_create_linux|contrib/seccomp|seccomp_default\.go' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention runc as the point of failure
-if grep -qiE 'runc.*fail|runc.*error|runc.*seccomp|BPF.*fail|filter.*fail' "$REPORT"; then
+# Must name the actual runc hop file/function
+if grep -qiE 'seccomp_linux\.go|InitSeccomp|buildFilter' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention moby default profile as reference or comparison point
-if grep -qiE 'moby.*default|default.*profile.*include|moby.*seccomp|docker.*seccomp' "$REPORT"; then
+# Must name the actual moby hop file
+if grep -qiE 'default_linux\.go|profiles/seccomp' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

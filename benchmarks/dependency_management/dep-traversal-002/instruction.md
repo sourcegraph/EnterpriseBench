@@ -2,19 +2,33 @@
 
 ## Context
 
-A ReDoS vulnerability (CVE-2021-3749) was found in the axios HTTP client library. Our frontend teams use axios extensively — it's embedded in Grafana plugins and the Druid web console.
+A ReDoS (Regular Expression Denial of Service) vulnerability was reported in
+the `axios` HTTP client library. Security wants the full blast radius across
+our frontend infrastructure before we prioritize patching.
 
-I need to know the full blast radius across our frontend infrastructure before we can prioritize patching.
+## Environment
+
+`/workspace/axios` is the vulnerable library. The workspace also contains
+every repo in our frontend ecosystem that might consume it — some declare it
+directly, some only pull it in through an intermediary package. You will need
+to search each repo's manifests and lockfiles to work out which is which.
 
 ## What I Need
 
-1. **CVE Identification**: Confirm the CVE, affected package, and version range.
+1. **CVE Identification**: Confirm the CVE identifier, the affected package,
+   and the vulnerable version range (and the version it was fixed in).
 
-2. **Direct Dependents**: Which workspace repos depend on axios? Show the manifest files.
+2. **Direct Dependents**: Which workspace repos declare `axios` directly?
+   Cite the manifest file where the dependency is declared for each, and note
+   whether it's a runtime or dev/test dependency.
 
-3. **Transitive Paths**: Trace how axios gets pulled in. Grafana uses a plugin SDK that may vendor axios. Druid has a web-console subfolder with its own package.json.
+3. **Transitive Paths**: For any repo that does *not* declare `axios` itself,
+   trace how it actually gets pulled in — name every intermediary package in
+   the chain from `axios` to that repo (A -> B -> C), and be explicit about
+   which dependents are direct vs. transitive.
 
-4. **Version Analysis**: Check resolved versions — are we actually running a vulnerable version, or have we already patched?
+4. **Version Analysis**: For each consumer, check the resolved/pinned version
+   in its lockfile and decide whether it falls inside the vulnerable range.
 
 ## Output
 

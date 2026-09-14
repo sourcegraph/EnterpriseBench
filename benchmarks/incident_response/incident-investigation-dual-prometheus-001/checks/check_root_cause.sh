@@ -11,13 +11,15 @@ fi
 FOUND=0
 TOTAL=3
 
-# Must identify inhibitor.go in Alertmanager
-if grep -qiE 'inhibitor\.go|inhibit/inhibitor|inhibition.*match' "$REPORT"; then
+# Must identify the actual Alertmanager inhibition source file/symbols, not
+# just the generic "inhibition rule matching" phrase already in the prompt.
+if grep -qiE 'inhibit/inhibit(or)?\.go|type[[:space:]]+Inhibitor|func.*Mutes\(|hasEqual\(' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must identify rules/manager.go in Prometheus
-if grep -qiE 'rules/manager\.go|rule.*manager|recording.*rule.*evaluat' "$REPORT"; then
+# Must identify the actual Prometheus rule-evaluation file/symbols, not just
+# generic "rule" + "manager" substrings (which also match "...Alertmanager").
+if grep -qiE 'rules/manager\.go|GroupEvalIterationFunc|DefaultEvalIterationFunc|NewRecordingRule\(' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

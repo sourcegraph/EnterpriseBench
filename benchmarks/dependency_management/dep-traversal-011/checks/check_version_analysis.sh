@@ -9,10 +9,11 @@ fi
 
 FOUND=0
 TOTAL=3
-# Multiple fix versions awareness
-if grep -qiE '2\.15.*partial|2\.16.*full|incomplete.*fix|still.*exploitable' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-# Backport versions
-if grep -qiE '2\.3\.1|2\.12\.2|backport|Java [67]' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific: the actual fix version numbers — the prompt describes the fix
+# staging in prose but never states these digits.
+if grep -qiE '2\.15\.0|2\.16\.0' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific: the actual backport version numbers — same reasoning.
+if grep -qiE '2\.3\.1|2\.12\.2' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 # Consumer classification
 if grep -qiE 'affected|vulnerable|patched|needs.*upgrade' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 

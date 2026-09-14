@@ -9,8 +9,12 @@ fi
 
 FOUND=0
 TOTAL=2
-if grep -qiE 'grafana' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'druid|web.console' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific: grafana as a direct dependent must be tied to the manifest
+# file that declares axios (its root package.json), not just the repo name.
+if grep -qiE 'grafana' "$REPORT" && grep -qiE 'package\.json' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific: druid's dependency runs through its web-console subfolder
+# manifest — require that exact path, not the generic word "druid".
+if grep -qiE 'web-console/package\.json|web.console.*package\.json|package\.json.*web.console' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

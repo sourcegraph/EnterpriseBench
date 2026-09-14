@@ -9,8 +9,23 @@ if [[ ! -f "$REPORT" ]]; then
 fi
 
 CONTENT=$(cat "$REPORT" | tr '[:upper:]' '[:lower:]')
-if echo "$CONTENT" | grep -q 'major'; then
-  printf '{"score": 1.0, "passed": true, "reason": "Correct classification found"}\n'
+
+FOUND=0
+TOTAL=3
+# "major" alone is already stated in the prompt ("still major if their
+# behavior changes") — require it alongside repo-specific grounding that only
+# comes from reading the changed source, not the instruction text.
+if echo "$CONTENT" | grep -q 'major'; then FOUND=$((FOUND + 1)); fi
+# The specific constant that was bumped — only visible in packages/constants/src/index.ts.
+if echo "$CONTENT" | grep -qE 'lockfile_version'; then FOUND=$((FOUND + 1)); fi
+# The v5->v6 migration path — only visible in the lockfile-file source, not the prompt.
+if echo "$CONTENT" | grep -qE 'inlinespecifierslockfileconverters|lockfile-file/src/experiments'; then FOUND=$((FOUND + 1)); fi
+
+if [ "$TOTAL" -gt 0 ]; then
+  SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 else
-  printf '{"score": 0.0, "passed": false, "reason": "Expected major classification not found"}\n'
+  SCORE="0.00"
 fi
+if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi
+
+printf '{"score": %s, "passed": %s, "reason": "Classified impact with %d/%d grounded signals"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"

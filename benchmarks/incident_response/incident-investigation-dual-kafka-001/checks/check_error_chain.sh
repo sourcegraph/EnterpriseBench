@@ -11,23 +11,30 @@ fi
 FOUND=0
 TOTAL=4
 
-# Must mention large batch as trigger
-if grep -qiE 'large.*batch|batch.*size|batch.*5000' "$REPORT"; then
+# Hop 1: WorkerSinkTask polling/handing off the large batch (repo-specific
+# class name, not the generic "large batch" phrasing already in the prompt).
+if grep -qiE 'WorkerSinkTask' "$REPORT" && grep -qiE 'poll|batch' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention JDBC transaction duration
-if grep -qiE 'jdbc.*transaction|database.*transaction|transaction.*duration' "$REPORT"; then
+# Hop 2/3: JdbcSinkTask/BufferedRecords owning the transaction and batch
+# insert (repo-specific class names, not the generic "JDBC transaction"
+# phrasing already in the prompt).
+if grep -qiE 'JdbcSinkTask|BufferedRecords' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention database timeout causing rollback
-if grep -qiE 'statement.*timeout|db.*timeout|rollback|SQLException' "$REPORT"; then
+# Hop 4/5: the DB-side timeout actually rolling back the transaction — must
+# name the rollback mechanism, not just echo "statement_timeout"/"SQLException"
+# from the alert text.
+if grep -qiE 'statement.*timeout|SQLException' "$REPORT" && grep -qiE 'rollback|rolls? back|rolled back' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention task failure and restart loop
-if grep -qiE 'task.*fail|restart.*loop|ConnectException|FAILED.*state' "$REPORT"; then
+# Hop 6/7/8: WorkerSinkTask marking the task FAILED and the restart loop that
+# follows (repo-specific class name tied to the failure, not just the
+# "restart"/"FAILED" symptom wording already in the prompt).
+if grep -qiE 'WorkerSinkTask' "$REPORT" && grep -qiE 'FAILED|restart' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

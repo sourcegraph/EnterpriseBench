@@ -9,8 +9,14 @@ fi
 
 FOUND=0
 TOTAL=2
-if grep -qiE 'affected|vulnerable|version|< *0\.3' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'not.affected|unaffected|safe|patched|needs.*upgrade|go\.mod' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific evidence only — "affected/vulnerable/version" and the CVE's own
+# < 0.3.8 range are already stated in the prompt and must not earn credit on
+# their own. Require the actual pinned version resolved in hugo's own
+# go.mod/go.sum (v0.7.0), which can only be obtained by reading the lockfile.
+if grep -qiE 'v0\.7\.0' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Agent must tie that resolved version to a classification for the named repo,
+# not just restate the CVE's generic fixed-version language.
+if grep -qiE 'hugo.*(patch|safe|not.*vulnerable|not.*affected|unaffected|already.*fixed)|(patch|safe|not.*vulnerable|not.*affected|unaffected|already.*fixed).*hugo' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

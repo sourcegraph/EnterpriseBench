@@ -2,21 +2,25 @@
 
 ## Context
 
-Spring Kafka's listener container threading model needs refactoring from
-single-threaded KafkaMessageListenerContainer to ConcurrentMessageListenerContainer
-with configurable concurrency. This change touches three repositories:
+Spring Kafka's listener container needs to support configurable concurrency
+for message consumption — the current default is single-threaded. This
+change spans three repositories with a real dependency chain:
 
-- spring-framework provides core messaging abstractions
-- spring-kafka implements Kafka-specific listener containers
+- spring-framework provides the core messaging abstractions Spring Kafka
+  builds on
+- spring-kafka owns the Kafka-specific listener container implementation(s)
 - spring-boot autoconfigures and exposes properties for listener containers
 
 The dependency chain: spring-framework -> spring-kafka -> spring-boot
 
 ## Task
 
-Produce a topologically sorted execution plan for this refactoring across all
-three repos, identifying ordering constraints, parallelization opportunities,
-and breaking changes.
+Investigate each repository to find the specific classes and configuration
+surfaces that this change actually touches, then produce a topologically
+sorted execution plan for the refactoring across all three repos, identifying
+ordering constraints, parallelization opportunities, and breaking changes.
+Ground each step in the actual code you find — a plan that only restates the
+repo names and roles above is not sufficient.
 
 ## Repos in Workspace
 
@@ -28,8 +32,10 @@ and breaking changes.
 
 Write `/workspace/REFACTOR_PLAN.md` containing:
 
-1. A numbered list of repos in the order they should be updated
+1. A numbered list of repos in the order they should be updated, each entry
+   citing the specific class(es) or file(s) in that repo the change touches
 2. Dependency graph (who depends on whom)
 3. Parallelization annotations (which steps can run concurrently)
-4. Breaking vs. compatible change annotations per step
+4. Breaking vs. compatible change annotations per step, grounded in the
+   actual container/config classes involved
 5. Risk assessment for each repo change

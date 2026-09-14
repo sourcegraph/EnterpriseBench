@@ -20,12 +20,9 @@ sorted execution plan for bumping cobra across the dependency chain.
 
 Write `/workspace/REFACTOR_PLAN.md` containing:
 
-1. A numbered list of repos in the order they should be updated
-2. Dependency graph (which repo depends on which)
-3. Parallelization annotations (which steps can run concurrently)
+1. A numbered list of repos in the order they should be updated, using each
+   repo's canonical GitHub `org/repo` identifier (owner/name form)
+2. Dependency graph (which repo depends on which) — ground each edge in the
+   actual dependency-manifest declaration you find in the repos, not assumption
+3. Parallelization annotations (which steps can run concurrently, if any)
 4. Risk assessment per step
-
-## Reference
-
-- spf13/cobra v1.10.2 release notes
-- kubernetes/kubernetes PR #137843: bump cobra to v1.10.2

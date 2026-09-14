@@ -8,11 +8,16 @@ if [[ ! -f "$REPORT" ]]; then
 fi
 
 FOUND=0
-TOTAL=2
-if grep -qiE 'setup\.py|setup\.cfg|requirements|pinned|version' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'affected|vulnerable|patched|needs.*upgrade|proxy.*auth|header.*leak' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+TOTAL=3
+V1_OK=0
+V2_OK=0
+# requests' own checked-out version, only found in requests/requests/__version__.py
+if grep -qiE '2\.28\.0' "$REPORT"; then FOUND=$((FOUND + 1)); V1_OK=1; fi
+# boto3's declared botocore pin range, only found in boto3/setup.py
+if grep -qiE '1\.29\.0.*1\.30\.0|1\.29\.0' "$REPORT"; then FOUND=$((FOUND + 1)); V2_OK=1; fi
+if grep -qiE 'affected|vulnerable|patched|needs.*upgrade' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
-if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi
+if [ "$V1_OK" -eq 1 ] && [ "$V2_OK" -eq 1 ]; then PASSED=true; else PASSED=false; fi
 
 printf '{"score": %s, "passed": %s, "reason": "Version analysis: %d/%d criteria met"}\n' "$SCORE" "$PASSED" "$FOUND" "$TOTAL"

@@ -9,9 +9,17 @@ if [[ ! -f "$REPORT" ]]; then
 fi
 
 FOUND=0
-TOTAL=2
+TOTAL=3
+# (1) The source for-of plugin is named in the prompt as one of the two
+# already-fixed packages, so this alone is not repo-specific evidence.
 if grep -qiE 'plugin.transform.for.of|@babel/plugin-transform-for-of' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'preset.env|@babel/preset-env' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# (2) preset-env must be tied to the *specific* regenerated integration
+# fixture directory, not just the package name — proves the agent actually
+# traced the fixture tree rather than guessing "preset-env bundles everything".
+if grep -qiE 'preset.env|@babel/preset-env' "$REPORT" && grep -qiE 'for-of-array-block-scoping' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# (3) The PR numbers that shipped these fixes are not stated anywhere in the
+# prompt — citing them requires actually finding the commits/changelog.
+if grep -qE '#?16166|#?16011' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 # Compute score as proper decimal
 if [ "$TOTAL" -gt 0 ]; then

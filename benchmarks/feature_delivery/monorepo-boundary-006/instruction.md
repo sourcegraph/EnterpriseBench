@@ -2,17 +2,21 @@
 
 ## Context
 
-Security team flagged that pnpm runs arbitrary lifecycle scripts (postinstall, preinstall, etc.) by default. For v10.0.0 we're flipping the default: lifecycle scripts now require an explicit allow-list in the project's `.npmrc` or `package.json`.
-
-The core change is in `@pnpm/config` — specifically `config/config/src/getOptionsFromRootManifest.ts`. It's a one-line default value change, but the ripple effect matters.
+Security team flagged that pnpm runs arbitrary lifecycle scripts (postinstall, preinstall, etc.) by default. For v10.0.0 we're evaluating flipping the default: lifecycle scripts would require an explicit allow-list in the project's `.npmrc` or `package.json`.
 
 ## What I Need
 
-1. **Affected packages**: Which workspace packages read the lifecycle script execution policy? Think about the install pipeline: config → core → build-modules → headless → plugin commands.
+Investigate the pnpm monorepo and write findings grounded in what you actually find in the code and tests — cite specific packages, files, and functions, not general semver theory.
 
-2. **Impact classification**: The config package itself is a major bump. But are downstream packages also major (they expose different behavior) or just patch (internal adjustment)?
+1. **Affected packages**: Which workspace packages read, enforce, or exercise the lifecycle-script execution policy? Trace the config → install/rebuild pipeline to find every package whose runtime behavior or test suite depends on this default.
 
-3. **Boundary violations**: Where in the codebase does code assume lifecycle scripts run by default? Show me test files that would fail with the new default, and source files that check this config value.
+2. **Impact classification**: For each affected package, classify the semver impact (major / minor / patch) of flipping this default, and justify each classification from the code and tests you found — don't just assert a number without tying it to what the package actually exposes or depends on.
+
+3. **Boundary violations**: Identify the source file(s) that implement or check this config default, and the test files that would need to change (or fail) under the new default.
+
+## Environment
+
+- `/workspace/pnpm/` — the pnpm monorepo (workspaces include `config/`, `exec/`, `pnpm/`, and others)
 
 ## Output
 

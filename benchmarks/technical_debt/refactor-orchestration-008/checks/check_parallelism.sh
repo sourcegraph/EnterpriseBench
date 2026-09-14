@@ -34,9 +34,40 @@ graph_nodes = set(dep_graph.keys())
 # Look for parallel annotations in the answer (e.g., 'parallel:', 'concurrent:', 'independent:')
 parallel_section = re.findall(r'(?:parallel|concurrent|independent|simultaneously)[:\s]*([^\n]+(?:\n\s*[-*]\s*[^\n]+)*)', answer, re.IGNORECASE)
 
-if not parallel_section and not gt_parallel:
-    # No parallelism expected and none claimed
-    print(json.dumps({'score': 1.0, 'passed': True, 'reason': 'No parallelism expected or claimed'}))
+# An explicit, repo-grounded statement that nothing is parallelizable — NOT
+# just silence/omission. A report that never mentions parallelism at all
+# (e.g. an empty or copy-pasted-prompt report) must not earn this credit.
+no_parallel_stated = bool(re.search(
+    r'no\s+(?:steps?\s+)?(?:that\s+)?(?:can\s+be\s+|are\s+)?parallel|'
+    r'not\s+parallelizable|'
+    r'zero\s+parallel(?:iz\w*)?\s+steps|'
+    r'cannot\s+(?:be\s+)?(?:run|executed|done)\s+in\s+parallel|'
+    r'every\s+step\s+(?:has\s+|depends)|'
+    r'each\s+step\s+(?:has\s+|depends)|'
+    r'hard\s+depend\w*\s+on\s+(?:the\s+)?previous|'
+    r'strictly\s+sequential',
+    answer, re.IGNORECASE,
+))
+
+if not gt_parallel and no_parallel_stated:
+    # No parallelism expected, and the plan explicitly says so (not just
+    # silence) — verify it isn't simultaneously contradicting itself.
+    raw_tokens = re.findall(r'[@\w/.-]+', ' '.join(parallel_section)) if parallel_section else []
+    claimed = [t for t in raw_tokens if t in graph_nodes]
+    violations = 0
+    for repo in claimed:
+        deps = dep_graph.get(repo, [])
+        for dep in deps:
+            if dep in claimed:
+                violations += 1
+    if violations == 0:
+        print(json.dumps({'score': 1.0, 'passed': True, 'reason': 'Explicitly states no parallelizable steps, no contradictions'}))
+    else:
+        score = max(0.0, 1.0 - violations * 0.3)
+        print(json.dumps({'score': score, 'passed': score >= 0.5, 'reason': f'{violations} contradictory parallel claims despite stating none'}))
+elif not parallel_section and not gt_parallel:
+    # Report never addresses parallelism at all — no credit for silence.
+    print(json.dumps({'score': 0.2, 'passed': False, 'reason': 'Plan does not address parallelism at all'}))
 elif not parallel_section and gt_parallel:
     # Parallelism exists but agent did not identify any
     print(json.dumps({'score': 0.2, 'passed': False, 'reason': 'Agent did not identify parallelizable steps'}))

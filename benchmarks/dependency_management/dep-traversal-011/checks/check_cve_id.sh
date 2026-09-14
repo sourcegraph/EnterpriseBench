@@ -10,8 +10,11 @@ fi
 FOUND=0
 TOTAL=3
 if grep -qi 'CVE-2021-44228' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'log4j.core|log4j-core' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE '2\.14\.1|2\.15\.0|2\.16\.0|Log4Shell' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific: the full Maven coordinate or the actual module path (log4j-core
+# is a submodule of logging-log4j2, not a top-level artifact) — not given in the prompt.
+if grep -qiE 'org\.apache\.logging\.log4j:log4j-core|log4j-core/pom\.xml' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific: the start of the vulnerable range, not stated in the prompt.
+if grep -qiE '2\.0-beta9' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi

@@ -11,18 +11,21 @@ fi
 FOUND=0
 TOTAL=3
 
-# Must identify runc seccomp filter generation file or function
-if grep -qiE 'seccomp_linux\.go|libcontainer.*seccomp|runc.*seccomp.*filter|runc.*BPF' "$REPORT"; then
+# Must name the actual runc file/function, not the generic "runc BPF filter" / "libcontainer seccomp"
+# phrasing already given in the prompt
+if grep -qiE 'seccomp_linux\.go|InitSeccomp|buildFilter' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention BPF filter or seccomp_rule or syscall filtering mechanism
-if grep -qiE 'BPF.*filter|seccomp_rule|libseccomp|SCMP_ACT|seccomp.*syscall' "$REPORT"; then
+# Must name the actual filtering mechanism/dependency (libseccomp binding, DefaultAction field), not
+# just "BPF filter" or "SCMP_ACT_ERRNO" — the latter is already quoted verbatim in the alert log
+if grep -qiE 'libseccomp|seccomp_rule|DefaultAction' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention unknown/unrecognized syscall handling (clone3, close_range, etc.)
-if grep -qiE 'clone3|close_range|openat2|unrecognized.*syscall|unknown.*syscall|syscall.*not.*found' "$REPORT"; then
+# Must name a syscall beyond the one already given in the alert log (clone3) — forces reading the
+# profile/filter code rather than echoing the alert
+if grep -qiE 'close_range|openat2|faccessat2|pidfd_open' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

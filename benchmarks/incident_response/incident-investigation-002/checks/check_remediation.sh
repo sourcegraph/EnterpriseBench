@@ -11,13 +11,17 @@ fi
 FOUND=0
 TOTAL=2
 
-# Must mention setting/updating the resourceVersion on the copied PrevObject
-if grep -qiE 'set.*resource.?[Vv]ersion|update.*resource.?[Vv]ersion|copy.*resource.?[Vv]ersion|versioner|resource.?[Vv]ersion.*copy|resource.?[Vv]ersion.*set' "$REPORT"; then
+# Repo-specific artifacts only -- generic phrases like "set resourceVersion" or
+# "reference implementation" are given in the prompt and must not earn credit.
+
+# Must locate the fix in the specific bug-location file
+if grep -qiE 'cacher\.go|storage/cacher' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must reference the etcd watcher implementation as the correct pattern
-if grep -qiE 'etcd.*watcher|etcd3.*watcher|existing.*logic|reference.*implementation|same.*pattern' "$REPORT"; then
+# Must reference the specific correct-pattern artifact: the reference
+# implementation file, the versioner mechanism, or the whitebox test file
+if grep -qiE 'etcd3/watcher\.go|etcd/etcd_watcher\.go|etcd_watcher\.go|versioner|cacher_whitebox_test' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

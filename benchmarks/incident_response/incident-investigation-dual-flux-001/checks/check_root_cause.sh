@@ -11,18 +11,21 @@ fi
 FOUND=0
 TOTAL=3
 
-# Must identify Flux reconciler condition parsing
-if grep -qiE 'helmrelease_reconciler|reconcil.*condition|reconcil.*status|reconcil.*pars' "$REPORT"; then
+# Repo-specific artifacts only — generic incident terms (reconciler, status
+# condition, upgrade) are already given in the prompt and must not earn credit.
+
+# Must name the helm-controller reconciler that misparses old-format conditions
+if grep -qiE 'internal/controller/helmrelease_controller\.go|helmrelease_controller\.go' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must identify helm-controller status writer
-if grep -qiE 'helmrelease\.go|helm.?controller.*status|status.*condition.*writ' "$REPORT"; then
+# Must name the helm-controller release writer that emits new-format conditions
+if grep -qiE 'internal/reconcile/release\.go' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention old vs new condition format mismatch
-if grep -qiE 'old.*format|new.*format|condition.*format|status.*condition.*API|stale.*condition' "$REPORT"; then
+# Must reference the HelmRelease v2beta2 API/type surface that changed
+if grep -qiE 'api/v2beta2/helmrelease_types\.go|api/v2beta2/condition_types\.go|v2beta2\b.*(helmrelease_types|condition_types)' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

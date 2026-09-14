@@ -11,18 +11,20 @@ fi
 FOUND=0
 TOTAL=3
 
-# Must identify moby seccomp profile files
-if grep -qiE 'profiles/seccomp|seccomp\.go|default_linux\.go|moby.*seccomp.*profile' "$REPORT"; then
+# Must name the actual moby seccomp profile file, not just "moby seccomp profile" (already in prompt)
+if grep -qiE 'profiles/seccomp/default_linux\.go|profiles/seccomp/seccomp\.go' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention default profile including newer syscalls
-if grep -qiE 'default.*profile|DefaultProfile|RuntimeDefault|moby.*default' "$REPORT"; then
+# Must name the actual profile-generation symbol, not the generic "default profile" / "RuntimeDefault"
+# phrasing already given in the prompt
+if grep -qiE 'DefaultProfile\(|func DefaultProfile|profiles/seccomp/default_linux' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 
-# Must mention the difference between default and custom profiles
-if grep -qiE 'custom.*profile.*missing|profile.*outdated|profile.*update|newer.*syscall|custom.*default.*differ|whitelist.*missing' "$REPORT"; then
+# Must name a specific syscall the default profile whitelists beyond the one already named in the
+# alert log (clone3) — forces the agent to actually read the profile rather than echo the alert
+if grep -qiE 'close_range|openat2|faccessat2|pidfd_open' "$REPORT"; then
   FOUND=$((FOUND + 1))
 fi
 

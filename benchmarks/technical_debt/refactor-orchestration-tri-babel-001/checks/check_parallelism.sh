@@ -30,15 +30,32 @@ parallel_steps = gt.get('parallelizable_steps', [])
 
 mentions_parallel = any(term in answer_text for term in ['parallel', 'concurrent', 'simultaneous', 'independent'])
 
+# A bare 'sequential'/'depends on' claim is generic — the prompt's own output
+# format ('Dependency relationships', 'Parallelization annotations') can bait
+# that. Full credit requires the claim PLUS repo-specific breaking-change
+# grounding for all three repos (only found by reading the actual repos),
+# mirroring ground_truth.json's breaking_changes list.
+sequential_claim = any(term in answer_text for term in [
+    'no parallel', 'not parallelizable', 'fully sequential', 'strictly sequential',
+    'strictly linear', 'cannot be parallelized', 'zero parallel',
+])
+babel_grounded = any(t in answer_text for t in ['@babel/parser', 'packages/babel-parser', '@babel/traverse', '@babel/types'])
+webpack_grounded = any(t in answer_text for t in ['babel-loader', 'tree-shaking', 'tree shaking'])
+nextjs_grounded = any(t in answer_text for t in ['next.config.js', 'swc fallback', 'packages/next', 'next/font', 'next/image'])
+breaking_change_grounded = babel_grounded and webpack_grounded and nextjs_grounded
+
 if not parallel_steps:
-    if any(term in answer_text for term in ['sequential', 'serial', 'no parallel', 'cannot.*parallel', 'depends on']):
+    if sequential_claim and breaking_change_grounded:
         score = 1.0
-        detail = 'Correctly identified no parallelizable steps (sequential chain)'
+        detail = 'Correctly identified fully sequential chain with repo-grounded breaking-change reasoning'
+    elif sequential_claim:
+        score = 0.6
+        detail = 'Correctly identified sequential chain but breaking-change reasoning is not repo-grounded'
     elif mentions_parallel:
         score = 0.3
         detail = 'Mentions parallelism but chain is fully sequential'
     else:
-        score = 0.5
+        score = 0.4
         detail = 'Did not explicitly address parallelism'
     passed = score >= 0.5
 else:

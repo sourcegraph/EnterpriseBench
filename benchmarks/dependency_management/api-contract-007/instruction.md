@@ -1,20 +1,41 @@
-# Impact Analysis: go-control-plane Module Split
+# Impact Analysis: go-control-plane Dependency Break
 
 ## Context
 
-We just hit a weird error running `go get -u` on our project that depends on `github.com/envoyproxy/go-control-plane`. The go-control-plane team restructured their repo into a multi-module layout (PR #714), creating separate Go modules for the generated Envoy protobuf bindings (`envoy/` and `contrib/` submodules).
+We just hit a weird error running `go get -u` on our project that depends on
+`github.com/envoyproxy/go-control-plane` (pinned around v0.13.2). Something
+changed in that repository around that version that broke dependency
+resolution for us — and, we've been told, for at least one other well-known
+consumer of the library too. We don't yet know exactly what changed, which of
+our neighboring projects it hit, or whether we need to change anything on our
+end.
 
-Turns out this broke dependency resolution for multiple major projects. We need to understand what happened and whether we need to apply a workaround.
+The go-control-plane maintainers landed a change (referenced in their issue
+tracker as PR #714) around this time, and there's a follow-up patch (PR #1075)
+that's supposed to have addressed the fallout. One of the affected consumers
+also shipped its own follow-up change (PR #8067) in response.
 
-## What I Need
+## What I need
 
-1. **Module structure**: What does the new multi-module layout look like? How do `go.mod` files in the root, `envoy/`, and `contrib/` directories relate to each other?
+1. **Root cause**: Look at the go-control-plane repository itself (its layout,
+   its dependency manifests, and its build tooling) around v0.13.2. What
+   changed at the repository/dependency level that would break `go get -u` for
+   downstream consumers? Point to the specific files that changed.
 
-2. **Affected consumers**: Which projects reported breakage? I've heard istio, grpc-go, and google-cloud-go were all affected. What error did they see?
+2. **Affected consumers**: Check the other repositories available in the
+   workspace — do they depend on go-control-plane, and if so, would running
+   `go get -u` or `go mod tidy` against the current state break for them too?
+   Cite the specific files/declarations that show the dependency. Separately:
+   we've also heard `googleapis/google-cloud-go` was affected by this same
+   break, but that repository isn't checked out locally, so you won't be able
+   to inspect its code directly — note it as a reported-affected project only.
 
-3. **Fix analysis**: The go-control-plane team landed PR #1075 to fix this. What backward-compatible imports did they add? Why do empty `.go` files solve a module resolution problem?
+3. **Fix analysis**: What did PR #1075 actually change, and why does that
+   change resolve the module-resolution problem? Walk through the mechanism,
+   don't just assert that it "fixed it."
 
-4. **grpc-go follow-up**: grpc-go also needed its own fix (PR #8067). What did it change in its go.mod?
+4. **Consumer follow-up**: What did PR #8067 change in the affected consumer's
+   `go.mod`, and why was that change necessary on top of the upstream fix?
 
 ## Output
 

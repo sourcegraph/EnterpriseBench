@@ -35,8 +35,12 @@ graph_nodes = set(dep_graph.keys())
 parallel_section = re.findall(r'(?:parallel|concurrent|independent|simultaneously)[:\s]*([^\n]+(?:\n\s*[-*]\s*[^\n]+)*)', answer, re.IGNORECASE)
 
 if not parallel_section and not gt_parallel:
-    # No parallelism expected and none claimed
-    print(json.dumps({'score': 1.0, 'passed': True, 'reason': 'No parallelism expected or claimed'}))
+    # The task explicitly requires a Parallelization section (Expected Output
+    # item 5). A report that never engages the topic at all — including an
+    # empty/garbage report — must not be credited just because ground truth
+    # happens to have no parallel steps; that would make this checkpoint
+    # always-pass regardless of content.
+    print(json.dumps({'score': 0.0, 'passed': False, 'reason': 'No parallelism analysis found in plan'}))
 elif not parallel_section and gt_parallel:
     # Parallelism exists but agent did not identify any
     print(json.dumps({'score': 0.2, 'passed': False, 'reason': 'Agent did not identify parallelizable steps'}))
@@ -51,7 +55,16 @@ elif parallel_section and not gt_parallel:
             if dep in claimed:
                 violations += 1
     if violations == 0:
-        print(json.dumps({'score': 0.8, 'passed': True, 'reason': 'Parallel claims are valid (no dependency violations)'}))
+        # Require the 'no parallelism' claim to be grounded in the actual
+        # dependency relationship (e.g. kubernetes depends on etcd/grpc-go),
+        # not just an unsupported assertion — repo-specific reasoning only.
+        grounded = bool(re.search(
+            r'kubernetes[^\n]{0,100}(depend|require|wait|block|sequential|pin)[^\n]{0,100}(etcd|grpc)'
+            r'|(?:etcd|grpc)[^\n]{0,100}(depend|require|before|must)[^\n]{0,100}kubernetes',
+            answer, re.IGNORECASE))
+        score = 1.0 if grounded else 0.8
+        reason = 'No parallel steps, grounded in dependency chain' if grounded else 'Parallel claims are valid (no dependency violations) but not grounded in the dependency chain'
+        print(json.dumps({'score': score, 'passed': True, 'reason': reason}))
     else:
         score = max(0.0, 1.0 - violations * 0.3)
         print(json.dumps({'score': score, 'passed': score >= 0.5, 'reason': f'{violations} dependency violations in parallel claims'}))

@@ -10,9 +10,13 @@ fi
 
 FOUND=0
 TOTAL=3
-if grep -qiE 'grpc-go|grpc.go' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'etcd' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'kubernetes' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific migration footprint only — bare repo names are given in the
+# prompt's environment list, so each check below also requires evidence that
+# could only come from investigating the repo (its actual call-site file,
+# PR reference, or vendored dependency), not from the instructions alone.
+if grep -qiE 'grpc-go|grpc/grpc-go' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
+if grep -qiE 'clientv3/client\.go|clientv3\.Client|etcd-io/etcd#?21282|DialTimeout' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
+if grep -qiE 'kubernetes/kubernetes#?128419|vendor.*(go\.)?etcd\.io|go\.mod.*etcd|etcd.*go\.mod|staging.*etcd' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge "$TOTAL" ]; then PASSED=true; else PASSED=false; fi

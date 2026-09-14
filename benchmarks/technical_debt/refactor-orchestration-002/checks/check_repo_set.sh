@@ -10,8 +10,12 @@ fi
 
 FOUND=0
 TOTAL=2
-if grep -qiE 'cobra|spf13' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE 'kubernetes' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
+# Repo-specific artifacts only: the bare words "cobra"/"kubernetes" are already
+# given in the prompt's context/environment sections, so each side additionally
+# requires a go.mod anchor to prove the agent grounded the claim in the repos
+# rather than echoing the task description.
+if grep -qiE 'spf13/cobra' "$ANSWER" && grep -qiE 'go\.mod' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
+if grep -qiE 'kubernetes/kubernetes' "$ANSWER" && grep -qiE 'go\.mod' "$ANSWER"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge "$TOTAL" ]; then PASSED=true; else PASSED=false; fi

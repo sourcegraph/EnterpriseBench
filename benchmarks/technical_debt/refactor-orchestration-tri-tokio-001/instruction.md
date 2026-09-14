@@ -2,19 +2,23 @@
 
 ## Context
 
-The Rust async HTTP ecosystem has a strict dependency chain:
-
-tokio (async runtime) -> hyper (HTTP implementation) -> axum (web framework)
-
-A refactoring of tokio's runtime builder API to support configurable task
-schedulers creates a cascade of required changes through hyper and axum. The
-change affects how hyper spawns connection handlers and how axum bootstraps
-its HTTP server.
+Three Rust crates live in this workspace: tokio (async runtime), hyper (HTTP
+implementation), and axum (web framework). The tokio maintainers are
+refactoring the runtime builder API to support configurable task schedulers.
+Because hyper and axum each build on tokio in some capacity, this change has
+downstream effects that need to be rolled out in the correct order -- but the
+exact dependency wiring between the three crates (who depends on whom, and
+whether any dependency is only transitive) is not given here. Determine it
+from each repo's own manifest and source.
 
 ## Task
 
-Produce a topologically sorted execution plan for propagating the tokio
-runtime builder refactoring through the HTTP stack.
+Investigate the three repos, determine the actual dependency relationships
+between them, and produce a topologically sorted execution plan for rolling
+out the tokio runtime builder refactoring across the stack. For each repo,
+identify the specific API surface in that repo's own code that the change
+touches -- don't assume which functions or types are affected without
+checking.
 
 ## Repos in Workspace
 

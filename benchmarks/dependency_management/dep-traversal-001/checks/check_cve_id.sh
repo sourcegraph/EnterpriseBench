@@ -11,7 +11,11 @@ fi
 FOUND=0
 TOTAL=2
 if grep -qi 'CVE-2021-23337' "$REPORT"; then FOUND=$((FOUND + 1)); fi
-if grep -qiE '4\.17\.21|< *4\.17\.21|lodash.*< *4' "$REPORT"; then FOUND=$((FOUND + 1)); fi
+# The fixed-version threshold (4.17.21) is stated in the prompt itself, so it
+# is not evidence the agent looked at the repo. Require the version actually
+# pinned in the workspace's checked-out lodash (package.json says 4.17.20) —
+# an agent can only produce this by opening /workspace/lodash/package.json.
+if grep -qE '4\.17\.20' "$REPORT"; then FOUND=$((FOUND + 1)); fi
 
 SCORE=$(awk "BEGIN {printf \"%.2f\", $FOUND/$TOTAL}")
 if [ "$FOUND" -ge 2 ]; then PASSED=true; else PASSED=false; fi
