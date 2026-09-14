@@ -43,13 +43,21 @@ class SessionConfig:
 
 @dataclass
 class SessionResult:
-    """Result of running a single session."""
+    """Result of running a single session.
+
+    ``success`` is derived, never assigned: assigned independently it could be
+    set before a later fallible step and left True beside that step's error, and
+    a session claiming completion is what admits the chain's final checkpoints.
+    """
 
     session_number: int
     branch_state: BranchState | None = None
     agent_output: str = ""
-    success: bool = False
     error: str = ""
+
+    @property
+    def success(self) -> bool:
+        return self.branch_state is not None and not self.error
 
 
 def setup_workspace(
@@ -222,8 +230,15 @@ def run_session(
             )
             if branch_state is None:
                 branch_state = bs  # Use first repo as primary branch state
+
+        if branch_state is None:
+            # Raised for the real cause: left to the log line below, this
+            # surfaces as an AttributeError naming NoneType instead.
+            raise ValueError(
+                f"run_session: session {session_num} committed no branch state "
+                f"({len(repos)} repos configured) — the chain has nothing to hand on."
+            )
         result.branch_state = branch_state
-        result.success = True
 
         logger.info(
             "Session %d completed. Branch: %s, SHA: %s",

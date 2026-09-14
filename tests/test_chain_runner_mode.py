@@ -117,9 +117,19 @@ class TestRunChainModePassthrough:
         # run_chain with mode="hybrid" — we expect it to set mode on sessions
         # before running. We mock run_session to avoid actual execution.
         with patch("orchestration.chain_runner.run_session") as mock_run:
+            from orchestration.branch_manager import BranchState
             from orchestration.session import SessionResult
 
-            mock_run.return_value = SessionResult(session_number=1, success=True)
+            # success is derived, so a succeeding mock must carry branch state.
+            mock_run.return_value = SessionResult(
+                session_number=1,
+                branch_state=BranchState(
+                    branch_name="eb-chain-t-session-1",
+                    commit_sha="deadbeef",
+                    repo_path="repo1",
+                    session_number=1,
+                ),
+            )
             try:
                 run_chain(task_def=task_def, simulate=True, mode="hybrid")
             except Exception:
