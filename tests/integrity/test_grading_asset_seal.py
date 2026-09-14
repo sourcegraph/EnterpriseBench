@@ -46,6 +46,7 @@ import run_task as rt  # noqa: E402
 from run_task import (  # noqa: E402
     AGENT_INSTRUCTION,
     AGENT_OUTPUT_DIR,
+    ANSWER_ARTIFACT_PATH,
     GRADING_PATHS,
     GROUND_TRUTH,
     SCORING_GROUP,
@@ -57,9 +58,12 @@ from run_task import (  # noqa: E402
     _assert_grading_assets_sealed,
     _assert_scoring_identity,
     _chown_to_agent,
+    _open_agent_output_for_scoring,
     _run_scoring,
     _seal_grading_assets,
 )
+
+from tests.conftest import docker_available  # noqa: E402
 
 
 def _is_parent_check(cmd: list[str]) -> bool:
@@ -105,6 +109,11 @@ def _reap_is(cmd: list) -> bool:
     return bool(cmd) and cmd[0] == "bash" and "kill -9" in cmd[-1] and "id -u agent" in cmd[-1]
 
 
+def _classify_is(cmd: list) -> bool:
+    """True if this exec is _open_agent_output_for_scoring's agent_output classify probe."""
+    return bool(cmd) and cmd[0] == "bash" and "echo symlink" in cmd[-1]
+
+
 def _run_scoring_capturing(stdout: str = '{"task_score": 0.5}'):
     """Drive _run_scoring past the seal gate and return the _docker_exec mock.
 
@@ -112,10 +121,18 @@ def _run_scoring_capturing(stdout: str = '{"task_score": 0.5}'):
     so the exec of interest is neither first nor last — use _scoring_call() to
     find it. The reap fails closed unless it reports zero survivors, so the mock
     returns that sentinel for the reap call and the caller's stdout otherwise.
+
+    These tests are about the verifier exec, not the agent's output, so the
+    classify probe answers "absent" — the one word that opens nothing and routes
+    nowhere, leaving _run_scoring to reach test.sh. A blanket stdout would be read
+    as an unclassifiable agent_output and (correctly) routed to an infra error
+    before scoring ran.
     """
     def fake_exec(container_id, cmd, **kwargs):
         if _reap_is(cmd):
             return _ok(stdout="agent_procs_remaining=0")
+        if _classify_is(cmd):
+            return _ok(stdout="absent")
         return _ok(stdout=stdout)
 
     with patch.object(rt, "_assert_grading_assets_sealed", return_value=(True, "")):
@@ -472,6 +489,8 @@ class TestRunScoringUnderTheSeal:
             calls.append(cmd)
             if _reap_is(cmd):
                 return _ok(stdout="agent_procs_remaining=0")
+            if _classify_is(cmd):
+                return _ok(stdout="absent")
             if cmd[0] == "bash" and rt.TEST_SH in cmd[-1]:
                 raise subprocess.TimeoutExpired(cmd="test.sh", timeout=600)
             return _ok()
@@ -954,7 +973,7 @@ class TestScoringIdentityContainsAgentCodeEndToEnd:
     """
 
     def test_arbitrary_code_as_the_scorer_cannot_forge_a_score(self) -> None:
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         cid = subprocess.run(
@@ -1063,7 +1082,7 @@ class TestScoringIdentityContainsAgentCodeEndToEnd:
     def test_a_root_scorer_is_caught_by_the_gate(self) -> None:
         """Mutation guard: the identity assertion must actually fail the run if
         someone points scoring back at root (the state this bead rejected)."""
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         cid = subprocess.run(
@@ -1100,7 +1119,7 @@ class TestLingeringAgentProcessCannotInjectAnswer:
     """
 
     def test_the_injection_works_without_the_reap_and_the_reap_stops_it(self) -> None:
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         def build() -> str:
@@ -1191,7 +1210,7 @@ class TestLingeringAgentProcessCannotInjectAnswer:
         reap cannot kill leaves survivors, and the run must fail closed rather
         than score beside them (the durable fix is a separate scoring container,
         fix-candidate-3)."""
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         cid = subprocess.run(
@@ -1226,6 +1245,76 @@ class TestLingeringAgentProcessCannotInjectAnswer:
             subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
 
 
+CALIBRATION_TASK = "benchmarks/customer_escalation/calibration-001"
+
+# The answer calibration-001's ground truth actually asks for — both required files.
+CALIBRATION_CORRECT_ANSWER = {
+    "source_files": ["src/flask/blueprints.py", "src/flask/sansio/scaffold.py"]
+}
+
+
+def _container_with_a_real_task(answer: dict, umask: str | None = None) -> str:
+    """A container carrying a real task's real grading assets and an answer.
+
+    One fixture for every test that needs the real scoring path, so it cannot
+    drift from production in one class and not another.
+
+    ``umask=None`` has root author answer.json, which the chown below leaves
+    agent-owned 0644 — the settled shape for the tests that are not about the
+    mode. ``umask='077'`` has the AGENT author it under that umask instead,
+    reproducing this bead's live vector: a 0600 answer.json that the
+    third-identity scorer, 'other' to the agent, cannot read.
+    """
+    cid = subprocess.run(
+        ["docker", "run", "-d", "--rm", "python:3.11-slim", "sleep", "300"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+
+    task = REPO_ROOT / CALIBRATION_TASK
+    subprocess.run(
+        [
+            "docker", "exec", cid, "bash", "-c",
+            "useradd -m -s /bin/bash agent; "
+            # production layout: the image hands /workspace to the agent, and the
+            # HARNESS creates agent_output before the agent runs, so the dir is
+            # 0755 whatever the agent's umask — only the FILE mode is the vector.
+            "mkdir -p /workspace/.verifiers /workspace/.task "
+            "/workspace/.eb_verify /workspace/agent_output /workspace/flask/.git; "
+            "chown -R agent:agent /workspace",
+        ],
+        capture_output=True, check=True,
+    )
+
+    rt._docker_cp(str(task / "checks/check_error_source.sh"),
+                  f"{cid}:/workspace/.verifiers/check_error_source.sh")
+    rt._docker_cp(str(task / "ground_truth.json"),
+                  f"{cid}:/workspace/.task/ground_truth.json")
+    rt._docker_cp(str(REPO_ROOT / "lib/eb_verify"),
+                  f"{cid}:/workspace/.eb_verify/eb_verify")
+    rt._docker_cp(str(REPO_ROOT / "scripts/sandbox/test_runner.sh"),
+                  f"{cid}:/workspace/test.sh")
+
+    write = (
+        f"cat > {ANSWER_ARTIFACT_PATH} <<'EOF'\n{json.dumps(answer)}\nEOF"
+    )
+    subprocess.run(
+        ["docker", "exec", cid, "bash", "-c", write] if umask is None
+        else ["docker", "exec", "-u", "agent", cid, "bash", "-c",
+              f"umask {umask}; {write}"],
+        capture_output=True, check=True,
+    )
+
+    subprocess.run(
+        ["docker", "exec", cid, "bash", "-c",
+         "chown -R agent:agent /workspace/agent_output /workspace/flask; "
+         # ...and the pre-seal state this bead exists to end
+         "chown -R agent:agent /workspace/.verifiers /workspace/.task "
+         "/workspace/.eb_verify /workspace/test.sh"],
+        capture_output=True, check=True,
+    )
+    return cid
+
+
 @pytest.mark.docker
 class TestRealTaskStillScoresUnderTheNewIdentity:
     """The other half of the bill: the seal must not silently zero real work.
@@ -1238,62 +1327,13 @@ class TestRealTaskStillScoresUnderTheNewIdentity:
     insists on a real score coming back out.
     """
 
-    CALIBRATION = "benchmarks/customer_escalation/calibration-001"
-
-    def _container_with_a_real_task(self, answer: dict) -> str:
-        cid = subprocess.run(
-            ["docker", "run", "-d", "--rm", "python:3.11-slim", "sleep", "300"],
-            capture_output=True, text=True, check=True,
-        ).stdout.strip()
-
-        task = REPO_ROOT / self.CALIBRATION
-        subprocess.run(
-            [
-                "docker", "exec", cid, "bash", "-c",
-                "useradd -m -s /bin/bash agent; "
-                # production layout: the image hands /workspace to the agent
-                "mkdir -p /workspace/.verifiers /workspace/.task "
-                "/workspace/.eb_verify /workspace/agent_output /workspace/flask/.git; "
-                "chown -R agent:agent /workspace",
-            ],
-            capture_output=True, check=True,
-        )
-
-        rt._docker_cp(str(task / "checks/check_error_source.sh"),
-                      f"{cid}:/workspace/.verifiers/check_error_source.sh")
-        rt._docker_cp(str(task / "ground_truth.json"),
-                      f"{cid}:/workspace/.task/ground_truth.json")
-        rt._docker_cp(str(REPO_ROOT / "lib/eb_verify"),
-                      f"{cid}:/workspace/.eb_verify/eb_verify")
-        rt._docker_cp(str(REPO_ROOT / "scripts/sandbox/test_runner.sh"),
-                      f"{cid}:/workspace/test.sh")
-
-        import json as _json
-        subprocess.run(
-            ["docker", "exec", cid, "bash", "-c",
-             f"cat > /workspace/agent_output/answer.json <<'EOF'\n"
-             f"{_json.dumps(answer)}\nEOF\n"
-             "chown -R agent:agent /workspace/agent_output /workspace/flask; "
-             # ...and the pre-seal state this bead exists to end
-             "chown -R agent:agent /workspace/.verifiers /workspace/.task "
-             "/workspace/.eb_verify /workspace/test.sh"],
-            capture_output=True, check=True,
-        )
-        return cid
-
     def test_a_correct_answer_still_scores_and_a_wrong_one_still_fails(self) -> None:
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
-        if not (REPO_ROOT / self.CALIBRATION / "ground_truth.json").exists():
+        if not (REPO_ROOT / CALIBRATION_TASK / "ground_truth.json").exists():
             pytest.skip("calibration task not present")
 
-        # The answer the ground truth actually asks for — both required files.
-        cid = self._container_with_a_real_task(
-            {"source_files": [
-                "src/flask/blueprints.py",
-                "src/flask/sansio/scaffold.py",
-            ]}
-        )
+        cid = _container_with_a_real_task(CALIBRATION_CORRECT_ANSWER)
         try:
             _seal_grading_assets(cid)
             scores = _run_scoring(cid, verifier_timeout=120)
@@ -1310,7 +1350,7 @@ class TestRealTaskStillScoresUnderTheNewIdentity:
         )
 
         # ...and the check is still discriminating, not just passing everything.
-        cid = self._container_with_a_real_task({"source_files": ["src/flask/wrong.py"]})
+        cid = _container_with_a_real_task({"source_files": ["src/flask/wrong.py"]})
         try:
             _seal_grading_assets(cid)
             wrong = _run_scoring(cid, verifier_timeout=120)
@@ -1328,12 +1368,12 @@ class TestRealTaskStillScoresUnderTheNewIdentity:
         rewrite the verifier, and copy the answer key over its own answer. Under
         the root grader both succeeded. The score must still be 0.0.
         """
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
-        if not (REPO_ROOT / self.CALIBRATION / "ground_truth.json").exists():
+        if not (REPO_ROOT / CALIBRATION_TASK / "ground_truth.json").exists():
             pytest.skip("calibration task not present")
 
-        cid = self._container_with_a_real_task({"source_files": ["src/flask/wrong.py"]})
+        cid = _container_with_a_real_task({"source_files": ["src/flask/wrong.py"]})
         try:
             forgery = (
                 'import json, os, shutil\n'
@@ -1386,7 +1426,7 @@ class TestForgeAttackEndToEnd:
     let the unprivileged user overwrite a verifier with a forged verdict."""
 
     def test_sealed_agent_cannot_forge_a_verdict_or_read_ground_truth(self) -> None:
-        if subprocess.run(["docker", "info"], capture_output=True).returncode != 0:
+        if not docker_available():
             pytest.skip("docker daemon unavailable")
 
         # debian-based, matching every production base image in
@@ -1522,3 +1562,716 @@ class TestForgeAttackEndToEnd:
             assert "test.sh" in err
         finally:
             subprocess.run(["docker", "kill", cid], capture_output=True)
+
+
+def _seal_probe_is(cmd: list) -> bool:
+    """True if this exec is the grading-asset other-readable snapshot."""
+    return bool(cmd) and cmd[0] == "bash" and "-perm /004" in cmd[-1]
+
+
+def _open_exec(
+    *,
+    kind: str = "dir",
+    classify_ok: bool = True,
+    answer_is_symlink: bool = False,
+    chmod_ok: bool = True,
+    grading_widened: bool = False,
+    seal_probe_ok: bool = True,
+    answer_present: bool = True,
+    answer_readable: bool = True,
+):
+    """A _docker_exec stand-in for _open_agent_output_for_scoring's probes.
+
+    Returns (fake_exec, calls) so a test can both steer each probe's outcome and
+    assert on the exact commands issued (e.g. that the grant carries no write
+    bit). ``kind`` is the classify word ("dir"|"symlink"|"file"|"absent").
+
+    ``grading_widened`` simulates a hard link that aimed the chmod at a sealed
+    asset: the seal snapshot is empty BEFORE the grant and names test.sh AFTER,
+    which is exactly the delta the real probe reports for a widened inode.
+    """
+    calls: list[list] = []
+    seal_probes = {"n": 0}
+
+    def fake_exec(container_id, cmd, **kwargs):
+        calls.append(cmd)
+        # The classify probe: one bash that echoes symlink/dir/file/absent.
+        if _classify_is(cmd):
+            return _ok(stdout=kind) if classify_ok else _fail("docker: no such container")
+        # The seal snapshot, issued either side of the chmod. First call is the
+        # BEFORE state, second the AFTER state.
+        if _seal_probe_is(cmd):
+            if not seal_probe_ok:
+                return _fail("find: cannot read")
+            seal_probes["n"] += 1
+            if seal_probes["n"] >= 2 and grading_widened:
+                return _ok(stdout=f"{rt.TEST_SH}\n")
+            return _ok(stdout="")
+        if cmd[:2] == ["test", "-L"] and cmd[2] == ANSWER_ARTIFACT_PATH:
+            return _ok() if answer_is_symlink else _fail()
+        if cmd[0] == "chmod":
+            return _ok() if chmod_ok else _fail("chmod: denied")
+        if cmd[:2] == ["test", "-e"] and cmd[2] == ANSWER_ARTIFACT_PATH:
+            return _ok() if answer_present else _fail()
+        if cmd[:2] == ["test", "-r"] and cmd[2] == ANSWER_ARTIFACT_PATH:
+            return _ok() if answer_readable else _fail()
+        return _ok()
+
+    return fake_exec, calls
+
+
+def _infra_detail(result: dict | None) -> str:
+    """The verifier_infra_error detail from an _open_agent_output_for_scoring result.
+
+    Named for the field it returns: ``reason`` is the sibling machine key
+    ("agent_output_unreadable_by_scorer") these tests assert separately.
+    """
+    return result["verifier_infra_error"]["detail"]
+
+
+class TestOpenAgentOutputForScoring:
+    """Unit-level: the umask under-credit gate (bead EnterpriseBench-qx4pg).
+
+    A correct agent must not score a false 0.0 because a restrictive umask left
+    agent_output/ unreadable to the third-identity scorer. The gate returns None
+    to proceed, or a scores fragment naming its channel: a symlink/hard link at
+    the seal is an ``integrity_violation`` (INVALID, never re-run), a genuine
+    unreadable answer is a ``verifier_infra_error`` (re-run), never a false 0.0.
+    """
+
+    def test_absent_agent_output_is_a_pass_and_opens_nothing(self) -> None:
+        # No output directory means an empty answer, which scores 0.0 on its own
+        # merits. Nothing for this gate to open, and no chmod to issue.
+        fake, calls = _open_exec(kind="absent")
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        assert result is None
+        assert not any(c[0] == "chmod" for c in calls), (
+            "opened a directory the agent never created"
+        )
+
+    def test_symlinked_agent_output_is_integrity_violation_and_never_chmods(
+        self,
+    ) -> None:
+        # An agent that replaces agent_output with a symlink (to the sealed
+        # grading assets, say) must not get this root chmod to follow it: both
+        # `test -d` and `chmod -R` dereference a top-level symlink, which would
+        # widen ground_truth.json to o=rX. It is grading-asset tampering, so it
+        # takes the INVALID channel (never a re-run mulligan), BEFORE any chmod.
+        fake, calls = _open_exec(kind="symlink")
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        violation = result["integrity_violation"]
+        assert violation["reason"] == "agent_output_tampered"
+        assert "symlink" in violation["detail"]
+        assert "verifier_infra_error" not in result, "tamper must not be a re-run"
+        assert not any(c[0] == "chmod" for c in calls), (
+            "followed a symlinked agent_output through a root chmod"
+        )
+
+    def test_symlinked_answer_json_is_integrity_violation_and_never_chmods(
+        self,
+    ) -> None:
+        # The nested-symlink forge: agent_output is a real dir, but answer.json is
+        # a symlink aimed at the sealed ground_truth.json. `chmod -R` does not
+        # follow it, but the ~119 grep checks `cat answer.json` would read the
+        # answer key through it. Reject on the tamper channel before any chmod.
+        fake, calls = _open_exec(answer_is_symlink=True)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        violation = result["integrity_violation"]
+        assert violation["reason"] == "agent_output_tampered"
+        assert "answer.json" in violation["detail"] and "symlink" in violation["detail"]
+        assert "verifier_infra_error" not in result
+        assert not any(c[0] == "chmod" for c in calls), (
+            "chmod'd a directory holding a symlinked answer.json"
+        )
+
+    def test_plain_file_agent_output_is_not_a_rerun_mulligan(self) -> None:
+        """A plain-file agent_output must not reach the re-run channel.
+
+        /workspace is 1777 during the session, so `echo x > /workspace/agent_output`
+        is a move any agent can make. verifier_infra_error "earns a fresh attempt",
+        so routing this agent-controlled shape there would hand every agent a
+        re-run button — an incentive inversion (g5k5s) that main does not have.
+        No answer.json can live inside a file, so the honest verdict is the same
+        as an absent agent_output: score it on the agent's merits, and log it.
+        """
+        fake, calls = _open_exec(kind="file")
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            with patch.object(rt, "logger") as log:
+                result = _open_agent_output_for_scoring("cid")
+        assert result is None, f"plain-file agent_output routed to a channel: {result}"
+        assert not any(c[0] == "chmod" for c in calls), "nothing to open in a file"
+        assert log.warning.called, "the anomaly must be surfaced, not silent"
+
+    def test_hardlinked_grading_asset_widened_by_chmod_is_integrity_violation(
+        self,
+    ) -> None:
+        # A hard link inside agent_output shares the grading asset's inode, so
+        # `chmod -R` widens the real file. The asset was not other-readable before
+        # the grant and is after; that delta is this open's doing -> tamper, never
+        # a re-run.
+        fake, _ = _open_exec(grading_widened=True)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        violation = result["integrity_violation"]
+        assert violation["reason"] == "agent_output_tampered"
+        assert "hard link" in violation["detail"]
+        assert rt.TEST_SH in violation["detail"]
+        assert "verifier_infra_error" not in result
+
+    def test_seal_is_checked_across_every_grading_path_not_just_two_files(
+        self,
+    ) -> None:
+        """The re-verify must cover all of GRADING_PATHS.
+
+        Only test.sh is link-able by a real agent today — .verifiers, .task and
+        .eb_verify sit under 0750 dirs it cannot traverse, so `ln` fails EACCES
+        before protected_hardlinks is even consulted. That safety lives in
+        _seal_grading_assets, not here, so a re-verify scoped to two file
+        constants would silently stop covering them the day the seal is loosened.
+        Probing by MODE as root (not "can the agent read it") is what makes the
+        check see inside those dirs at all.
+        """
+        fake, calls = _open_exec()
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            _open_agent_output_for_scoring("cid")
+        seal_probes = [c for c in calls if _seal_probe_is(c)]
+        assert len(seal_probes) == 2, "seal must be snapshotted before AND after"
+        for probe in seal_probes:
+            for path in rt.GRADING_PATHS:
+                assert path in probe[-1], f"{path} is never re-verified"
+
+    def test_preexisting_other_readable_asset_is_not_a_false_tamper(self) -> None:
+        """Only a delta across the chmod is tampering.
+
+        If a grading path is already other-readable before the grant, this open
+        did not widen it. Flagging it would fail a correct agent as a saboteur —
+        an under-credit, the exact class this bead exists to kill.
+        """
+        calls: list[list] = []
+
+        def fake(container_id, cmd, **kwargs):
+            calls.append(cmd)
+            if _classify_is(cmd):
+                return _ok(stdout="dir")
+            if _seal_probe_is(cmd):
+                # Same non-empty listing before and after: no delta, no tamper.
+                return _ok(stdout=f"{rt.TEST_SH}\n")
+            if cmd[:2] == ["test", "-L"]:
+                return _fail()
+            return _ok()
+
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        assert result is None, f"pre-existing seal state flagged as tamper: {result}"
+
+    def test_failed_classify_probe_is_infra_not_a_silent_absent(self) -> None:
+        """A probe that could not run is not evidence the agent wrote nothing.
+
+        Falling through to "absent" would let the checks score a correct answer
+        0.0 on a docker hiccup — this bead's own bug class from the other side.
+        """
+        fake, calls = _open_exec(classify_ok=False)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        assert "could not classify" in _infra_detail(result)
+        assert "integrity_violation" not in result
+        assert not any(c[0] == "chmod" for c in calls)
+
+    def test_unexpected_classify_output_is_infra_not_a_silent_absent(self) -> None:
+        fake, calls = _open_exec(kind="{}")
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        assert "unexpected probe result" in _infra_detail(result)
+        assert not any(c[0] == "chmod" for c in calls)
+
+    def test_failed_seal_probe_is_infra_not_a_pass(self) -> None:
+        """Unable to verify the seal is not the same as the seal holding."""
+        fake, _ = _open_exec(seal_probe_ok=False)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        assert "grading-asset seal" in _infra_detail(result)
+        assert "integrity_violation" not in result
+
+    def test_readable_answer_passes(self) -> None:
+        fake, _ = _open_exec()
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            assert _open_agent_output_for_scoring("cid") is None
+
+    def test_grant_is_read_and_traverse_only_never_write(self) -> None:
+        fake, calls = _open_exec()
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            _open_agent_output_for_scoring("cid")
+        chmod = next(c for c in calls if c[0] == "chmod")
+        assert chmod == ["chmod", "-R", "u=rwX,go=rX", AGENT_OUTPUT_DIR]
+        # The load-bearing invariant: no group/other WRITE bit is ever granted,
+        # so the scorer (still 'other') cannot forge the answer it grades.
+        go_clause = chmod[2].split(",")[1]  # "go=rX"
+        assert go_clause.startswith("go=") and "w" not in go_clause
+
+    def test_chmod_failure_is_infra_not_pass(self) -> None:
+        fake, _ = _open_exec(chmod_ok=False)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        assert "chmod: denied" in _infra_detail(result)
+        assert "integrity_violation" not in result
+
+    def test_present_but_unreadable_answer_is_infra_not_false_zero(self) -> None:
+        # The exact bug: answer.json exists (the agent answered) but the scorer
+        # cannot read it. Must be VERIFIER_INFRA_ERROR, never a silent 0.0.
+        fake, _ = _open_exec(answer_readable=False)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            result = _open_agent_output_for_scoring("cid")
+        assert "answer.json" in _infra_detail(result)
+        assert "integrity_violation" not in result
+
+    def test_absent_answer_json_is_not_flagged(self) -> None:
+        # agent_output/ exists but holds no answer.json (agent wrote some other
+        # artifact, or nothing): a genuine empty answer, not this gate's concern.
+        fake, _ = _open_exec(answer_present=False, answer_readable=False)
+        with patch.object(rt, "_docker_exec", side_effect=fake):
+            assert _open_agent_output_for_scoring("cid") is None
+
+
+class TestRunScoringRoutesUnreadableAgentOutput:
+    """The gate is wired into _run_scoring; each failure keeps its own channel."""
+
+    def _drive(self, open_result: dict, reopened: list[str]):
+        with patch.object(
+            rt, "_assert_grading_assets_sealed", return_value=(True, "")
+        ), patch.object(rt, "_reap_agent_processes"), patch.object(
+            rt, "_close_workspace_for_scoring"
+        ), patch.object(
+            rt, "_open_agent_output_for_scoring", return_value=open_result
+        ), patch.object(
+            rt,
+            "_reopen_workspace_for_agent",
+            side_effect=lambda cid: reopened.append(cid),
+        ), patch.object(
+            rt, "_docker_exec", return_value=_ok(stdout='{"task_score": 1.0}')
+        ) as exec_:
+            scores = _run_scoring("cid")
+        return scores, exec_
+
+    def test_unreadable_agent_output_becomes_infra_error_and_reopens(self) -> None:
+        reopened: list[str] = []
+        scores, exec_ = self._drive(
+            rt._agent_output_infra("scorer cannot read answer.json"), reopened
+        )
+
+        assert scores["task_score"] == 0.0
+        assert scores["all_passed"] is False
+        infra = scores["verifier_infra_error"]
+        assert infra["reason"] == "agent_output_unreadable_by_scorer"
+        assert infra["stage"] == "deterministic_scoring"
+        assert "integrity_violation" not in scores
+        # The finally block must still reopen the workspace for a chain's next
+        # session, even though we returned early inside the try.
+        assert reopened == ["cid"]
+        # And test.sh must never have run — we bailed before scoring, so the
+        # un-credited 1.0 in the mock's stdout can never reach the caller.
+        assert not any(
+            call.args[1][0] == "bash" and rt.TEST_SH in call.args[1][-1]
+            for call in exec_.call_args_list
+        ), "scoring ran test.sh despite unreadable agent output"
+
+    def test_tampered_agent_output_becomes_integrity_violation_not_a_rerun(
+        self,
+    ) -> None:
+        # A symlink/hard link aimed at the seal must reach the INVALID channel, so
+        # the top-level router marks the run invalid and never re-scores it. The
+        # verifier_infra_error re-run channel would be a free mulligan (g5k5s).
+        reopened: list[str] = []
+        scores, exec_ = self._drive(
+            rt._agent_output_tampered("answer.json is a symlink"), reopened
+        )
+
+        assert scores["task_score"] == 0.0
+        assert scores["all_passed"] is False
+        assert scores["integrity_violation"]["reason"] == "agent_output_tampered"
+        assert "verifier_infra_error" not in scores
+        assert reopened == ["cid"]
+        assert not any(
+            call.args[1][0] == "bash" and rt.TEST_SH in call.args[1][-1]
+            for call in exec_.call_args_list
+        ), "scoring ran test.sh despite a tampered agent_output"
+
+
+@pytest.mark.docker
+class TestUmaskDoesNotUnderCreditTheScorer:
+    """bead EnterpriseBench-qx4pg, end-to-end on the real two-user topology.
+
+    A correct agent must not score a false 0.0 because its umask left
+    agent_output/ unreadable to the third-identity scorer (ebscorer, 'other' to
+    the agent). Reproduces the bug under umask 077, then proves the harness-side
+    open makes a correct answer.json readable — without granting the scorer the
+    write bit that would let it forge one.
+    """
+
+    def _build(self, umask: str) -> str:
+        cid = subprocess.run(
+            ["docker", "run", "-d", "--rm", "debian:bookworm-slim", "sleep", "300"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        subprocess.run(
+            ["docker", "exec", cid, "bash", "-c",
+             "useradd -m -s /bin/bash agent; mkdir -p /workspace"],
+            capture_output=True, check=True,
+        )
+        # The scoring identity comes from production's own sealer for the reason
+        # _seal_cid below spells out: a hand-rolled groupadd/useradd drops the
+        # SCORING_UID pin and its fallback, and drifts silently when they change.
+        # It also leaves /workspace in its real session shape (root-owned 1777)
+        # rather than agent-owned.
+        _seal_grading_assets(cid)
+        # Mirror production: the HARNESS creates agent_output before the agent
+        # runs (_install_claude_cli mkdirs it as root, _run_agent mkdirs it in the
+        # wrapper around the agent command), so the directory is 0755 and the
+        # agent's own `mkdir -p` from the instruction appendix is a no-op. Letting
+        # the agent create it here instead would land a 0700 directory and test
+        # the fix against a shape production never produces.
+        subprocess.run(
+            ["docker", "exec", cid, "bash", "-c",
+             "mkdir -p /workspace/agent_output && "
+             "chown agent:agent /workspace/agent_output"],
+            capture_output=True, check=True,
+        )
+        # The agent AUTHORS answer.json under its own umask — that file's mode is
+        # the live vector: at umask 077 it lands 0600 and only the READ fails.
+        subprocess.run(
+            ["docker", "exec", "-u", "agent", cid, "bash", "-c",
+             f"umask {umask}; mkdir -p /workspace/agent_output; "
+             'echo \'{"answer": "42"}\' > /workspace/agent_output/answer.json'],
+            capture_output=True, check=True,
+        )
+        return cid
+
+    def _scorer_sees_answer(self, cid: str) -> bool:
+        # Exactly what an answer.json checkpoint does: as ebscorer, is answer.json
+        # a readable file? Both halves matter — on the live vector `[ -f ]` passes
+        # (the dir is traversable) and the `cat` is what gets EACCES on the agent's
+        # 0600 file, which is why the under-credit is silent.
+        out = subprocess.run(
+            ["docker", "exec", "-u", SCORING_USER, cid, "bash", "-c",
+             "[ -f /workspace/agent_output/answer.json ] && "
+             "cat /workspace/agent_output/answer.json"],
+            capture_output=True, text=True,
+        )
+        return out.returncode == 0 and "42" in out.stdout
+
+    def _seal_cid(self) -> str:
+        """A container sealed by the real _seal_grading_assets, assets populated.
+
+        Sealing through production's own function rather than a hand-copied
+        chown/chmod keeps the fixture tracking GRADING_PATHS by construction: add
+        a fifth sealed path, or change the seal's mode, and this fixture follows.
+        A hand-maintained copy would silently stop mirroring production while
+        test_seal_is_checked_across_every_grading_path_not_just_two_files kept
+        passing against the stale shape — the exact drift it exists to catch.
+        """
+        cid = subprocess.run(
+            ["docker", "run", "-d", "--rm", "debian:bookworm-slim", "sleep", "300"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        # The agent user, and content in every sealed path so the seal has
+        # something to cover. _seal_grading_assets creates the scoring identity
+        # and sets /workspace root-owned + 1777 itself.
+        subprocess.run(
+            ["docker", "exec", cid, "bash", "-c",
+             "useradd -m -s /bin/bash agent; "
+             "mkdir -p /workspace/.task /workspace/.verifiers /workspace/.eb_verify; "
+             'echo \'{"answer": "42"}\' > /workspace/.task/ground_truth.json; '
+             'echo \'grep -q EXPECTED_TOKEN\' > /workspace/.verifiers/check1.sh; '
+             'echo \'SECRET_PLUGIN_LOGIC\' > /workspace/.eb_verify/plugin.py; '
+             'echo \'#!/bin/bash\' > /workspace/test.sh'],
+            capture_output=True, check=True,
+        )
+        _seal_grading_assets(cid)
+        return cid
+
+    @staticmethod
+    def _mode(cid: str, path: str) -> str:
+        return subprocess.run(
+            ["docker", "exec", cid, "stat", "-c", "%a", path],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+
+    def test_umask_077_correct_answer_is_readable_after_the_open(self) -> None:
+        if not docker_available():
+            pytest.skip("docker daemon unavailable")
+
+        cid = self._build("077")
+        try:
+            # Control: reproduce the bug. The scorer is blind to a correct answer.
+            assert not self._scorer_sees_answer(cid), (
+                "umask 077 did not hide the answer from the scorer — the test "
+                "proves nothing if the control case is already readable"
+            )
+
+            rt._close_workspace_for_scoring(cid)
+            result = _open_agent_output_for_scoring(cid)
+            assert result is None, result
+
+            # Fixed: the scorer can now read the answer it must grade -> 1.0, not
+            # a false 0.0.
+            assert self._scorer_sees_answer(cid), (
+                "the scorer still cannot read a correct answer.json after the "
+                "open — the umask under-credit bug is not fixed"
+            )
+
+            # Forge invariant preserved: read+traverse was granted, never write.
+            # ebscorer is 'other' and must not be able to plant an answer.
+            planted = subprocess.run(
+                ["docker", "exec", "-u", SCORING_USER, cid, "bash", "-c",
+                 "echo forged > /workspace/agent_output/answer.json"],
+                capture_output=True, text=True,
+            )
+            assert planted.returncode != 0, (
+                "opening agent_output for READ also granted the scorer WRITE — "
+                "it can now forge the very answer it grades"
+            )
+
+            # The agent keeps full access to its own tree for a chain session.
+            rt._reopen_workspace_for_agent(cid)
+            back = subprocess.run(
+                ["docker", "exec", "-u", "agent", cid, "bash", "-c",
+                 'echo \'{"answer": "43"}\' > /workspace/agent_output/answer.json'],
+                capture_output=True, text=True,
+            )
+            assert back.returncode == 0, (
+                f"the open cost the agent write access to its own output: "
+                f"{back.stderr.strip()}"
+            )
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+    def test_umask_077_correct_answer_scores_on_a_real_task(self) -> None:
+        """The acceptance criterion, measured with the instrument that found it.
+
+        The sibling above proves the scorer can READ the answer after the open,
+        but it calls _open_agent_output_for_scoring directly: neuter the wiring in
+        _run_scoring and it stays green. This bug's whole class is an under-credit
+        nothing detects, and the bead's repro measured SCORES (umask 077 and 027
+        -> 0.0, umask 022 -> 1.0), so a real score off the real path is the proof
+        that is owed — a real calibration task's assets, a correct answer the
+        agent authored under umask 077, through _run_scoring end to end.
+        """
+        if not docker_available():
+            pytest.skip("docker daemon unavailable")
+        if not (REPO_ROOT / CALIBRATION_TASK / "ground_truth.json").exists():
+            pytest.skip("calibration task not present")
+
+        cid = _container_with_a_real_task(CALIBRATION_CORRECT_ANSWER, umask="077")
+        try:
+            # Anti-vacuity: the vector is live going in. 0600 is unreadable to
+            # 'other' whatever the directory's mode, and the scorer is 'other' —
+            # so a 1.0 below can only be the open's doing.
+            mode = self._mode(cid, ANSWER_ARTIFACT_PATH)
+            assert mode == "600", (
+                f"answer.json landed {mode}, not 600 — umask 077 never hid it from "
+                f"the scorer, so this proves nothing"
+            )
+
+            _seal_grading_assets(cid)
+            scores = _run_scoring(cid, verifier_timeout=120)
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+        assert scores["task_score"] == 1.0, (
+            f"a correct answer scored a false 0.0 because the agent's umask left it "
+            f"unreadable to the scorer — the under-credit this bead exists to end: "
+            f"{scores}"
+        )
+        assert "verifier_infra_error" not in scores, scores
+        assert "integrity_violation" not in scores, scores
+
+    def test_umask_022_baseline_still_readable(self) -> None:
+        # The default umask that already worked must keep working after the open.
+        if not docker_available():
+            pytest.skip("docker daemon unavailable")
+
+        cid = self._build("022")
+        try:
+            assert self._scorer_sees_answer(cid), (
+                "umask 022 answer.json was not readable even before the open — "
+                "the baseline the suite relies on is broken"
+            )
+            rt._close_workspace_for_scoring(cid)
+            result = _open_agent_output_for_scoring(cid)
+            assert result is None, result
+            assert self._scorer_sees_answer(cid)
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+    def test_symlinked_agent_output_does_not_widen_the_grading_seal(self) -> None:
+        # Attack: during its 1777 session the agent swaps its output dir for a
+        # symlink aimed at the sealed grading assets. A bare `chmod -R` follows a
+        # top-level symlink, so without the guard this root chmod would widen
+        # ground_truth.json to o=rX and leak the answer key into a chain session.
+        # The guard must reject the symlink -> integrity_violation (INVALID, never
+        # a re-run mulligan), seal untouched.
+        if not docker_available():
+            pytest.skip("docker daemon unavailable")
+
+        cid = self._seal_cid()
+        try:
+            # The agent owns the entry in the sticky dir, so it can unlink its own
+            # output dir and point the name at the sealed assets.
+            subprocess.run(
+                ["docker", "exec", "-u", "agent", cid, "bash", "-c",
+                 "ln -s /workspace/.task /workspace/agent_output"],
+                capture_output=True, check=True,
+            )
+
+            rt._close_workspace_for_scoring(cid)
+            result = _open_agent_output_for_scoring(cid)
+            violation = result.get("integrity_violation", {})
+            assert violation.get("reason") == "agent_output_tampered", (
+                f"symlinked agent_output was not routed to integrity_violation: "
+                f"{result!r}"
+            )
+            assert "symlink" in violation["detail"]
+            assert "verifier_infra_error" not in result, (
+                "grading-asset tampering was handed the re-run mulligan channel"
+            )
+
+            # The seal is intact: ground_truth.json never gained 'other' read.
+            mode = self._mode(cid, "/workspace/.task/ground_truth.json")
+            assert mode == "640", (
+                f"the grading seal was widened through the symlink: "
+                f"ground_truth.json is now {mode}, not 640 — the answer key "
+                "leaked to 'other'"
+            )
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+    def test_nested_symlinked_answer_json_does_not_leak_the_answer_key(self) -> None:
+        # The nested-symlink forge (review reject #1): agent_output is a real dir
+        # `chmod -R` will not follow, but answer.json inside it is a symlink aimed
+        # at the sealed ground_truth.json. The ~119 grep checks `cat answer.json`
+        # would read the answer key through it and score a false HIGH. The guard
+        # must reject the symlinked answer.json -> integrity_violation (INVALID,
+        # never scored), before any chmod, so those checks never run.
+        if not docker_available():
+            pytest.skip("docker daemon unavailable")
+
+        cid = self._seal_cid()
+        try:
+            subprocess.run(
+                ["docker", "exec", "-u", "agent", cid, "bash", "-c",
+                 "mkdir -p /workspace/agent_output; "
+                 "ln -s /workspace/.task/ground_truth.json "
+                 "/workspace/agent_output/answer.json"],
+                capture_output=True, check=True,
+            )
+
+            rt._close_workspace_for_scoring(cid)
+            result = _open_agent_output_for_scoring(cid)
+            violation = result.get("integrity_violation", {})
+            assert violation.get("reason") == "agent_output_tampered", (
+                f"symlinked answer.json was not routed to integrity_violation: "
+                f"{result!r}"
+            )
+            assert "answer.json" in violation["detail"] and "symlink" in violation[
+                "detail"
+            ]
+            assert "verifier_infra_error" not in result, (
+                "grading-asset tampering was handed the re-run mulligan channel"
+            )
+
+            # Rejected before any chmod ran, so nothing was widened: the seal on
+            # the answer key the symlink targets is intact (still 640, no 'other').
+            assert self._mode(cid, "/workspace/.task/ground_truth.json") == "640"
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+    def test_hardlinked_grading_asset_widened_by_chmod_is_caught(self) -> None:
+        # `chmod -R` follows a HARD LINK (unlike a symlink, it is the file), so a
+        # hard link inside agent_output pointing at test.sh would let the read
+        # grant widen the sealed inode to agent-readable. fs.protected_hardlinks
+        # normally stops the agent making the link, so we plant it as root to
+        # exercise the post-chmod seal re-verify directly: after the grant, if a
+        # grading asset is agent-readable, this open widened it -> tamper, never a
+        # scoreable run.
+        if not docker_available():
+            pytest.skip("docker daemon unavailable")
+
+        cid = self._seal_cid()
+        try:
+            subprocess.run(
+                ["docker", "exec", cid, "bash", "-c",
+                 "mkdir -p /workspace/agent_output && chown agent:agent "
+                 "/workspace/agent_output; "
+                 "ln /workspace/test.sh /workspace/agent_output/x"],
+                capture_output=True, check=True,
+            )
+            # Precondition: the agent cannot read the sealed test.sh before the open.
+            pre = subprocess.run(
+                ["docker", "exec", "-u", "agent", cid, "test", "-r",
+                 "/workspace/test.sh"],
+                capture_output=True,
+            )
+            assert pre.returncode != 0, (
+                "test.sh was agent-readable before the open — the seal precondition "
+                "the re-verify relies on is already broken"
+            )
+
+            rt._close_workspace_for_scoring(cid)
+            result = _open_agent_output_for_scoring(cid)
+            violation = result.get("integrity_violation", {})
+            assert violation.get("reason") == "agent_output_tampered", (
+                f"a hard link that widened a grading inode was not caught: "
+                f"{result!r}"
+            )
+            assert "hard link" in violation["detail"]
+            assert "verifier_infra_error" not in result, (
+                "grading-asset tampering was handed the re-run mulligan channel"
+            )
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
+
+    def test_hardlink_into_verifiers_or_eb_verify_is_caught_too(self) -> None:
+        """The re-verify covers the whole sealed set, not just the two files.
+
+        A check script embeds the literal token its checkpoint greps for, and an
+        eb_verify plugin is the grading logic itself; widening either to the agent
+        leaks answer-adjacent material just as ground_truth.json would. A re-verify
+        that iterated only (GROUND_TRUTH, TEST_SH) returned "proceed, nothing
+        wrong" here while the chmod had in fact widened both inodes.
+
+        Planted as root deliberately: a real agent cannot reach these at all
+        (0750 dirs -> `ln` fails EACCES before protected_hardlinks is consulted),
+        so this pins the check itself rather than the seal that currently keeps
+        the vector out of reach.
+        """
+        if not docker_available():
+            pytest.skip("docker daemon unavailable")
+
+        cid = self._seal_cid()
+        try:
+            subprocess.run(
+                ["docker", "exec", cid, "bash", "-c",
+                 "mkdir -p /workspace/agent_output && chown agent:agent "
+                 "/workspace/agent_output; "
+                 "ln /workspace/.verifiers/check1.sh /workspace/agent_output/x; "
+                 "ln /workspace/.eb_verify/plugin.py /workspace/agent_output/y"],
+                capture_output=True, check=True,
+            )
+            rt._close_workspace_for_scoring(cid)
+            result = _open_agent_output_for_scoring(cid)
+
+            violation = result.get("integrity_violation", {}) if result else {}
+            assert violation.get("reason") == "agent_output_tampered", (
+                "a hard link that widened .verifiers/.eb_verify was not caught: "
+                f"{result!r}"
+            )
+            assert "verifier_infra_error" not in result, (
+                "grading-asset tampering was handed the re-run mulligan channel"
+            )
+            # The specific widened paths are named, not just "something changed".
+            assert "/workspace/.verifiers/check1.sh" in violation["detail"]
+            assert "/workspace/.eb_verify/plugin.py" in violation["detail"]
+        finally:
+            subprocess.run(["docker", "rm", "-f", cid], capture_output=True)
