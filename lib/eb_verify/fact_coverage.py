@@ -23,11 +23,24 @@ game the score: bag-of-ngrams is word-order-blind, so a direction-reversed
 relation ("scheduler restarts the worker" vs "worker restarts the scheduler")
 scores similarity 1.000; a negated statement scores ~0.956; and a genuine
 paraphrase with divergent surface forms can miss at ~0.30 (below the 0.40
-operating threshold). Before this module scores anything agents are graded
-on, plug a real embedding model in via ``Embedder`` and re-run the
-calibration sweep in ``fact_coverage_calibration`` (ideally regrown from
-actual task GT facts); a directional/negation post-check on matched pairs is
-the cheap alternative mitigation.
+operating threshold). Swapping in a real sentence-transformer embedder does
+NOT close this gap either (see EnterpriseBench-8qya.1's calibration): both
+embedder families hit the identical best-F1 operating point on real GT-
+derived pairs and both fail the same order-reversed/negation cases.
+
+``fact_polarity_check.apply_polarity_check`` (a sibling module) implements
+the LLM-backed post-check mitigation: it re-verifies each recovered
+``coverage()``/``precision()`` match's direction and polarity via an LLM
+(``eb_verify.judge``'s backend), downgrading only confirmed disagreements.
+It is opt-in and does not change this module's behavior or its "no network,
+no persisted state" guarantee. The deployment boundary above is NOT lifted
+by its existence alone -- that still requires validating it closes the gap
+on a real adversarial hold-out (see EnterpriseBench-i02m) and, for any live
+task wiring, provisioning eb_verify's Python deps into the scoring sandbox
+(neither is done yet). Note ``plugins/fact_triples.py``'s own semantic
+fallback matcher does not consume ``coverage()``/``FactMatch`` at all (it
+matches via its own greedy assignment over a raw similarity matrix), so it
+is unaffected by and not automatically improved by this post-check.
 
 Mapping onto lib/eb_verify/scoring.py checkpoints
 -------------------------------------------------
