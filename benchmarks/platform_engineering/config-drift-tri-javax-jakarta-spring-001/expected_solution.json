@@ -1,0 +1,41 @@
+{
+  "task_id": "config-drift-tri-javax-jakarta-spring-001",
+  "checkpoints": {
+    "spring_jakarta": {
+      "expected_solution": "Spring Boot 3.0 (v3.0.0) made the jakarta.* migration mandatory across the framework. The embedded servlet container wiring is rewritten in spring-boot-project/spring-boot/src/main/java/org/springframework/boot/web/servlet/context/ServletWebServerApplicationContext.java, which imports jakarta.servlet.Filter, jakarta.servlet.Servlet, jakarta.servlet.ServletConfig, jakarta.servlet.ServletContext, and jakarta.servlet.ServletException instead of the javax.servlet.* equivalents. Boot 3 requires Java 17+ and the entire spring-framework 6.x family, which itself migrated to jakarta. Concretely, the migration touches: (a) auto-configuration classes under spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/web/ (servlet vs reactive auto-config now use jakarta types); (b) web.servlet packages such as ServletWebServerApplicationContext that wrap servlet API calls; (c) JPA auto-configuration which expects jakarta.persistence.* (provided by Hibernate 6) instead of javax.persistence.*. The Boot 3 release notes explicitly state that any application running on Boot 3 must update all `javax.*` imports to `jakarta.*` for the eight Java EE specs that were renamed (servlet, jms, persistence, validation, mail, xml, transaction, annotation).",
+      "evaluation_criteria": [
+        "Must identify spring-boot-project/spring-boot/src/main/java/org/springframework/boot/web/servlet/context/ServletWebServerApplicationContext.java (or ServletWebServerApplicationContext by name) as updated for jakarta",
+        "Must explain that Spring Boot 3.0 mandates jakarta.* imports throughout (servlet, persistence, validation, etc.)",
+        "Must mention spring-framework 6.x as the underlying jakarta-migrated dependency",
+        "Must list at least three of the renamed packages (e.g., jakarta.servlet, jakarta.persistence, jakarta.validation)"
+      ]
+    },
+    "hibernate_jakarta": {
+      "expected_solution": "Hibernate ORM 6.0 made the jakarta.persistence migration: every implementation of the JPA API was rewritten to depend on jakarta.persistence.* instead of javax.persistence.*. Hibernate's Configuration class in the hibernate-core module imports jakarta.persistence.spi.PersistenceUnitInfo, jakarta.persistence.PersistenceException, etc. Hibernate 6 dropped backwards compatibility for the javax namespace; running Hibernate 5.x with Boot 3 (which expects jakarta) is impossible — the SessionFactory and EntityManagerFactory contracts are typed against the wrong package and the JVM throws ClassNotFoundException at boot or LinkageError at first entity load. The hibernate-core jakarta artifacts (the only artifacts shipped under 6.x) are the matching Boot 3 dependency.",
+      "evaluation_criteria": [
+        "Must identify Hibernate ORM 6.0 as the version that completed the jakarta.persistence migration",
+        "Must reference Configuration / SessionFactory / EntityManagerFactory or other JPA-implementing types in hibernate-core",
+        "Must explain that Hibernate 6 dropped javax.persistence compatibility entirely (no dual-namespace artifact)",
+        "Must note that Hibernate 5.x cannot be used with Spring Boot 3 because of the namespace mismatch"
+      ]
+    },
+    "tomcat_jakarta": {
+      "expected_solution": "Apache Tomcat 10 (10.1.0) is the first Tomcat major to adopt the jakarta servlet namespace. The catalina core in java/org/apache/catalina/startup/Tomcat.java and the connector / coyote modules all import jakarta.servlet.* — Tomcat 10.0.x was the initial GA series following the rename, and 10.1.x lines up with Servlet 6.0 (Jakarta EE 10). Tomcat 9.x stays on javax.servlet for legacy users; Tomcat 10.x is the only line that pairs with Spring Boot 3 / Jakarta EE 10. Mixing javax-namespace WAR files with Tomcat 10 is unsupported — the container's class loader will not silently rewrite imports, and a request handler that uses javax.servlet.HttpServletRequest will throw NoClassDefFoundError because Tomcat 10 only exposes jakarta.servlet.HttpServletRequest.",
+      "evaluation_criteria": [
+        "Must identify Tomcat 10 (specifically 10.1.x at v10.1.0) as the first jakarta.servlet line",
+        "Must reference java/org/apache/catalina/startup/Tomcat.java or the catalina core as updated for jakarta",
+        "Must contrast Tomcat 10 (jakarta) with Tomcat 9 (javax) as the version split",
+        "Must explain that javax-namespace WARs cannot run on Tomcat 10 (NoClassDefFoundError on servlet types)"
+      ]
+    },
+    "drift_analysis": {
+      "expected_solution": "Cross-component drift scenarios that produce ClassNotFoundException / LinkageError at boot or first request. (1) Boot 3 + Hibernate 5.x: Spring Boot 3.0 expects jakarta.persistence (Hibernate 6); pulling Hibernate 5.x (still on javax.persistence) into the classpath leads to an EntityManagerFactory that does not satisfy Boot's auto-configured bean type — typical symptom is NoClassDefFoundError on jakarta/persistence/EntityManagerFactory or ClassCastException between javax and jakarta interfaces. (2) Boot 3 + Tomcat 9: Boot 3 ships Tomcat 10 by default; explicitly downgrading to Tomcat 9 (still javax.servlet) breaks because Boot's web auto-configuration registers jakarta.servlet types that Tomcat 9 cannot resolve. (3) Boot 3 + Hibernate 6 + Tomcat 9: same issue from the servlet side — JPA works but the embedded servlet container cannot start. (4) Boot 2.x + Hibernate 6: opposite problem — the older Boot expects javax.persistence but Hibernate 6 only ships jakarta artifacts. (5) Mixed third-party JARs: any library that internally imports javax.servlet (e.g., older Spring Security, Jackson modules with servlet integration) becomes a runtime trap when paired with Boot 3 + Tomcat 10, requiring a coordinated upgrade across all transitive deps. Resolution: align all three components to their jakarta lines (Boot 3 + Hibernate 6 + Tomcat 10) AND audit every transitive dependency for javax imports.",
+      "evaluation_criteria": [
+        "Must identify at least two concrete drift scenarios where the components disagree on the namespace (Boot 3 + Hibernate 5, Boot 3 + Tomcat 9, Boot 2 + Hibernate 6, etc.)",
+        "Must explain the failure mode (ClassNotFoundException, NoClassDefFoundError, LinkageError) when namespaces disagree",
+        "Must reference all three repos (spring-boot, hibernate-orm, tomcat) by name in the analysis",
+        "Must conclude with the alignment requirement: Boot 3 + Hibernate 6 + Tomcat 10 (jakarta) or stay on Boot 2 + Hibernate 5 + Tomcat 9 (javax)"
+      ]
+    }
+  }
+}
