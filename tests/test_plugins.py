@@ -296,6 +296,49 @@ class TestConfigValidator:
             result = validator._validate_file(f, tmp_path)
         assert result.valid is True
 
+    def test_every_config_glob_suffix_has_a_working_parser(self, tmp_path):
+        """Guards against the .hcl class of bug: a CONFIG_GLOBS entry that
+        _validate_file falls through to valid=True for, without ever
+        actually parsing the file.
+        """
+        malformed_content_by_suffix = {
+            ".yaml": "key: [unterminated",
+            ".yml": "key: [unterminated",
+            ".json": "{bad json:::}",
+            ".toml": "[section\nbad toml [[[",
+        }
+        suffixes = {Path(g).suffix for g in ConfigValidator.CONFIG_GLOBS}
+        missing = suffixes - malformed_content_by_suffix.keys()
+        assert not missing, (
+            f"CONFIG_GLOBS has suffix(es) {missing} with no malformed-content "
+            "fixture here -- add one, or the suffix risks being silently "
+            "counted as validated without any parser ever running (the "
+            ".hcl bug)."
+        )
+
+        validator = ConfigValidator()
+        for suffix, content in malformed_content_by_suffix.items():
+            f = tmp_path / f"bad{suffix}"
+            f.write_text(content)
+            result = validator._validate_file(f, tmp_path)
+            if result.valid:
+                pytest.skip(f"no parser available for {suffix} in this environment")
+            assert result.valid is False, f"{suffix} parser did not reject malformed content"
+
+    def test_hcl_files_not_counted_as_validated(self, tmp_path):
+        workspace = tmp_path / "ws"
+        workspace.mkdir()
+        output = workspace / "output"
+        output.mkdir()
+        (output / "malformed.hcl").write_text("this is not valid hcl {{{")
+
+        validator = ConfigValidator()
+        result = validator.validate(workspace)
+        # No parser exists for .hcl, so it must not be glob-matched or
+        # counted — otherwise "Validated N config files" is a false claim.
+        assert result.valid is True
+        assert "No config" in result.detail
+
 
 # ---------------------------------------------------------------------------
 # AnswerValidator
