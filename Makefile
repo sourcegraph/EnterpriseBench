@@ -59,6 +59,10 @@ verify-expected-solutions: ## Validate expected_solution.json files
 verify-unmerged: ## Fail if a closed bead's work branch never landed on main
 	$(PYTHON) scripts/infra/check_unmerged_closed_beads.py
 
+.PHONY: verify-leak
+verify-leak: ## Gate B: oracle-token leakage classification over the task corpus
+	$(PYTHON) scripts/validation/leak_classifier.py --corpus benchmarks/
+
 .PHONY: analyze
 analyze: ## Run the score analysis engine (always re-scans raw runs)
 	@mkdir -p $(dir $(ANALYSIS_JSON))

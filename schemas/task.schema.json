@@ -421,6 +421,53 @@
       "minItems": 1,
       "uniqueItems": true,
       "description": "Verification strategies used for this task's checkpoints (deterministic = exact match/script, llm_curator = LLM-judged, solve_verified = solve-then-compare, structural_match = structural/pattern validation)"
+    },
+    "qa": {
+      "type": "object",
+      "description": "QA-layer metadata: triage decisions for validator findings an author has reviewed and resolved.",
+      "properties": {
+        "waivers": {
+          "type": "array",
+          "description": "Reviewed QA findings deliberately accepted or waived for this task. Each waiver suppresses the matching finding (downgraded to info severity) and records why.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Finding code being waived (e.g. F2 for aux-file leakage)."
+              },
+              "token": {
+                "type": "string",
+                "description": "The specific oracle token / path the finding flagged. Matched verbatim against the finding."
+              },
+              "decision": {
+                "type": "string",
+                "enum": ["accept", "waive"],
+                "description": "accept = genuine but tolerated leak; waive = false positive for this task family."
+              },
+              "rationale": {
+                "type": "string",
+                "description": "Why this finding is accepted/waived for this task."
+              },
+              "approved_by": {
+                "type": "string",
+                "description": "Who approved the decision (person + decision ref)."
+              },
+              "bead": {
+                "type": "string",
+                "description": "Tracking bead under which the triage was performed."
+              },
+              "date": {
+                "type": "string",
+                "description": "ISO date the decision was recorded (YYYY-MM-DD)."
+              }
+            },
+            "required": ["code", "token", "decision", "rationale"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
     }
   }
 }
